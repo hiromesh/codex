@@ -1,10 +1,10 @@
-#[cfg(any(unix, windows))]
+#[cfg(unix)]
 use std::process::Stdio;
 use std::time::Duration;
 
 use pretty_assertions::assert_eq;
 use tempfile::TempDir;
-#[cfg(any(unix, windows))]
+#[cfg(unix)]
 use tokio::time::sleep;
 
 use codex_app_server_transport::REMOTE_CONTROL_DISABLED_ENV_VAR;
@@ -435,7 +435,7 @@ async fn stop_reaps_untracked_app_server_child() {
     assert!(!pid_file.exists());
 }
 
-#[cfg(any(unix, windows))]
+#[cfg(unix)]
 #[tokio::test]
 async fn shutdown_grace_child() {
     let Some(ready) = std::env::var_os("CODEX_TEST_SHUTDOWN_GRACE_READY") else {
@@ -462,7 +462,7 @@ async fn shutdown_grace_child() {
     .await;
 }
 
-#[cfg(any(unix, windows))]
+#[cfg(unix)]
 #[tokio::test]
 async fn shutdown_grace_handles_process_exit() {
     let temp = TempDir::new().expect("temp dir");

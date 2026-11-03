@@ -185,7 +185,7 @@ impl ExecExpiration {
         }
     }
 
-    #[cfg_attr(not(target_os = "windows"), allow(dead_code))]
+    #[allow(dead_code)]
     pub(crate) fn cancellation_token(&self) -> Option<CancellationToken> {
         match self {
             ExecExpiration::Timeout(_) | ExecExpiration::DefaultTimeout => None,

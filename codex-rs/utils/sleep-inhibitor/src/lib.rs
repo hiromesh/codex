@@ -3,18 +3,16 @@
 //! Platform-specific behavior:
 //! - macOS: Uses native IOKit power assertions instead of spawning `caffeinate`.
 //! - Linux: Spawns `systemd-inhibit` or `gnome-session-inhibit` while active.
-//! - Windows: Uses `PowerCreateRequest` + `PowerSetRequest` with
-//!   `PowerRequestSystemRequired`.
 //! - Other platforms: No-op backend.
 
-#[cfg(not(any(target_os = "linux", target_os = "macos", target_os = "windows")))]
+#[cfg(not(any(target_os = "linux", target_os = "macos")))]
 mod dummy;
 #[cfg(target_os = "linux")]
 mod linux_inhibitor;
 #[cfg(target_os = "macos")]
 mod macos;
 
-#[cfg(not(any(target_os = "linux", target_os = "macos", target_os = "windows")))]
+#[cfg(not(any(target_os = "linux", target_os = "macos")))]
 use dummy as imp;
 #[cfg(target_os = "linux")]
 use linux_inhibitor as imp;

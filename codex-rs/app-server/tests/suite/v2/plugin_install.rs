@@ -78,7 +78,7 @@ use wiremock::matchers::path;
 use wiremock::matchers::query_param;
 
 // Plugin install tests wait on connector discovery after the install response path
-// starts, which is noticeably slower on Windows CI.
+// starts, which is noticeably slower on CI.
 const DEFAULT_TIMEOUT: Duration = Duration::from_secs(60);
 const REMOTE_PLUGIN_ID: &str = "plugins~Plugin_00000000000000000000000000000000";
 const INSTALL_ATTEMPT_ID: &str = "94c79f7b-cceb-4415-9a3e-b51b2f718d43";

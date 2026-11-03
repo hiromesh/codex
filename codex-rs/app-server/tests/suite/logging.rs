@@ -35,7 +35,6 @@ use codex_state::StateRuntime;
 use core_test_support::load_default_config_for_test;
 use core_test_support::responses;
 use core_test_support::skip_if_no_network;
-use core_test_support::skip_if_wine_exec;
 use pretty_assertions::assert_eq;
 use serde_json::Value;
 use serde_json::json;
@@ -59,10 +58,6 @@ const READ_TIMEOUT: Duration = Duration::from_secs(10);
 
 #[tokio::test]
 async fn submission_metadata_reaches_persisted_and_feedback_logs() -> Result<()> {
-    skip_if_wine_exec!(
-        Ok(()),
-        "command approval routing requires a host-native cwd under Wine-exec"
-    );
     skip_if_no_network!(Ok(()));
 
     let server = create_mock_responses_server_sequence(vec![

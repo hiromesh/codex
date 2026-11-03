@@ -360,7 +360,7 @@ async fn cached_legacy_resume_revalidates_history_across_migration_settings() ->
         let local_settings = crate::local_settings::LocalSettings::from(&resume_config);
         let next_request_id = app_server.next_request_id;
         let legacy = {
-            // Keep the large resume future off the Windows test thread's stack.
+            // Keep the large resume future off the test thread's stack.
             let mut resume = Box::pin(app_server.resume_thread(
                 &local_settings,
                 resume_config.clone(),

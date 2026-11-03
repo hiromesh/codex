@@ -97,7 +97,7 @@ impl Drop for ChildProcessCleanupGuard {
             let _ = codex_utils_pty::process_group::kill_process_group(self.0);
         }
 
-        #[cfg(not(any(unix, windows)))]
+        #[cfg(not(unix))]
         {
             let _ = self.0;
         }

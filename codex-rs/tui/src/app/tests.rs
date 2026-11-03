@@ -6395,10 +6395,6 @@ async fn render_clear_ui_header_after_long_transcript_for_snapshot() -> String {
 }
 
 #[tokio::test]
-#[cfg_attr(
-    target_os = "windows",
-    ignore = "snapshot path rendering differs on Windows"
-)]
 async fn clear_ui_after_long_transcript_snapshots_fresh_header_only() {
     let rendered = render_clear_ui_header_after_long_transcript_for_snapshot().await;
     assert_app_snapshot!("clear_ui_after_long_transcript_fresh_header_only", rendered);
@@ -8407,17 +8403,13 @@ async fn in_app_resume_session_cwd_without_metadata_is_non_fatal() -> Result<()>
 
 #[tokio::test]
 async fn remote_resume_keeps_server_only_cwd_out_of_local_config() -> Result<()> {
-    // Keep the large setup and resume futures off the Windows test stack.
+    // Keep the large setup and resume futures off the test stack.
     let (mut app, _app_event_rx, _op_rx) = Box::pin(make_test_app_with_channels()).await;
     let local_cwd = app.config.cwd.to_path_buf();
     let local_workspace_roots = Box::pin(app.rebuild_config_for_cwd(local_cwd.clone()))
         .await?
         .workspace_roots;
-    let remote_cwd = if false {
-        PathBuf::from("/srv/remote/project")
-    } else {
-        PathBuf::from(r"C:\remote\project")
-    };
+    let remote_cwd = PathBuf::from("/srv/remote/project");
     let filename_timestamp = "2025-01-05T12-00-00";
     let thread_id = app_test_support::create_fake_rollout(
         app.config.codex_home.as_path(),

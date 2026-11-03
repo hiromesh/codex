@@ -1330,7 +1330,7 @@ impl NetworkProxy {
             return Ok(NetworkProxyHandle::noop());
         }
 
-        if !cfg!(target_os = "windows") && !unix_socket_permissions_supported() {
+        if !unix_socket_permissions_supported() {
             warn!(
                 "allowUnixSockets and dangerouslyAllowAllUnixSockets are macOS-only; requests will be rejected on this platform"
             );
@@ -1521,8 +1521,6 @@ mod tests {
                 runtime: Some(ProxyRuntime::Listeners(listeners)),
                 proxy: None,
                 environment_proxies: Some(Arc::new(Mutex::new(HashMap::new()))),
-                #[cfg(target_os = "windows")]
-                windows_active_route: None,
             };
 
             let error = tokio::time::timeout(std::time::Duration::from_secs(1), handle.wait())
@@ -1713,90 +1711,6 @@ mod tests {
 
         assert!(proxy.http_addr.ip().is_loopback());
         assert!(proxy.socks_addr.ip().is_loopback());
-        #[cfg(target_os = "windows")]
-        {
-            assert_eq!(proxy.http_addr, http_addr);
-            assert_eq!(proxy.socks_addr, socks_addr);
-            assert_eq!(proxy.network_proxy_restricting_sid(None), None);
-            let (result, events) =
-                crate::network_policy::test_support::capture_events(|| async { proxy.run().await })
-                    .await;
-            let handle = result.expect("start stable ingress route");
-            assert!(!events.iter().any(|event| {
-                event
-                    .field("message")
-                    .is_some_and(|message| message.contains("allowUnixSockets"))
-            }));
-            let second_state = Arc::new(network_proxy_state_for_policy(NetworkProxyConfig {
-                enabled: true,
-                proxy_url: format!("http://{http_addr}"),
-                socks_url: format!("http://{socks_addr}"),
-                ..NetworkProxyConfig::default()
-            }));
-            let second = NetworkProxy::builder()
-                .state(second_state)
-                .build()
-                .await
-                .expect("second proxy should share the stable ingress");
-            let second_handle = second
-                .run()
-                .await
-                .expect("start second stable ingress route");
-            assert_eq!(second.http_addr, proxy.http_addr);
-            assert_eq!(second.socks_addr, proxy.socks_addr);
-            assert_ne!(
-                second.network_proxy_restricting_sid(None),
-                proxy.network_proxy_restricting_sid(None)
-            );
-            let differently_configured =
-                Arc::new(network_proxy_state_for_policy(NetworkProxyConfig {
-                    enabled: true,
-                    proxy_url: "http://127.0.0.1:1".to_string(),
-                    socks_url: "http://127.0.0.1:2".to_string(),
-                    allow_local_binding: Some(true),
-                    ..NetworkProxyConfig::default()
-                }));
-            let third = NetworkProxy::builder()
-                .state(differently_configured)
-                .build()
-                .await
-                .expect("different route config should share the stable ingress");
-            let third_handle = third
-                .run()
-                .await
-                .expect("start differently configured stable route");
-            assert_eq!(third.http_addr, proxy.http_addr);
-            assert_eq!(third.socks_addr, proxy.socks_addr);
-            assert!(third.allow_local_binding());
-            let replacement = crate::state::build_config_state(
-                NetworkProxyConfig {
-                    enabled: true,
-                    proxy_url: format!("http://{http_addr}"),
-                    socks_url: format!("http://{socks_addr}"),
-                    allow_local_binding: Some(true),
-                    ..NetworkProxyConfig::default()
-                },
-                Default::default(),
-                crate::Platform::native(),
-            )
-            .expect("replacement config state");
-            proxy
-                .replace_config_state(replacement)
-                .await
-                .expect("live route should accept a local-binding policy change");
-            assert!(proxy.allow_local_binding());
-            third_handle
-                .shutdown()
-                .await
-                .expect("stop differently configured stable route");
-            second_handle
-                .shutdown()
-                .await
-                .expect("stop second stable ingress route");
-            handle.shutdown().await.expect("stop stable ingress route");
-            assert_ne!(proxy.http_addr.port(), 0);
-            assert_ne!(proxy.socks_addr.port(), 0);
-        }
     }
 
     #[tokio::test]
@@ -2203,132 +2117,6 @@ mod tests {
         assert!(proxy.http_addr.ip().is_loopback());
         assert_ne!(proxy.http_addr.port(), 0);
         assert_eq!(proxy.socks_addr, socks_addr);
-        #[cfg(target_os = "windows")]
-        {
-            assert_eq!(proxy.http_addr, http_addr);
-            assert!(proxy.reserved_listeners.is_none());
-            assert!(proxy.windows_runtime.is_some());
-            assert_eq!(proxy.network_proxy_restricting_sid(None), None);
-            let handle = proxy.run().await.expect("start HTTP-only stable route");
-            assert!(proxy.network_proxy_restricting_sid(None).is_some());
-            let prepared_before_upgrade = proxy
-                .prepare_for_optional_environment(
-                    HashMap::from([(
-                        WINDOWS_SANDBOX_PROXY_PORTS_ENV_KEY.to_string(),
-                        "1,2".to_string(),
-                    )]),
-                    None,
-                )
-                .expect("prepare stable Windows proxy");
-            assert_eq!(
-                prepared_before_upgrade.sandbox_context.loopback_ports,
-                vec![proxy.http_addr.port()]
-            );
-            assert_eq!(
-                prepared_before_upgrade
-                    .env
-                    .get(WINDOWS_SANDBOX_PROXY_PORTS_ENV_KEY),
-                Some(&proxy.http_addr.port().to_string())
-            );
-            assert_eq!(
-                prepared_before_upgrade.env.get("ALL_PROXY"),
-                Some(&format!("http://{}", proxy.http_addr))
-            );
-            let environment_id = "cached-before-socks-upgrade";
-            let environment_before_upgrade = proxy
-                .prepare_for_optional_environment(HashMap::new(), Some(environment_id))
-                .expect("prepare cached HTTP-only environment");
-            assert_eq!(
-                environment_before_upgrade.sandbox_context.loopback_ports,
-                vec![proxy.http_addr.port()]
-            );
-
-            let requested_socks =
-                StdTcpListener::bind(SocketAddr::from(([127, 0, 0, 1], 0))).unwrap();
-            let requested_socks_addr = requested_socks.local_addr().unwrap();
-            assert_ne!(requested_socks_addr, socks_addr);
-            let socks_state = Arc::new(network_proxy_state_for_policy(NetworkProxyConfig {
-                enabled: true,
-                enable_socks5: true,
-                proxy_url: format!("http://{http_addr}"),
-                socks_url: format!("socks5://{requested_socks_addr}"),
-                ..NetworkProxyConfig::default()
-            }));
-            let socks_proxy = NetworkProxy::builder()
-                .state(socks_state)
-                .build()
-                .await
-                .expect("upgrade stable ingress to SOCKS5");
-            let actual_socks_addr = socks_proxy.socks_addr();
-            assert_eq!(socks_proxy.http_addr(), proxy.http_addr());
-            assert!(actual_socks_addr.ip().is_loopback());
-            assert_ne!(actual_socks_addr, requested_socks_addr);
-            assert!(WINDOWS_MANAGED_SOCKS_PROXY_PORTS.contains(&actual_socks_addr.port()));
-            assert_eq!(proxy.socks_addr(), actual_socks_addr);
-            let socks_handle = socks_proxy
-                .run()
-                .await
-                .expect("start SOCKS-enabled stable route");
-
-            let mut expected_ports = vec![proxy.http_addr.port(), actual_socks_addr.port()];
-            expected_ports.sort_unstable();
-            let prepared_after_upgrade = proxy
-                .prepare_for_optional_environment(HashMap::new(), None)
-                .expect("re-prepare HTTP-only route after SOCKS5 upgrade");
-            let environment_after_upgrade = proxy
-                .prepare_for_optional_environment(HashMap::new(), Some(environment_id))
-                .expect("re-prepare cached environment after SOCKS5 upgrade");
-            for prepared in [&prepared_after_upgrade, &environment_after_upgrade] {
-                assert_eq!(prepared.sandbox_context.loopback_ports, expected_ports);
-                assert_eq!(
-                    prepared.env.get(WINDOWS_SANDBOX_PROXY_PORTS_ENV_KEY),
-                    Some(
-                        &expected_ports
-                            .iter()
-                            .map(u16::to_string)
-                            .collect::<Vec<_>>()
-                            .join(",")
-                    )
-                );
-                assert_eq!(
-                    prepared.env.get("ALL_PROXY"),
-                    Some(&format!("http://{}", proxy.http_addr))
-                );
-            }
-            let socks_prepared = socks_proxy
-                .prepare_for_optional_environment(HashMap::new(), None)
-                .expect("prepare SOCKS-enabled route");
-            assert_eq!(
-                socks_prepared.sandbox_context.loopback_ports,
-                expected_ports
-            );
-            assert_eq!(
-                socks_prepared.env.get("ALL_PROXY"),
-                Some(&format!("socks5h://{actual_socks_addr}"))
-            );
-            let remote = proxy
-                .prepare_for_remote_environment(
-                    HashMap::from([(
-                        WINDOWS_SANDBOX_PROXY_PORTS_ENV_KEY.to_string(),
-                        "1,2".to_string(),
-                    )]),
-                    "remote",
-                )
-                .expect("prepare HTTP-only trusted bridge proxy");
-            assert_eq!(remote.sandbox_context.loopback_ports.len(), 1);
-            assert_eq!(remote.env.get(WINDOWS_SANDBOX_PROXY_PORTS_ENV_KEY), None);
-            assert_eq!(proxy.network_proxy_restricting_sid(Some("remote")), None);
-            socks_handle
-                .shutdown()
-                .await
-                .expect("stop SOCKS-enabled stable route");
-            handle
-                .shutdown()
-                .await
-                .expect("stop HTTP-only stable route");
-            assert_eq!(proxy.network_proxy_restricting_sid(None), None);
-        }
-        #[cfg(not(target_os = "windows"))]
         assert!(
             proxy
                 .reserved_listeners
@@ -2339,90 +2127,6 @@ mod tests {
         );
         drop(proxy);
         drop(occupied_socks);
-    }
-
-    #[cfg(target_os = "windows")]
-    #[test]
-    fn windows_managed_loopback_addr_clamps_non_loopback_inputs() {
-        assert_eq!(
-            windows_managed_loopback_addr("0.0.0.0:3128".parse::<SocketAddr>().unwrap()),
-            "127.0.0.1:3128".parse::<SocketAddr>().unwrap()
-        );
-        assert_eq!(
-            windows_managed_loopback_addr("[::]:8081".parse::<SocketAddr>().unwrap()),
-            "127.0.0.1:8081".parse::<SocketAddr>().unwrap()
-        );
-    }
-
-    #[cfg(target_os = "windows")]
-    #[test]
-    fn reserve_windows_managed_listeners_falls_back_when_http_port_is_busy() {
-        let occupied = StdTcpListener::bind(SocketAddr::from(([127, 0, 0, 1], 0))).unwrap();
-        let busy_port = occupied.local_addr().unwrap().port();
-
-        let reserved = reserve_windows_managed_listeners(
-            SocketAddr::from(([127, 0, 0, 1], busy_port)),
-            SocketAddr::from(([127, 0, 0, 1], 48081)),
-            /*reserve_socks_listener*/ false,
-        )
-        .unwrap();
-
-        assert!(reserved.socks_listener.is_none());
-        assert!(
-            reserved
-                .http_listener
-                .local_addr()
-                .unwrap()
-                .ip()
-                .is_loopback()
-        );
-        let fallback_port = reserved.http_listener.local_addr().unwrap().port();
-        assert_ne!(fallback_port, busy_port);
-        assert!(WINDOWS_MANAGED_HTTP_PROXY_PORTS.contains(&fallback_port));
-    }
-
-    #[cfg(target_os = "windows")]
-    #[test]
-    fn reserve_windows_managed_listeners_preserves_http_when_socks_port_is_busy() {
-        let http_listener = StdTcpListener::bind(SocketAddr::from(([127, 0, 0, 1], 0))).unwrap();
-        let http_addr = http_listener.local_addr().unwrap();
-        drop(http_listener);
-        let occupied_socks = StdTcpListener::bind(SocketAddr::from(([127, 0, 0, 1], 0))).unwrap();
-
-        let reserved = reserve_windows_managed_listeners(
-            http_addr,
-            occupied_socks.local_addr().unwrap(),
-            /*reserve_socks_listener*/ true,
-        )
-        .unwrap();
-
-        assert_eq!(reserved.http_listener.local_addr().unwrap(), http_addr);
-        assert!(
-            WINDOWS_MANAGED_SOCKS_PROXY_PORTS.contains(
-                &reserved
-                    .socks_listener
-                    .unwrap()
-                    .local_addr()
-                    .unwrap()
-                    .port()
-            )
-        );
-    }
-
-    #[cfg(target_os = "windows")]
-    #[test]
-    fn reserve_windows_managed_listener_uses_ephemeral_port_when_preferred_ports_are_busy() {
-        let occupied = StdTcpListener::bind(SocketAddr::from(([127, 0, 0, 1], 0))).unwrap();
-        let occupied_addr = occupied.local_addr().unwrap();
-        let occupied_port = occupied_addr.port();
-
-        let listener =
-            reserve_windows_managed_listener(occupied_addr, occupied_port..=occupied_port, "HTTP")
-                .unwrap();
-
-        let fallback_addr = listener.local_addr().unwrap();
-        assert!(fallback_addr.ip().is_loopback());
-        assert_ne!(fallback_addr.port(), occupied_port);
     }
 
     #[test]

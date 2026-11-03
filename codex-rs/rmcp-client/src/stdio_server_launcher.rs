@@ -408,7 +408,7 @@ fn kill_process_group_and_warn(pid: u32) -> io::Result<()> {
         .inspect_err(|error| warn!("Failed to kill MCP process group {pid}: {error}"))
 }
 
-#[cfg(not(any(unix, windows)))]
+#[cfg(not(unix))]
 struct LocalProcessTerminator;
 
 pub(crate) struct StdioServerProcessHandle {
@@ -500,7 +500,7 @@ impl LocalStdioServerLauncher {
             });
             (transport, terminator)
         };
-        #[cfg(not(any(unix, windows)))]
+        #[cfg(not(unix))]
         let terminator = process_id.map(|_| LocalProcessTerminator);
         let stderr_reader = stderr.map(|stderr| {
             let program_name = program_name.clone();
@@ -642,12 +642,12 @@ impl LocalProcessTerminator {
         }
     }
 
-    #[cfg(not(any(unix, windows)))]
+    #[cfg(not(unix))]
     fn terminate_discovery(&self, _reason: StdioTermination) -> io::Result<()> {
         Err(io::Error::other("MCP stdio restart is unsupported"))
     }
 
-    #[cfg(not(any(unix, windows)))]
+    #[cfg(not(unix))]
     fn terminate(&self) {}
 }
 

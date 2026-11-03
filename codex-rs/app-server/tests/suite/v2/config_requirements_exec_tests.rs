@@ -18,7 +18,6 @@ use codex_app_server_protocol::TurnStatus;
 use codex_app_server_protocol::UserInput;
 use core_test_support::responses;
 use core_test_support::skip_if_no_network;
-use core_test_support::skip_if_wine_exec;
 use pretty_assertions::assert_eq;
 use serde_json::json;
 use std::time::Duration;
@@ -28,10 +27,6 @@ use tokio::time::timeout;
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn managed_unified_exec_disabled_preserves_approved_command_execution() -> Result<()> {
     skip_if_no_network!(Ok(()));
-    skip_if_wine_exec!(
-        Ok(()),
-        "non-TTY PowerShell execution and command approval routing are unsupported under Wine"
-    );
 
     let read_timeout = Duration::from_secs(/*secs*/ 60);
     let server = responses::start_mock_server().await;

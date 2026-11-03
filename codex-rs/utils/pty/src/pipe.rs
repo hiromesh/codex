@@ -44,11 +44,6 @@ impl ChildTerminator for PipeChildTerminator {
                 {
                     crate::process_group::interrupt_process_group(self.process_group_id)
                 }
-
-                #[cfg(not(unix))]
-                {
-                    Err(crate::process::unsupported_signal(signal))
-                }
             }
         }
     }
@@ -57,11 +52,6 @@ impl ChildTerminator for PipeChildTerminator {
         #[cfg(unix)]
         {
             crate::process_group::kill_process_group(self.process_group_id)
-        }
-
-        #[cfg(not(unix))]
-        {
-            Ok(())
         }
     }
 }
@@ -103,9 +93,6 @@ async fn spawn_process_with_stdin_mode(
         anyhow::bail!("missing program for pipe spawn");
     }
 
-    #[cfg(not(unix))]
-    let _ = inherited_fds;
-
     let mut command = Command::new(program);
     #[cfg(unix)]
     if let Some(arg0) = arg0 {
@@ -118,8 +105,6 @@ async fn spawn_process_with_stdin_mode(
         .inherit_fds(inherited_fds);
     #[cfg(target_os = "linux")]
     command.terminate_on_parent_death();
-    #[cfg(not(unix))]
-    let _ = arg0;
     command
         .current_dir(cwd)
         .envs(env)

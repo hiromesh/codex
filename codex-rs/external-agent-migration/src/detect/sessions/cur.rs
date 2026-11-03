@@ -202,7 +202,7 @@ fn decode_cur_project_path(encoded: &str) -> Option<PathBuf> {
     matched_path
 }
 
-#[cfg(any(windows, test))]
+#[cfg(test)]
 fn decode_cur_windows_project_drive(encoded: &str) -> Option<(char, &str)> {
     let drive = encoded.as_bytes().first().copied()?;
     if !drive.is_ascii_alphabetic() || encoded.as_bytes().get(1) != Some(&b'-') {

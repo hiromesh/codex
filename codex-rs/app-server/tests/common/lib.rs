@@ -28,7 +28,6 @@ pub use core_test_support::format_with_current_shell_display;
 pub use core_test_support::format_with_current_shell_display_non_login;
 pub use core_test_support::format_with_current_shell_non_login;
 pub use core_test_support::test_absolute_path;
-pub use core_test_support::test_path_buf_with_windows;
 pub use core_test_support::test_tmp_path;
 pub use core_test_support::test_tmp_path_buf;
 pub use json_logging::app_server_json_shutdown_event;

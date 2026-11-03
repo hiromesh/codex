@@ -40,11 +40,11 @@ use wiremock::matchers::header;
 use wiremock::matchers::method;
 use wiremock::matchers::path;
 
-// macOS and Windows Bazel CI can spend tens of seconds starting app-server
+// macOS Bazel CI can spend tens of seconds starting app-server
 // subprocesses or processing test RPCs under load.
-#[cfg(any(target_os = "macos", windows))]
+#[cfg(target_os = "macos")]
 const DEFAULT_READ_TIMEOUT: Duration = Duration::from_secs(60);
-#[cfg(not(any(target_os = "macos", windows)))]
+#[cfg(not(any(target_os = "macos")))]
 const DEFAULT_READ_TIMEOUT: Duration = Duration::from_secs(10);
 const COMMIT_ATTRIBUTION: &str = "Co-authored-by: Codex <noreply@openai.com>";
 const PR_ATTRIBUTION: &str = "Generated with [Codex](https://openai.com/codex/).";

@@ -136,14 +136,14 @@ pub fn default_bg() -> Option<(u8, u8, u8)> {
     default_colors().map(|c| c.bg)
 }
 
-#[cfg(any(unix, windows))]
+#[cfg(unix)]
 pub(crate) fn set_default_colors_from_startup_probe(
     colors: Option<crate::terminal_probe::DefaultColors>,
 ) {
     imp::set_default_colors_from_startup_probe(colors);
 }
 
-#[cfg(any(all(unix, not(test)), windows))]
+#[cfg(all(unix, not(test)))]
 mod imp {
     use super::DefaultColors;
     use std::sync::Mutex;
@@ -212,7 +212,7 @@ mod imp {
     }
 }
 
-#[cfg(not(any(all(unix, not(test)), windows)))]
+#[cfg(not(any(all(unix, not(test)))))]
 mod imp {
     use super::DefaultColors;
 
@@ -220,7 +220,7 @@ mod imp {
         None
     }
 
-    #[cfg(any(unix, windows))]
+    #[cfg(unix)]
     pub(super) fn set_default_colors_from_startup_probe(
         _colors: Option<crate::terminal_probe::DefaultColors>,
     ) {

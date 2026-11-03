@@ -49,7 +49,7 @@ pub(super) fn resolve(config: &TuiKeymap, chords: &mut RuntimeChordKeymap) -> Re
             return Err(format!(
                 "Invalid `tui.keymap.global.leader` = `{label}`: use ctrl, alt, super, or a \
 non-character key so ordinary text input is not intercepted. Ctrl-alt characters may be AltGr \
-input on Windows."
+input."
             ));
         }
         #[cfg(unix)]

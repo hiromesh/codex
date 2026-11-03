@@ -110,8 +110,8 @@ async fn test_config() -> Config {
 }
 
 fn test_cwd() -> PathBuf {
-    // These tests only need a stable absolute cwd; using temp_dir() avoids baking Unix- or
-    // Windows-specific root semantics into the fixtures.
+    // These tests only need a stable absolute cwd; using temp_dir() avoids baking
+    // platform-specific root semantics into the fixtures.
     std::env::temp_dir()
 }
 
@@ -751,10 +751,6 @@ async fn session_info_uses_availability_nux_tooltip_override() {
 }
 
 #[tokio::test]
-#[cfg_attr(
-    target_os = "windows",
-    ignore = "snapshot path rendering differs on Windows"
-)]
 async fn session_info_availability_nux_tooltip_snapshot() {
     let mut config = test_config().await;
     config.cwd = test_path_buf("/tmp/project").abs();
@@ -1386,15 +1382,6 @@ fn standalone_unix_update_available_history_cell_snapshot() {
 }
 
 #[test]
-fn standalone_windows_update_available_history_cell_snapshot() {
-    let cell =
-        UpdateAvailableHistoryCell::new("9.9.9".to_string(), Some(UpdateAction::StandaloneWindows));
-    let rendered = render_lines(&cell.display_lines(/*width*/ 110)).join("\n");
-
-    insta::assert_snapshot!(rendered);
-}
-
-#[test]
 fn pnpm_update_available_history_cell_snapshot() {
     let cell =
         UpdateAvailableHistoryCell::new("9.9.9".to_string(), Some(UpdateAction::PnpmGlobalLatest));
@@ -1866,10 +1853,6 @@ fn session_header_clamps_to_narrow_width() {
 }
 
 #[test]
-#[cfg_attr(
-    target_os = "windows",
-    ignore = "snapshot path rendering differs on Windows"
-)]
 fn session_header_indicates_yolo_mode() {
     let cell = SessionHeaderHistoryCell::new(
         "gpt-5".to_string(),

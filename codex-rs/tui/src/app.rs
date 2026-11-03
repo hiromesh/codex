@@ -198,7 +198,7 @@ mod agent_message_consolidation;
 mod agent_navigation;
 mod agent_picker;
 mod agent_status_feed;
-#[cfg(any(unix, windows))]
+#[cfg(unix)]
 mod agents_overview;
 mod agents_overview_actions;
 mod agents_overview_details;

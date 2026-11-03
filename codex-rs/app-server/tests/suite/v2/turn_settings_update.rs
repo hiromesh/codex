@@ -27,7 +27,6 @@ use codex_protocol::config_types::ReasoningSummary;
 use codex_protocol::openai_models::ModelsResponse;
 use codex_protocol::openai_models::ReasoningEffort;
 use core_test_support::responses;
-use core_test_support::skip_if_wine_exec;
 use pretty_assertions::assert_eq;
 use serde_json::Value;
 use serde_json::json;
@@ -429,7 +428,6 @@ async fn live_reviewer_updates_route_approvals_without_changing_future_turns(
     initial: ApprovalsReviewer,
     updated: ApprovalsReviewer,
 ) -> Result<()> {
-    skip_if_wine_exec!(Ok(()), "command approval requires host-native paths");
 
     let server = responses::start_mock_server().await;
     let mut replies = vec![responses::sse(vec![

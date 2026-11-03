@@ -108,7 +108,7 @@ fn read_config(path: &Path) -> anyhow::Result<DocumentMut> {
     }
 }
 
-#[cfg(any(target_os = "macos", windows))]
+#[cfg(target_os = "macos")]
 async fn detect() -> bool {
     let (tx, rx) = tokio::sync::oneshot::channel();
     // Native calls cannot be cancelled. A detached thread bounds startup and avoids waiting
@@ -162,7 +162,7 @@ async fn detect() -> bool {
     }
 }
 
-#[cfg(not(any(target_os = "macos", target_os = "linux", windows)))]
+#[cfg(not(any(target_os = "macos", target_os = "linux")))]
 async fn detect() -> bool {
     false
 }

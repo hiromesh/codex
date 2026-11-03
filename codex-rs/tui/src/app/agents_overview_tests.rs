@@ -2005,7 +2005,7 @@ async fn overview_cold_resume_honors_working_directory_selection() -> Result<()>
         ("session", true, true),
         ("session", false, false),
     ] {
-        // Keep the large setup and cold-resume futures off the Windows test stack.
+        // Keep the large setup and cold-resume futures off the test stack.
         let mut app = Box::pin(make_test_app()).await;
         trust_fixture_folders(&mut app);
         let chosen = app.config.codex_home.join("chosen");

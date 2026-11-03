@@ -78,7 +78,6 @@ const SUPPORTED_EXPERIMENTAL_FEATURE_ENABLEMENT: &[&str] = &[
     "remote_control",
     "remote_plugin",
     "tool_suggest",
-    "windows_sandbox_service",
 ];
 
 #[derive(Clone)]

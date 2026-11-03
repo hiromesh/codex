@@ -16,7 +16,7 @@ use codex_network_proxy::NetworkUnixSocketPermissions;
 use codex_network_proxy::PROXY_ATTRIBUTION_TOKEN_ENV_KEY;
 use codex_network_proxy::RemoteNetworkProxyConfig;
 use codex_network_proxy::RemoteNetworkProxyLaunchConfig;
-#[cfg(any(unix, windows))]
+#[cfg(unix)]
 use codex_protocol::models::PermissionProfile;
 #[cfg(target_os = "linux")]
 use codex_sandboxing::landlock::CODEX_LINUX_SANDBOX_ARG0;
@@ -36,7 +36,7 @@ use super::prepare_exec_request_with_telemetry;
 use crate::CODEX_ARG0_EXEC_HELPER_ARG1;
 use crate::ExecParams;
 use crate::ExecServerRuntimeOptions;
-#[cfg(any(unix, windows))]
+#[cfg(unix)]
 use crate::FileSystemSandboxContext;
 use crate::ProcessId;
 use crate::process_telemetry::ProcessTelemetry;

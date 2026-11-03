@@ -34,7 +34,6 @@ use codex_protocol::request_permissions::RequestPermissionsResponse;
 use codex_utils_path_uri::LegacyAppPathString;
 use codex_utils_path_uri::PathUri;
 use core_test_support::responses;
-use core_test_support::skip_if_wine_exec;
 use pretty_assertions::assert_eq;
 use serde_json::json;
 use test_case::test_case;

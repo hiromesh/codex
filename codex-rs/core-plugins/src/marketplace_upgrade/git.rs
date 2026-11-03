@@ -162,7 +162,7 @@ fn git_path_arg(path: &Path) -> PathBuf {
     path.to_path_buf()
 }
 
-#[cfg(any(windows, test))]
+#[cfg(test)]
 fn strip_windows_verbatim_path_prefix(path: &str) -> Option<String> {
     let stripped = path.strip_prefix(r"\\?\")?;
     let stripped = stripped

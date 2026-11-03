@@ -100,11 +100,7 @@ MCP_TEST_PID_FILE = {}
         )
         .await;
         wait_for_path_exists(&pid_file, Duration::from_secs(/*secs*/ 10)).await?;
-        #[cfg(unix)]
         let pid = wait_for_pid_file(&pid_file).await?;
-        #[cfg(not(unix))]
-        wait_for_pid_file(&pid_file).await?;
-        #[cfg(unix)]
         anyhow::ensure!(
             core_test_support::process::process_is_alive(&pid)?,
             "MCP process should be running before releasing startup"

@@ -62,7 +62,7 @@ where
 }
 
 pub fn normalize_for_native_workdir(path: impl AsRef<Path>) -> PathBuf {
-    normalize_for_native_workdir_with_flag(path.as_ref().to_path_buf(), false)
+    path.as_ref().to_path_buf()
 }
 
 pub struct SymlinkWritePaths {
@@ -167,14 +167,6 @@ pub fn write_atomically(write_path: &Path, contents: &str) -> io::Result<()> {
 
 fn normalize_for_wsl(path: PathBuf) -> PathBuf {
     normalize_for_wsl_with_flag(path, env::is_wsl())
-}
-
-fn normalize_for_native_workdir_with_flag(path: PathBuf, is_windows: bool) -> PathBuf {
-    if is_windows {
-        dunce::simplified(&path).to_path_buf()
-    } else {
-        path
-    }
 }
 
 fn normalize_for_wsl_with_flag(path: PathBuf, is_wsl: bool) -> PathBuf {

@@ -114,8 +114,8 @@ mod tests {
     use std::path::PathBuf;
 
     fn test_cwd() -> PathBuf {
-        // These tests only need a stable absolute cwd; using temp_dir() avoids baking Unix- or
-        // Windows-specific root semantics into the fixtures.
+        // These tests only need a stable absolute cwd; using temp_dir() avoids baking
+        // platform-specific root semantics into the fixtures.
         std::env::temp_dir()
     }
 

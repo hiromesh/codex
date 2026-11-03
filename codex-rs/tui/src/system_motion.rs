@@ -59,7 +59,7 @@ async fn detect() -> Option<MotionMode> {
     .flatten()
 }
 
-#[cfg(not(any(target_os = "macos", target_os = "linux", windows)))]
+#[cfg(not(any(target_os = "macos", target_os = "linux")))]
 async fn detect() -> Option<MotionMode> {
     None
 }

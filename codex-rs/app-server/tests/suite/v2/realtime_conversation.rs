@@ -3936,7 +3936,7 @@ async fn websocket_v2_tool_call_delegated_turn_can_execute_shell_tool() -> Resul
         create_command_execution_sse_response(
             realtime_tool_ok_command(),
             /*workdir*/ None,
-            // Windows CI can spend several seconds starting the nested PowerShell command. This
+            // CI can spend several seconds starting the nested shell command. This
             // test verifies delegated shell-tool plumbing, not timeout enforcement.
             Some(DELEGATED_SHELL_TOOL_TIMEOUT_MS),
             "shell_call",

@@ -623,7 +623,7 @@ pub(crate) fn map_remote_error(error: ExecServerError) -> io::Error {
     }
 }
 
-#[cfg(all(test, any(unix, windows)))]
+#[cfg(all(test, any(unix)))]
 #[path = "remote_file_system_path_uri_tests.rs"]
 mod path_uri_tests;
 

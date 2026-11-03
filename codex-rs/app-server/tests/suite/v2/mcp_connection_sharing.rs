@@ -117,14 +117,6 @@ async fn stdio_sharing_follows_protocol_and_enablement_for_loaded_chats() -> Res
             )
             .await?;
         }
-        #[cfg(not(unix))]
-        {
-            let third = app.start_thread(ThreadStartParams::default()).await?.thread;
-            let third_processes = call_servers(&mut app, &third.id).await?;
-            for name in ["alpha", "beta"] {
-                assert_ne!(third_processes[name], first_processes[name]);
-            }
-        }
     }
     Ok(())
 }

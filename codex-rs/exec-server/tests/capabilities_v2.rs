@@ -13,7 +13,7 @@ use common::exec_server::ExecServerHarness;
 use common::exec_server::exec_server_with_env;
 use pretty_assertions::assert_eq;
 
-#[cfg(any(target_os = "linux", target_os = "macos", windows))]
+#[cfg(any(target_os = "linux", target_os = "macos"))]
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn v2_rpc_refreshes_metadata_and_enforces_sandbox() -> anyhow::Result<()> {
     let home = tempfile::tempdir()?;

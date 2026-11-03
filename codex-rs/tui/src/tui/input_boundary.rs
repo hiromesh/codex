@@ -51,7 +51,7 @@ pub(crate) fn discard_pending_terminal_input() -> Result<()> {
             continue;
         }
 
-        #[cfg(any(unix, windows))]
+        #[cfg(unix)]
         match terminal_input_is_readable() {
             Ok(true) => continue,
             Ok(false) => {}

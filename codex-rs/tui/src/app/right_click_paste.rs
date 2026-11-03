@@ -1,4 +1,4 @@
-//! Clipboard text paste from Windows shortcuts, right-click, or X11 middle-click PRIMARY.
+//! Clipboard text paste from right-click or X11 middle-click PRIMARY.
 //! The policy also reports why a configured mode is unavailable in this terminal.
 //! Existing selection handlers run first. Only a draw may deliver a read, so real input
 //! invalidates pending paste before completion and is never replaced by clipboard text.
@@ -32,7 +32,7 @@ impl PasteEnvironment {
     pub(crate) fn detect() -> Self {
         Self {
             primary: crate::clipboard_copy::primary::available(),
-            platform_default: cfg!(any(target_os = "windows", target_os = "linux")),
+            platform_default: cfg!(target_os = "linux"),
             ssh: crate::clipboard_copy::is_ssh_session(),
             wsl: crate::clipboard_copy::is_wsl_session(),
             vscode: tui::detect_vscode_terminal(),

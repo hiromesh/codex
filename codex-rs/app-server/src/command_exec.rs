@@ -378,11 +378,7 @@ impl CommandExecManager {
                     ))
                 })?
         };
-        let CommandExecSession::Active { control_tx } = session else {
-            return Err(invalid_request(
-                "command/exec/write, command/exec/terminate, and command/exec/resize are not supported for windows sandbox processes",
-            ));
-        };
+        let CommandExecSession::Active { control_tx } = session;
         let (response_tx, response_rx) = oneshot::channel();
         let request = CommandControlRequest {
             control,

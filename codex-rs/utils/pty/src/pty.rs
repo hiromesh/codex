@@ -18,8 +18,6 @@ use std::process::Stdio;
 use std::sync::Arc;
 use std::sync::Mutex as StdMutex;
 use std::sync::atomic::AtomicBool;
-#[cfg(not(unix))]
-use std::time::Duration;
 
 use anyhow::Result;
 use portable_pty::CommandBuilder;
@@ -55,11 +53,6 @@ impl<'a> ChildFds<'a> {
             Self::Inherited(fds) | Self::Attached(fds) => fds,
         }
     }
-}
-
-/// Returns true when ConPTY support is available (non-Windows always true).
-pub fn conpty_supported() -> bool {
-    true
 }
 
 struct PtyChildTerminator {
@@ -143,9 +136,6 @@ pub async fn spawn_process(
         anyhow::bail!("missing program for PTY spawn");
     }
 
-    #[cfg(not(unix))]
-    let _ = inherited_fds;
-
     #[cfg(target_os = "linux")]
     if crate::spawn_helper::is_available()
         && inherited_fds.as_slice().is_empty()
@@ -211,43 +201,6 @@ async fn spawn_process_portable(
         writer_rx,
         crate::unix_io::StdinCloseBehavior::SendEof,
     );
-    #[cfg(not(unix))]
-    let (reader_handle, writer_handle) = {
-        let mut reader = pair.master.try_clone_reader()?;
-        let reader_handle: JoinHandle<()> = tokio::task::spawn_blocking(move || {
-            let mut buf = [0u8; 8_192];
-            loop {
-                match reader.read(&mut buf) {
-                    Ok(0) => break,
-                    Ok(n) => {
-                        let _ = stdout_tx.blocking_send(buf[..n].to_vec());
-                    }
-                    Err(ref e) if e.kind() == ErrorKind::Interrupted => continue,
-                    Err(ref e) if e.kind() == ErrorKind::WouldBlock => {
-                        std::thread::sleep(Duration::from_millis(5));
-                        continue;
-                    }
-                    Err(_) => break,
-                }
-            }
-        });
-
-        let mut writer_rx = writer_rx;
-        let writer = pair.master.take_writer()?;
-        let writer = Arc::new(tokio::sync::Mutex::new(writer));
-        let writer_handle: JoinHandle<()> = tokio::spawn({
-            let writer = Arc::clone(&writer);
-            async move {
-                while let Some(bytes) = writer_rx.recv().await {
-                    let mut guard = writer.lock().await;
-                    use std::io::Write;
-                    let _ = guard.write_all(&bytes);
-                    let _ = guard.flush();
-                }
-            }
-        });
-        (reader_handle, writer_handle)
-    };
 
     let (exit_tx, exit_rx) = oneshot::channel::<i32>();
     let exit_status = Arc::new(AtomicBool::new(false));
@@ -267,11 +220,7 @@ async fn spawn_process_portable(
     });
 
     let handles = PtyHandles {
-        _slave: if false {
-            Some(pair.slave)
-        } else {
-            None
-        },
+        _slave: None,
         _master: PtyMasterHandle::Resizable(pair.master),
     };
 

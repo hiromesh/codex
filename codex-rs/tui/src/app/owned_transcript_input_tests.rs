@@ -797,7 +797,7 @@ async fn raw_multiline_paste_defers_rendering_and_submits_once() -> Result<()> {
     );
     assert!(app.chat_widget.queued_user_message_texts().is_empty());
     let during_paste = screen(&tui);
-    // Wait out Windows' active-paste timeout and accidental-Enter suppression window.
+    // Wait out the paste-burst timeout and accidental-Enter suppression window.
     tokio::time::advance(Duration::from_secs(/*secs*/ 1)).await;
     app.handle_tui_event(&mut tui, &mut server, TuiEvent::Draw)
         .await?;

@@ -5,7 +5,7 @@
 //!
 //! It edits [`TextArea`] and attachments, routes popup keys, makes completed slash commands atomic,
 //! and handles Enter/newlines. It shows Luna Reserve's yellow arrow and detects unbracketed paste
-//! bursts, especially on Windows. Paste timing uses Tokio's clock so asynchronous flush deadlines
+//! bursts. Paste timing uses Tokio's clock so asynchronous flush deadlines
 //! and input classification share a clock, including in paused-time tests. Copy shortcuts and right
 //! clicks preserve selected draft text.
 //! Local recall retains full draft metadata for composer submissions and accepted command-line
@@ -257,9 +257,9 @@
 //!
 //! # Non-bracketed Paste Bursts
 //!
-//! Some terminals, especially Windows, deliver pastes as rapid `KeyCode::Char`/`Enter`/`Tab` events.
+//! Some terminals deliver pastes as rapid `KeyCode::Char`/`Enter`/`Tab` events.
 //! [`PasteBurst`](super::paste_burst::PasteBurst) buffers text-producing keys (plain, Shift, or
-//! Windows AltGr) and integrates buffered text through the composer, avoiding transient shortcut UI.
+//! AltGr) and integrates buffered text through the composer, avoiding transient shortcut UI.
 //! It briefly holds the first ASCII char to detect a burst. Non-ASCII chars appear immediately
 //! for IME responsiveness, but still participate in burst detection.
 //! Parent views must keep flushing editors that lose focus while input is buffered; a hidden
@@ -3732,7 +3732,7 @@ impl ChatComposer {
 
         // Intercept text-producing Char inputs to optionally accumulate into a burst buffer.
         //
-        // This preserves plain, Shift, and Windows AltGr input while keeping shortcut modifiers
+        // This preserves plain, Shift, and AltGr input while keeping shortcut modifiers
         // out of the burst detector and flushing any in-flight text before a non-text key.
         if let KeyEvent {
             code: KeyCode::Char(ch),
@@ -12120,34 +12120,6 @@ mod tests {
         assert_eq!(composer.draft.textarea.text(), "ab");
         assert!(!composer.is_in_paste_burst());
         assert!(!composer.handle_paste_burst_flush(now + PasteBurst::recommended_flush_delay()));
-    }
-
-    #[test]
-    fn platform_specific_altgr_input_remains_text() {
-        for modifiers in [
-            KeyModifiers::CONTROL | KeyModifiers::ALT,
-            KeyModifiers::SHIFT | KeyModifiers::CONTROL | KeyModifiers::ALT,
-        ] {
-            let (mut composer, _rx) = new_test_composer();
-            let now = Instant::now();
-
-            composer
-                .handle_input_basic_with_time(KeyEvent::new(KeyCode::Char('@'), modifiers), now);
-
-            if false {
-                assert!(composer.is_in_paste_burst());
-                assert!(
-                    composer.handle_paste_burst_flush(now + PasteBurst::recommended_flush_delay())
-                );
-                assert_eq!(composer.draft.textarea.text(), "@");
-            } else {
-                assert!(!composer.is_in_paste_burst());
-                assert!(
-                    !composer.handle_paste_burst_flush(now + PasteBurst::recommended_flush_delay())
-                );
-                assert_eq!(composer.draft.textarea.text(), "");
-            }
-        }
     }
 
     /// Behavior: the first fast ASCII character is held briefly to avoid flicker; if no burst

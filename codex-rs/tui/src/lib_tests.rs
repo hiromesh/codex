@@ -1252,11 +1252,7 @@ async fn latest_session_lookup_falls_back_for_rollout_missing_from_state_db()
 
 #[tokio::test]
 async fn config_cwd_for_app_server_target_omits_cwd_for_remote_sessions() -> std::io::Result<()> {
-    let remote_only_cwd = if false {
-        Path::new(r"C:\definitely\not\local\to\this\test")
-    } else {
-        Path::new("/definitely/not/local/to/this/test")
-    };
+    let remote_only_cwd = Path::new("/definitely/not/local/to/this/test");
     let target = AppServerTarget::Remote {
         endpoint: RemoteAppServerEndpoint::UnixSocket {
             socket_path: AbsolutePathBuf::relative_to_current_dir("codex.sock")?,
@@ -1352,11 +1348,7 @@ async fn config_cwd_for_app_server_target_errors_for_missing_embedded_cli_cwd()
 #[tokio::test]
 async fn config_cwd_for_app_server_target_omits_cwd_for_remote_exec_server() -> std::io::Result<()>
 {
-    let remote_only_cwd = if false {
-        Path::new(r"C:\definitely\not\local\to\this\test")
-    } else {
-        Path::new("/definitely/not/local/to/this/test")
-    };
+    let remote_only_cwd = Path::new("/definitely/not/local/to/this/test");
     let target = AppServerTarget::Embedded;
     let environment_manager = EnvironmentManager::create_for_tests(
         Some("ws://127.0.0.1:8765".to_string()),
@@ -1640,7 +1632,7 @@ async fn config_rebuild_changes_trust_defaults_with_cwd() -> std::io::Result<()>
     std::fs::create_dir_all(&trusted)?;
     std::fs::create_dir_all(&untrusted)?;
 
-    // TOML keys need escaped backslashes on Windows paths.
+    // TOML keys need escaped backslashes.
     let trusted_display = trusted.display().to_string().replace('\\', "\\\\");
     let untrusted_display = untrusted.display().to_string().replace('\\', "\\\\");
     let config_toml = format!(

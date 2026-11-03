@@ -64,7 +64,7 @@ fn configure_open(options: &mut std::fs::OpenOptions) {
     options.custom_flags(libc::O_NONBLOCK);
 }
 
-#[cfg(not(any(unix, windows)))]
+#[cfg(not(unix))]
 fn configure_open(_options: &mut std::fs::OpenOptions) {}
 
 fn is_disk_file<T>(_file: &T) -> bool {

@@ -147,7 +147,7 @@ fn process_snapshot() -> ProcessSnapshot {
     }
 }
 
-#[cfg(not(any(target_os = "macos", target_os = "linux", target_os = "windows")))]
+#[cfg(not(any(target_os = "macos", target_os = "linux")))]
 fn process_snapshot() -> ProcessSnapshot {
     empty_process_snapshot()
 }

@@ -8,7 +8,6 @@ Lightweight helpers for spawning interactive processes either under a PTY (pseud
 - `spawn_pipe_process(program, args, cwd, env, arg0)` → `SpawnedProcess`
 - `spawn_pipe_process_no_stdin(program, args, cwd, env, arg0)` → `SpawnedProcess`
 - `combine_output_receivers(stdout_rx, stderr_rx)` → `broadcast::Receiver<Vec<u8>>`
-- `conpty_supported()` → `bool` (Windows only; always true elsewhere)
 - `TerminalSize { rows, cols }` selects PTY dimensions in character cells.
 - `ProcessHandle` exposes:
   - `writer_sender()` → `mpsc::Sender<Vec<u8>>` (stdin)

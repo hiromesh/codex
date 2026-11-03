@@ -21,13 +21,7 @@ pub(crate) fn split_command_string(command: &str) -> Vec<String> {
         return vec![command.to_string()];
     };
     match shlex::try_join(parts.iter().map(String::as_str)) {
-        Ok(round_trip)
-            if round_trip == command
-                || (!command.contains(":\\")
-                    && shlex::split(&round_trip).as_ref() == Some(&parts)) =>
-        {
-            parts
-        }
+        Ok(round_trip) if round_trip == command => parts,
         _ => vec![command.to_string()],
     }
 }
@@ -100,7 +94,7 @@ mod tests {
     }
 
     #[test]
-    fn split_command_string_preserves_non_roundtrippable_windows_commands() {
+    fn split_command_string_preserves_non_roundtrippable_commands() {
         let command = r#"C:\Program Files\Git\bin\bash.exe -lc "echo hi""#;
         assert_eq!(split_command_string(command), vec![command.to_string()]);
     }

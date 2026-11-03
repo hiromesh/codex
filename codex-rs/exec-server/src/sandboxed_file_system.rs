@@ -485,6 +485,6 @@ fn map_sandbox_error(error: JSONRPCErrorError) -> io::Error {
     }
 }
 
-#[cfg(all(test, any(unix, windows)))]
+#[cfg(all(test, any(unix)))]
 #[path = "sandboxed_file_system_path_uri_tests.rs"]
 mod path_uri_tests;

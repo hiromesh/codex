@@ -21,7 +21,6 @@ use codex_exec_server::CreateDirectoryOptions;
 use codex_utils_path_uri::PathUri;
 use core_test_support::responses;
 use core_test_support::skip_if_remote;
-use core_test_support::skip_if_target_windows;
 use futures::StreamExt;
 use futures::TryStreamExt;
 use pretty_assertions::assert_eq;
@@ -84,12 +83,6 @@ async fn exercise_executor_skill(scenario: ExecutorSkillScenario) -> Result<()> 
             | ExecutorSkillScenario::RestrictedDeniedReference
             | ExecutorSkillScenario::RestrictedVisible
     );
-    if restricted {
-        skip_if_target_windows!(
-            Ok(()),
-            "the unelevated Windows sandbox cannot enforce restricted filesystem reads"
-        );
-    }
     if scenario == ExecutorSkillScenario::RestrictedDeniedReference {
         skip_if_remote!(Ok(()), "the external symlink fixture is host-local");
     }
@@ -99,7 +92,7 @@ async fn exercise_executor_skill(scenario: ExecutorSkillScenario) -> Result<()> 
     let (sandbox_config, permission_profile) = if restricted {
         (
             "default_permissions = \"workspace\"",
-            "\n[permissions.workspace.filesystem.\":workspace_roots\"]\n\".\" = \"write\"\n\n[windows]\nsandbox = \"unelevated\"\n",
+            "\n[permissions.workspace.filesystem.\":workspace_roots\"]\n\".\" = \"write\"\n",
         )
     } else {
         ("sandbox_mode = \"read-only\"", "")

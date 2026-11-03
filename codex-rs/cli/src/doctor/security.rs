@@ -23,9 +23,9 @@ const MAX_PRODUCT_OUTPUT_BYTES: usize = 64 * 1024;
 
 pub(super) enum EndpointInspection {
     Complete(Vec<&'static str>),
-    #[cfg(any(target_os = "windows", test))]
+    #[cfg(test)]
     Partial(Vec<&'static str>),
-    #[cfg(any(target_os = "macos", target_os = "windows", test))]
+    #[cfg(any(target_os = "macos", test))]
     Unavailable,
 }
 
@@ -36,9 +36,9 @@ pub(super) async fn check() -> DoctorCheck {
 pub(super) fn endpoint_check(inspection: EndpointInspection) -> DoctorCheck {
     let (products, visibility_incomplete) = match inspection {
         EndpointInspection::Complete(products) => (products, false),
-        #[cfg(any(target_os = "windows", test))]
+        #[cfg(test)]
         EndpointInspection::Partial(products) => (products, true),
-        #[cfg(any(target_os = "macos", target_os = "windows", test))]
+        #[cfg(any(target_os = "macos", test))]
         EndpointInspection::Unavailable => {
             return DoctorCheck::new(
                 "security.endpoint",
@@ -51,7 +51,7 @@ pub(super) fn endpoint_check(inspection: EndpointInspection) -> DoctorCheck {
     };
 
     if products.is_empty() {
-        let (summary, detail) = if cfg!(any(target_os = "macos", target_os = "windows")) {
+        let (summary, detail) = if cfg!(any(target_os = "macos")) {
             ("no supported endpoint protection detected", "none detected")
         } else {
             (

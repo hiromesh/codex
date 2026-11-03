@@ -574,19 +574,6 @@ API-key and explicitly external-auth providers bypass discovery. Custom ChatGPT-
 require discovery before being treated as independent. Changing a workspace-bound thread's
 bootstrap origin requires a new thread.
 
-## Windows sandbox implementation selection
-
-`windowsSandbox/setupStart` applies only to the legacy `elevated` and
-`unelevated` backends. `windowsSandbox/readiness` reports `ready` when MXC is
-selected so clients do not offer legacy setup. The
-`allowedWindowsSandboxImplementations` requirement governs only the legacy
-backends and does not restrict MXC. Its `mxc` enum member is retained for wire
-compatibility but is not emitted. Non-Windows hosts report `notConfigured`.
-
-MXC uses the standard `command/exec` streaming and process-control path, including
-ConPTY when `tty` is enabled. The buffered legacy Windows sandbox restrictions on
-process control and custom output caps do not apply to MXC.
-
 ### Gateway OAuth sign-in
 
 Providers configured with `gateway_oauth` require a secondary OAuth credential in

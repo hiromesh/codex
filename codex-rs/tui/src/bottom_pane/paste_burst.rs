@@ -1,6 +1,6 @@
 //! Paste-burst detection for terminals without bracketed paste.
 //!
-//! On some platforms (notably Windows), pastes often arrive as a rapid stream of
+//! In some terminals, pastes often arrive as a rapid stream of
 //! `KeyCode::Char`, `KeyCode::Enter`, and `KeyCode::Tab` key events rather than as a single "paste" event.
 //! In that mode, the composer needs to:
 //!
@@ -10,7 +10,7 @@
 //!   paste once enough chars have arrived.
 //!
 //! This module provides the `PasteBurst` state machine. `ChatComposer` feeds it only
-//! text-producing character events (plain, Shift, or Windows AltGr) and uses the full buffering
+//! text-producing character events (plain, Shift, or AltGr) and uses the full buffering
 //! decisions to either:
 //!
 //! - briefly hold a first ASCII char (flicker suppression),
@@ -31,7 +31,7 @@
 //! - On a UI tick, call [`PasteBurst::flush_if_due`]. If it returns [`FlushResult::Typed`], insert
 //!   that char as normal typing. If it returns [`FlushResult::Paste`], treat the returned string as
 //!   an explicit paste.
-//! - Before applying non-text input (arrow keys; Ctrl/Alt shortcuts other than Windows AltGr;
+//! - Before applying non-text input (arrow keys; Ctrl/Alt shortcuts other than AltGr;
 //!   or Super, Hyper, and Meta modifiers), use
 //!   [`PasteBurst::flush_before_modified_input`] to avoid leaving buffered text "stuck", and then
 //!   [`PasteBurst::clear_window_after_non_char`] so subsequent typing does not get grouped into a
@@ -146,7 +146,7 @@
 //!   - [`FlushResult::Typed`]: insert that single char as normal typing.
 //!   - [`FlushResult::Paste`]: treat the returned string as an explicit paste.
 //!
-//! - When non-text input is pressed (Ctrl/Alt shortcuts other than Windows AltGr; Super, Hyper,
+//! - When non-text input is pressed (Ctrl/Alt shortcuts other than AltGr; Super, Hyper,
 //!   and Meta modifiers; arrows; etc.), callers should use
 //!   [`PasteBurst::clear_window_after_non_char`] to prevent the next keystroke from being
 //!   incorrectly grouped into a previous burst.

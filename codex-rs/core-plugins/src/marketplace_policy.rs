@@ -531,7 +531,7 @@ fn is_expected_managed_path(path: &Path, expected: &Path) -> bool {
                 .strip_prefix("/private/var")
                 .is_ok_and(|suffix| Path::new("/var").join(suffix) == path)
     }
-    #[cfg(not(any(target_os = "macos", windows)))]
+    #[cfg(not(any(target_os = "macos")))]
     {
         false
     }

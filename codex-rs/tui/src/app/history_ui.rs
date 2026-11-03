@@ -465,7 +465,7 @@ fn open_desktop_thread_url(url: &str) -> Result<(), String> {
 
 #[cfg(not(target_os = "macos"))]
 fn open_desktop_thread_url(_url: &str) -> Result<(), String> {
-    Err("The Desktop app is only available on macOS and Windows".to_string())
+    Err("The Desktop app is only available on macOS".to_string())
 }
 
 #[cfg(test)]

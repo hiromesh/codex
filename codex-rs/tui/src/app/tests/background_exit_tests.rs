@@ -476,17 +476,10 @@ async fn exit_interrupts_before_requesting_shutdown() -> Result<()> {
     // the directory also releases it if the test fails before reaching the exit.
     let running = tempdir()?;
     let running_path = running.path().to_string_lossy();
-    let command = if false {
-        format!(
-            "Write-Output 'exit-test-ready'; while (Test-Path -LiteralPath '{}') {{ Start-Sleep -Milliseconds 100 }}",
-            running_path.replace('\'', "''"),
-        )
-    } else {
-        format!(
-            "printf 'exit-test-ready\\n'; while [ -d {} ]; do sleep 0.1; done",
-            shlex::try_quote(&running_path)?,
-        )
-    };
+    let command = format!(
+        "printf 'exit-test-ready\\n'; while [ -d {} ]; do sleep 0.1; done",
+        shlex::try_quote(&running_path)?,
+    );
     app_server.thread_shell_command(thread_id, command).await?;
     let turn_id = time::timeout(Duration::from_secs(/*secs*/ 10), async {
         let mut turn_id = None;

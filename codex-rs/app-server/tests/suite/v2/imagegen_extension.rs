@@ -53,11 +53,11 @@ const TINY_PNG_BYTES: &[u8] = &[
 ];
 const TINY_PNG_DATA_URL: &str = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGP4z8DwHwAFAAH/iZk9HQAAAABJRU5ErkJggg==";
 
-// macOS and Windows Bazel CI can spend tens of seconds starting app-server
+// macOS Bazel CI can spend tens of seconds starting app-server
 // subprocesses or processing test RPCs under load.
-#[cfg(any(target_os = "macos", windows))]
+#[cfg(target_os = "macos")]
 const DEFAULT_READ_TIMEOUT: Duration = Duration::from_secs(60);
-#[cfg(not(any(target_os = "macos", windows)))]
+#[cfg(not(any(target_os = "macos")))]
 const DEFAULT_READ_TIMEOUT: Duration = Duration::from_secs(10);
 
 #[test_case(Some(true), "transparent"; "transparent")]

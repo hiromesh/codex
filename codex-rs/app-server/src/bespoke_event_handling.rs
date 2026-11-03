@@ -2974,21 +2974,9 @@ mod tests {
 
     #[test]
     fn request_permissions_response_deserializes_network_and_file_system_grants() {
-        let input_path = if false {
-            r"C:\tmp\input"
-        } else {
-            "/tmp/input"
-        };
-        let output_path = if false {
-            r"C:\tmp\output"
-        } else {
-            "/tmp/output"
-        };
-        let extra_path = if false {
-            r"C:\tmp\extra"
-        } else {
-            "/tmp/extra"
-        };
+        let input_path = "/tmp/input";
+        let output_path = "/tmp/output";
+        let extra_path = "/tmp/extra";
         let absolute_path = |path: &str| {
             AbsolutePathBuf::try_from(std::path::PathBuf::from(path)).expect("absolute path")
         };

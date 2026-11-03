@@ -4,7 +4,7 @@
 #[path = "pid_identity.rs"]
 mod identity;
 
-#[cfg(any(unix, windows))]
+#[cfg(unix)]
 use std::borrow::Cow;
 use std::collections::BTreeMap;
 use std::io::SeekFrom;
@@ -16,7 +16,7 @@ use crate::managed_install::ExecutableIdentity;
 use anyhow::Context;
 use anyhow::Result;
 use anyhow::bail;
-#[cfg(any(unix, windows))]
+#[cfg(unix)]
 use codex_app_server_transport::REMOTE_CONTROL_DISABLED_ENV_VAR;
 use serde::Deserialize;
 use serde::Serialize;
@@ -35,7 +35,7 @@ const START_TIMEOUT: Duration = Duration::from_secs(10);
 const STDERR_LOG_TAIL_BYTES: u64 = 4096;
 
 #[derive(Debug)]
-#[cfg_attr(not(any(unix, windows)), allow(dead_code))]
+#[cfg_attr(not(any(unix)), allow(dead_code))]
 pub(crate) struct PidBackend {
     pub(super) feature_overrides: BTreeMap<String, bool>,
     codex_bin: PathBuf,
@@ -84,7 +84,7 @@ enum PidFileState {
 }
 
 #[derive(Debug, Clone)]
-#[cfg_attr(not(any(unix, windows)), allow(dead_code))]
+#[cfg_attr(not(any(unix)), allow(dead_code))]
 enum PidCommandKind {
     AppServer { remote_control_enabled: bool },
     UpdateLoop { restore_release: Option<String> },
@@ -155,12 +155,12 @@ impl PidBackend {
         }
     }
 
-    #[cfg(any(unix, windows))]
+    #[cfg(unix)]
     pub(crate) async fn start(&self) -> Result<Option<u32>> {
         self.start_inner(/*replacement*/ None).await
     }
 
-    #[cfg(not(any(unix, windows)))]
+    #[cfg(not(unix))]
     pub(crate) async fn start(&self) -> Result<Option<u32>> {
         bail!("pid-managed app-server startup is unsupported on this platform")
     }
@@ -329,7 +329,7 @@ impl PidBackend {
         Ok(reservation_lock)
     }
 
-    #[cfg(any(unix, windows))]
+    #[cfg(unix)]
     async fn open_stderr_log(&self) -> Result<fs::File> {
         let stderr_log_file = stderr_log_file_for_pid_file(&self.pid_file);
         super::stderr_log::preserve(&stderr_log_file).await;
@@ -356,7 +356,7 @@ impl PidBackend {
         })
     }
 
-    #[cfg(any(unix, windows))]
+    #[cfg(unix)]
     fn command_args(&self) -> Vec<Cow<'_, str>> {
         let mut args = match &self.command_kind {
             PidCommandKind::AppServer {
@@ -392,7 +392,7 @@ impl PidBackend {
         args
     }
 
-    #[cfg(any(unix, windows))]
+    #[cfg(unix)]
     fn command_env(&self) -> Option<(&'static str, &'static str)> {
         match self.command_kind {
             PidCommandKind::AppServer {
@@ -560,17 +560,17 @@ fn force_terminate_process_group(pid: u32) -> Result<()> {
     Err(err).with_context(|| format!("failed to force terminate pid-managed updater group {pid}"))
 }
 
-#[cfg(not(any(unix, windows)))]
+#[cfg(not(unix))]
 fn terminate_process(_pid: u32) -> Result<()> {
     bail!("pid-managed app-server shutdown is unsupported on this platform")
 }
 
-#[cfg(not(any(unix, windows)))]
+#[cfg(not(unix))]
 fn force_terminate_process(_pid: u32) -> Result<()> {
     bail!("pid-managed app-server shutdown is unsupported on this platform")
 }
 
-#[cfg(not(any(unix, windows)))]
+#[cfg(not(unix))]
 fn force_terminate_process_group(_pid: u32) -> Result<()> {
     bail!("pid-managed updater shutdown is unsupported on this platform")
 }
@@ -618,13 +618,13 @@ async fn process_matches_record(record: &PidRecord) -> Result<bool> {
     }
 }
 
-#[cfg(not(any(unix, windows)))]
+#[cfg(not(unix))]
 async fn process_matches_record(_record: &PidRecord) -> Result<bool> {
     Ok(false)
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-#[cfg_attr(not(any(unix, windows)), allow(dead_code))]
+#[cfg_attr(not(any(unix)), allow(dead_code))]
 enum EmptyPidReservation {
     Active,
     Stale,
@@ -647,12 +647,12 @@ fn try_lock_file(file: &fs::File) -> Result<bool> {
     Err(err).context("failed to lock pid reservation")
 }
 
-#[cfg(not(any(unix, windows)))]
+#[cfg(not(unix))]
 fn try_lock_file(_file: &fs::File) -> Result<bool> {
     bail!("pid-managed app-server startup is unsupported on this platform")
 }
 
-#[cfg(any(unix, windows))]
+#[cfg(unix)]
 async fn reservation_lock_is_active(path: &Path) -> Result<bool> {
     let file = match fs::OpenOptions::new()
         .write(true)
@@ -673,7 +673,7 @@ async fn reservation_lock_is_active(path: &Path) -> Result<bool> {
     probe_reservation_lock(file)
 }
 
-#[cfg(any(unix, windows))]
+#[cfg(unix)]
 fn probe_reservation_lock(file: fs::File) -> Result<bool> {
     if !try_lock_file(&file)? {
         return Ok(true);
@@ -692,12 +692,12 @@ fn probe_reservation_lock(file: fs::File) -> Result<bool> {
     Ok(false)
 }
 
-#[cfg(not(any(unix, windows)))]
+#[cfg(not(unix))]
 async fn reservation_lock_is_active(_path: &Path) -> Result<bool> {
     Ok(false)
 }
 
-#[cfg(any(unix, windows))]
+#[cfg(unix)]
 async fn inspect_empty_pid_reservation(
     pid_path: &Path,
     lock_path: &Path,
@@ -736,7 +736,7 @@ impl Drop for EmptyPidProbeLock {
     }
 }
 
-#[cfg(any(unix, windows))]
+#[cfg(unix)]
 async fn inspect_empty_pid_reservation_with_file(
     pid_path: &Path,
     file: fs::File,
@@ -767,7 +767,7 @@ async fn inspect_empty_pid_reservation_with_file(
     Ok(EmptyPidReservation::Record(record))
 }
 
-#[cfg(not(any(unix, windows)))]
+#[cfg(not(unix))]
 async fn inspect_empty_pid_reservation(
     _pid_path: &Path,
     _lock_path: &Path,
@@ -804,12 +804,12 @@ async fn read_process_details(pid: u32) -> Result<(String, String)> {
     Ok((state.to_string(), start_time.to_string()))
 }
 
-#[cfg(all(test, any(unix, windows)))]
+#[cfg(all(test, any(unix)))]
 #[path = "pid_tests.rs"]
 mod tests;
 
 
 
-#[cfg(any(unix, windows))]
+#[cfg(unix)]
 #[path = "pid_start.rs"]
 mod start;

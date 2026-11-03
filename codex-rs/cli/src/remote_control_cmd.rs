@@ -88,6 +88,8 @@ pub(crate) async fn run(
                 .await
             {
                 Ok(daemon) => daemon,
+                Err(error) => return Err(error),
+            };
             if daemon.backend.is_none() {
                 return run_foreground_remote_control(
                     command.json,

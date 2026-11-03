@@ -1978,11 +1978,7 @@ async fn executor_skill_invocation_is_environment_scoped_and_deduplicated() -> R
         ],
         warnings: Vec::new(),
     };
-    let read_command = if false {
-        format!("Get-Content -LiteralPath \"{}\"", skill_path.display())
-    } else {
-        format!("cat {}", skill_path.display())
-    };
+    let read_command = format!("cat {}", skill_path.display());
     let command = json!({
         "cmd": read_command,
         "login": false,
@@ -3362,12 +3358,7 @@ async fn production_turn_keeps_rebalanced_catalogs_stable_after_compaction_and_r
     }
 
     insta::assert_snapshot!(
-        // The in-process executor uses the host OS. Windows guidance appears when it is ready.
-        if false {
-            "cloud_skills_across_executor_readiness_windows"
-        } else {
-            "cloud_skills_across_executor_readiness"
-        },
+        "cloud_skills_across_executor_readiness",
         context_snapshot::format_request_history_snapshot(
             "Cloud skills rebalance once to retain every executor skill. Post-turn compaction installs both catalogs and their allocation before resume; the saved catalogs remain visible while the executor reconnects.",
             &requests,

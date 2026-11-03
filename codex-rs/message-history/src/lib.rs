@@ -422,7 +422,7 @@ fn log_identity(metadata: &std::fs::Metadata) -> Option<u64> {
     Some(metadata.ino())
 }
 
-#[cfg(not(any(unix, windows)))]
+#[cfg(not(unix))]
 fn log_identity(_metadata: &std::fs::Metadata) -> Option<u64> {
     None
 }

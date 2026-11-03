@@ -23,7 +23,6 @@ pub(super) async fn run_main_inner(
             "--add-dir is not supported with --remote. Configure additional workspace roots on the server.",
         ));
     }
-    let elevated_warning: Option<&str> = None;
     let strict_config = cli.strict_config;
     if cli.shared.worktree {
         if explicit_remote_endpoint.is_some() {
@@ -553,7 +552,7 @@ pub(super) async fn run_main_inner(
     } else {
         None
     };
-    let auto_start_daemon = cfg!(any(unix, windows))
+    let auto_start_daemon = cfg!(unix)
         && (cli.agents_overview || config.features.enabled(Feature::DaemonAutoStart))
         && implicit_connection
         && !cli.no_daemon
@@ -604,19 +603,21 @@ pub(super) async fn run_main_inner(
                     codex_app_server_daemon::start_with_features(&Default::default()).await;
                 daemon_telemetry::record_start(&config, &result).await;
                 match result {
-                    Ok(output) => Ok(Some(output)),
-        if let Some(output) = output {
-            managed_daemon = output.backend.is_some();
-            app_server_target = AppServerTarget::LocalDaemon {
-                endpoint: RemoteAppServerEndpoint::UnixSocket {
-                    socket_path: AbsolutePathBuf::from_absolute_path_checked(output.socket_path)?,
-                },
-                allow_embedded_fallback: false,
-            };
-        } else {
-            app_server_target = AppServerTarget::Embedded;
-            daemon_exclusion = Some("this Windows launcher");
-        }
+                    Ok(output) => Ok(output),
+                    Err(err) => Err(std::io::Error::other(format!(
+                        "{err:#}\n{}",
+                        daemon_startup::FAILURE_HINT
+                    ))),
+                }
+            })
+            .await??;
+        managed_daemon = output.backend.is_some();
+        app_server_target = AppServerTarget::LocalDaemon {
+            endpoint: RemoteAppServerEndpoint::UnixSocket {
+                socket_path: AbsolutePathBuf::from_absolute_path_checked(output.socket_path)?,
+            },
+            allow_embedded_fallback: false,
+        };
     }
     let compatibility_warning = daemon_recovery::check(
         &mut startup_draft,
@@ -633,9 +634,7 @@ pub(super) async fn run_main_inner(
     if app_server_target.uses_embedded_network_policy() {
         embedded_network_policy.activate(&mut config);
     }
-    let daemon_startup_warning = elevated_warning
-        .map(str::to_string)
-        .or(compatibility_warning)
+    let daemon_startup_warning = compatibility_warning
         .or_else(|| {
             daemon_exclusion
             .filter(|_| auto_start_daemon)
@@ -706,7 +705,6 @@ pub(super) async fn run_main_inner(
     let selection_reason = match (&app_server_target, daemon_exclusion) {
         (AppServerTarget::Remote { .. }, _) => "explicit_remote",
         _ if cli.agents_overview => "agents",
-        _ if elevated_warning.is_some() => "elevated_windows",
         (_, Some("--no-daemon")) => "explicit_no_daemon",
         (_, Some(_)) => "incompatible_option",
         _ if auto_start_daemon => "auto_start",
@@ -770,7 +768,6 @@ pub(super) async fn run_main_inner(
         let _ = metrics.counter("codex.tui.start", /*inc*/ 1, &launch_tags);
         if app_server_mode == "in_process" {
             let reason = match daemon_exclusion {
-                _ if elevated_warning.is_some() => "windows_elevated",
                 Some("--no-daemon") => "explicit_no_daemon",
                 Some("--profile") => "profile",
                 Some("--oss") => "oss",
@@ -790,7 +787,6 @@ pub(super) async fn run_main_inner(
                 }
                 Some("Bedrock sign-in") => "bedrock_sign_in",
                 Some(daemon_startup::WSL_DRVFS_EXCLUSION) => "wsl_drvfs",
-                Some("this Windows launcher") => "windows_detach_restricted",
                 Some("daemon feature settings") => "daemon_compatibility",
                 None if selection_reason == "auto_start_disabled" => {
                     "auto_start_disabled_no_daemon"
@@ -878,8 +874,6 @@ pub(super) async fn run_main_inner(
         log_file_opts.create(true).append(true);
 
         // Ensure the file is only readable and writable by the current user.
-        // Doing the equivalent to `chmod 600` on Windows is quite a bit more
-        // code and requires the Windows API crates.
         #[cfg(unix)]
         {
             use std::os::unix::fs::OpenOptionsExt;

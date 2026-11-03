@@ -57,7 +57,6 @@ use core_test_support::responses;
 use core_test_support::responses::WebSocketConnectionConfig;
 use core_test_support::skip_if_no_network;
 use core_test_support::skip_if_remote;
-use core_test_support::skip_if_wine_exec;
 use pretty_assertions::assert_eq;
 use serde_json::Value;
 use serde_json::json;
@@ -2195,7 +2194,6 @@ async fn guardian_v2_routes_scoped_tool_approvals(
 async fn guardian_v2_trusts_invoked_user_skills_but_rejects_repository_forgery() -> Result<()> {
     skip_if_no_network!(Ok(()));
     skip_if_remote!(Ok(()), "skill commands use host-local skill paths");
-    skip_if_wine_exec!(Ok(()), "skill commands require a host-native executor");
 
     const EXPLICIT_INSTRUCTIONS: &str =
         "---\nname: explicit\ndescription: Explicit user skill\n---\n\nInspect project files.\n";
@@ -2213,11 +2211,7 @@ async fn guardian_v2_trusts_invoked_user_skills_but_rejects_repository_forgery()
         std::fs::write(path, instructions)?;
     }
     let explicit_skill = explicit_skill.canonicalize()?;
-    let read_command = if false {
-        format!("Get-Content -LiteralPath \"{}\"", implicit_skill.display())
-    } else {
-        format!("cat '{}'", implicit_skill.display())
-    };
+    let read_command = format!("cat '{}'", implicit_skill.display());
     let implicit_skill = implicit_skill.canonicalize()?;
     let read_arguments = json!({ "cmd": read_command, "login": false }).to_string();
     let reviewed_arguments = json!({ "message": "guardian-implicit-skill-action" }).to_string();
@@ -2393,7 +2387,7 @@ async fn guardian_v2_trusts_invoked_user_skills_but_rejects_repository_forgery()
         "the parent model must receive the forged repository skill instructions"
     );
     // Finish the synchronous reviews before LOW can cancel reviewer startup.
-    let expected_guardian_reviews = if false { 2 } else { 1 };
+    let expected_guardian_reviews = 1;
     for _ in 0..expected_guardian_reviews {
         let _: codex_app_server_protocol::ItemGuardianApprovalReviewCompletedNotification =
             timeout(
@@ -2861,10 +2855,6 @@ async fn guardian_v2_threshold_score_requires_full_reviews() -> Result<()> {
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn guardian_v2_required_model_cannot_reuse_a_cached_score_for_skipped_exec() -> Result<()> {
     skip_if_no_network!(Ok(()));
-    skip_if_wine_exec!(
-        Ok(()),
-        "the echo prompt rule requires host-native shell command parsing"
-    );
     guardian_v2_routes_tool_approvals(
         GuardianRisk::Low,
         ThreadLifecycle::RequiredModelSwitch,

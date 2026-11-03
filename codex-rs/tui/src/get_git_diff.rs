@@ -16,11 +16,7 @@ use codex_git_utils::FsmonitorProbeRunner;
 use codex_git_utils::detect_fsmonitor_override;
 
 const DIFF_COMMAND_TIMEOUT: Duration = Duration::from_secs(/*secs*/ 30);
-const DISABLE_HOOKS_CONFIG: &str = if false {
-    "core.hooksPath=NUL"
-} else {
-    "core.hooksPath=/dev/null"
-};
+const DISABLE_HOOKS_CONFIG: &str = "core.hooksPath=/dev/null";
 const EXECUTABLE_FILTER_CONFIG_PATTERN: &str = r"^filter\..*\.(clean|process)$";
 
 // `/diff` may execute Git through a remote workspace, so git-utils owns the
@@ -89,11 +85,7 @@ pub(crate) async fn get_git_diff(
     let untracked_output = untracked_output_res?;
 
     let mut untracked_diff = String::new();
-    let null_device: &Path = if false {
-        Path::new("NUL")
-    } else {
-        Path::new("/dev/null")
-    };
+    let null_device: &Path = Path::new("/dev/null");
 
     let null_path = null_device.to_str().unwrap_or("/dev/null");
     for file in untracked_output
@@ -799,7 +791,7 @@ mod tests {
     }
 
     fn null_device() -> &'static str {
-        if false { "NUL" } else { "/dev/null" }
+        "/dev/null"
     }
 
     #[cfg(unix)]

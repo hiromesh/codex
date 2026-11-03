@@ -294,6 +294,8 @@ pub(crate) async fn run_command(
 
     let mut process_tree_guard = ProcessTreeGuard {
         process_id: child.id(),
+    };
+
     let stdin = child.stdin.take();
     let write_stdin = async {
         if let Some(mut stdin) = stdin
@@ -361,3 +363,101 @@ pub(crate) async fn run_command(
 // Needed only until command hooks move to the exec server, which owns process-tree cleanup.
 struct ProcessTreeGuard {
     process_id: Option<u32>,
+}
+
+impl Drop for ProcessTreeGuard {
+    fn drop(&mut self) {
+        let Some(process_id) = self.process_id else {
+            return;
+        };
+
+        #[cfg(unix)]
+        {
+            let _ = codex_utils_pty::process_group::kill_process_group(process_id);
+        }
+    }
+}
+
+struct CommandRunCompletion {
+    exit_code: Option<i32>,
+    stdout: String,
+    stderr: String,
+    error: Option<String>,
+    outcome: &'static str,
+}
+
+fn finish_command_run(
+    started_at: i64,
+    started: Instant,
+    completion: CommandRunCompletion,
+) -> HandlerRunResult {
+    Span::current().record("hook.command_outcome", completion.outcome);
+    HandlerRunResult {
+        context_metadata: codex_protocol::models::ContentItemMetadata::command_hook(),
+        started_at,
+        completed_at: chrono::Utc::now().timestamp(),
+        duration_ms: started.elapsed().as_millis().try_into().unwrap_or(i64::MAX),
+        exit_code: completion.exit_code,
+        stdout: completion.stdout,
+        stderr: completion.stderr,
+        error: completion.error,
+    }
+}
+
+fn build_command(
+    shell: &CommandShell,
+    command_line: &str,
+    environment: &[(OsString, OsString)],
+    env: &HashMap<String, String>,
+) -> Command {
+    let mut command = if shell.program.is_empty() {
+        Command::new(default_shell_program(environment))
+    } else {
+        Command::new(&shell.program)
+    };
+    if shell.program.is_empty() {
+        command.arg("-lc");
+    } else {
+        command.args(&shell.args);
+    }
+    command.arg(command_line);
+
+    #[cfg(unix)]
+    command.process_mode(codex_utils_pty::ProcessMode::NewSession);
+    #[cfg(not(unix))]
+    command
+        .env_clear()
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .kill_on_drop(true);
+
+    // Both launchers start with an empty environment. Replay the session snapshot
+    // before hook overrides, filtering restricted names from both sources.
+    command.envs(
+        environment
+            .iter()
+            .map(|(key, value)| (key.as_os_str(), value.as_os_str()))
+            .chain(
+                env.iter()
+                    .map(|(key, value)| (OsStr::new(key), OsStr::new(value))),
+            )
+            .filter(|(key, _)| !key.to_str().is_some_and(is_non_inheritable_env_var)),
+    );
+    command
+}
+
+fn default_shell_program(environment: &[(OsString, OsString)]) -> OsString {
+    let environment_variable = "SHELL";
+    let fallback_program = "/bin/sh";
+
+    environment
+        .iter()
+        .find(|(key, _)| key == OsStr::new(environment_variable))
+        .map(|(_, value)| value.clone())
+        .unwrap_or_else(|| OsString::from(fallback_program))
+}
+
+#[cfg(test)]
+#[path = "command_runner_tests.rs"]
+mod tests;

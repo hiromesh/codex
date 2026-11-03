@@ -129,7 +129,6 @@ use codex_utils_path_uri::LegacyAppPathString;
 use core_test_support::responses;
 use core_test_support::skip_if_no_network;
 use core_test_support::skip_if_remote;
-use core_test_support::skip_if_wine_exec;
 use core_test_support::streaming_sse::StreamingSseChunk;
 use core_test_support::streaming_sse::start_streaming_sse_server;
 use pretty_assertions::assert_eq;
@@ -851,9 +850,6 @@ async fn cold_resume_workspace_roots_honor_owned_snapshot_and_caller_overrides()
             r#"[sandbox_workspace_write]
 exclude_tmpdir_env_var = true
 exclude_slash_tmp = true
-
-[windows]
-sandbox = "unelevated"
 "#,
         )
         .write(codex_home.path())?;
@@ -1106,11 +1102,7 @@ async fn cold_resume_workspace_roots_validate_foreign_startup_paths() -> Result<
         .join("..")
         .to_string_lossy()
         .into_owned();
-    let (foreign_cwd, foreign_extra) = if false {
-        ("/foreign/project", "/foreign/extra")
-    } else {
-        (r"C:\foreign\project", r"C:\foreign\extra")
-    };
+    let (foreign_cwd, foreign_extra) = ("/foreign/project", "/foreign/extra");
     let mut mcp = TestAppServer::builder()
         .with_codex_home(codex_home.path())
         // Startup metadata uses the app-server host's paths, not executor paths.
@@ -2010,8 +2002,7 @@ async fn cold_resume_permission_overrides_win_over_persisted_profile() -> Result
     Ok(())
 }
 
-// Unelevated Windows sandboxes cannot enforce managed deny-read.
-#[cfg_attr(unix, test_case(
+#[test_case(
     SandboxMode::DangerFullAccess,
     BUILT_IN_PERMISSION_PROFILE_WORKSPACE,
     "[permissions.filesystem]\ndeny_read = [\"./private\"]",
@@ -2022,7 +2013,7 @@ async fn cold_resume_permission_overrides_win_over_persisted_profile() -> Result
         exclude_slash_tmp: false,
     };
     "managed deny-read"
-))]
+)]
 #[test_case(
     SandboxMode::DangerFullAccess,
     BUILT_IN_PERMISSION_PROFILE_WORKSPACE,
@@ -5827,12 +5818,6 @@ async fn thread_resume_can_skip_turns_when_thread_is_running() -> Result<()> {
 
 #[tokio::test]
 async fn thread_resume_replays_pending_command_execution_request_approval() -> Result<()> {
-    // TODO(anp): Remove after shell approval replay can route target-native cwd across host OSes.
-    skip_if_wine_exec!(
-        Ok(()),
-        "shell approval replay rejects the Windows cwd on the Linux host"
-    );
-
     let responses = vec![
         create_final_assistant_message_sse_response("seeded")?,
         create_command_execution_sse_response(

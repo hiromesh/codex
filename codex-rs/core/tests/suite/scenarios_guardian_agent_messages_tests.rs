@@ -21,7 +21,7 @@ use pretty_assertions::assert_eq;
 use serde_json::json;
 use test_case::test_case;
 
-#[cfg_attr(not(target_os = "windows"), test_case(None; "agent_reply"))]
+#[test_case(None; "agent_reply")]
 #[test_case(Some("functions"); "native_default_namespace")]
 #[test_case(Some("team"); "native_custom_namespace")]
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]

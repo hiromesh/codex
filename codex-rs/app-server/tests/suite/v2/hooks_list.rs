@@ -31,7 +31,6 @@ use codex_features::Feature;
 use codex_plugin::PluginId;
 use codex_protocol::config_types::TrustLevel;
 use codex_utils_absolute_path::AbsolutePathBuf;
-use core_test_support::skip_if_host_windows;
 use core_test_support::skip_if_remote;
 use pretty_assertions::assert_eq;
 use serde::Serialize;
@@ -327,7 +326,6 @@ async fn hooks_list_shows_discovered_plugin_hook() -> Result<()> {
 
 #[tokio::test]
 async fn plugin_upgrade_refreshes_hook_runtime_for_loaded_session() -> Result<()> {
-    skip_if_host_windows!(Ok(()));
     skip_if_remote!(Ok(()), "command hooks use host-local script and log paths");
 
     let responses = vec![
@@ -558,7 +556,6 @@ async fn plugin_upgrade_refreshes_hook_runtime_for_loaded_session() -> Result<()
 
 #[tokio::test]
 async fn loaded_session_refreshes_externally_updated_plugin_hooks() -> Result<()> {
-    skip_if_host_windows!(Ok(()));
     skip_if_remote!(Ok(()), "command hooks use host-local script and log paths");
 
     let server = create_mock_responses_server_sequence_unchecked(vec![
@@ -723,7 +720,6 @@ async fn loaded_session_refreshes_externally_updated_plugin_hooks() -> Result<()
 #[cfg(unix)]
 #[tokio::test]
 async fn automatic_marketplace_upgrade_refreshes_hook_runtime_for_loaded_session() -> Result<()> {
-    skip_if_host_windows!(Ok(()));
     skip_if_remote!(Ok(()), "command hooks use host-local script and log paths");
 
     let server = create_mock_responses_server_sequence_unchecked(vec![
@@ -1444,7 +1440,6 @@ async fn config_batch_write_toggles_user_hook() -> Result<()> {
 
 #[tokio::test]
 async fn config_batch_write_updates_hook_trust_for_loaded_session() -> Result<()> {
-    skip_if_host_windows!(Ok(()));
     // TODO(anp): Teach command-hook fixtures to run in selected remote environments.
     skip_if_remote!(Ok(()), "command hooks use host-local script and log paths");
 
@@ -1651,7 +1646,6 @@ command = "python3 {}"
 
 #[tokio::test]
 async fn config_batch_write_disables_hook_for_loaded_session() -> Result<()> {
-    skip_if_host_windows!(Ok(()));
     // TODO(anp): Teach command-hook fixtures to run in selected remote environments.
     skip_if_remote!(Ok(()), "command hooks use host-local script and log paths");
 

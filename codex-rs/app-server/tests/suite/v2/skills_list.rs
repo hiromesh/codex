@@ -38,7 +38,6 @@ use codex_protocol::config_types::TrustLevel;
 use codex_utils_absolute_path::AbsolutePathBuf;
 use codex_utils_path_uri::PathUri;
 use core_test_support::skip_if_remote;
-use core_test_support::skip_if_wine_exec;
 use pretty_assertions::assert_eq;
 use tempfile::TempDir;
 use test_case::test_case;
@@ -804,10 +803,6 @@ async fn skills_list_accepts_relative_cwds() -> Result<()> {
 #[test_case(true; "plugins enabled by default")]
 #[tokio::test]
 async fn skills_list_preserves_requested_cwd_order(home_plugins_enabled: bool) -> Result<()> {
-    skip_if_wine_exec!(
-        Ok(()),
-        "skills/list currently requires host-native cwd paths for workspace config"
-    );
     let codex_home = TempDir::new()?;
     let first_cwd = TempDir::new()?;
     let second_cwd = TempDir::new()?;
@@ -933,10 +928,6 @@ enabled = false
 
 #[tokio::test]
 async fn skills_list_refreshes_externally_updated_plugin_versions() -> Result<()> {
-    skip_if_wine_exec!(
-        Ok(()),
-        "skills/list currently requires host-native cwd paths for workspace config"
-    );
     let codex_home = TempDir::new()?;
     let cwd = TempDir::new()?;
     let source = TempDir::new()?;
@@ -1022,10 +1013,6 @@ enabled = true
 
 #[tokio::test]
 async fn skills_list_force_reload_refreshes_cached_plugin_roots() -> Result<()> {
-    skip_if_wine_exec!(
-        Ok(()),
-        "skills/list currently requires host-native cwd paths for workspace config"
-    );
     let codex_home = TempDir::new()?;
     let first_cwd = TempDir::new()?;
     let second_cwd = TempDir::new()?;

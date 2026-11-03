@@ -1,9 +1,9 @@
-#[cfg(any(target_os = "macos", windows))]
+#[cfg(any(target_os = "macos"))]
 use rama_tls_rustls::dep::pki_types::CertificateDer;
 use rustls_native_certs::CertificateResult;
-#[cfg(any(target_os = "macos", windows))]
+#[cfg(any(target_os = "macos"))]
 use rustls_native_certs::Error;
-#[cfg(any(target_os = "macos", windows))]
+#[cfg(any(target_os = "macos"))]
 use rustls_native_certs::ErrorKind;
 
 // `rustls_native_certs::load_native_certs()` first consults SSL_CERT_FILE and
@@ -75,7 +75,7 @@ pub(crate) fn load_platform_native_certs() -> CertificateResult {
     result
 }
 
-#[cfg(not(any(all(unix, not(target_os = "macos")), target_os = "macos", windows)))]
+#[cfg(not(any(all(unix, not(target_os = "macos")), target_os = "macos")))]
 pub(crate) fn load_platform_native_certs() -> CertificateResult {
     rustls_native_certs::load_native_certs()
 }

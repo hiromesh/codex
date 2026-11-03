@@ -97,7 +97,6 @@ use core_test_support::apps_test_server::SEARCH_CALENDAR_NAMESPACE;
 use core_test_support::responses;
 use core_test_support::skip_if_no_network;
 use core_test_support::skip_if_remote;
-use core_test_support::skip_if_wine_exec;
 use core_test_support::streaming_sse::StreamingSseChunk;
 use core_test_support::streaming_sse::start_streaming_sse_server;
 use pretty_assertions::assert_eq;
@@ -2978,11 +2977,6 @@ async fn turn_start_forwards_custom_local_image_detail() -> Result<()> {
 
 #[tokio::test]
 async fn turn_start_exec_approval_toggle_v2() -> Result<()> {
-    // TODO(anp): Remove after shell-command approval routing supports target-native Windows cwd.
-    skip_if_wine_exec!(
-        Ok(()),
-        "shell-command approval routing requires a host-native cwd under Wine-exec"
-    );
     skip_if_no_network!(Ok(()));
 
     let tmp = TempDir::new()?;
@@ -3221,11 +3215,6 @@ async fn run_turn_start_exec_approval_rejection_v2(
     expected_status: CommandExecutionStatus,
     expected_rejection: &str,
 ) -> Result<()> {
-    // TODO(anp): Remove after command approval routing accepts target-native Windows cwd.
-    skip_if_wine_exec!(
-        Ok(()),
-        "command approval routing rejects the selected Windows cwd on the Linux host"
-    );
     skip_if_no_network!(Ok(()));
 
     let tmp = TempDir::new()?;
@@ -3629,8 +3618,6 @@ wire_api = "responses"
 request_max_retries = 0
 stream_max_retries = 0
 
-# This test only exercises writable workspace roots; the Windows restricted-token
-# sandbox cannot enforce a filesystem policy without root read access.
 [permissions.dev.filesystem]
 ":root" = "read"
 
@@ -5486,18 +5473,13 @@ async fn run_turn_start_file_change_approval_rejection_v2(
     Ok(())
 }
 
-#[cfg_attr(not(windows), test_case(None; "started"))]
+#[test_case(None; "started")]
 #[test_case(Some(json!({"cmd": "echo unreachable", "workdir": "missing-work-directory", "tty": false})); "pipe_launch_failure")]
 #[test_case(Some(json!({"cmd": "echo unreachable\u{0}", "tty": true, "login": false})); "pty_launch_failure")]
 #[tokio::test]
 async fn command_execution_notifications_include_process_id(
     launch_failure_args: Option<Value>,
 ) -> Result<()> {
-    // TODO(anp): Add target-Windows process-id expectations for remote executors.
-    skip_if_wine_exec!(
-        Ok(()),
-        "process id reporting differs for a Windows executor"
-    );
     skip_if_no_network!(Ok(()));
 
     let launch_failed = launch_failure_args.is_some();
@@ -5636,7 +5618,6 @@ async fn command_execution_notifications_include_process_id(
     Ok(())
 }
 
-#[cfg_attr(windows, ignore = "plugin attribution fixture is Unix-only")]
 #[test_case(CommandExecutionStatus::Completed; "completed")]
 #[test_case(CommandExecutionStatus::Failed; "launch_failure")]
 #[tokio::test]
@@ -5644,7 +5625,6 @@ async fn command_execution_notifications_include_trusted_plugin_id(
     expected_status: CommandExecutionStatus,
 ) -> Result<()> {
     skip_if_no_network!(Ok(()));
-    skip_if_wine_exec!(Ok(()), "plugin attribution fixture is Unix-only");
 
     let codex_home = TempDir::new()?;
     let missing_cwd = codex_home.path().join("missing-work-directory");

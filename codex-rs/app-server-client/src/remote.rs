@@ -795,6 +795,8 @@ async fn connect_unix_socket_endpoint(
         })?;
     match peer_policy {
         SocketPeerPolicy::ExplicitEndpoint => {}
+    }
+    let websocket_config = remote_websocket_config();
     let stream = timeout(
         CONNECT_TIMEOUT,
         client_async_with_config(request, stream, Some(websocket_config)),

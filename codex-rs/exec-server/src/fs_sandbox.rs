@@ -1,5 +1,5 @@
 use std::collections::HashMap;
-#[cfg(any(windows, test))]
+#[cfg(test)]
 use std::time::Duration;
 
 use codex_exec_server_protocol::JSONRPCErrorError;
@@ -19,9 +19,9 @@ use codex_sandboxing::SandboxType;
 use codex_utils_absolute_path::AbsolutePathBuf;
 #[cfg(not(any(target_os = "linux", target_os = "macos")))]
 use codex_utils_absolute_path::canonicalize_preserving_symlinks;
-#[cfg(any(windows, test))]
+#[cfg(test)]
 use codex_utils_path_uri::LegacyAppPathString;
-#[cfg(any(windows, test))]
+#[cfg(test)]
 use codex_utils_path_uri::PathConvention;
 use codex_utils_path_uri::PathUri;
 use codex_utils_pty::Child;
@@ -30,9 +30,9 @@ use codex_utils_pty::Command;
 #[cfg(target_os = "macos")]
 use codex_utils_pty::DescriptorPolicy;
 use codex_utils_pty::SpawnFallback;
-#[cfg(any(windows, test))]
+#[cfg(test)]
 use tokio::io::AsyncBufReadExt;
-#[cfg(any(windows, test))]
+#[cfg(test)]
 use tokio::io::AsyncReadExt;
 use tokio::io::AsyncWriteExt;
 
@@ -46,9 +46,9 @@ use crate::rpc::internal_error;
 use crate::rpc::invalid_request;
 
 const FS_HELPER_ENV_ALLOWLIST: &[&str] = &["PATH", "TMPDIR", "TMP", "TEMP"];
-#[cfg(any(windows, test))]
+#[cfg(test)]
 const FS_HELPER_EXIT_TIMEOUT: Duration = Duration::from_secs(/*secs*/ 2);
-#[cfg(any(windows, test))]
+#[cfg(test)]
 const MAX_FS_HELPER_STDERR_BYTES: u64 = 4096;
 #[cfg(debug_assertions)]
 const FS_HELPER_BAZEL_BWRAP_ENV_ALLOWLIST: &[&str] = &[
@@ -259,7 +259,7 @@ fn add_helper_runtime_permissions(
     }
 }
 
-#[cfg(any(windows, test))]
+#[cfg(test)]
 fn bind_windows_cwd_relative_deny_read_globs(
     file_system_policy: &mut FileSystemSandboxPolicy,
     cwd: &PathUri,
@@ -401,7 +401,7 @@ async fn run_command(
     }
 }
 
-#[cfg(any(windows, test))]
+#[cfg(test)]
 pub(crate) async fn read_helper_response(
     stdout: impl tokio::io::AsyncRead + Unpin,
 ) -> Result<Vec<u8>, JSONRPCErrorError> {
@@ -418,7 +418,7 @@ pub(crate) async fn read_helper_response(
     Ok(response)
 }
 
-#[cfg(any(windows, test))]
+#[cfg(test)]
 pub(crate) fn drain_helper_stderr(
     child: &mut Child,
 ) -> tokio::task::JoinHandle<Result<Vec<u8>, std::io::Error>> {
@@ -436,7 +436,7 @@ pub(crate) fn drain_helper_stderr(
     })
 }
 
-#[cfg(any(windows, test))]
+#[cfg(test)]
 pub(crate) async fn reap_helper_after_response(
     mut child: Child,
     stderr: tokio::task::JoinHandle<Result<Vec<u8>, std::io::Error>>,

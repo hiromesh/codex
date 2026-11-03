@@ -123,6 +123,7 @@ pub async fn bind_private_daemon_socket(
         rendezvous_path,
         #[cfg(unix)]
         _startup_lock: startup_lock,
+    };
     set_control_socket_permissions(socket_guard.socket_path.as_path()).await?;
     #[cfg(unix)]
     std::os::unix::fs::symlink(

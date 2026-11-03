@@ -1458,11 +1458,7 @@ mod tests {
 
     #[test]
     fn marketplace_add_source_for_request_resolves_relative_local_paths() {
-        let cwd = if false {
-            PathBuf::from(r"C:\workspace\project")
-        } else {
-            PathBuf::from("/workspace/project")
-        };
+        let cwd = PathBuf::from("/workspace/project");
 
         let resolved = marketplace_add_source_for_request(&cwd, "./marketplace".to_string());
         assert!(std::path::Path::new(&resolved).is_absolute());

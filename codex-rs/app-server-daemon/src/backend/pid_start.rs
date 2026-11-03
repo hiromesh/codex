@@ -160,11 +160,7 @@ impl PidBackend {
                     let _ = fs::remove_file(&self.pid_file).await;
                 }
                 return Err(err).with_context(|| {
-                    let job_hint = if false {
-                        " (the Windows host job must allow breakaway)"
-                    } else {
-                        ""
-                    };
+                    let job_hint = "";
                     format!(
                         "failed to spawn detached app-server process using {}{job_hint}",
                         self.codex_bin.display()
@@ -241,10 +237,6 @@ impl PidBackend {
             return Err(err).with_context(|| {
                 format!("failed to publish pid file {}", self.pid_file.display())
             });
-        }
-) {
-            self.finish_updater_start(&record, replacement.as_ref())
-                .await?;
         }
         drop(reservation_lock);
         Ok(Some(pid))

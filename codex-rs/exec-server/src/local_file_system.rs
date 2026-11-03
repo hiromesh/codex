@@ -1260,7 +1260,7 @@ fn copy_symlink(source: &Path, target: &Path) -> io::Result<()> {
     {
         std::os::unix::fs::symlink(&link_target, target)
     }
-    #[cfg(not(any(unix, windows)))]
+    #[cfg(not(unix))]
     {
         let _ = link_target;
         let _ = target;
@@ -1278,7 +1278,7 @@ fn system_time_to_unix_ms(time: SystemTime) -> i64 {
         .unwrap_or(0)
 }
 
-#[cfg(all(test, any(unix, windows)))]
+#[cfg(all(test, any(unix)))]
 #[path = "local_file_system_path_uri_tests.rs"]
 mod path_uri_tests;
 
@@ -1309,31 +1309,6 @@ mod tests {
             resolved,
             resolve_existing_path(temp_dir.path())?.join("secret.txt")
         );
-        Ok(())
-    }
-}
-
-#[cfg(all(test, windows))]
-mod tests {
-    use super::*;
-    use pretty_assertions::assert_eq;
-
-    #[test]
-    fn symlink_points_to_directory_handles_dangling_directory_symlinks() -> io::Result<()> {
-        use std::os::windows::fs::symlink_dir;
-
-        let temp_dir = tempfile::TempDir::new()?;
-        let source_dir = temp_dir.path().join("source");
-        let link_path = temp_dir.path().join("source-link");
-        std::fs::create_dir(&source_dir)?;
-
-        if symlink_dir(&source_dir, &link_path).is_err() {
-            return Ok(());
-        }
-
-        std::fs::remove_dir(&source_dir)?;
-
-        assert_eq!(symlink_points_to_directory(&link_path)?, true);
         Ok(())
     }
 }

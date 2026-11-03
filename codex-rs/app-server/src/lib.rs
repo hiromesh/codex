@@ -793,14 +793,7 @@ pub async fn run_main_with_transport_options(
                 socket_path.clone(),
                 transport_event_tx.clone(),
                 transport_shutdown_token.clone(),
-                if false
-                    && std::env::var_os(codex_app_server_transport::DAEMON_SHUTDOWN_SOCKET_ENV)
-                        .is_some()
-                {
-                    DaemonShutdownAccess::Managed
-                } else {
-                    DaemonShutdownAccess::Disabled
-                },
+                DaemonShutdownAccess::Disabled,
                 websocket_compression,
             )
             .await?;

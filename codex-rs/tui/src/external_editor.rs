@@ -143,7 +143,7 @@ pub(crate) async fn run_editor(
     #[cfg(any(target_os = "macos", target_os = "linux"))]
     candidate_homes.push(&project_codex_home);
     let editor_directory = editor_directory(&candidate_homes, file_system_policy, cwd)?;
-    // Convert to TempPath immediately so no file handle stays open on Windows.
+    // Convert to TempPath immediately so no file handle stays open longer than necessary.
     let temp_path = Builder::new()
         .suffix(".md")
         .tempfile_in(editor_directory)?

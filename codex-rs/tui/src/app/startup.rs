@@ -218,7 +218,7 @@ impl App {
     }
 
     /// Wait until visible and queued startup decisions cannot consume a delayed OSC response.
-    #[cfg(any(windows, test))]
+    #[cfg(test)]
     pub(super) fn ready_for_terminal_color_probe(&self, has_pending_app_events: bool) -> bool {
         !has_pending_app_events
             && !self.chat_widget.has_active_view()
@@ -1660,6 +1660,11 @@ See the Codex keymap documentation for supported actions and examples."
                                 &mut pending_startup_submission,
                             );
                         }
+                    }
+                    AppRunControl::Exit(reason) => break Ok(reason),
+                }
+            }
+        };
         // Let the pending terminal poll unwind while the app server shuts down.
         tui.pause_events();
         app.chat_widget.mention_usage_mut().flush().await;

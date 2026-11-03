@@ -266,7 +266,7 @@ fn kill_child(child: &mut Child) {
     let _ = child.wait();
 }
 
-#[cfg(all(test, windows))]
+#[cfg(all(test))]
 mod tests {
     use super::*;
     use crate::powershell::try_find_powershell_executable_blocking;

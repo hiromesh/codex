@@ -1,4 +1,3 @@
-#![cfg(not(target_os = "windows"))]
 
 use codex_core::TurnInputRequest;
 use core_test_support::test_codex::local_requests;

@@ -39,11 +39,7 @@ pub(crate) fn tags(size: Size) -> [(&'static str, &'static str); 2] {
 
 pub(crate) fn read_size() -> Size {
     // On Unix, size() may synchronously spawn tput when the direct query fails.
-    #[cfg(unix)]
     let size = crossterm::terminal::window_size().map(|size| Size::new(size.columns, size.rows));
-    // Windows size() queries the console directly; window_size() is unsupported there.
-    #[cfg(not(unix))]
-    let size = crossterm::terminal::size().map(|(width, height)| Size::new(width, height));
     size.unwrap_or_default()
 }
 

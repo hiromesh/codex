@@ -2011,8 +2011,8 @@ allow_login_shell = false
     service
         .write_value(ConfigValueWriteParams {
             file_path: Some(path.display().to_string()),
-            key_path: "windows.sandbox".to_string(),
-            value: serde_json::json!("elevated"),
+            key_path: "model".to_string(),
+            value: serde_json::json!("gpt-5.1-codex"),
             merge_strategy: MergeStrategy::Replace,
             expected_version: None,
         })

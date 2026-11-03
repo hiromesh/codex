@@ -174,7 +174,7 @@ const UNIX_CORE_ENV_VARS: &[&str] = &[
 #[path = "shell_environment_tests.rs"]
 mod tests;
 
-#[cfg(all(test, target_os = "windows"))]
+#[cfg(all(test))]
 mod windows_tests {
     use super::*;
     use pretty_assertions::assert_eq;
@@ -188,7 +188,7 @@ mod windows_tests {
 
 }
 
-#[cfg(all(test, not(target_os = "windows")))]
+#[cfg(test)]
 mod non_windows_tests {
     use super::*;
     use pretty_assertions::assert_eq;

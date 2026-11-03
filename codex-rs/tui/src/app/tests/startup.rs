@@ -1,5 +1,3 @@
-use super::session_lifecycle_requests::recorded_params;
-use super::session_lifecycle_requests::start_recording_remote_app_server;
 use super::*;
 use crate::ThreadParamsMode;
 use crate::app_event_sender::AppEventSender;
@@ -9,7 +7,6 @@ use crate::tui::FrameRequester;
 use app_test_support::create_fake_parented_rollout_with_source;
 use codex_app_server_protocol::ToolRequestUserInputOption;
 use codex_app_server_protocol::ToolRequestUserInputQuestion;
-use codex_utils_approval_presets::builtin_approval_presets;
 use crossterm::event::KeyCode;
 use crossterm::event::KeyEvent;
 use crossterm::event::KeyModifiers;

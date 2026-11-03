@@ -58,7 +58,7 @@ fn local_fqdn_for_hostname(hostname: &str) -> Option<String> {
         .find_map(|hostname| normalize_fqdn_candidate(&hostname))
 }
 
-#[cfg(not(any(unix, windows)))]
+#[cfg(not(unix))]
 fn local_fqdn_for_hostname(_hostname: &str) -> Option<String> {
     None
 }

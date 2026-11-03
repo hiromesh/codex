@@ -345,11 +345,7 @@ async fn oauth_login_validates_callback_issuer_and_uses_http_headers_helper(
         .await;
 
     let codex_home = TempDir::new()?;
-    let helper_command = if false {
-        r#"echo {"X-Gateway":"gateway-token"}"#
-    } else {
-        r#"printf '{"X-Gateway":"gateway-token"}'"#
-    };
+    let helper_command = r#"printf '{"X-Gateway":"gateway-token"}'"#;
     let saved_callback = configured_callback
         .map(|callback| format!("callback_url = \"{callback}\"\n"))
         .unwrap_or_default();

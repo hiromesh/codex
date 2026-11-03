@@ -1559,26 +1559,15 @@ model_reasoning_effort = "high"
         .await?;
 
     let config_toml = std::fs::read_to_string(codex_home.path().join("config.toml"))?;
-    if false {
-        assert_eq!(
-            first_response.sandbox,
-            codex_app_server_protocol::SandboxPolicy::ReadOnly {
-                network_access: false,
-            }
-        );
-        assert_eq!(reasoning_effort, None);
-        assert_eq!(config_toml, config_before);
-    } else {
-        assert_eq!(approval_policy, AskForApproval::OnRequest);
-        assert_eq!(reasoning_effort, Some(ReasoningEffort::High));
-        let workspace_abs = workspace.path().to_path_buf().abs();
-        let trusted_root = resolve_root_git_project_for_trust(LOCAL_FS.as_ref(), &workspace_abs)
-            .await
-            .unwrap_or(workspace_abs);
-        let trusted_root_key = project_trust_key(trusted_root.as_path());
-        assert!(config_toml.contains(&trusted_root_key));
-        assert!(config_toml.contains("trust_level = \"trusted\""));
-    }
+    assert_eq!(approval_policy, AskForApproval::OnRequest);
+    assert_eq!(reasoning_effort, Some(ReasoningEffort::High));
+    let workspace_abs = workspace.path().to_path_buf().abs();
+    let trusted_root = resolve_root_git_project_for_trust(LOCAL_FS.as_ref(), &workspace_abs)
+        .await
+        .unwrap_or(workspace_abs);
+    let trusted_root_key = project_trust_key(trusted_root.as_path());
+    assert!(config_toml.contains(&trusted_root_key));
+    assert!(config_toml.contains("trust_level = \"trusted\""));
 
     Ok(())
 }
@@ -1690,24 +1679,14 @@ async fn thread_start_with_nested_git_cwd_respects_effective_permissions_for_pro
         .await?;
 
     let config_toml = std::fs::read_to_string(codex_home.path().join("config.toml"))?;
-    if false {
-        assert_eq!(
-            sandbox,
-            codex_app_server_protocol::SandboxPolicy::ReadOnly {
-                network_access: false,
-            }
-        );
-        assert_eq!(config_toml, config_before);
-    } else {
-        let nested_abs = nested.abs();
-        let trusted_root = resolve_root_git_project_for_trust(LOCAL_FS.as_ref(), &nested_abs)
-            .await
-            .expect("git root should resolve");
-        let trusted_root_key = project_trust_key(trusted_root.as_path());
-        let nested_key = project_trust_key(&nested);
-        assert!(config_toml.contains(&trusted_root_key));
-        assert!(!config_toml.contains(&nested_key));
-    }
+    let nested_abs = nested.abs();
+    let trusted_root = resolve_root_git_project_for_trust(LOCAL_FS.as_ref(), &nested_abs)
+        .await
+        .expect("git root should resolve");
+    let trusted_root_key = project_trust_key(trusted_root.as_path());
+    let nested_key = project_trust_key(&nested);
+    assert!(config_toml.contains(&trusted_root_key));
+    assert!(!config_toml.contains(&nested_key));
 
     Ok(())
 }
@@ -1917,8 +1896,6 @@ fn create_config_toml_with_profile_workspace_root(
 [permissions.dev.workspace_roots]
 "{profile_root_key}" = true
 
-# This test only exercises workspace roots; Windows restricted-token sandboxes
-# cannot enforce a filesystem policy without root read access.
 [permissions.dev.filesystem]
 ":root" = "read"
 

@@ -525,7 +525,6 @@ async fn user_shell_command_does_not_set_network_sandbox_env_var() -> anyhow::Re
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-#[cfg(not(target_os = "windows"))] // TODO: unignore on windows
 async fn user_shell_command_output_is_truncated_in_history() -> anyhow::Result<()> {
     let server = responses::start_mock_server().await;
     let builder = core_test_support::test_codex::test_codex();

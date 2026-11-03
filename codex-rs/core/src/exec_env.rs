@@ -81,7 +81,7 @@ pub fn inject_apply_patch_env(env: &mut HashMap<String, String>) {
     );
 }
 
-#[cfg(all(test, target_os = "windows"))]
+#[cfg(all(test))]
 fn create_env_from_vars<I>(
     vars: I,
     policy: &ShellEnvironmentPolicy,

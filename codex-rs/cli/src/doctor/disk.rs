@@ -139,7 +139,7 @@ fn available_space(path: &Path) -> io::Result<u64> {
         .map_err(|_| io::Error::other("available disk space exceeds u64"))
 }
 
-#[cfg(not(any(unix, windows)))]
+#[cfg(not(unix))]
 fn available_space(_path: &Path) -> io::Result<u64> {
     Err(io::Error::new(
         io::ErrorKind::Unsupported,

@@ -241,7 +241,7 @@ fn macos_desktop_update_url(home: &Path, application: &InstalledApp, os_version:
     url.to_string()
 }
 
-#[cfg(any(target_os = "windows", test))]
+#[cfg(test)]
 fn windows_store_update(
     manifest: &[u8],
     installed_version: &str,

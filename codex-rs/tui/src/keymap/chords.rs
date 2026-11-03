@@ -808,8 +808,7 @@ fn validate_binding_shape(binding: &RuntimeChordBinding) -> Result<(), String> {
         && !binding.action.context.allows_plain_chord_prefix()
     {
         return Err(format!(
-            "Invalid `{path}` = `{}`: a ctrl-alt character prefix may be AltGr text input on \
-Windows. Choose a different chord and retry.",
+            "Invalid `{path}` = `{}`: a ctrl-alt character prefix may be AltGr text input. Choose a different chord and retry.",
             binding.spec
         ));
     }

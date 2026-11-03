@@ -338,12 +338,7 @@ async fn status_snapshot_includes_reasoning_details() {
         /*collaboration_mode*/ None,
         reasoning_effort_override,
     );
-    let mut rendered_lines = render_lines(&composite.display_lines(/*width*/ 80));
-    if false {
-        for line in &mut rendered_lines {
-            *line = line.replace('\\', "/");
-        }
-    }
+    let rendered_lines = render_lines(&composite.display_lines(/*width*/ 80));
     let sanitized = sanitize_directory(rendered_lines).join("\n");
     assert_snapshot!(sanitized);
 }
@@ -757,12 +752,7 @@ async fn status_snapshot_shows_active_user_defined_profile() {
         /*collaboration_mode*/ None,
         /*reasoning_effort_override*/ None,
     );
-    let mut rendered_lines = render_lines(&composite.display_lines(/*width*/ 80));
-    if false {
-        for line in &mut rendered_lines {
-            *line = line.replace('\\', "/");
-        }
-    }
+    let rendered_lines = render_lines(&composite.display_lines(/*width*/ 80));
     let sanitized = sanitize_directory(rendered_lines).join("\n");
     assert_snapshot!(sanitized);
 }
@@ -913,12 +903,7 @@ async fn status_snapshot_shows_auto_review_permissions() {
         /*collaboration_mode*/ None,
         /*reasoning_effort_override*/ None,
     );
-    let mut rendered_lines = render_lines(&composite.display_lines(/*width*/ 80));
-    if false {
-        for line in &mut rendered_lines {
-            *line = line.replace('\\', "/");
-        }
-    }
+    let rendered_lines = render_lines(&composite.display_lines(/*width*/ 80));
     let sanitized = sanitize_directory(rendered_lines).join("\n");
     assert_snapshot!(sanitized);
 }
@@ -1013,12 +998,7 @@ async fn status_snapshot_includes_forked_from() {
         /*collaboration_mode*/ None,
         /*reasoning_effort_override*/ None,
     );
-    let mut rendered_lines = render_lines(&composite.display_lines(/*width*/ 80));
-    if false {
-        for line in &mut rendered_lines {
-            *line = line.replace('\\', "/");
-        }
-    }
+    let rendered_lines = render_lines(&composite.display_lines(/*width*/ 80));
     let sanitized = sanitize_directory(rendered_lines).join("\n");
     assert_snapshot!(sanitized);
 }
@@ -1079,12 +1059,7 @@ async fn status_snapshot_includes_monthly_limit() {
         /*collaboration_mode*/ None,
         /*reasoning_effort_override*/ None,
     );
-    let mut rendered_lines = render_lines(&composite.display_lines(/*width*/ 80));
-    if false {
-        for line in &mut rendered_lines {
-            *line = line.replace('\\', "/");
-        }
-    }
+    let rendered_lines = render_lines(&composite.display_lines(/*width*/ 80));
     let sanitized = sanitize_directory(rendered_lines).join("\n");
     assert_snapshot!(sanitized);
 }
@@ -1145,21 +1120,11 @@ async fn status_snapshot_includes_enterprise_monthly_credit_limit() {
         /*collaboration_mode*/ None,
         /*reasoning_effort_override*/ None,
     );
-    let mut rendered_lines = render_lines(&composite.display_lines(/*width*/ 92));
-    if false {
-        for line in &mut rendered_lines {
-            *line = line.replace('\\', "/");
-        }
-    }
+    let rendered_lines = render_lines(&composite.display_lines(/*width*/ 92));
     let sanitized = sanitize_directory(rendered_lines).join("\n");
     assert_snapshot!(sanitized);
 
-    let mut rendered_lines = render_lines(&composite.display_lines(/*width*/ 46));
-    if false {
-        for line in &mut rendered_lines {
-            *line = line.replace('\\', "/");
-        }
-    }
+    let rendered_lines = render_lines(&composite.display_lines(/*width*/ 46));
     let sanitized = sanitize_directory(rendered_lines).join("\n");
     assert_snapshot!(
         "status_snapshot_wraps_enterprise_monthly_credit_details_in_narrow_terminal",
@@ -1227,12 +1192,7 @@ async fn status_snapshot_uses_generic_limit_labels_for_unsupported_windows() {
         /*collaboration_mode*/ None,
         /*reasoning_effort_override*/ None,
     );
-    let mut rendered_lines = render_lines(&composite.display_lines(/*width*/ 80));
-    if false {
-        for line in &mut rendered_lines {
-            *line = line.replace('\\', "/");
-        }
-    }
+    let rendered_lines = render_lines(&composite.display_lines(/*width*/ 80));
     let sanitized = sanitize_directory(rendered_lines).join("\n");
     assert_snapshot!(sanitized);
 }
@@ -1615,12 +1575,7 @@ async fn status_snapshot_wraps_in_narrow_terminal() {
         /*collaboration_mode*/ None,
         reasoning_effort_override,
     );
-    let mut rendered_lines = render_lines(&composite.display_lines(/*width*/ 70));
-    if false {
-        for line in &mut rendered_lines {
-            *line = line.replace('\\', "/");
-        }
-    }
+    let rendered_lines = render_lines(&composite.display_lines(/*width*/ 70));
     let sanitized = sanitize_directory(rendered_lines).join("\n");
 
     assert_snapshot!("status_snapshot_truncates_in_narrow_terminal", sanitized);
@@ -1704,12 +1659,7 @@ async fn status_snapshot_shows_missing_limits_message() {
         /*collaboration_mode*/ None,
         /*reasoning_effort_override*/ None,
     );
-    let mut rendered_lines = render_lines(&composite.display_lines(/*width*/ 80));
-    if false {
-        for line in &mut rendered_lines {
-            *line = line.replace('\\', "/");
-        }
-    }
+    let rendered_lines = render_lines(&composite.display_lines(/*width*/ 80));
     let sanitized = sanitize_directory(rendered_lines).join("\n");
     assert_snapshot!(sanitized);
 }
@@ -1772,12 +1722,7 @@ async fn status_snapshot_uses_default_reasoning_when_config_empty() {
             "<none>".to_string(),
             /*refreshing_rate_limits*/ false,
         );
-        let mut rendered_lines = render_lines(&composite.display_lines(/*width*/ 80));
-        if false {
-            for line in &mut rendered_lines {
-                *line = line.replace('\\', "/");
-            }
-        }
+        let rendered_lines = render_lines(&composite.display_lines(/*width*/ 80));
         let sanitized = sanitize_directory(rendered_lines).join("\n");
         assert_snapshot!(snapshot, sanitized);
     }
@@ -1841,12 +1786,7 @@ async fn status_snapshot_shows_refreshing_limits_notice() {
         /*reasoning_effort_override*/ None,
         /*refreshing_rate_limits*/ true,
     );
-    let mut rendered_lines = render_lines(&composite.display_lines(/*width*/ 80));
-    if false {
-        for line in &mut rendered_lines {
-            *line = line.replace('\\', "/");
-        }
-    }
+    let rendered_lines = render_lines(&composite.display_lines(/*width*/ 80));
     let sanitized = sanitize_directory(rendered_lines).join("\n");
     assert_snapshot!(sanitized);
 }
@@ -2003,12 +1943,7 @@ async fn status_snapshot_includes_credits_and_limits() {
         /*collaboration_mode*/ None,
         /*reasoning_effort_override*/ None,
     );
-    let mut rendered_lines = render_lines(&composite.display_lines(/*width*/ 80));
-    if false {
-        for line in &mut rendered_lines {
-            *line = line.replace('\\', "/");
-        }
-    }
+    let rendered_lines = render_lines(&composite.display_lines(/*width*/ 80));
     let sanitized = sanitize_directory(rendered_lines).join("\n");
     assert_snapshot!(sanitized);
 }
@@ -2064,12 +1999,7 @@ async fn status_snapshot_shows_unavailable_limits_message() {
         /*collaboration_mode*/ None,
         /*reasoning_effort_override*/ None,
     );
-    let mut rendered_lines = render_lines(&composite.display_lines(/*width*/ 80));
-    if false {
-        for line in &mut rendered_lines {
-            *line = line.replace('\\', "/");
-        }
-    }
+    let rendered_lines = render_lines(&composite.display_lines(/*width*/ 80));
     let sanitized = sanitize_directory(rendered_lines).join("\n");
     assert_snapshot!(sanitized);
 }
@@ -2125,12 +2055,7 @@ async fn status_snapshot_treats_refreshing_empty_limits_as_unavailable() {
         /*reasoning_effort_override*/ None,
         /*refreshing_rate_limits*/ true,
     );
-    let mut rendered_lines = render_lines(&composite.display_lines(/*width*/ 80));
-    if false {
-        for line in &mut rendered_lines {
-            *line = line.replace('\\', "/");
-        }
-    }
+    let rendered_lines = render_lines(&composite.display_lines(/*width*/ 80));
     let sanitized = sanitize_directory(rendered_lines).join("\n");
     assert!(sanitized.contains("Limits:          not available for this account"));
 }
@@ -2195,12 +2120,7 @@ async fn status_snapshot_shows_stale_limits_message() {
         /*collaboration_mode*/ None,
         /*reasoning_effort_override*/ None,
     );
-    let mut rendered_lines = render_lines(&composite.display_lines(/*width*/ 80));
-    if false {
-        for line in &mut rendered_lines {
-            *line = line.replace('\\', "/");
-        }
-    }
+    let rendered_lines = render_lines(&composite.display_lines(/*width*/ 80));
     let sanitized = sanitize_directory(rendered_lines).join("\n");
     assert_snapshot!(sanitized);
 }
@@ -2269,12 +2189,7 @@ async fn status_snapshot_cached_limits_hide_credits_without_flag() {
         /*collaboration_mode*/ None,
         /*reasoning_effort_override*/ None,
     );
-    let mut rendered_lines = render_lines(&composite.display_lines(/*width*/ 80));
-    if false {
-        for line in &mut rendered_lines {
-            *line = line.replace('\\', "/");
-        }
-    }
+    let rendered_lines = render_lines(&composite.display_lines(/*width*/ 80));
     let sanitized = sanitize_directory(rendered_lines).join("\n");
     assert_snapshot!(sanitized);
 }

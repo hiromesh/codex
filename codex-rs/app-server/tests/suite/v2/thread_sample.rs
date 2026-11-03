@@ -36,7 +36,6 @@ use codex_protocol::openai_models::ReasoningEffort;
 use core_test_support::context_snapshot;
 use core_test_support::context_snapshot::ContextSnapshotOptions;
 use core_test_support::responses;
-use core_test_support::skip_if_host_windows;
 use core_test_support::skip_if_remote;
 use pretty_assertions::assert_eq;
 use serde_json::Value;
@@ -524,7 +523,6 @@ async fn sample_preserves_effort_baseline(
 
 #[tokio::test]
 async fn sample_skips_inherited_stop_hooks() -> Result<()> {
-    skip_if_host_windows!(Ok(()));
     skip_if_remote!(Ok(()), "command hook uses host-local paths");
     let server = responses::start_mock_server().await;
     let mock = responses::mount_sse_sequence(

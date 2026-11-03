@@ -1,6 +1,5 @@
 use anyhow::Result;
 use app_test_support::TestAppServer;
-use app_test_support::test_path_buf_with_windows;
 use app_test_support::test_tmp_path_buf;
 use codex_app_server_protocol::AllowDenyRequirement;
 use codex_app_server_protocol::AppConfig;
@@ -1741,8 +1740,8 @@ async fn config_read_respects_managed_project_root_markers() -> Result<()> {
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn config_read_includes_system_layer_and_overrides() -> Result<()> {
     let codex_home = TempDir::new()?;
-    let user_dir = test_path_buf_with_windows("/user", Some(r"C:\Users\user"));
-    let system_dir = test_path_buf_with_windows("/system", Some(r"C:\System"));
+    let user_dir = std::path::PathBuf::from("/user");
+    let system_dir = std::path::PathBuf::from("/system");
     write_config(
         &codex_home,
         &format!(

@@ -231,9 +231,8 @@ pub fn set_modes() -> Result<()> {
     // Enable keyboard enhancement flags so modifiers for keys like Enter are disambiguated.
     // chat_composer.rs is using a keyboard event listener to enter for any modified keys
     // to create a new line that require this.
-    // Some terminals (notably legacy Windows consoles) do not support
-    // keyboard enhancement flags. Attempt to enable them, but continue
-    // gracefully if unsupported.
+    // Some terminals do not support keyboard enhancement flags. Attempt to enable
+    // them, but continue gracefully if unsupported.
     keyboard_modes::enable_keyboard_enhancement(&mut stdout());
 
     let _ = execute!(stdout(), EnableFocusChange);

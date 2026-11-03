@@ -151,8 +151,7 @@ impl AlternateScreen {
         self.input_configured
             .store(/*val*/ false, Ordering::Relaxed);
         let mouse_result = self.disable_mouse(writer);
-        // Crossterm never pushes a keyboard stack on native Windows: its input-record API
-        // already reports enhanced keys, and its push/pop commands return Unsupported.
+        // Crossterm's push/pop keyboard commands may return Unsupported on some platforms.
         let keyboard_result = if self.keyboard_active.load(Ordering::Relaxed) {
             // modifyOtherKeys is not stacked per screen; keep the main screen's fallback enabled
             // until terminal handoff restores its keyboard modes too.

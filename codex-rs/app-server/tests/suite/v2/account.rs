@@ -422,30 +422,10 @@ async fn logout_account_succeeds_when_config_reload_fails() -> Result<()> {
     Ok(())
 }
 
-#[test_case(false, false; "local_auth_before_cloud")]
-#[test_case(true, false; "local_mxc_after_cloud_selection")]
-#[test_case(false, true; "cloud_mxc_without_default_recovery")]
 #[tokio::test]
-async fn startup_enforces_requirements_at_the_correct_load_stage(
-    local_mxc: bool,
-    cloud_mxc: bool,
-) -> Result<()> {
+async fn startup_enforces_requirements_at_the_correct_load_stage() -> Result<()> {
     let codex_home = TempDir::new()?;
     let mock_server = MockServer::start().await;
-    let require_mxc = "[windows]\nrequire_mxc = true\n";
-    let fetch_cloud = local_mxc || cloud_mxc;
-    if fetch_cloud {
-        let bundle = codex_config::test_support::CloudConfigBundleFixture::enterprise_requirement(
-            if cloud_mxc { require_mxc } else { "" },
-        )
-        .add_enterprise_config(format!("[features]\nprefer_mxc = {local_mxc}\n"))
-        .into_bundle();
-        Mock::given(path("/backend-api/wham/config/bundle"))
-            .respond_with(ResponseTemplate::new(200).set_body_json(bundle))
-            .expect(1..)
-            .mount(&mock_server)
-            .await;
-    }
     create_config_toml(
         codex_home.path(),
         CreateConfigTomlParams {
@@ -455,13 +435,7 @@ async fn startup_enforces_requirements_at_the_correct_load_stage(
     )?;
     std::fs::write(
         codex_home.path().join("requirements.toml"),
-        if local_mxc {
-            require_mxc
-        } else if cloud_mxc {
-            ""
-        } else {
-            "allowed_login_methods = [\"api\"]\n"
-        },
+        "allowed_login_methods = [\"api\"]\n",
     )?;
     write_chatgpt_auth(
         codex_home.path(),
@@ -480,16 +454,13 @@ async fn startup_enforces_requirements_at_the_correct_load_stage(
         .await?;
 
     timeout(DEFAULT_READ_TIMEOUT, mcp.initialize()).await??;
-    if !fetch_cloud {
-        assert_eq!(read_account(&mut mcp).await?.account, None);
-    }
-    assert_eq!(
+    assert_eq!(read_account(&mut mcp).await?.account, None);
+    assert!(
         mock_server
             .received_requests()
             .await
             .expect("recorded requests")
-            .is_empty(),
-        !fetch_cloud,
+            .is_empty()
     );
 
     Ok(())

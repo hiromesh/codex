@@ -1450,7 +1450,7 @@ mod tests {
         Ok(())
     }
 
-    #[cfg(any(unix, windows))]
+    #[cfg(unix)]
     #[test]
     fn fallback_file_write_does_not_follow_symlinks() -> Result<()> {
         #[cfg(unix)]

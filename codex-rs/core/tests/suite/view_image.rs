@@ -1,4 +1,3 @@
-#![cfg(not(target_os = "windows"))]
 
 use anyhow::Context;
 use base64::Engine;

@@ -70,7 +70,6 @@ impl ChatWidget {
         }
     }
 
-    #[cfg_attr(not(target_os = "windows"), allow(dead_code))]
     pub(crate) fn set_permission_profile_from_session_snapshot(
         &mut self,
         snapshot: PermissionProfileSnapshot,
@@ -107,7 +106,6 @@ impl ChatWidget {
         self.config.permissions.network = network;
     }
 
-    #[cfg_attr(not(target_os = "windows"), allow(dead_code))]
     pub(crate) fn set_feature_enabled(&mut self, feature: Feature, enabled: bool) -> bool {
         if let Err(err) = self.config.features.set_enabled(feature, enabled) {
             tracing::warn!(

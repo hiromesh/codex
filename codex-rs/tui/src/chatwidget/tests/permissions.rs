@@ -1345,12 +1345,10 @@ async fn permissions_full_access_history_cell_emitted_only_after_confirmation() 
             _ => {}
         }
     }
-    if cfg!(not(target_os = "windows")) {
-        assert!(
-            cells_before_confirmation.is_empty(),
-            "did not expect history cell before confirming full access"
-        );
-    }
+    assert!(
+        cells_before_confirmation.is_empty(),
+        "did not expect history cell before confirming full access"
+    );
     let (preset, return_to_permissions, profile_selection) =
         open_confirmation_event.expect("expected full access confirmation event");
     chat.open_full_access_confirmation(preset, return_to_permissions, profile_selection);

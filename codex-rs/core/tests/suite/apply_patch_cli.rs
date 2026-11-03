@@ -215,7 +215,7 @@ fn create_file_symlink(source: &std::path::Path, link: &std::path::Path) -> std:
     std::os::unix::fs::symlink(source, link)
 }
 
-#[cfg(not(any(unix, windows)))]
+#[cfg(not(unix))]
 fn create_file_symlink(_source: &std::path::Path, _link: &std::path::Path) -> std::io::Result<()> {
     Err(std::io::Error::new(
         std::io::ErrorKind::Unsupported,

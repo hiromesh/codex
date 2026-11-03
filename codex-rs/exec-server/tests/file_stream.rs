@@ -22,10 +22,10 @@ use futures::StreamExt;
 use futures::TryStreamExt;
 use pretty_assertions::assert_eq;
 use std::sync::Arc;
-#[cfg(any(unix, windows))]
+#[cfg(unix)]
 use std::time::Duration;
 use tempfile::TempDir;
-#[cfg(any(unix, windows))]
+#[cfg(unix)]
 use tokio::time::timeout;
 use uuid::Uuid;
 

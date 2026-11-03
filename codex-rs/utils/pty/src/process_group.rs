@@ -15,7 +15,6 @@
 //!
 //! On macOS, `terminate_process_group` and `kill_process_group` retry denied
 //! group signals against individual members.
-//! On non-Unix platforms these helpers are no-ops.
 
 use std::io;
 
@@ -60,12 +59,6 @@ pub fn detach_from_tty() -> io::Result<()> {
     Ok(())
 }
 
-#[cfg(not(unix))]
-/// No-op on non-Unix platforms.
-pub fn detach_from_tty() -> io::Result<()> {
-    Ok(())
-}
-
 #[cfg(unix)]
 /// Put the calling process into its own process group.
 ///
@@ -77,12 +70,6 @@ pub fn set_process_group() -> io::Result<()> {
     } else {
         Ok(())
     }
-}
-
-#[cfg(not(unix))]
-/// No-op on non-Unix platforms.
-pub fn set_process_group() -> io::Result<()> {
-    Ok(())
 }
 
 #[cfg(unix)]
@@ -110,12 +97,6 @@ pub fn kill_process_group_by_pid(pid: u32) -> io::Result<()> {
         }
     }
 
-    Ok(())
-}
-
-#[cfg(not(unix))]
-/// No-op on non-Unix platforms.
-pub fn kill_process_group_by_pid(_pid: u32) -> io::Result<()> {
     Ok(())
 }
 
@@ -246,22 +227,10 @@ pub fn terminate_process_group(process_group_id: u32) -> io::Result<bool> {
     )
 }
 
-#[cfg(not(unix))]
-/// No-op on non-Unix platforms.
-pub fn terminate_process_group(_process_group_id: u32) -> io::Result<bool> {
-    Ok(false)
-}
-
 #[cfg(unix)]
 /// Send SIGINT to a specific process group ID (best-effort).
 pub fn interrupt_process_group(process_group_id: u32) -> io::Result<()> {
     signal_process_group_id(process_group_id as libc::pid_t, libc::SIGINT).map(|_| ())
-}
-
-#[cfg(not(unix))]
-/// No-op on non-Unix platforms.
-pub fn interrupt_process_group(_process_group_id: u32) -> io::Result<()> {
-    Ok(())
 }
 
 #[cfg(all(unix, not(target_os = "macos")))]
@@ -280,12 +249,6 @@ pub fn kill_process_group(process_group_id: u32) -> io::Result<()> {
         signal_process_id,
     )
     .map(|_| ())
-}
-
-#[cfg(not(unix))]
-/// No-op on non-Unix platforms.
-pub fn kill_process_group(_process_group_id: u32) -> io::Result<()> {
-    Ok(())
 }
 
 /// Wait up to `grace` for a signaled group's members to release their resources.
@@ -322,12 +285,6 @@ pub fn kill_child_process_group(child: &mut Child) -> io::Result<()> {
         return kill_process_group_by_pid(pid);
     }
 
-    Ok(())
-}
-
-#[cfg(not(unix))]
-/// No-op on non-Unix platforms.
-pub fn kill_child_process_group(_child: &mut Child) -> io::Result<()> {
     Ok(())
 }
 

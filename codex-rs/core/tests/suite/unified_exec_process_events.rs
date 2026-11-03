@@ -72,7 +72,7 @@ const REPLAY_OUTPUT_EVENT_COUNT: u64 = 1024;
 const REPLAY_RETAINED_OUTPUT_SEQ: u64 = 800;
 
 #[derive(Debug, Clone, Copy)]
-#[cfg_attr(windows, allow(dead_code))]
+#[allow(dead_code)]
 enum PushedExecScenario {
     Complete,
     CredentialMasking,
@@ -872,22 +872,6 @@ async fn serve_exec_with_pushed_events(
 #[test_case(PushedExecScenario::CredentialMaskingUnsupportedShell, ManagedNetworkScenario::Enabled { policy_callbacks: true }, false ; "credential_masking_warns_and_runs_unsupported_shell")]
 #[test_case(PushedExecScenario::Complete, ManagedNetworkScenario::Enabled { policy_callbacks: false }, false ; "strict_managed_allowlist_omits_policy_callbacks")]
 #[test_case(PushedExecScenario::Complete, ManagedNetworkScenario::Disabled, false ; "disabled_managed_network_omits_executor_proxy_launch")]
-#[cfg_attr(not(windows), test_case(PushedExecScenario::Complete, ManagedNetworkScenario::Enabled { policy_callbacks: true }, true ; "foreign_windows_managed_network_preserves_approval_registration"))]
-#[cfg_attr(not(windows), test_case(PushedExecScenario::Complete, ManagedNetworkScenario::None, true ; "foreign_windows_workspace_sandbox"))]
-#[test_case(PushedExecScenario::DenyWin, ManagedNetworkScenario::None, true ; "old_windows_deny_read_allows_approved_escalation")]
-#[test_case(PushedExecScenario::DenyWinUnchanged, ManagedNetworkScenario::None, true ; "old_windows_deny_read_keeps_unmaterializable_policy_unchanged")]
-#[cfg_attr(not(windows), test_case(PushedExecScenario::DenyOldLinux, ManagedNetworkScenario::None, false ; "old_linux_deny_read_rejects_approved_escalation"))]
-#[cfg_attr(not(windows), test_case(PushedExecScenario::DenyOldLinuxWithRoot(FileSystemAccessMode::Deny), ManagedNetworkScenario::None, false ; "old_linux_deny_read_keeps_root_deny_unchanged"))]
-#[cfg_attr(not(windows), test_case(PushedExecScenario::DenyOldLinuxWithRoot(FileSystemAccessMode::Write), ManagedNetworkScenario::None, false ; "device_only_linux_deny_read_rejects_unchanged_writable_root_metadata"))]
-#[cfg_attr(not(windows), test_case(PushedExecScenario::DenyLinux, ManagedNetworkScenario::None, false ; "linux_deny_read_allows_approved_escalation"))]
-#[test_case(PushedExecScenario::ElevatedPowerShell, ManagedNetworkScenario::None, true ; "windows_elevated_powershell_disables_profile")]
-#[cfg_attr(not(windows), test_case(PushedExecScenario::RejectedLongWindowsDangerousCommand, ManagedNetworkScenario::None, true ; "remote_windows_dangerous_command_rejection_is_bounded"))]
-#[cfg_attr(not(windows), test_case(PushedExecScenario::SandboxedInterceptedPatch, ManagedNetworkScenario::None, true ; "foreign_windows_intercepted_patch_is_sandboxed"))]
-#[cfg_attr(not(windows), test_case(PushedExecScenario::SandboxedDirectPatch, ManagedNetworkScenario::None, true ; "foreign_windows_direct_patch_is_sandboxed"))]
-#[cfg_attr(not(windows), test_case(PushedExecScenario::SandboxedDirectPatchDenied, ManagedNetworkScenario::None, true ; "foreign_windows_direct_patch_denial_requests_approval"))]
-#[cfg_attr(not(windows), test_case(PushedExecScenario::SandboxedDirectPatchRetry, ManagedNetworkScenario::None, true ; "foreign_windows_direct_patch_denial_approval_retries_unsandboxed"))]
-#[cfg_attr(not(windows), test_case(PushedExecScenario::UnsandboxedInterceptedPatch, ManagedNetworkScenario::None, true ; "foreign_windows_unsandboxed_intercepted_patch_succeeds"))]
-#[cfg_attr(not(windows), test_case(PushedExecScenario::FullDiskInterceptedPatch, ManagedNetworkScenario::None, true ; "foreign_windows_full_disk_intercepted_patch_succeeds"))]
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn exec_command_consumes_pushed_remote_process_events(
     scenario: PushedExecScenario,

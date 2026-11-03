@@ -1,8 +1,6 @@
 //! Local daemon launch policy. Explicit embedded launches never discover or start a daemon;
 //! optional attachment may fall back to embedded mode, while automatic launches
-//! require a compatible shared server and a successful connection, except when
-//! the Windows launcher forbids detaching a missing server. Elevated local
-//! Windows sessions use explicit embedded behavior before discovery or startup.
+//! require a compatible shared server and a successful connection.
 //! Explicit feature overrides are compared with the daemon's reported
 //! configuration; removed features are inert, and unreported features are assumed disabled.
 
@@ -47,9 +45,6 @@ pub fn uses_wsl_drvfs(codex_home: &std::path::Path) -> bool {
         false
     }
 }
-
-#[cfg(any(windows, test))]
-pub(super) const ELEVATED_LAUNCH_WARNING: &str = "Running as administrator: shared background server disabled. To enable it, restart Codex in a terminal without administrator permissions.";
 
 #[derive(Debug, thiserror::Error)]
 #[error("Cannot use the shared background server: {reason}.\n{FAILURE_HINT}")]

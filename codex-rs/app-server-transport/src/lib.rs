@@ -1,5 +1,5 @@
 pub mod daemon_recovery;
-#[cfg(any(windows, test))]
+#[cfg(test)]
 mod daemon_shutdown;
 /// Only managed app-server launches accept the local socket shutdown request.
 pub const DAEMON_SHUTDOWN_SOCKET_ENV: &str = "CODEX_DAEMON_SHUTDOWN_SOCKET";

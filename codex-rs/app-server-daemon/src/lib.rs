@@ -35,7 +35,7 @@ use codex_app_server_protocol::RemoteControlPairingStartResponse;
 use codex_app_server_transport::app_server_control_socket_path;
 use codex_utils_home_dir::find_codex_home;
 use managed_install::managed_codex_bin;
-#[cfg(any(unix, windows))]
+#[cfg(unix)]
 use managed_install::managed_codex_version;
 use serde::Serialize;
 use settings::DaemonSettings;
@@ -203,7 +203,7 @@ pub struct RemoteControlOutput {
     pub app_server_version: Option<String>,
 }
 
-#[cfg(any(unix, windows))]
+#[cfg(unix)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum RestartIfRunningOutcome {
     Busy,
@@ -213,7 +213,7 @@ pub(crate) enum RestartIfRunningOutcome {
     Restarted,
 }
 
-#[cfg(any(unix, windows))]
+#[cfg(unix)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum RestartMode {
     IfVersionChanged,
@@ -221,7 +221,7 @@ pub(crate) enum RestartMode {
     Always,
 }
 
-#[cfg(any(unix, windows))]
+#[cfg(unix)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum RestartDecision {
     NotReady,
@@ -231,6 +231,56 @@ enum RestartDecision {
 
 pub async fn run(command: LifecycleCommand) -> Result<LifecycleOutput> {
     ensure_supported_platform()?;
+    // Keep daemon package preparation off callers' async stack frames.
+    Box::pin(Daemon::from_environment()?.run(command)).await
+}
+
+pub async fn bootstrap(options: BootstrapOptions) -> Result<BootstrapOutput> {
+    ensure_supported_platform()?;
+    Box::pin(Daemon::from_environment()?.bootstrap(options)).await
+}
+
+pub async fn ensure_remote_control_ready() -> Result<RemoteControlReadyOutput> {
+    ensure_supported_platform()?;
+    Box::pin(Daemon::from_environment()?.ensure_remote_control_ready()).await
+}
+
+pub async fn enable_remote_control_on_socket(
+    socket_path: &Path,
+    connect_timeout: Duration,
+    connect_retry_delay: Duration,
+) -> Result<RemoteControlReadyStatus> {
+    ensure_supported_platform()?;
+    remote_control_client::enable_remote_control_with_connect_retry(
+        socket_path,
+        connect_timeout,
+        connect_retry_delay,
+    )
+    .await
+}
+
+/// Starts a manual pairing session through an already-running daemon app-server.
+pub async fn start_remote_control_pairing() -> Result<RemoteControlPairingStartResponse> {
+    ensure_supported_platform()?;
+    let daemon = Daemon::from_environment()?;
+    remote_control_client::start_pairing(&daemon.socket_path).await
+}
+
+pub async fn set_remote_control(mode: RemoteControlMode) -> Result<RemoteControlOutput> {
+    ensure_supported_platform()?;
+    Box::pin(Daemon::from_environment()?.set_remote_control(mode)).await
+}
+
+pub async fn run_pid_update_loop(
+    http_client_factory: codex_http_client::HttpClientFactory,
+    restore_release: Option<String>,
+) -> Result<()> {
+    ensure_supported_platform()?;
+    update_loop::run(http_client_factory, restore_release).await
+}
+
+pub use backend::stderr_log::stderr_writer;
+
 /// Routes managed app-server logs through a bounded queue to a dedicated file worker.
 /// Full queues and oversized records are dropped; shutdown never waits for disk I/O.
 /// Native and other-process stderr writes remain best effort during pruning.
@@ -250,12 +300,12 @@ pub async fn update(
     update_loop::request_manual_update(&Daemon::from_environment()?, http_client_factory).await
 }
 
-#[cfg(any(unix, windows))]
+#[cfg(unix)]
 fn ensure_supported_platform() -> Result<()> {
     Ok(())
 }
 
-#[cfg(not(any(unix, windows)))]
+#[cfg(not(unix))]
 fn ensure_supported_platform() -> Result<()> {
     Err(anyhow!(
         "codex app-server daemon lifecycle is only supported on Unix and Windows platforms"
@@ -465,7 +515,7 @@ impl Daemon {
             .await)
     }
 
-    #[cfg(any(unix, windows))]
+    #[cfg(unix)]
     pub(crate) async fn try_restart_if_running(
         &self,
         mode: RestartMode,
@@ -1008,12 +1058,12 @@ impl Daemon {
         ))
     }
 
-    #[cfg(any(unix, windows))]
+    #[cfg(unix)]
     async fn managed_codex_version_best_effort(&self) -> Option<String> {
         managed_codex_version(&self.managed_codex_bin).await.ok()
     }
 
-    #[cfg(not(any(unix, windows)))]
+    #[cfg(not(unix))]
     async fn managed_codex_version_best_effort(&self) -> Option<String> {
         None
     }
@@ -1140,7 +1190,7 @@ fn already_remote_control_status(mode: RemoteControlMode) -> RemoteControlStatus
     }
 }
 
-#[cfg(any(unix, windows))]
+#[cfg(unix)]
 fn restart_decision(
     mode: RestartMode,
     info: Option<&client::ProbeInfo>,
@@ -1176,12 +1226,12 @@ fn try_lock_file(file: &tokio::fs::File) -> Result<bool> {
     Err(err).context("failed to lock daemon operation")
 }
 
-#[cfg(not(any(unix, windows)))]
+#[cfg(not(unix))]
 fn try_lock_file(_file: &tokio::fs::File) -> Result<bool> {
     Ok(true)
 }
 
-#[cfg(all(test, any(unix, windows)))]
+#[cfg(all(test, any(unix)))]
 mod tests {
     use pretty_assertions::assert_eq;
     use tempfile::TempDir;

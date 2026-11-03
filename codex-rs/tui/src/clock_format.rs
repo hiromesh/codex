@@ -120,7 +120,7 @@ fn detect() -> Option<ClockFormat> {
     parse_native_pattern(&pattern.to_string(), "hHKk")
 }
 
-#[cfg(any(target_os = "macos", windows, test))]
+#[cfg(any(target_os = "macos", test))]
 fn parse_native_pattern(pattern: &str, hour_symbols: &str) -> Option<ClockFormat> {
     let mut quoted = false;
     let mut twelve = false;

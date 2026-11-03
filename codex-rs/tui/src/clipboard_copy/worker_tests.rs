@@ -377,15 +377,13 @@ async fn right_click_paste_uses_normal_input_and_discards_stale_reads() {
                 .unwrap();
             }
             if change == "none" {
-                // Shift+Insert is a native paste shortcut only on Windows.
-                let other = if false && key == ctrl_v {
-                    KeyEvent::new(shift_insert, KeyModifiers::SHIFT)
-                } else {
-                    KeyEvent::new(ctrl_v, KeyModifiers::CONTROL)
-                };
-                app.handle_tui_event(&mut tui, &mut server, TuiEvent::Key(other))
-                    .await
-                    .unwrap();
+                app.handle_tui_event(
+                    &mut tui,
+                    &mut server,
+                    TuiEvent::Key(KeyEvent::new(ctrl_v, KeyModifiers::CONTROL)),
+                )
+                .await
+                .unwrap();
             }
         } else if change == "none" {
             app.handle_tui_event(&mut tui, &mut server, TuiEvent::Mouse(click))

@@ -1024,7 +1024,6 @@ fn describe_install_context(context: &InstallContext) -> String {
         } => {
             let platform = match platform {
                 StandalonePlatform::Unix => "unix",
-                StandalonePlatform::Windows => "windows",
             };
             match &context.package_layout {
                 Some(package_layout) => {

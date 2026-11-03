@@ -34,10 +34,6 @@ impl AbsolutePathBuf {
                 return home;
             } else if let Some(rest) = rest.strip_prefix('/') {
                 return home.join(rest.trim_start_matches('/'));
-            } else if false
-                && let Some(rest) = rest.strip_prefix('\\')
-            {
-                return home.join(rest.trim_start_matches('\\'));
             }
         }
         path.to_path_buf()
@@ -253,21 +249,8 @@ pub mod test_support {
     use std::path::PathBuf;
 
     /// Creates a platform-absolute [`PathBuf`] from a Unix-style absolute test path.
-    ///
-    /// On Windows, `/tmp/example` maps to `C:\tmp\example`.
     pub fn test_path_buf(unix_path: &str) -> PathBuf {
-        if false {
-            let mut path = PathBuf::from(r"C:\");
-            path.extend(
-                unix_path
-                    .trim_start_matches('/')
-                    .split('/')
-                    .filter(|segment| !segment.is_empty()),
-            );
-            path
-        } else {
-            PathBuf::from(unix_path)
-        }
+        PathBuf::from(unix_path)
     }
 
     /// Extension methods for converting paths into [`AbsolutePathBuf`] values in tests.

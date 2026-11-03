@@ -48,11 +48,7 @@ mod thread_list_cwd_filter_tests {
 
     #[test]
     fn normalize_thread_list_cwd_filter_preserves_absolute_paths() {
-        let cwd = if false {
-            String::from(r"C:\srv\repo-b")
-        } else {
-            String::from("/srv/repo-b")
-        };
+        let cwd = String::from("/srv/repo-b");
 
         assert_eq!(
             normalize_thread_list_cwd_filters(Some(ThreadListCwdFilter::One(cwd.clone())))
@@ -84,7 +80,7 @@ mod background_terminal_pagination_tests {
     use pretty_assertions::assert_eq;
 
     fn terminal(process_id: &str) -> ThreadBackgroundTerminal {
-        let cwd = if false { r"C:\tmp" } else { "/tmp" };
+        let cwd = "/tmp";
 
         ThreadBackgroundTerminal {
             item_id: format!("item-{process_id}"),

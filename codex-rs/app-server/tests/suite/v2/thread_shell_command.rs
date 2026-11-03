@@ -36,7 +36,6 @@ use codex_app_server_protocol::TurnStartResponse;
 use codex_app_server_protocol::TurnStartedNotification;
 use codex_app_server_protocol::TurnStatus;
 use codex_app_server_protocol::UserInput as V2UserInput;
-use codex_core::shell::default_user_shell;
 use codex_exec_server::CODEX_EXEC_SERVER_URL_ENV_VAR;
 use pretty_assertions::assert_eq;
 use serde_json::json;
@@ -536,11 +535,7 @@ async fn thread_shell_command_rejects_invalid_timeouts_before_execution() -> Res
 
 fn current_shell_slow_command() -> Result<(String, String)> {
     let (command, expected_output) = current_shell_output_command("shell-timeout-ready")?;
-    let suffix = match default_user_shell().name() {
-        "powershell" => "; Start-Sleep -Seconds 60",
-        "cmd" => " & ping -n 61 127.0.0.1 > nul",
-        _ => "; exec sleep 60",
-    };
+    let suffix = "; exec sleep 60";
     Ok((format!("{command}{suffix}"), expected_output))
 }
 
@@ -554,21 +549,8 @@ fn assert_no_command_executions(items: &[codex_app_server_protocol::ThreadItem],
 }
 
 fn current_shell_output_command(text: &str) -> Result<(String, String)> {
-    let command_and_output = match default_user_shell().name() {
-        "powershell" => {
-            let escaped_text = text.replace('\'', "''");
-            (
-                format!("Write-Output '{escaped_text}'"),
-                format!("{text}\r\n"),
-            )
-        }
-        "cmd" => (format!("echo {text}"), format!("{text}\r\n")),
-        _ => {
-            let quoted_text = shlex::try_quote(text)?;
-            (format!("printf '%s\\n' {quoted_text}"), format!("{text}\n"))
-        }
-    };
-    Ok(command_and_output)
+    let quoted_text = shlex::try_quote(text)?;
+    Ok((format!("printf '%s\\n' {quoted_text}"), format!("{text}\n")))
 }
 
 async fn wait_for_command_execution_started(

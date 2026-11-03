@@ -17,9 +17,7 @@ const ANNOUNCEMENT_TIP_URL: &str =
     "https://raw.githubusercontent.com/openai/codex/main/announcement_tip.toml";
 
 const IS_MACOS: bool = cfg!(target_os = "macos");
-const IS_WINDOWS: bool = false;
 
-const WINDOWS_APP_TOOLTIP: &str = "Use the **desktop app**. Install it from https://chatgpt.com/codex?app-landing-page=true and run `codex app`.";
 const MACOS_APP_TOOLTIP: &str =
     "Use the **desktop app**. Run `codex app` to open it. It installs automatically if needed.";
 const LINUX_APP_TOOLTIP: &str = "Use the **desktop app**. Install it from https://learn.chatgpt.com/docs/linux/linux-app and run `chatgpt`.";
@@ -102,8 +100,6 @@ fn linux_app_tooltip(session: LinuxDesktopSession) -> Option<&'static str> {
 fn app_tooltip() -> Option<&'static str> {
     if IS_MACOS {
         Some(MACOS_APP_TOOLTIP)
-    } else if IS_WINDOWS {
-        Some(WINDOWS_APP_TOOLTIP)
     } else {
         linux_app_tooltip(LinuxDesktopSession::current())
     }
@@ -230,7 +226,6 @@ pub(crate) mod announcement {
     enum TargetOs {
         Linux,
         Macos,
-        Windows,
         #[serde(other)]
         Unknown,
     }
@@ -239,10 +234,8 @@ pub(crate) mod announcement {
         const fn current() -> Self {
             if cfg!(target_os = "macos") {
                 Self::Macos
-            } else if false {
-                Self::Windows
             } else {
-                // Codex currently publishes CLI builds for macOS, Windows, and Linux.
+                // Codex publishes CLI builds for macOS and Linux.
                 Self::Linux
             }
         }
@@ -394,11 +387,7 @@ mod tests {
     #[test]
     fn desktop_app_tips_render_at_narrow_width() {
         let cwd = std::env::current_dir().unwrap();
-        for (platform, tip) in [
-            ("macos", MACOS_APP_TOOLTIP),
-            ("windows", WINDOWS_APP_TOOLTIP),
-            ("linux", LINUX_APP_TOOLTIP),
-        ] {
+        for (platform, tip) in [("macos", MACOS_APP_TOOLTIP), ("linux", LINUX_APP_TOOLTIP)] {
             let rendered = render_tooltip_lines(tip, /*width*/ 40, &cwd)
                 .iter()
                 .map(|line| format!("{:?} {:?}", line.line, line.hyperlinks))
@@ -420,9 +409,6 @@ mod tests {
             assert_eq!(app_tooltip(), Some(tooltip));
         } else if IS_MACOS {
             let tooltip = tooltip.expect("macOS should advertise the desktop app");
-            assert_eq!(app_tooltip(), Some(tooltip));
-        } else if IS_WINDOWS {
-            let tooltip = tooltip.expect("Windows should advertise the desktop app");
             assert_eq!(app_tooltip(), Some(tooltip));
         } else {
             assert_eq!(tooltip, None);
@@ -643,16 +629,10 @@ target_oses = ["linux"]
 [[announcements]]
 content = "macos announcement"
 target_oses = ["macos"]
-
-[[announcements]]
-content = "windows announcement"
-target_oses = ["windows"]
         "#;
 
         let expected = if cfg!(target_os = "macos") {
             "macos announcement"
-        } else if false {
-            "windows announcement"
         } else {
             "linux announcement"
         };

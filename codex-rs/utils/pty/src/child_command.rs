@@ -4,7 +4,6 @@
 //! change settings that the native backend cannot inspect. Children receive only
 //! explicitly supplied environment variables and default to kill-on-drop. Stdio,
 //! descriptor inheritance, and compatibility fallbacks are configured independently.
-//! Windows children communicate over pipes and never allocate a console window.
 //! Original Unix inputs retain their NUL validation even when std replaces them.
 
 use std::ffi::OsStr;
@@ -341,8 +340,6 @@ impl Command {
                         None => ChildKind::Tokio(child),
                     }
                 }
-                #[cfg(not(unix))]
-                ChildKind::Tokio(child)
             },
         })
     }

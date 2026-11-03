@@ -176,7 +176,6 @@ pub(crate) enum ConsolidationScrollbackReflow {
 }
 
 #[derive(Debug, Clone)]
-#[cfg_attr(not(target_os = "windows"), allow(dead_code))]
 pub(crate) struct ConnectorsSnapshot {
     pub(crate) connectors: Vec<AppInfo>,
 }

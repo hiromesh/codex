@@ -312,7 +312,7 @@ fn unavailable_system_route_preserves_wss_http_proxy_fallback() {
     );
 }
 
-#[cfg(any(target_os = "windows", target_os = "macos"))]
+#[cfg(target_os = "macos")]
 #[tokio::test]
 async fn async_resolution_uses_cached_route_before_global_permit() {
     let request_url = "https://cached-fast-path.test/request";
@@ -343,7 +343,7 @@ async fn async_resolution_uses_cached_route_before_global_permit() {
     assert_eq!(route, OutboundProxyRoute::Direct);
 }
 
-#[cfg(any(target_os = "windows", target_os = "macos"))]
+#[cfg(target_os = "macos")]
 #[tokio::test(flavor = "current_thread")]
 async fn async_resolution_yields_while_cache_is_locked() {
     let request_url = "https://contended-cache.test/request";

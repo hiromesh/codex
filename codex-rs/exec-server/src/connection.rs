@@ -206,7 +206,7 @@ fn terminate_process_tree(child_process: &mut Child, process_group_id: Option<u3
         kill_direct_child(child_process, "terminate");
     }
 
-    #[cfg(not(any(unix, windows)))]
+    #[cfg(not(unix))]
     {
         let _ = process_group_id;
         kill_direct_child(child_process, "terminate");
@@ -224,7 +224,7 @@ fn kill_process_tree(child_process: &mut Child, process_group_id: Option<u32>) {
         warn!("failed to kill exec-server stdio process group {process_group_id}: {err}");
     }
 
-    #[cfg(not(any(unix, windows)))]
+    #[cfg(not(unix))]
     {
         let _ = process_group_id;
         kill_direct_child(child_process, "kill");

@@ -40,7 +40,6 @@ use codex_protocol::openai_models::ReasoningEffort;
 use core_test_support::responses;
 use core_test_support::skip_if_no_network;
 use core_test_support::skip_if_remote;
-use core_test_support::skip_if_wine_exec;
 use pretty_assertions::assert_eq;
 use serde_json::Value;
 use serde_json::json;
@@ -835,7 +834,6 @@ async fn assert_plugin_measurement_analytics(remote: bool, background: bool) -> 
         Ok(()),
         "trusted plugin metrics fixture uses a local Codex home cache"
     );
-    skip_if_wine_exec!(Ok(()), "plugin metrics fixture is Unix-only");
 
     let codex_home = TempDir::new()?;
     let script_path = write_curated_metrics_plugin(codex_home.path())?.canonicalize()?;
@@ -1168,25 +1166,21 @@ enabled = true
     Ok(())
 }
 
-#[cfg_attr(windows, ignore = "plugin metrics fixture is Unix-only")]
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn unified_plugin_script_emits_measurement_analytics() -> Result<()> {
     assert_plugin_measurement_analytics(/*remote*/ false, /*background*/ false).await
 }
 
-#[cfg_attr(windows, ignore = "plugin metrics fixture is Unix-only")]
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn remote_unified_plugin_script_emits_measurement_analytics() -> Result<()> {
     assert_plugin_measurement_analytics(/*remote*/ true, /*background*/ false).await
 }
 
-#[cfg_attr(windows, ignore = "plugin metrics fixture is Unix-only")]
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn unified_background_plugin_script_emits_measurements_after_turn_completion() -> Result<()> {
     assert_plugin_measurement_analytics(/*remote*/ false, /*background*/ true).await
 }
 
-#[cfg_attr(windows, ignore = "plugin metrics fixture is Unix-only")]
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn remote_unified_background_plugin_script_emits_measurements_after_turn_completion()
 -> Result<()> {

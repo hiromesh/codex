@@ -17,9 +17,6 @@ use wiremock::matchers::body_string_contains;
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 #[ignore = "requires tmux and a locally built codex binary; run with --ignored for manual resize smoke"]
 async fn tmux_split_preserves_fresh_session_composer_row_after_resize_reflow() -> Result<()> {
-    if false {
-        return Ok(());
-    }
     skip_if_no_network!(Ok(()));
     if Command::new("tmux").arg("-V").output().is_err() {
         eprintln!("skipping resize smoke because tmux is unavailable");
@@ -164,9 +161,6 @@ async fn tmux_split_preserves_fresh_session_composer_row_after_resize_reflow() -
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 #[ignore = "requires tmux and a locally built codex binary; run with --ignored for manual resize smoke"]
 async fn tmux_repeated_resizes_do_not_push_composer_down() -> Result<()> {
-    if false {
-        return Ok(());
-    }
     skip_if_no_network!(Ok(()));
     if Command::new("tmux").arg("-V").output().is_err() {
         eprintln!("skipping resize smoke because tmux is unavailable");
@@ -181,9 +175,6 @@ async fn tmux_repeated_resizes_do_not_push_composer_down() -> Result<()> {
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 #[ignore = "requires tmux and a locally built codex binary; run with --ignored for manual resize smoke"]
 async fn tmux_width_resize_restore_keeps_visible_content_anchored() -> Result<()> {
-    if false {
-        return Ok(());
-    }
     skip_if_no_network!(Ok(()));
     if Command::new("tmux").arg("-V").output().is_err() {
         eprintln!("skipping resize smoke because tmux is unavailable");
@@ -309,9 +300,6 @@ async fn tmux_width_resize_restore_keeps_visible_content_anchored() -> Result<()
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 #[ignore = "requires tmux and a locally built codex binary; run with --ignored for manual resize smoke"]
 async fn tmux_scrolled_composer_resize_preserves_visible_draft_text() -> Result<()> {
-    if false {
-        return Ok(());
-    }
     skip_if_no_network!(Ok(()));
     if Command::new("tmux").arg("-V").output().is_err() {
         eprintln!("skipping resize smoke because tmux is unavailable");
