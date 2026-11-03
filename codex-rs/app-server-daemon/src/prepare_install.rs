@@ -505,16 +505,9 @@ fn stable_version(value: &str) -> Option<semver::Version> {
 }
 
 fn validate_package(root: &Path, entrypoint: &str) -> Result<()> {
-    let code_mode_host = Path::new(entrypoint).with_file_name(if cfg!(windows) {
-        "codex-code-mode-host.exe"
-    } else {
-        "codex-code-mode-host"
-    });
-    let code_mode_host = code_mode_host.to_string_lossy();
     let mut names = vec![
         "codex-package.json",
         entrypoint,
-        code_mode_host.as_ref(),
         if cfg!(windows) {
             "codex-path/rg.exe"
         } else {

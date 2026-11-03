@@ -18,7 +18,6 @@ members = [
     "app-server-client",
     "app-server-protocol",
     "app-server-protocol-noop-macros",
-    "app-server-test-client",
     "apply-patch",
     "arg0",
     "feedback",
@@ -26,15 +25,10 @@ members = [
     "install-context",
     "codex-backend-openapi-models",
     "code-mode",
-    "code-mode-host",
     "code-mode-protocol",
-    "code-mode-runtime",
     "plugin-host",
     "codex-home",
     "cloud-config",
-    "cloud-tasks",
-    "cloud-tasks-client",
-    "cloud-tasks-mock-client",
     "cli",
     "collaboration-mode-templates",
     "connectors",
@@ -44,7 +38,6 @@ members = [
     "shell-command",
     "skills",
     "core",
-    "core-api",
     "core-plugin-common",
     "core-plugins",
     "diagnostics",
@@ -105,18 +98,14 @@ members = [
     "rollout",
     "rollout-trace",
     "rmcp-client",
-    "responses-api-proxy",
     "runtime-agent-instance",
     "response-debug-context",
     "sandboxing",
-    "stdio-to-uds",
     "otel",
     "otel-trace-websocket",
-    "tcp-tunnel",
     "tui",
     "user-verification",
     "tools",
-    "v8-poc",
     "websocket-auth",
     "websocket-client",
     "windows-sandbox-rs/tests/support",
@@ -157,7 +146,6 @@ members = [
     "state",
     "terminal-detection",
     "test-binary-support",
-    "thread-manager-sample",
     "thread-store",
     "uds",
     "codex-experimental-api-macros",
@@ -193,7 +181,6 @@ codex-app-server-daemon = { path = "app-server-daemon" }
 codex-app-server-client = { path = "app-server-client" }
 codex-app-server-protocol = { path = "app-server-protocol" }
 codex-app-server-protocol-noop-macros = { path = "app-server-protocol-noop-macros" }
-codex-app-server-test-client = { path = "app-server-test-client" }
 codex-apply-patch = { path = "apply-patch" }
 codex-arg0 = { path = "arg0" }
 codex-async-utils = { path = "async-utils" }
@@ -203,11 +190,8 @@ codex-chatgpt = { path = "chatgpt" }
 codex-client = { path = "codex-client" }
 codex-collaboration-mode-templates = { path = "collaboration-mode-templates" }
 codex-cloud-config = { path = "cloud-config" }
-codex-cloud-tasks-client = { path = "cloud-tasks-client" }
-codex-cloud-tasks-mock-client = { path = "cloud-tasks-mock-client" }
 codex-code-mode = { path = "code-mode" }
 codex-code-mode-protocol = { path = "code-mode-protocol" }
-codex-code-mode-runtime = { path = "code-mode-runtime" }
 codex-plugin-host = { path = "plugin-host" }
 codex-home = { path = "codex-home" }
 codex-http-client = { path = "http-client" }
@@ -222,7 +206,6 @@ codex-message-board-mcp = { path = "message-board-mcp" }
 codex-connectors-extension = { path = "ext/connectors" }
 codex-context-fragments = { path = "context-fragments" }
 codex-core = { path = "core" }
-codex-core-api = { path = "core-api" }
 codex-core-plugin-common = { path = "core-plugin-common" }
 codex-core-plugins = { path = "core-plugins" }
 codex-diagnostics = { path = "diagnostics" }
@@ -280,7 +263,6 @@ codex-protocol = { path = "protocol" }
 codex-protocol-test-support = { path = "protocol/tests/support" }
 codex-prompts = { path = "prompts" }
 codex-queue-extension = { path = "ext/queue" }
-codex-responses-api-proxy = { path = "responses-api-proxy" }
 codex-response-debug-context = { path = "response-debug-context" }
 codex-rmcp-client = { path = "rmcp-client" }
 codex-rollout = { path = "rollout" }
@@ -292,12 +274,10 @@ codex-shell-command = { path = "shell-command" }
 codex-skills-extension = { path = "ext/skills" }
 codex-skills = { path = "skills" }
 codex-state = { path = "state" }
-codex-stdio-to-uds = { path = "stdio-to-uds" }
 codex-terminal-detection = { path = "terminal-detection" }
 codex-test-binary-support = { path = "test-binary-support" }
 codex-thread-store = { path = "thread-store" }
 codex-tools = { path = "tools" }
-codex-tcp-tunnel = { path = "tcp-tunnel" }
 codex-tui = { path = "tui" }
 codex-uds = { path = "uds" }
 codex-utils-absolute-path = { path = "utils/absolute-path" }
@@ -330,7 +310,6 @@ codex-utils-stream-parser = { path = "utils/stream-parser" }
 codex-utils-string = { path = "utils/string" }
 codex-utils-template = { path = "utils/template" }
 codex-user-verification = { path = "user-verification" }
-codex-v8-poc = { path = "v8-poc" }
 codex-workload-identity = { path = "workload-identity" }
 codex-windows-sandbox = { path = "windows-sandbox-rs" }
 codex-windows-sandbox-test-support = { path = "windows-sandbox-rs/tests/support" }
@@ -556,7 +535,6 @@ unicode-width = "0.2"
 url = "2"
 urlencoding = "2.1"
 uuid = "1"
-v8 = "=152.2.0"
 vt100 = "0.16.2"
 walkdir = "2.5.0"
 webbrowser = "1.2.2"
@@ -630,7 +608,6 @@ unwrap_used = "deny"
 ignored = [
     "icu_provider",
     "openssl-sys",
-    "codex-v8-poc",
 ]
 
 [profile.dev]
@@ -672,7 +649,6 @@ opt-level = 0
 crossterm = { git = "https://github.com/openai-oss-forks/crossterm", rev = "ed1cdab335221515706178d68495bba2aed1924f" }
 tokio-tungstenite = { git = "https://github.com/openai-oss-forks/tokio-tungstenite", rev = "0e5b2d73aa18dd9f0a50ee9ff199d5aef7594186" }
 tungstenite = { git = "https://github.com/openai-oss-forks/tungstenite-rs", rev = "4fffad30fe373adbdcffab9545e9e9bf4f2fc19f" }
-v8 = { git = "https://github.com/seanh-oai/rusty_v8.git", rev = "350c5a859a9b3c84ab8701b3ad51e3b7699b30c0" }
 
 # Uncomment to debug local changes.
 # rmcp = { path = "../../rust-sdk/crates/rmcp" }

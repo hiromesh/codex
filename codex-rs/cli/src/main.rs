@@ -19,12 +19,10 @@ use codex_cli::run_login_with_api_key;
 use codex_cli::run_login_with_browser;
 use codex_cli::run_login_with_device_code;
 use codex_cli::run_logout;
-use codex_cloud_tasks::Cli as CloudTasksCli;
 use codex_exec::Cli as ExecCli;
 use codex_exec::Command as ExecCommand;
 use codex_exec::ReviewArgs;
 use codex_execpolicy::ExecPolicyCheckCommand;
-use codex_responses_api_proxy::Args as ResponsesApiProxyArgs;
 use codex_rollout_trace::REDUCED_STATE_FILE_NAME;
 use codex_rollout_trace::replay_bundle;
 use codex_state::StateRuntime;
@@ -146,9 +144,6 @@ enum Subcommand {
     /// Open the agent command center to browse and switch sessions.
     Agents(AgentsCommand),
 
-    /// Internal: forward a local TCP socket through an HTTP/3 CONNECT proxy.
-    #[clap(hide = true)]
-    TcpTunnel(codex_tcp_tunnel::Args),
     /// Run Codex non-interactively.
     #[clap(visible_alias = "e")]
     Exec(ExecCli),
@@ -225,18 +220,6 @@ enum Subcommand {
     /// Fork a previous interactive session (picker by default; use --last to fork the most recent).
     Fork(ForkCommand),
 
-    /// [EXPERIMENTAL] Browse tasks from Codex Cloud and apply changes locally.
-    #[clap(name = "cloud", alias = "cloud-tasks")]
-    Cloud(CloudTasksCli),
-
-    /// Internal: run the responses API proxy.
-    #[clap(hide = true)]
-    ResponsesApiProxy(ResponsesApiProxyArgs),
-
-    /// Internal: relay stdio to a Unix domain socket.
-    #[clap(hide = true, name = "stdio-to-uds")]
-    StdioToUds(StdioToUdsCommand),
-
     /// [EXPERIMENTAL] Run the standalone exec-server service.
     ExecServer(ExecServerCommand),
 
@@ -262,9 +245,6 @@ enum DebugSubcommand {
     /// Render the raw model catalog as JSON.
     Models(DebugModelsCommand),
 
-    /// Tooling: helps debug the app server.
-    AppServer(DebugAppServerCommand),
-
     /// Render the model-visible prompt input list as JSON.
     PromptInput(DebugPromptInputCommand),
 
@@ -275,24 +255,6 @@ enum DebugSubcommand {
     /// Internal: reset local memory state for a fresh start.
     #[clap(hide = true)]
     ClearMemories,
-}
-
-#[derive(Debug, Parser)]
-struct DebugAppServerCommand {
-    #[command(subcommand)]
-    subcommand: DebugAppServerSubcommand,
-}
-
-#[derive(Debug, clap::Subcommand)]
-enum DebugAppServerSubcommand {
-    // Send message to app server V2.
-    SendMessageV2(DebugAppServerSendMessageV2Command),
-}
-
-#[derive(Debug, Parser)]
-struct DebugAppServerSendMessageV2Command {
-    #[arg(value_name = "USER_MESSAGE", required = true)]
-    user_message: String,
 }
 
 #[derive(Debug, Parser)]
@@ -636,9 +598,6 @@ enum AppServerSubcommand {
     /// Manage the local app-server daemon.
     Daemon(AppServerDaemonCommand),
 
-    /// Proxy stdio bytes to the running app-server control socket.
-    Proxy(AppServerProxyCommand),
-
     /// [experimental] Generate TypeScript bindings for the app server protocol.
     GenerateTs(GenerateTsCommand),
 
@@ -702,13 +661,6 @@ enum AppServerDaemonSubcommand {
 }
 
 #[derive(Debug, Args)]
-struct AppServerProxyCommand {
-    /// Path to the app-server Unix domain socket to connect to.
-    #[arg(long = "sock", value_name = "SOCKET_PATH", value_parser = parse_socket_path)]
-    socket_path: Option<AbsolutePathBuf>,
-}
-
-#[derive(Debug, Args)]
 struct AppServerBootstrapCommand {
     /// Launch the managed app-server with remote control enabled.
     #[arg(long = "remote-control")]
@@ -746,18 +698,6 @@ struct GenerateInternalJsonSchemaCommand {
     /// Output directory where internal JSON Schema artifacts will be written
     #[arg(short = 'o', long = "out", value_name = "DIR")]
     out_dir: PathBuf,
-}
-
-#[derive(Debug, Parser)]
-struct StdioToUdsCommand {
-    /// Path to the Unix domain socket to connect to.
-    #[arg(value_name = "SOCKET_PATH", value_parser = parse_socket_path)]
-    socket_path: AbsolutePathBuf,
-}
-
-fn parse_socket_path(raw: &str) -> Result<AbsolutePathBuf, String> {
-    AbsolutePathBuf::relative_to_current_dir(raw)
-        .map_err(|err| format!("failed to resolve socket path `{raw}`: {err}"))
 }
 
 /// Handle the app exit and print the results. Optionally run the update action.
@@ -942,16 +882,6 @@ fn delete_action(target: &str, force: bool) -> anyhow::Result<codex_tui::Session
         false => codex_tui::DeleteConfirmation::Prompt,
     };
     Ok(codex_tui::SessionArchiveAction::Delete(confirmation))
-}
-
-async fn run_debug_app_server_command(cmd: DebugAppServerCommand) -> anyhow::Result<()> {
-    match cmd.subcommand {
-        DebugAppServerSubcommand::SendMessageV2(cmd) => {
-            let codex_bin = std::env::current_exe()?;
-            codex_app_server_test_client::send_message_v2(&codex_bin, &[], cmd.user_message, &None)
-                .await
-        }
-    }
 }
 
 #[derive(Debug, Default, Parser, Clone)]
@@ -1144,9 +1074,6 @@ async fn dispatch_cli(
                 root_remote_auth_token_env,
                 arg0_paths,
             )));
-        }
-        Some(Subcommand::TcpTunnel(args)) => {
-            codex_tcp_tunnel::run(args).await?;
         }
         Some(Subcommand::Exec(mut exec_cli)) => {
             reject_remote_mode_for_subcommand(
@@ -1461,16 +1388,6 @@ async fn dispatch_cli(
                         }
                     }
                 },
-                Some(AppServerSubcommand::Proxy(proxy_cli)) => {
-                    let socket_path = match proxy_cli.socket_path {
-                        Some(socket_path) => socket_path,
-                        None => {
-                            let codex_home = find_codex_home()?;
-                            codex_app_server::app_server_control_socket_path(&codex_home)?
-                        }
-                    };
-                    codex_stdio_to_uds::run(socket_path.as_path()).await?;
-                }
                 Some(AppServerSubcommand::GenerateTs(gen_cli)) => {
                     let options = codex_app_server_protocol::GenerateTsOptions {
                         experimental_api: gen_cli.experimental,
@@ -1724,19 +1641,6 @@ async fn dispatch_cli(
             )
             .await?;
         }
-        Some(Subcommand::Cloud(mut cloud_cli)) => {
-            reject_remote_mode_for_subcommand(
-                root_remote.as_deref(),
-                root_remote_auth_token_env.as_deref(),
-                "cloud",
-            )?;
-            prepend_config_flags(
-                &mut cloud_cli.config_overrides,
-                root_config_overrides.clone(),
-            );
-            codex_cloud_tasks::run_main(cloud_cli, arg0_paths.codex_linux_sandbox_exe.clone())
-                .await?;
-        }
         Some(Subcommand::Sandbox(SandboxCommand {
             host: mut sandbox_cli,
             subcommand,
@@ -1809,14 +1713,6 @@ async fn dispatch_cli(
                 )?;
                 run_debug_models_command(cmd, root_config_overrides).await?;
             }
-            DebugSubcommand::AppServer(cmd) => {
-                reject_remote_mode_for_subcommand(
-                    root_remote.as_deref(),
-                    root_remote_auth_token_env.as_deref(),
-                    "debug app-server",
-                )?;
-                run_debug_app_server_command(cmd).await?;
-            }
             DebugSubcommand::PromptInput(cmd) => {
                 reject_remote_mode_for_subcommand(
                     root_remote.as_deref(),
@@ -1869,24 +1765,6 @@ async fn dispatch_cli(
                 root_config_overrides.clone(),
             );
             run_apply_command(apply_cli, /*cwd*/ None).await?;
-        }
-        Some(Subcommand::ResponsesApiProxy(args)) => {
-            reject_remote_mode_for_subcommand(
-                root_remote.as_deref(),
-                root_remote_auth_token_env.as_deref(),
-                "responses-api-proxy",
-            )?;
-            tokio::task::spawn_blocking(move || codex_responses_api_proxy::run_main(args))
-                .await??;
-        }
-        Some(Subcommand::StdioToUds(cmd)) => {
-            reject_remote_mode_for_subcommand(
-                root_remote.as_deref(),
-                root_remote_auth_token_env.as_deref(),
-                "stdio-to-uds",
-            )?;
-            let socket_path = cmd.socket_path;
-            codex_stdio_to_uds::run(socket_path.as_path()).await?;
         }
         Some(Subcommand::ExecServer(mut cmd)) => {
             reject_remote_mode_for_subcommand(
@@ -2364,15 +2242,11 @@ fn unsupported_subcommand_name_for_strict_config(
         Some(Subcommand::Logout(_)) => Some("logout"),
         Some(Subcommand::Completion(_)) => Some("completion"),
         Some(Subcommand::Update) => Some("update"),
-        Some(Subcommand::Cloud(_)) => Some("cloud"),
         Some(Subcommand::Sandbox(_)) => Some("sandbox"),
         Some(Subcommand::Debug(_)) => Some("debug"),
         Some(Subcommand::Execpolicy(_)) => Some("execpolicy"),
         Some(Subcommand::Apply(_)) => Some("apply"),
-        Some(Subcommand::ResponsesApiProxy(_)) => Some("responses-api-proxy"),
-        Some(Subcommand::StdioToUds(_)) => Some("stdio-to-uds"),
         Some(Subcommand::Features(_)) => Some("features"),
-        Some(Subcommand::TcpTunnel(_)) => Some("tcp-tunnel"),
     }
 }
 
@@ -2426,7 +2300,6 @@ fn app_server_subcommand_name(subcommand: Option<&AppServerSubcommand>) -> &'sta
             AppServerDaemonSubcommand::Version => "app-server daemon version",
             AppServerDaemonSubcommand::PidUpdateLoop { .. } => "app-server daemon pid-update-loop",
         },
-        Some(AppServerSubcommand::Proxy(_)) => "app-server proxy",
         Some(AppServerSubcommand::GenerateTs(_)) => "app-server generate-ts",
         Some(AppServerSubcommand::GenerateJsonSchema(_)) => "app-server generate-json-schema",
         Some(AppServerSubcommand::GenerateInternalJsonSchema(_)) => {
@@ -3479,36 +3352,6 @@ enabled = true
             .map(str::trim)
             .collect::<Vec<_>>();
         insta::assert_snapshot!(local_flags.join("\n"), @"-C, --cd <DIR>");
-    }
-
-    #[test]
-    fn tcp_tunnel_is_hidden_and_accepts_its_control_input_contract() {
-        let root_help = help_from_args(&["codex", "--help"]);
-        assert!(!root_help.contains("tcp-tunnel"), "{root_help}");
-        let help = help_from_args(&["codex", "tcp-tunnel", "--help"]);
-        for option in [
-            "--target",
-            "--auth-token-stdin",
-            "--auth-token-updates-stdin",
-            "--connect-headers-stdin",
-        ] {
-            assert!(help.contains(option), "{help}");
-        }
-        let cli = MultitoolCli::try_parse_from([
-            "codex",
-            "tcp-tunnel",
-            "--proxy-url",
-            "https://proxy.example.org",
-            "--proxy-origins-file",
-            "/tmp/approved-origins",
-            "--target",
-            "[::1]:22",
-            "--auth-token-stdin",
-            "--auth-token-updates-stdin",
-            "--connect-headers-stdin",
-        ])
-        .expect("generic tunnel should parse");
-        assert!(matches!(cli.subcommand, Some(Subcommand::TcpTunnel(_))));
     }
 
     #[test]
@@ -4695,17 +4538,6 @@ enabled = true
     }
 
     #[test]
-    fn app_server_proxy_subcommand_parses() {
-        let app_server = app_server_from_args(["codex", "app-server", "proxy"].as_ref());
-        assert!(matches!(
-            app_server.subcommand,
-            Some(AppServerSubcommand::Proxy(AppServerProxyCommand {
-                socket_path: None
-            }))
-        ));
-    }
-
-    #[test]
     fn app_server_daemon_subcommands_parse() {
         assert!(matches!(
             app_server_from_args(
@@ -4767,34 +4599,6 @@ enabled = true
                 subcommand: AppServerDaemonSubcommand::Version
             }))
         ));
-    }
-
-    #[test]
-    fn app_server_proxy_sock_path_parses() {
-        let app_server =
-            app_server_from_args(["codex", "app-server", "proxy", "--sock", "codex.sock"].as_ref());
-        let Some(AppServerSubcommand::Proxy(proxy)) = app_server.subcommand else {
-            panic!("expected proxy subcommand");
-        };
-        assert_eq!(
-            proxy.socket_path,
-            Some(
-                AbsolutePathBuf::relative_to_current_dir("codex.sock")
-                    .expect("relative path should resolve")
-            )
-        );
-    }
-
-    #[test]
-    fn reject_remote_auth_token_env_for_app_server_proxy() {
-        let subcommand = AppServerSubcommand::Proxy(AppServerProxyCommand { socket_path: None });
-        let err = reject_remote_mode_for_app_server_subcommand(
-            /*remote*/ None,
-            Some("CODEX_REMOTE_AUTH_TOKEN"),
-            Some(&subcommand),
-        )
-        .expect_err("app-server proxy should reject --remote-auth-token-env");
-        assert!(err.to_string().contains("app-server proxy"));
     }
 
     #[test]

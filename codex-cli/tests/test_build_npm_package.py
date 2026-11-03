@@ -41,7 +41,6 @@ class NpmPackageTest(unittest.TestCase):
                 files = [
                     metadata["entrypoint"],
                     metadata["execServer"],
-                    f"bin/codex-code-mode-host{suffix}",
                     f"codex-path/rg{suffix}",
                 ]
                 if platform["os"] == "linux":
