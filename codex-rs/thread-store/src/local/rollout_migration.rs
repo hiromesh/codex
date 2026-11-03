@@ -1220,12 +1220,6 @@ impl LocalThreadStore {
                     } else {
                         project_rollout_line(&line)
                     },
-                    realtime_item: match line.item {
-                        RolloutItem::RealtimeItem(item) if !is_inherited_subagent_history => {
-                            Some(item)
-                        }
-                        _ => None,
-                    },
                 },
             )));
             offset = next_offset;

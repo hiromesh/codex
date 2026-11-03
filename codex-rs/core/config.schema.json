@@ -345,14 +345,6 @@
         }
       ]
     },
-    "AsyncClassifierMode": {
-      "description": "Legacy classifier modes retained for configuration and model-catalog compatibility.",
-      "enum": [
-        "snapshot",
-        "conversation"
-      ],
-      "type": "string"
-    },
     "AsyncCompactionConfigToml": {
       "additionalProperties": false,
       "description": "Background compaction settings. A threshold alone does not enable the feature.",
@@ -948,15 +940,6 @@
             "guardian_trust_orchestrator_connectors": {
               "type": "boolean"
             },
-            "guardianv2": {
-              "$ref": "#/definitions/FeatureToml_for_GuardianV2ConfigToml"
-            },
-            "guardianv2_decisions_comparison": {
-              "type": "boolean"
-            },
-            "guardianv3": {
-              "$ref": "#/definitions/FeatureToml_for_GuardianV3ConfigToml"
-            },
             "hooks": {
               "type": "boolean"
             },
@@ -1154,9 +1137,6 @@
             },
             "rollout_budget": {
               "$ref": "#/definitions/FeatureToml_for_RolloutBudgetConfigToml"
-            },
-            "runtime_agent_instances": {
-              "$ref": "#/definitions/FeatureToml_for_RuntimeAgentInstancesConfigToml"
             },
             "runtime_metrics": {
               "type": "boolean"
@@ -1652,26 +1632,6 @@
         }
       ]
     },
-    "FeatureToml_for_GuardianV2ConfigToml": {
-      "anyOf": [
-        {
-          "type": "boolean"
-        },
-        {
-          "$ref": "#/definitions/GuardianV2ConfigToml"
-        }
-      ]
-    },
-    "FeatureToml_for_GuardianV3ConfigToml": {
-      "anyOf": [
-        {
-          "type": "boolean"
-        },
-        {
-          "$ref": "#/definitions/GuardianV3ConfigToml"
-        }
-      ]
-    },
     "FeatureToml_for_MultiAgentV2ConfigToml": {
       "anyOf": [
         {
@@ -1709,16 +1669,6 @@
         },
         {
           "$ref": "#/definitions/RolloutBudgetConfigToml"
-        }
-      ]
-    },
-    "FeatureToml_for_RuntimeAgentInstancesConfigToml": {
-      "anyOf": [
-        {
-          "type": "boolean"
-        },
-        {
-          "$ref": "#/definitions/RuntimeAgentInstancesConfigToml"
         }
       ]
     },
@@ -1980,174 +1930,6 @@
         "rules",
         "sandbox_approval"
       ],
-      "type": "object"
-    },
-    "GuardianV2ConfigToml": {
-      "additionalProperties": false,
-      "description": "User-configurable prompt, approval, and context settings for Guardian v2.",
-      "properties": {
-        "async_classifier_conversation_token_limit": {
-          "description": "Reset retained async history when the next request exceeds this token estimate. Defaults to 100,000. Fresh requests remain subject to the model's input limit.",
-          "format": "uint",
-          "minimum": 1.0,
-          "type": "integer"
-        },
-        "async_classifier_mode": {
-          "allOf": [
-            {
-              "$ref": "#/definitions/AsyncClassifierMode"
-            }
-          ],
-          "description": "Deprecated and ignored; asynchronous classification always uses conversations."
-        },
-        "classifier_instructions": {
-          "type": "string"
-        },
-        "enabled": {
-          "type": "boolean"
-        },
-        "free_guardian": {
-          "description": "Legacy setting retained for config compatibility; the backend now controls Guardian billing.",
-          "type": "boolean"
-        },
-        "max_action_tokens": {
-          "format": "uint",
-          "maximum": 100000.0,
-          "minimum": 100.0,
-          "type": "integer"
-        },
-        "max_classifier_instruction_tokens": {
-          "format": "uint",
-          "maximum": 100000.0,
-          "minimum": 100.0,
-          "type": "integer"
-        },
-        "max_parent_compaction_tokens": {
-          "format": "uint",
-          "maximum": 100000.0,
-          "minimum": 100.0,
-          "type": "integer"
-        },
-        "max_tool_call_lag": {
-          "format": "uint",
-          "minimum": 0.0,
-          "type": "integer"
-        },
-        "persist_scores": {
-          "description": "Persist reviewed actions and risk scores to rollout files for debugging.",
-          "type": "boolean"
-        },
-        "reasoning_effort": {
-          "$ref": "#/definitions/ReasoningEffort"
-        },
-        "reuse_parent_compaction": {
-          "type": "boolean"
-        },
-        "review_scope": {
-          "$ref": "#/definitions/GuardianV2ReviewScopeConfigToml"
-        },
-        "review_threshold": {
-          "format": "double",
-          "maximum": 1.0,
-          "minimum": 0.0,
-          "type": "number"
-        },
-        "thread_context": {
-          "description": "Deprecated and ignored; thread-owned Guardian context is always enabled.",
-          "type": "boolean"
-        },
-        "transcript": {
-          "$ref": "#/definitions/GuardianV2TranscriptConfigToml"
-        },
-        "transcript_mode": {
-          "allOf": [
-            {
-              "$ref": "#/definitions/TranscriptFormat"
-            }
-          ],
-          "description": "Transcript encoding for synchronous Guardian review and asynchronous scoring. Defaults to line."
-        }
-      },
-      "type": "object"
-    },
-    "GuardianV2ReviewScopeConfigToml": {
-      "additionalProperties": false,
-      "description": "Optional tool-call categories available to the Guardian v2 classifier.",
-      "properties": {
-        "computer_use_only": {
-          "description": "Restrict asynchronous classification and fast approvals to browser and computer-use tools.",
-          "type": "boolean"
-        },
-        "sandboxed_exec_commands": {
-          "description": "Include sandboxed shell command calls in Guardian v2 classification.",
-          "type": "boolean"
-        }
-      },
-      "type": "object"
-    },
-    "GuardianV2TranscriptConfigToml": {
-      "additionalProperties": false,
-      "description": "Bounds and optional sources for the Guardian v2 conversation transcript.",
-      "properties": {
-        "include_images": {
-          "description": "Include recent screenshots from messages and configured tool outputs.",
-          "type": "boolean"
-        },
-        "max_message_entry_tokens": {
-          "format": "uint",
-          "maximum": 100000.0,
-          "minimum": 100.0,
-          "type": "integer"
-        },
-        "max_message_transcript_tokens": {
-          "format": "uint",
-          "maximum": 100000.0,
-          "minimum": 100.0,
-          "type": "integer"
-        },
-        "max_recent_non_user_entries": {
-          "format": "uint",
-          "minimum": 1.0,
-          "type": "integer"
-        },
-        "max_tool_entry_tokens": {
-          "format": "uint",
-          "maximum": 100000.0,
-          "minimum": 100.0,
-          "type": "integer"
-        },
-        "max_tool_transcript_tokens": {
-          "format": "uint",
-          "maximum": 100000.0,
-          "minimum": 100.0,
-          "type": "integer"
-        },
-        "sources": {
-          "items": {
-            "$ref": "#/definitions/GuardianV2TranscriptSource"
-          },
-          "type": "array"
-        }
-      },
-      "type": "object"
-    },
-    "GuardianV2TranscriptSource": {
-      "description": "Optional conversation sources available to the Guardian v2 classifier.",
-      "enum": [
-        "tool_calls",
-        "tool_outputs",
-        "reasoning"
-      ],
-      "type": "string"
-    },
-    "GuardianV3ConfigToml": {
-      "additionalProperties": false,
-      "description": "User-configurable settings for Guardian V3.",
-      "properties": {
-        "enabled": {
-          "type": "boolean"
-        }
-      },
       "type": "object"
     },
     "History": {
@@ -4452,36 +4234,6 @@
       },
       "type": "object"
     },
-    "RuntimeAgentInstancesConfigToml": {
-      "additionalProperties": false,
-      "properties": {
-        "enabled": {
-          "type": "boolean"
-        },
-        "mode": {
-          "$ref": "#/definitions/RuntimeAuthMode"
-        }
-      },
-      "type": "object"
-    },
-    "RuntimeAuthMode": {
-      "oneOf": [
-        {
-          "description": "Send the actor credential and a runtime assertion together during migration.",
-          "enum": [
-            "dual_header"
-          ],
-          "type": "string"
-        },
-        {
-          "description": "Send only the runtime assertion as the request credential.",
-          "enum": [
-            "assertion_only"
-          ],
-          "type": "string"
-        }
-      ]
-    },
     "SandboxMode": {
       "enum": [
         "read-only",
@@ -4880,25 +4632,6 @@
         }
       },
       "type": "object"
-    },
-    "TranscriptFormat": {
-      "description": "Transcript encoding shared by rendering, provenance instructions and budget recovery.",
-      "oneOf": [
-        {
-          "description": "Numbered entries with a role prefix and unescaped text.",
-          "enum": [
-            "line"
-          ],
-          "type": "string"
-        },
-        {
-          "description": "Host-owned metadata with message text escaped as a JSON string.",
-          "enum": [
-            "json"
-          ],
-          "type": "string"
-        }
-      ]
     },
     "TrustLevel": {
       "description": "Represents the trust level for a project directory. This determines the approval policy and sandbox mode applied.",
@@ -7551,15 +7284,6 @@
         "guardian_trust_orchestrator_connectors": {
           "type": "boolean"
         },
-        "guardianv2": {
-          "$ref": "#/definitions/FeatureToml_for_GuardianV2ConfigToml"
-        },
-        "guardianv2_decisions_comparison": {
-          "type": "boolean"
-        },
-        "guardianv3": {
-          "$ref": "#/definitions/FeatureToml_for_GuardianV3ConfigToml"
-        },
         "hooks": {
           "type": "boolean"
         },
@@ -7757,9 +7481,6 @@
         },
         "rollout_budget": {
           "$ref": "#/definitions/FeatureToml_for_RolloutBudgetConfigToml"
-        },
-        "runtime_agent_instances": {
-          "$ref": "#/definitions/FeatureToml_for_RuntimeAgentInstancesConfigToml"
         },
         "runtime_metrics": {
           "type": "boolean"

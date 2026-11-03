@@ -591,22 +591,6 @@ pub(crate) enum AnalyticsFact {
         completed_at_ms: u64,
         request_id: RequestId,
     },
-    RealtimeHandoffRequested {
-        thread_id: String,
-    },
-    RealtimeSessionStarted {
-        thread_id: String,
-        realtime_session_id: Option<String>,
-        started_at: u64,
-    },
-    RealtimeSessionUpdated {
-        thread_id: String,
-        realtime_session_id: String,
-    },
-    RealtimeSessionClosed {
-        thread_id: String,
-        closed_at: u64,
-    },
     Notification(Box<ServerNotification>),
     // Facts that do not naturally exist on the app-server protocol surface, or
     // would require non-trivial protocol reshaping on this branch.

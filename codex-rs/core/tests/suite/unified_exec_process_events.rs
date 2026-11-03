@@ -1936,5 +1936,3 @@ timeout = 900
 #[path = "network_approval_completion.rs"]
 mod network_approval_completion;
 
-#[path = "guardian_sandbox_retry.rs"]
-mod guardian_sandbox_retry;

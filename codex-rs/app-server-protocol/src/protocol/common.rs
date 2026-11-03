@@ -1106,47 +1106,11 @@ client_request_definitions! {
         serialization: thread_id(params.thread_id),
         response: v2::TurnInterruptResponse,
     },
-    #[experimental("thread/realtime/start")]
-    ThreadRealtimeStart => "thread/realtime/start" {
-        params: v2::ThreadRealtimeStartParams,
-        serialization: thread_id(params.thread_id),
-        response: v2::ThreadRealtimeStartResponse,
-    },
-    #[experimental("thread/realtime/appendAudio")]
-    ThreadRealtimeAppendAudio => "thread/realtime/appendAudio" {
-        params: v2::ThreadRealtimeAppendAudioParams,
-        serialization: thread_id(params.thread_id),
-        response: v2::ThreadRealtimeAppendAudioResponse,
-    },
-    #[experimental("thread/realtime/appendText")]
-    ThreadRealtimeAppendText => "thread/realtime/appendText" {
-        params: v2::ThreadRealtimeAppendTextParams,
-        serialization: thread_id(params.thread_id),
-        response: v2::ThreadRealtimeAppendTextResponse,
-    },
-    #[experimental("thread/realtime/appendSpeech")]
-    ThreadRealtimeAppendSpeech => "thread/realtime/appendSpeech" {
-        params: v2::ThreadRealtimeAppendSpeechParams,
-        serialization: thread_id(params.thread_id),
-        response: v2::ThreadRealtimeAppendSpeechResponse,
-    },
-    #[experimental("thread/realtime/stop")]
-    ThreadRealtimeStop => "thread/realtime/stop" {
-        params: v2::ThreadRealtimeStopParams,
-        serialization: thread_id(params.thread_id),
-        response: v2::ThreadRealtimeStopResponse,
-    },
     #[experimental("thread/timeline/list")]
     ThreadTimelineList => "thread/timeline/list" {
         params: v2::ThreadTimelineListParams,
         serialization: thread_id(params.thread_id),
         response: v2::ThreadTimelineListResponse,
-    },
-    #[experimental("thread/realtime/listVoices")]
-    ThreadRealtimeListVoices => "thread/realtime/listVoices" {
-        params: v2::ThreadRealtimeListVoicesParams,
-        serialization: None,
-        response: v2::ThreadRealtimeListVoicesResponse,
     },
     ReviewStart => "review/start" {
         params: v2::ReviewStartParams,
@@ -2094,28 +2058,6 @@ server_notification_definitions! {
     ConfigWarning => "configWarning" (v2::ConfigWarningNotification),
     FuzzyFileSearchSessionUpdated => "fuzzyFileSearch/sessionUpdated" (FuzzyFileSearchSessionUpdatedNotification),
     FuzzyFileSearchSessionCompleted => "fuzzyFileSearch/sessionCompleted" (FuzzyFileSearchSessionCompletedNotification),
-    #[experimental("thread/realtime/started")]
-    ThreadRealtimeStarted => "thread/realtime/started" (v2::ThreadRealtimeStartedNotification),
-    #[experimental("thread/realtime/itemAdded")]
-    ThreadRealtimeItemAdded => "thread/realtime/itemAdded" (v2::ThreadRealtimeItemAddedNotification),
-    #[experimental("thread/realtime/item/started")]
-    ThreadRealtimeItemStarted => "thread/realtime/item/started" (v2::ThreadRealtimeItemStartedNotification),
-    #[experimental("thread/realtime/item/transcript/delta")]
-    ThreadRealtimeItemTranscriptDelta => "thread/realtime/item/transcript/delta" (v2::ThreadRealtimeItemTranscriptDeltaNotification),
-    #[experimental("thread/realtime/item/completed")]
-    ThreadRealtimeItemCompleted => "thread/realtime/item/completed" (v2::ThreadRealtimeItemCompletedNotification),
-    #[experimental("thread/realtime/transcript/delta")]
-    ThreadRealtimeTranscriptDelta => "thread/realtime/transcript/delta" (v2::ThreadRealtimeTranscriptDeltaNotification),
-    #[experimental("thread/realtime/transcript/done")]
-    ThreadRealtimeTranscriptDone => "thread/realtime/transcript/done" (v2::ThreadRealtimeTranscriptDoneNotification),
-    #[experimental("thread/realtime/outputAudio/delta")]
-    ThreadRealtimeOutputAudioDelta => "thread/realtime/outputAudio/delta" (v2::ThreadRealtimeOutputAudioDeltaNotification),
-    #[experimental("thread/realtime/sdp")]
-    ThreadRealtimeSdp => "thread/realtime/sdp" (v2::ThreadRealtimeSdpNotification),
-    #[experimental("thread/realtime/error")]
-    ThreadRealtimeError => "thread/realtime/error" (v2::ThreadRealtimeErrorNotification),
-    #[experimental("thread/realtime/closed")]
-    ThreadRealtimeClosed => "thread/realtime/closed" (v2::ThreadRealtimeClosedNotification),
 
     #[serde(rename = "account/login/completed")]
     #[ts(rename = "account/login/completed")]
@@ -2156,11 +2098,6 @@ mod tests {
     use codex_protocol::config_types::MultiAgentMode;
     use codex_protocol::models::BUILT_IN_PERMISSION_PROFILE_READ_ONLY;
     use codex_protocol::parse_command::ParsedCommand;
-    use codex_protocol::protocol::CodexResponseHandoffMode;
-    use codex_protocol::protocol::ConversationTextRole;
-    use codex_protocol::protocol::RealtimeConversationVersion;
-    use codex_protocol::protocol::RealtimeOutputModality;
-    use codex_protocol::protocol::RealtimeVoice;
     use codex_utils_absolute_path::AbsolutePathBuf;
     use codex_utils_absolute_path::test_support::PathBufExt;
     use codex_utils_absolute_path::test_support::test_path_buf;
@@ -4101,269 +4038,6 @@ mod tests {
     }
 
     #[test]
-    fn serialize_thread_realtime_start() -> Result<()> {
-        let request = ClientRequest::ThreadRealtimeStart {
-            request_id: RequestId::Integer(9),
-            params: v2::ThreadRealtimeStartParams {
-                client_managed_handoffs: Some(true),
-                delegation_ack_filler: Some(false),
-                flush_transcript_tail_on_session_end: Some(true),
-                codex_responses_as_items: None,
-                codex_response_item_prefix: None,
-                codex_response_handoff_mode: Some(CodexResponseHandoffMode::BemTags),
-                backend_reasoning_status: false,
-                codex_response_handoff_channel_prefixes: Some(std::collections::BTreeMap::from([
-                    ("analysis".to_string(), vec!["[THINKING]".to_string()]),
-                    (
-                        "commentary".to_string(),
-                        vec!["[PROGRESS]".to_string(), "[UPDATE]".to_string()],
-                    ),
-                    ("final".to_string(), vec!["[DONE]".to_string()]),
-                ])),
-                thread_id: "thr_123".to_string(),
-                model: Some("realtime-treatment-model".to_string()),
-                output_modality: RealtimeOutputModality::Audio,
-                include_startup_context: Some(false),
-                initial_items: Some(vec![
-                    v2::ThreadRealtimeInitialItem {
-                        role: ConversationTextRole::Developer,
-                        text: "Remember this.".to_string(),
-                    },
-                    v2::ThreadRealtimeInitialItem {
-                        role: ConversationTextRole::Assistant,
-                        text: "Understood.".to_string(),
-                    },
-                ]),
-                realtime_start_instructions: Some("Use realtime output channels.".to_string()),
-                realtime_end_instructions: Some("Resume normal text responses.".to_string()),
-                prompt: Some(Some("You are on a call".to_string())),
-                realtime_session_id: Some("sess_456".to_string()),
-                voice_session_id: Some("voice_789".to_string()),
-                transport: None,
-                version: Some(RealtimeConversationVersion::V3),
-                voice: Some(RealtimeVoice::Marin),
-            },
-        };
-        assert_eq!(
-            json!({
-                "method": "thread/realtime/start",
-                "id": 9,
-                "params": {
-                    "threadId": "thr_123",
-                    "clientManagedHandoffs": true,
-                    "delegationAckFiller": false,
-                    "flushTranscriptTailOnSessionEnd": true,
-                    "codexResponsesAsItems": null,
-                    "codexResponseItemPrefix": null,
-                    "codexResponseHandoffMode": "bemTags",
-                    "codexResponseHandoffChannelPrefixes": {
-                        "analysis": ["[THINKING]"],
-                        "commentary": ["[PROGRESS]", "[UPDATE]"],
-                        "final": ["[DONE]"]
-                    },
-                    "model": "realtime-treatment-model",
-                    "outputModality": "audio",
-                    "includeStartupContext": false,
-                    "initialItems": [
-                        {
-                            "role": "developer",
-                            "text": "Remember this."
-                        },
-                        {
-                            "role": "assistant",
-                            "text": "Understood."
-                        }
-                    ],
-                    "realtimeStartInstructions": "Use realtime output channels.",
-                    "realtimeEndInstructions": "Resume normal text responses.",
-                    "prompt": "You are on a call",
-                    "realtimeSessionId": "sess_456",
-                    "voiceSessionId": "voice_789",
-                    "transport": null,
-                    "version": "v3",
-                    "voice": "marin"
-                }
-            }),
-            serde_json::to_value(&request)?,
-        );
-        Ok(())
-    }
-
-    #[test]
-    fn serialize_thread_realtime_start_prompt_default_and_null() -> Result<()> {
-        let default_prompt_request = ClientRequest::ThreadRealtimeStart {
-            request_id: RequestId::Integer(9),
-            params: v2::ThreadRealtimeStartParams {
-                client_managed_handoffs: None,
-                delegation_ack_filler: None,
-                flush_transcript_tail_on_session_end: None,
-                codex_responses_as_items: None,
-                codex_response_item_prefix: None,
-                codex_response_handoff_mode: None,
-                backend_reasoning_status: false,
-                codex_response_handoff_channel_prefixes: None,
-                thread_id: "thr_123".to_string(),
-                model: None,
-                output_modality: RealtimeOutputModality::Audio,
-                include_startup_context: None,
-                initial_items: None,
-                realtime_start_instructions: None,
-                realtime_end_instructions: None,
-                prompt: None,
-                realtime_session_id: None,
-                voice_session_id: None,
-                transport: None,
-                version: None,
-                voice: None,
-            },
-        };
-        assert_eq!(
-            json!({
-                "method": "thread/realtime/start",
-                "id": 9,
-                "params": {
-                    "threadId": "thr_123",
-                    "clientManagedHandoffs": null,
-                    "delegationAckFiller": null,
-                    "flushTranscriptTailOnSessionEnd": null,
-                    "codexResponsesAsItems": null,
-                    "codexResponseItemPrefix": null,
-                    "codexResponseHandoffMode": null,
-                    "codexResponseHandoffChannelPrefixes": null,
-                    "model": null,
-                    "outputModality": "audio",
-                    "includeStartupContext": null,
-                    "initialItems": null,
-                    "realtimeStartInstructions": null,
-                    "realtimeEndInstructions": null,
-                    "realtimeSessionId": null,
-                    "voiceSessionId": null,
-                    "transport": null,
-                    "version": null,
-                    "voice": null
-                }
-            }),
-            serde_json::to_value(&default_prompt_request)?,
-        );
-
-        let null_prompt_request = ClientRequest::ThreadRealtimeStart {
-            request_id: RequestId::Integer(9),
-            params: v2::ThreadRealtimeStartParams {
-                client_managed_handoffs: None,
-                delegation_ack_filler: None,
-                flush_transcript_tail_on_session_end: None,
-                codex_responses_as_items: None,
-                codex_response_item_prefix: None,
-                codex_response_handoff_mode: None,
-                backend_reasoning_status: false,
-                codex_response_handoff_channel_prefixes: None,
-                thread_id: "thr_123".to_string(),
-                model: None,
-                output_modality: RealtimeOutputModality::Audio,
-                include_startup_context: None,
-                initial_items: None,
-                realtime_start_instructions: None,
-                realtime_end_instructions: None,
-                prompt: Some(None),
-                realtime_session_id: None,
-                voice_session_id: None,
-                transport: None,
-                version: None,
-                voice: None,
-            },
-        };
-        assert_eq!(
-            json!({
-                "method": "thread/realtime/start",
-                "id": 9,
-                "params": {
-                    "threadId": "thr_123",
-                    "clientManagedHandoffs": null,
-                    "delegationAckFiller": null,
-                    "flushTranscriptTailOnSessionEnd": null,
-                    "codexResponsesAsItems": null,
-                    "codexResponseItemPrefix": null,
-                    "codexResponseHandoffMode": null,
-                    "codexResponseHandoffChannelPrefixes": null,
-                    "model": null,
-                    "outputModality": "audio",
-                    "includeStartupContext": null,
-                    "initialItems": null,
-                    "realtimeStartInstructions": null,
-                    "realtimeEndInstructions": null,
-                    "prompt": null,
-                    "realtimeSessionId": null,
-                    "voiceSessionId": null,
-                    "transport": null,
-                    "version": null,
-                    "voice": null
-                }
-            }),
-            serde_json::to_value(&null_prompt_request)?,
-        );
-
-        let default_prompt_value = json!({
-            "method": "thread/realtime/start",
-            "id": 9,
-            "params": {
-                "threadId": "thr_123",
-                // Retain runtime compatibility with clients that have not yet removed this field.
-                "codexResponseHandoffPrefix": "",
-                "outputModality": "audio",
-                "realtimeSessionId": null,
-                "transport": null,
-                "voice": null
-            }
-        });
-        assert_eq!(
-            serde_json::from_value::<ClientRequest>(default_prompt_value)?,
-            default_prompt_request,
-        );
-
-        let null_prompt_value = json!({
-            "method": "thread/realtime/start",
-            "id": 9,
-            "params": {
-                "threadId": "thr_123",
-                "outputModality": "audio",
-                "prompt": null,
-                "realtimeSessionId": null,
-                "transport": null,
-                "voice": null
-            }
-        });
-        assert_eq!(
-            serde_json::from_value::<ClientRequest>(null_prompt_value)?,
-            null_prompt_request,
-        );
-
-        Ok(())
-    }
-
-    #[test]
-    fn serialize_thread_realtime_append_speech() -> Result<()> {
-        let request = ClientRequest::ThreadRealtimeAppendSpeech {
-            request_id: RequestId::Integer(10),
-            params: v2::ThreadRealtimeAppendSpeechParams {
-                thread_id: "thr_123".to_string(),
-                text: "Short voice update".to_string(),
-            },
-        };
-        assert_eq!(
-            json!({
-                "method": "thread/realtime/appendSpeech",
-                "id": 10,
-                "params": {
-                    "threadId": "thr_123",
-                    "text": "Short voice update"
-                }
-            }),
-            serde_json::to_value(&request)?,
-        );
-        Ok(())
-    }
-
-    #[test]
     fn serialize_thread_status_changed_notification() -> Result<()> {
         let notification =
             ServerNotification::ThreadStatusChanged(v2::ThreadStatusChangedNotification {
@@ -4409,39 +4083,6 @@ mod tests {
                     "reasons": ["user_risk"],
                     "showBufferingUi": true,
                     "fasterModel": "faster-model"
-                }
-            }),
-            serde_json::to_value(&notification)?,
-        );
-        Ok(())
-    }
-
-    #[test]
-    fn serialize_thread_realtime_output_audio_delta_notification() -> Result<()> {
-        let notification = ServerNotification::ThreadRealtimeOutputAudioDelta(
-            v2::ThreadRealtimeOutputAudioDeltaNotification {
-                thread_id: "thr_123".to_string(),
-                audio: v2::ThreadRealtimeAudioChunk {
-                    data: "AQID".to_string(),
-                    sample_rate: 24_000,
-                    num_channels: 1,
-                    samples_per_channel: Some(512),
-                    item_id: None,
-                },
-            },
-        );
-        assert_eq!(
-            json!({
-                "method": "thread/realtime/outputAudio/delta",
-                "params": {
-                    "threadId": "thr_123",
-                    "audio": {
-                        "data": "AQID",
-                        "sampleRate": 24000,
-                        "numChannels": 1,
-                        "samplesPerChannel": 512,
-                        "itemId": null
-                    }
                 }
             }),
             serde_json::to_value(&notification)?,
@@ -4612,36 +4253,6 @@ mod tests {
             crate::experimental_api::ExperimentalApi::experimental_reason(&notification),
             Some("turn/moderationMetadata")
         );
-    }
-
-    #[test]
-    fn thread_realtime_started_notification_is_marked_experimental() {
-        let notification =
-            ServerNotification::ThreadRealtimeStarted(v2::ThreadRealtimeStartedNotification {
-                thread_id: "thr_123".to_string(),
-                realtime_session_id: Some("sess_456".to_string()),
-                version: RealtimeConversationVersion::V1,
-            });
-        let reason = crate::experimental_api::ExperimentalApi::experimental_reason(&notification);
-        assert_eq!(reason, Some("thread/realtime/started"));
-    }
-
-    #[test]
-    fn thread_realtime_output_audio_delta_notification_is_marked_experimental() {
-        let notification = ServerNotification::ThreadRealtimeOutputAudioDelta(
-            v2::ThreadRealtimeOutputAudioDeltaNotification {
-                thread_id: "thr_123".to_string(),
-                audio: v2::ThreadRealtimeAudioChunk {
-                    data: "AQID".to_string(),
-                    sample_rate: 24_000,
-                    num_channels: 1,
-                    samples_per_channel: Some(512),
-                    item_id: None,
-                },
-            },
-        );
-        let reason = crate::experimental_api::ExperimentalApi::experimental_reason(&notification);
-        assert_eq!(reason, Some("thread/realtime/outputAudio/delta"));
     }
 
     #[test]

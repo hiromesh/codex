@@ -5,7 +5,6 @@ use super::CompactedItem;
 use super::EventMsg;
 use super::InterAgentCommunication;
 use super::McpResourceOriginCheckpoint;
-use super::RealtimeItem;
 use super::ResponseItem;
 use super::ResponseItemEnvelope;
 use super::RolloutItem;
@@ -70,7 +69,7 @@ pub(super) enum RolloutItemWire<'a> {
         payload: Cow<'a, EventMsg>,
     },
     RealtimeItem {
-        payload: Cow<'a, RealtimeItem>,
+        payload: serde_json::Value,
     },
 }
 
@@ -171,8 +170,8 @@ impl<'a> From<&'a RolloutItem> for RolloutItemWire<'a> {
             RolloutItem::EventMsg(payload) => Self::EventMsg {
                 payload: Cow::Borrowed(payload),
             },
-            RolloutItem::RealtimeItem(payload) => Self::RealtimeItem {
-                payload: Cow::Borrowed(payload),
+            RolloutItem::Ignored(payload) => Self::RealtimeItem {
+                payload: payload.clone(),
             },
         }
     }
@@ -254,7 +253,7 @@ impl From<RolloutItemWire<'_>> for RolloutItem {
                 Self::SecurityRiskScore(payload.into_owned())
             }
             RolloutItemWire::EventMsg { payload } => Self::EventMsg(payload.into_owned()),
-            RolloutItemWire::RealtimeItem { payload } => Self::RealtimeItem(payload.into_owned()),
+            RolloutItemWire::RealtimeItem { payload } => Self::Ignored(payload),
         }
     }
 }

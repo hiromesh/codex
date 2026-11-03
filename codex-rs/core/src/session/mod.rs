@@ -25,7 +25,6 @@ use crate::compact::CompactedHistoryMetadata;
 use crate::config::ManagedFeatures;
 use crate::context::ContextualUserFragment;
 use crate::context::DeveloperInstructions;
-use crate::context::GuardianPolicy;
 use crate::context::ManagedDeveloperInstructions;
 use crate::context::ModelSwitchInstructions;
 use crate::context::MultiAgentRoleInstructions;
@@ -4636,12 +4635,7 @@ impl Session {
                 state.auto_compact_window_ids(),
             )
         };
-        let separate_guardian_developer_message =
-            crate::guardian::is_basic_session_source(&session_source);
-        // Keep the guardian policy prompt out of the aggregated developer bundle so it
-        // stays isolated as its own top-level developer message for guardian subagents.
-        if !separate_guardian_developer_message
-            && let Some(developer_instructions) = turn_context.developer_instructions.as_deref()
+        if let Some(developer_instructions) = turn_context.developer_instructions.as_deref()
             && !developer_instructions.is_empty()
         {
             developer_sections
@@ -4849,19 +4843,6 @@ impl Session {
                 ))
             {
                 items.push(contextual_user_message);
-            }
-            // Emit the guardian policy prompt as a separate developer item so the guardian
-            // subagent sees a distinct, easy-to-audit instruction block.
-            if next_item.is_none()
-                && separate_guardian_developer_message
-                && let Some(developer_instructions) = turn_context.developer_instructions.as_deref()
-                && !developer_instructions.is_empty()
-                && let Some(guardian_developer_message) =
-                    crate::context_manager::updates::build_rendered_message(vec![
-                        GuardianPolicy::new(developer_instructions).render_fragment(),
-                    ])
-            {
-                items.push(guardian_developer_message);
             }
             if let Some(managed_developer_instructions) = managed_developer_instructions
                 && let Some(message) =

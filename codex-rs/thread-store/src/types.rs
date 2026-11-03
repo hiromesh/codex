@@ -566,12 +566,11 @@ pub struct ListTimelineParams {
     pub page_size: usize,
 }
 
-/// Ordinary items, realtime facts, and the session state preceding their page.
+/// Ordinary items and the session state preceding their page.
 #[derive(Clone, Debug, PartialEq)]
 pub struct TimelinePage {
     pub items: Vec<ThreadTimelineEntry>,
     pub next_cursor: Option<String>,
-    pub active_realtime_session_at_page_start: Option<String>,
 }
 
 /// Parameters for searching visible message occurrences within one paginated thread.

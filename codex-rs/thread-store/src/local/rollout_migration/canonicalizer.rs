@@ -292,7 +292,7 @@ impl LegacyRolloutCanonicalizer {
             | RolloutItem::TurnContext(_)
             | RolloutItem::DynamicToolsUpdated { .. }
             | RolloutItem::TokenUsageRecord(_)
-            | RolloutItem::RealtimeItem(_)
+            | RolloutItem::Ignored(_)
             | RolloutItem::RetainedContext(_)
             | RolloutItem::SecurityRiskScore(_)
             | RolloutItem::WorldState(_)) => {

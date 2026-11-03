@@ -1072,7 +1072,10 @@ async fn codex_instances_share_board_with_fixed_access() -> anyhow::Result<()> {
         options
             .thread_extension_init
             .insert(IsolatedSessionExtensions(extensions.clone()));
-        let mut policy = codex_guardian_reviewer::reviewer_tool_policy();
+        let mut policy = codex_extension_api::ToolPolicy {
+            allowed_tools: Some(Vec::new()),
+            ..Default::default()
+        };
         policy.allowed_tools.as_mut().unwrap().extend(
             [
                 "post",

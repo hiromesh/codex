@@ -215,7 +215,6 @@ pub(crate) struct SkillInvocationEventParams {
     pub(crate) remote_plugin_id: Option<String>,
     pub(crate) thread_id: Option<String>,
     pub(crate) turn_id: Option<String>,
-    pub(crate) voice_session_id: Option<String>,
     pub(crate) invoke_type: Option<InvocationType>,
     pub(crate) model_slug: Option<String>,
 }
@@ -905,7 +904,6 @@ pub(crate) struct CodexMcpToolCallEventParams {
     pub(crate) mcp_error_present: bool,
     pub(crate) plugin_id: Option<String>,
     pub(crate) connector_id: Option<String>,
-    pub(crate) voice_session_id: Option<String>,
     pub(crate) elicitation_type: Option<ElicitationType>,
 }
 
@@ -1019,7 +1017,6 @@ pub(crate) struct CodexAppMentionedEventRequest {
 pub(crate) struct CodexAppUsedMetadata {
     #[serde(flatten)]
     pub(crate) app: CodexAppMetadata,
-    pub(crate) voice_session_id: Option<String>,
     pub(crate) elicitation_type: Option<ElicitationType>,
 }
 
@@ -1064,7 +1061,6 @@ pub(crate) struct CodexCompactionEventParams {
     pub(crate) phase: CompactionPhase,
     pub(crate) strategy: CompactionStrategy,
     pub(crate) status: CompactionStatus,
-    pub(crate) voice_session_id: Option<String>,
     pub(crate) codex_error_kind: Option<CodexErrKind>,
     pub(crate) codex_error_http_status_code: Option<u16>,
     pub(crate) usage_limit_window_minutes: Option<u16>,
@@ -1118,7 +1114,6 @@ pub(crate) struct CodexTurnEventParams {
     pub(crate) turn_id: String,
     /// First received active plugin inventory. Null is unknown; [] is observed empty.
     pub(crate) active_plugin_ids_at_turn_start: Option<Vec<String>>,
-    pub(crate) voice_session_id: Option<String>,
     pub(crate) root_turn_id: Option<String>,
     pub(crate) turn_trigger: Option<String>,
     pub(crate) codex_turn_source: Option<String>,
@@ -1436,7 +1431,6 @@ pub(crate) fn codex_compaction_event_params(
         phase: input.phase,
         strategy: input.strategy,
         status: input.status,
-        voice_session_id: None,
         codex_error_kind: input.codex_error_kind,
         codex_error_http_status_code: input.codex_error_http_status_code,
         usage_limit_window_minutes: input.usage_limit_window_minutes,

@@ -346,14 +346,8 @@ async fn startup_allowlist_controls_advertising_and_execution(
     Ok(())
 }
 
-#[test_case(None, Some(codex_guardian_reviewer::reviewer_tool_policy()), false; "explicit_policy")]
+#[test_case(None, Some(ToolPolicy::default()), true; "explicit_policy")]
 #[test_case(None, None, true; "ordinary_defaults")]
-#[test_case(Some(codex_protocol::protocol::SessionSource::Internal(
-    codex_protocol::protocol::InternalSessionSource::Guardian)), None, false; "internal_guardian_fallback")]
-#[test_case(Some(codex_protocol::protocol::SessionSource::SubAgent(
-    codex_protocol::protocol::SubAgentSource::Other("guardian".to_owned()))), None, false; "legacy_guardian_fallback")]
-#[test_case(Some(codex_protocol::protocol::SessionSource::Internal(
-    codex_protocol::protocol::InternalSessionSource::Guardian)), Some(ToolPolicy::default()), true; "explicit_policy_overrides_identity")]
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn startup_tool_policy_controls_additional_permission_parameters(
     source: Option<codex_protocol::protocol::SessionSource>,

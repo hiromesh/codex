@@ -1063,8 +1063,8 @@ async fn read_head_summary(path: &Path, head_limit: usize) -> io::Result<HeadTai
             | RolloutItem::SecurityRiskScore(_) => {
                 // Not included in `head`; skip.
             }
-            RolloutItem::RealtimeItem(_) => {
-                // Realtime presentation does not affect model-visible thread summaries.
+            RolloutItem::Ignored(_) => {
+                // Tombstoned items do not affect model-visible thread summaries.
             }
             RolloutItem::Compacted(_) => {
                 // Not included in `head`; skip.
@@ -1137,7 +1137,7 @@ pub async fn read_head_for_summary(path: &Path) -> io::Result<Vec<serde_json::Va
                 | RolloutItem::TurnContext(_)
                 | RolloutItem::TokenUsageRecord(_)
                 | RolloutItem::WorldState(_)
-                | RolloutItem::RealtimeItem(_)
+                | RolloutItem::Ignored(_)
                 | RolloutItem::RetainedContext(_)
                 | RolloutItem::DynamicToolsUpdated { .. }
                 | RolloutItem::SecurityRiskScore(_)
@@ -1232,7 +1232,7 @@ pub async fn read_session_meta_line(path: &Path) -> io::Result<SessionMetaLine> 
             | RolloutItem::TurnContext(_)
             | RolloutItem::TokenUsageRecord(_)
             | RolloutItem::WorldState(_)
-            | RolloutItem::RealtimeItem(_)
+            | RolloutItem::Ignored(_)
             | RolloutItem::RetainedContext(_)
             | RolloutItem::DynamicToolsUpdated { .. }
             | RolloutItem::SecurityRiskScore(_)

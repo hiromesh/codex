@@ -132,23 +132,6 @@ justification = "A person must approve this command."
         }
         requests.push(result);
     }
-    // Direct Guardian review cannot substitute for the managed human checkpoint either.
-    test.codex
-        .inject_response_items(vec![serde_json::from_value(json!({
-            "type": "function_call", "name": "exec_command", "call_id": "direct-review",
-            "arguments": r#"{"cmd":"echo checkpoint-ok","login":false}"#,
-        }))?])
-        .await?;
-    let error = test
-        .codex
-        .guardian_review(&CancellationToken::new())
-        .await
-        .expect_err("managed checkpoint requires a human");
-    assert!(matches!(
-        error.details(),
-        codex_protocol::error::CodexErrorDetails::InvalidRequest(message)
-            if message == "Managed command policy requires human approval."
-    ));
     let mut snapshot = context_snapshot::format_request_history_snapshot(
         "Managed command checkpoints override saved allow rules and automatic review. Reusable decisions are rejected, and each successful execution requires a fresh human decision.",
         &requests,

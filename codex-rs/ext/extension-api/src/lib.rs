@@ -61,7 +61,6 @@ pub use contributors::CommandStartInput;
 pub use contributors::ConfigContributor;
 pub use contributors::ContextContributor;
 pub use contributors::ExtensionFuture;
-pub use contributors::GuardianV2Enabled;
 pub use contributors::McpServerContribution;
 pub use contributors::McpServerContributionContext;
 pub use contributors::McpServerContributor;

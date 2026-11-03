@@ -1347,11 +1347,7 @@ async fn track_turn_resolved_config_analytics(
                 .and_then(ServiceTier::from_request_value),
             approval_policy: turn_context.approval_policy(),
             approvals_reviewer: turn_context.config.approvals_reviewer,
-            guardian_v2_enabled: sess
-                .services
-                .thread_extension_data
-                .get::<codex_extension_api::GuardianV2Enabled>()
-                .is_some(),
+            guardian_v2_enabled: false,
             sandbox_network_access: turn_context.network_sandbox_policy().is_enabled(),
             multi_agent_version: turn_context.multi_agent_version,
             collaboration_mode: turn_context.mode(),

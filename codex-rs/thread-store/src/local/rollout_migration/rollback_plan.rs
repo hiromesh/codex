@@ -282,7 +282,7 @@ impl RollbackPlanner {
             RolloutItem::TokenUsageRecord(record) => {
                 self.assign_targeted_record(index, Some(record.turn_id.as_str()));
             }
-            RolloutItem::WorldState(_) | RolloutItem::RealtimeItem(_) => {}
+            RolloutItem::WorldState(_) | RolloutItem::Ignored(_) => {}
             RolloutItem::RetainedContext(codex_rollout::RetainedContextEvent::VerifiedAnswer {
                 answer,
                 acceptance_order,

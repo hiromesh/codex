@@ -7,8 +7,6 @@ use codex_protocol::ThreadId;
 use crate::ExtensionData;
 
 /// Thread-local state installed only after Guardian V2's async classifier initializes.
-pub struct GuardianV2Enabled;
-
 /// Guardian's choice for one approval. Synchronous results pass through unchanged.
 #[derive(Clone, Debug, PartialEq)]
 pub enum ApprovalDecision {

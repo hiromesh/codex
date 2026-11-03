@@ -2025,7 +2025,6 @@ async fn resume_candidate_matches_cwd_reads_latest_turn_context() -> std::io::Re
             comp_hash: None,
             collaboration_mode: None,
             multi_agent_version: None,
-            realtime_active: None,
             cyber_access_program: None,
             effort: None,
             summary: Some(codex_protocol::config_types::ReasoningSummary::Auto),

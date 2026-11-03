@@ -492,7 +492,7 @@ impl LocalThreadStore {
         thread_history::list_items(self, params).await
     }
 
-    /// Lists bounded ordinary and realtime items from the rollout projection.
+    /// Lists bounded ordinary items from the rollout projection.
     pub async fn list_timeline(
         &self,
         params: ListTimelineParams,

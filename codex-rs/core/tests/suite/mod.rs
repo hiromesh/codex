@@ -82,6 +82,8 @@ mod gcp;
 mod git_enrichment;
 mod guardian_authorization;
 mod guardian_authorization_refresh;
+#[path = "guardian_checkpoint_migration_tests.rs"]
+mod guardian_checkpoint_migration;
 mod builtin_model_catalog;
 mod canonical_plugin_connectors;
 mod critical_path_runtime;

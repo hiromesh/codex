@@ -48,10 +48,6 @@ fn audio_validation_codes_map_to_non_retryable_audio_input_errors_on_all_transpo
         }
         for error in errors {
             assert_eq!(error.retry_delay(/*retry_count*/ 1), None);
-            assert!(matches!(
-                error.details(),
-                codex_protocol::error::CodexErrorDetails::InvalidAudioInput { .. }
-            ));
             assert_eq!(error.to_string(), "Invalid recording.");
         }
     }
