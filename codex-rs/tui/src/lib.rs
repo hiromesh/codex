@@ -47,7 +47,6 @@ use codex_app_server_protocol::ThreadListCwdFilter;
 use codex_app_server_protocol::ThreadListParams;
 use codex_app_server_protocol::ThreadSortKey as AppServerThreadSortKey;
 use codex_app_server_protocol::ThreadSourceKind;
-use codex_cloud_config::managed_config_bundle_loader_for_storage;
 use codex_config::CloudConfigBundleLoader;
 use codex_config::ConfigLoadError;
 use codex_config::LoaderOverrides;
@@ -1087,20 +1086,12 @@ fn app_server_target_for_launch(
 }
 
 async fn cloud_config_bundle_for_app_server_target(
-    app_server_target: &AppServerTarget,
-    bootstrap_config: &ConfigTomlLoadResult,
-    codex_home: &Path,
-    embedded_network_policy: &codex_app_server_client::EmbeddedNetworkPolicy,
+    _app_server_target: &AppServerTarget,
+    _bootstrap_config: &ConfigTomlLoadResult,
+    _codex_home: &Path,
+    _embedded_network_policy: &codex_app_server_client::EmbeddedNetworkPolicy,
 ) -> std::io::Result<CloudConfigBundleLoader> {
-    managed_config_bundle_loader_for_storage(
-        embedded_network_policy
-            .bind_bootstrap_auth(app_server_target.auth_config_for_cloud_loader(
-                bootstrap_auth_config(codex_home, bootstrap_config)?,
-            )),
-        bootstrap_config.config_layer_stack.requirements_toml(),
-        /*enable_codex_api_key_env*/ false,
-    )
-    .await
+    Ok(CloudConfigBundleLoader::default())
 }
 
 fn loader_overrides_are_default(loader_overrides: &LoaderOverrides) -> bool {
@@ -1196,7 +1187,7 @@ async fn run_ratatui_app(
     manually_selected_oss_provider: Option<String>,
     overrides: ConfigOverrides,
     cli_kv_overrides: Vec<(String, toml::Value)>,
-    mut cloud_config_bundle: CloudConfigBundleLoader,
+    cloud_config_bundle: CloudConfigBundleLoader,
     feedback: codex_feedback::CodexFeedback,
     log_db: Option<log_db::LogDbLayer>,
     mut state_db: Option<StateDbHandle>,
@@ -1425,18 +1416,6 @@ async fn run_ratatui_app(
         }
         let reloaded_config = startup_draft
             .run_until(&mut tui, async {
-                // If this onboarding run included the login step, always refresh the cloud config
-                // bundle and rebuild config. This avoids missing newly available cloud-managed
-                // policy due to login status detection edge cases.
-                if show_login_screen && !uses_remote_workspace {
-                    cloud_config_bundle = managed_config_bundle_loader_for_storage(
-                        embedded_network_policy.bind_bootstrap_auth(initial_config.auth_config()),
-                        initial_config.config_layer_stack.requirements_toml(),
-                        /*enable_codex_api_key_env*/ false,
-                    )
-                    .await?;
-                }
-
                 // Reload config when persisted trust or auth changes alter the current process.
                 Ok::<_, std::io::Error>(
                     if !uses_remote_workspace

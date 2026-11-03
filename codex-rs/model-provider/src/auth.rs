@@ -292,8 +292,8 @@ mod tests {
     use codex_model_provider_info::create_oss_provider_with_base_url;
     use codex_protocol::config_types::ModelProviderAuthInfo;
     use codex_protocol::error::CodexErrorDetails;
-    use http::header::AUTHORIZATION;
     use http::HeaderValue;
+    use http::header::AUTHORIZATION;
     use pretty_assertions::assert_eq;
     use std::num::NonZeroU64;
     use std::path::PathBuf;
@@ -311,7 +311,6 @@ mod tests {
             id = NEXT_CODEX_HOME_ID.fetch_add(1, Ordering::Relaxed)
         ))
     }
-
 
     #[test]
     fn unauthenticated_auth_provider_adds_no_headers() {
@@ -684,5 +683,4 @@ mod tests {
             }
         }
     }
-
 }

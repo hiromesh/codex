@@ -111,8 +111,8 @@ async fn auth_refresh_read_failure_is_transient_and_preserves_network_permit() {
 
     let payload = base64::engine::general_purpose::URL_SAFE_NO_PAD
         .encode(json!({"iat": "private-credential-value"}).to_string());
-    let nested_secret = json!({"tokens": {"access_token": format!("header.{payload}.signature")}})
-        .to_string();
+    let nested_secret =
+        json!({"tokens": {"access_token": format!("header.{payload}.signature")}}).to_string();
     // Cover interrupted writes and credential values rejected by outer JSON or nested parsing.
     for contents in [
         "",

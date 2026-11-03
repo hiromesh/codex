@@ -42,7 +42,6 @@ use crate::request_processors::ThreadQueueRequestProcessor;
 use crate::request_processors::ThreadRequestProcessor;
 use crate::request_processors::ThreadResumeTarget;
 use crate::request_processors::TurnRequestProcessor;
-use crate::request_processors::account_processor::handle_gcp_setup;
 use crate::request_processors::read_server_diagnostics;
 use crate::request_serialization::QueuedInitializedRequest;
 use crate::request_serialization::RequestSerializationQueueKey;
@@ -1572,49 +1571,21 @@ impl MessageProcessor {
             ClientRequest::BedrockSetup { .. } => Err(invalid_request(
                 "Amazon Bedrock setup is no longer supported.",
             )),
-            ClientRequest::GcpSetup { params, .. } => {
-                handle_gcp_setup(&self.account_processor, params).await
-            }
+            ClientRequest::GcpSetup { .. } => Err(invalid_request(
+                "Google Cloud setup is no longer supported.",
+            )),
             ClientRequest::BedrockCheckGovCloudRequirements { .. } => Err(invalid_request(
                 "Amazon Bedrock setup is no longer supported.",
             )),
-            ClientRequest::GatewayOAuthRead { .. } => {
-                Box::pin(self.account_processor.gateway_oauth_read())
-                    .await
-                    .map(|response| Some(response.into()))
-            }
-            ClientRequest::GatewayOAuthLogin { .. } => {
-                if session
-                    .opted_out_notification_methods()
-                    .contains("account/gatewayOAuth/changed")
-                {
-                    Err(invalid_request(
-                        "Gateway login requires account/gatewayOAuth/changed notifications",
-                    ))
-                } else {
-                    Box::pin(
-                        self.account_processor
-                            .gateway_oauth_login(connection_id, &session.rpc_gate),
-                    )
-                    .await
-                    .map(|response| Some(response.into()))
-                }
-            }
-            ClientRequest::GatewayOAuthCancel { .. } => {
-                Box::pin(self.account_processor.gateway_oauth_cancel(connection_id))
-                    .await
-                    .map(|response| Some(response.into()))
-            }
-            ClientRequest::AccountSessionsList { params, .. } => self
-                .account_processor
-                .list_account_sessions(params)
-                .await
-                .map(|response| Some(ClientResponsePayload::AccountSessionsList(response))),
-            ClientRequest::AccountSessionsSwitch { params, .. } => self
-                .account_processor
-                .switch_account_session(params, &self.thread_processor, &self.turn_admission)
-                .await
-                .map(|response| Some(ClientResponsePayload::AccountSessionsSwitch(response))),
+            ClientRequest::GatewayOAuthRead { .. } => Err(invalid_request(
+                "Gateway OAuth is no longer supported.",
+            )),
+            ClientRequest::GatewayOAuthLogin { .. } => Err(invalid_request(
+                "Gateway OAuth is no longer supported.",
+            )),
+            ClientRequest::GatewayOAuthCancel { .. } => Err(invalid_request(
+                "Gateway OAuth is no longer supported.",
+            )),
             ClientRequest::LogoutAccount { .. } => {
                 self.account_processor
                     .logout_account(request_id.clone())
@@ -1718,10 +1689,6 @@ impl MessageProcessor {
 #[cfg(test)]
 #[path = "message_processor_tracing_tests.rs"]
 mod message_processor_tracing_tests;
-
-#[cfg(test)]
-#[path = "message_processor_gateway_oauth_tests.rs"]
-mod gateway_oauth_tests;
 
 #[cfg(test)]
 #[path = "message_processor_thread_lifecycle_tests.rs"]

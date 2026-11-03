@@ -405,7 +405,10 @@ async fn item_lifecycle_notifications_publish_command_execution_event() {
     let payload = serde_json::to_value(&events).expect("serialize events");
     assert_eq!(payload.as_array().expect("events array").len(), 1);
     assert_eq!(payload[0]["event_params"]["model_slug"], "invoking-model");
-    assert_eq!(payload[0]["event_params"]["sandbox_backend"], "linux_seccomp");
+    assert_eq!(
+        payload[0]["event_params"]["sandbox_backend"],
+        "linux_seccomp"
+    );
     assert_eq!(payload[0]["event_params"]["reasoning_effort"], "max");
     assert_eq!(payload[0]["event_type"], "codex_command_execution_event");
     assert_eq!(payload[0]["event_params"]["thread_id"], "thread-1");

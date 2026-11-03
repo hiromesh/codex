@@ -25,7 +25,6 @@ codex-skills = { workspace = true }
 codex-tools = { workspace = true }
 codex-utils-absolute-path = { workspace = true }
 codex-utils-path-uri = { workspace = true }
-codex-utils-plugins = { workspace = true }
 codex-utils-string = { workspace = true }
 dirs = { workspace = true }
 futures = { workspace = true }
@@ -39,7 +38,6 @@ tracing = { workspace = true }
 [dev-dependencies]
 assert_matches = { workspace = true }
 codex-attachment-store = { workspace = true }
-codex-core-plugin-common = { workspace = true }
 codex-models-manager = { workspace = true }
 codex-protocol-test-support = { workspace = true }
 codex-utils-cargo-bin = { workspace = true }

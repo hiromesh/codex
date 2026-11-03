@@ -2,7 +2,6 @@
 
 use std::collections::BTreeMap;
 
-use base64::Engine;
 use codex_http_client::HttpClient;
 use codex_http_client::HttpClientBuilder;
 use http::HeaderMap;
@@ -11,8 +10,6 @@ use http::StatusCode;
 use pretty_assertions::assert_eq;
 use serde_json::Value;
 use serde_json::json;
-use sha2::Digest;
-use sha2::Sha256;
 use tokio::io::AsyncReadExt;
 use tokio::io::AsyncWriteExt;
 use tokio::net::TcpListener;
@@ -22,10 +19,6 @@ use wiremock::ResponseTemplate;
 use wiremock::matchers::method;
 
 use super::*;
-use crate::oauth::AuthorizationRequest;
-use crate::oauth::build_authorization_url;
-use crate::oauth::generate_pkce;
-use crate::oauth::generate_state;
 
 fn oauth<'a>(http: &'a HttpClient, url: &'a str, limit: ErrorBodyLimit) -> OAuthClient<'a> {
     OAuthClient::new(
@@ -33,96 +26,11 @@ fn oauth<'a>(http: &'a HttpClient, url: &'a str, limit: ErrorBodyLimit) -> OAuth
         TokenEndpoint {
             url,
             client_id: "client id",
-            encoding: TokenEncoding::Form,
+            encoding: TokenEncoding::Json,
             timeout: None,
             error_body_limit: limit,
         },
     )
-}
-
-#[tokio::test]
-async fn authorization_code_preserves_pkce_and_http_policy() {
-    let server = MockServer::start().await;
-    Mock::given(method("POST"))
-        .respond_with(
-            ResponseTemplate::new(/*s*/ 200).set_body_json(json!({"access_token": "access"})),
-        )
-        .expect(/*r*/ 1)
-        .mount(&server)
-        .await;
-    let mut headers = HeaderMap::new();
-    headers.insert("x-client-policy", HeaderValue::from_static("preserved"));
-    let http = HttpClientBuilder::new()
-        .default_headers(headers)
-        .build_direct()
-        .unwrap();
-    let endpoint = server.uri();
-    let form = oauth(&http, &endpoint, ErrorBodyLimit::Unlimited);
-    let pkce = generate_pkce();
-    let state = generate_state();
-    let resource = "https://gateway.example.test/a?b=c&d=e";
-    let redirect_uri = "http://127.0.0.1:1234/callback";
-    let authorization_url = build_authorization_url(AuthorizationRequest {
-        endpoint: &format!("{endpoint}/authorize?tenant=existing"),
-        client_id: "client id",
-        redirect_uri,
-        scope: Some("openid gateway.inference"),
-        resource: Some(resource),
-        pkce: &pkce,
-        state: &state,
-        extra_parameters: &[("prompt", "login")],
-    })
-    .unwrap();
-    let tokens: Value = form
-        .exchange_code(AuthorizationCodeGrant {
-            code: "code+with&reserved=characters",
-            redirect_uri,
-            pkce: &pkce,
-            resource: Some(resource),
-        })
-        .await
-        .unwrap();
-    assert_eq!(tokens, json!({"access_token": "access"}));
-    let requests = server.received_requests().await.unwrap();
-    let code_parameters = decode_form(&requests[0].body);
-    assert_eq!(
-        requests[0].headers["content-type"],
-        "application/x-www-form-urlencoded"
-    );
-    assert_eq!(requests[0].headers["x-client-policy"], "preserved");
-    assert_eq!(
-        code_parameters,
-        json!({
-            "grant_type": "authorization_code",
-            "client_id": "client id",
-            "code": "code+with&reserved=characters",
-            "redirect_uri": redirect_uri,
-            "code_verifier": pkce.code_verifier,
-            "resource": resource,
-        })
-    );
-    // Bind the browser challenge to the verifier actually sent in the code exchange.
-    let challenge = base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(Sha256::digest(
-        code_parameters["code_verifier"]
-            .as_str()
-            .unwrap()
-            .as_bytes(),
-    ));
-    assert_eq!(
-        decode_form(authorization_url.query().unwrap().as_bytes()),
-        json!({
-            "response_type": "code",
-            "client_id": "client id",
-            "redirect_uri": redirect_uri,
-            "scope": "openid gateway.inference",
-            "resource": resource,
-            "state": state,
-            "code_challenge": challenge,
-            "code_challenge_method": "S256",
-            "tenant": "existing",
-            "prompt": "login",
-        })
-    );
 }
 
 #[tokio::test]

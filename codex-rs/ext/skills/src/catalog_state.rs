@@ -23,7 +23,7 @@ use crate::provider::SkillReadRequest;
 const MAX_CACHED_CLOUD_RESOURCES: usize = 100;
 const MAX_CACHED_CLOUD_CONTENT_BYTES: usize = 8 * 1024 * 1024;
 
-/// Reusable provider catalogs, before step-specific plugin policy and merging.
+/// Reusable provider catalogs, before step-specific policy and merging.
 #[derive(Clone, Debug, Default)]
 pub(crate) struct SkillCatalogState {
     // Roots-only discovery, reused within a turn.
@@ -100,7 +100,7 @@ impl std::fmt::Debug for CloudSkillGeneration {
     }
 }
 
-/// Reuses the projection of unchanged successful V2 inventories, before plugin policy.
+/// Reuses the projection of unchanged successful V2 inventories before merging.
 #[derive(Clone, Debug)]
 pub(crate) struct CachedExecutorV2Catalog {
     pub(crate) snapshots: Vec<codex_exec_server::ExecutorCapabilityDiscoveryV2Snapshot>,

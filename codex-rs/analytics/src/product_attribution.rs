@@ -86,7 +86,6 @@ fn event_thread_id(event: &TrackEventRequest) -> Option<&str> {
         TrackEventRequest::TurnSteer(event) => Some(&event.event_params.thread_id),
         TrackEventRequest::ArtifactOperation(event) => Some(&event.event_params.thread_id),
         TrackEventRequest::CommandExecution(event) => Some(&event.event_params.base.thread_id),
-        TrackEventRequest::PluginMeasurement(event) => Some(&event.event_params.thread_id),
         TrackEventRequest::FileChange(event) => Some(&event.event_params.base.thread_id),
         TrackEventRequest::CuaToolCallStarted(event) => Some(&event.event_params.thread_id),
         TrackEventRequest::McpToolCall(event) => Some(&event.event_params.base.thread_id),
@@ -96,14 +95,7 @@ fn event_thread_id(event: &TrackEventRequest) -> Option<&str> {
         TrackEventRequest::WebSearch(event) => Some(&event.event_params.base.thread_id),
         TrackEventRequest::AcceptedLineFingerprints(event) => Some(&event.event_params.thread_id),
         TrackEventRequest::ReviewEvent(event) => Some(&event.event_params.thread_id),
-        TrackEventRequest::PluginUsed(event) => event.event_params.thread_id.as_deref(),
-        TrackEventRequest::PluginInstallRequested(event) => Some(&event.event_params.thread_id),
-        TrackEventRequest::PluginInstalled(_)
-        | TrackEventRequest::PluginUninstalled(_)
-        | TrackEventRequest::PluginEnabled(_)
-        | TrackEventRequest::PluginDisabled(_)
-        | TrackEventRequest::PluginInstallFailed(_)
-        | TrackEventRequest::ExternalAgentConfigImportCompleted(_)
+        TrackEventRequest::ExternalAgentConfigImportCompleted(_)
         | TrackEventRequest::ExternalAgentConfigImportFailure(_) => None,
     }
 }

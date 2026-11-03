@@ -33,10 +33,6 @@ use std::time::Duration;
 use std::time::Instant;
 
 use crate::client_tool_catalog::ClientToolCatalog;
-use crate::codex_apps::normalize_codex_apps_callable_name;
-use crate::codex_apps::normalize_codex_apps_callable_namespace;
-use crate::codex_apps::normalize_codex_apps_tool_title;
-use crate::codex_apps::prepare_openai_file_params_for_model;
 use crate::connection_pool::ConnectionKey;
 use crate::connection_pool::ConnectionSharing;
 use crate::connection_pool::ConnectionSlot;
@@ -44,7 +40,6 @@ use crate::connection_pool::LEASE_CAPABILITY;
 use crate::connection_pool::SharingNegotiation;
 use crate::elicitation::ElicitationRequestManager;
 use crate::executor_environment_http_client::ExecutorEnvironmentHttpClient;
-use crate::mcp::CODEX_APPS_MCP_SERVER_NAME;
 use crate::mcp::ToolPluginContext;
 use crate::openai_docs_source_attribution::maybe_with_openai_docs_source_attribution;
 use crate::pagination::collect_paginated_with_limit;
@@ -67,17 +62,12 @@ use codex_config::McpServerConfig;
 use codex_config::McpServerTransportConfig;
 use codex_config::types::AuthKeyringBackendKind;
 use codex_config::types::OAuthCredentialsStoreMode;
-use codex_connectors::ConnectorRuntimeContext;
-use codex_connectors::ConnectorRuntimeFetchSource;
 use codex_exec_server::Environment;
 use codex_login::AuthChangeState;
 use codex_otel::auth_storage::AuthStorageOriginator;
 use codex_protocol::mcp::ClientMcpExtensions;
 use codex_protocol::mcp::McpServerInfo;
 use codex_protocol::protocol::Event;
-use codex_protocol::protocol::EventMsg;
-use codex_protocol::protocol::McpStartupStatus;
-use codex_protocol::protocol::McpStartupUpdateEvent;
 use codex_rmcp_client::EmaAuthFailure;
 use codex_rmcp_client::EmaTokenSourceError;
 use codex_rmcp_client::ExecutorStdioServerLauncher;
@@ -101,7 +91,6 @@ use rmcp::model::ProtocolVersion;
 use rmcp::model::ServerPeerInfo;
 use rmcp::model::Tool as RmcpTool;
 use tokio::sync::watch;
-use tokio::time::Instant as TokioInstant;
 use tokio_util::sync::CancellationToken;
 use tracing::Instrument;
 use tracing::instrument;
@@ -118,12 +107,8 @@ const MAX_PLUGIN_PROVENANCE_BYTES: usize = 1_024;
 pub(crate) const MCP_TOOLS_LIST_DURATION_METRIC: &str = "codex.mcp.tools.list.duration_ms";
 pub(crate) const MCP_TOOLS_FETCH_UNCACHED_DURATION_METRIC: &str =
     "codex.mcp.tools.fetch_uncached.duration_ms";
-pub(crate) const CODEX_APPS_REFRESH_DURATION_METRIC: &str = "codex.apps.refresh.duration_ms";
 pub(crate) const DEFAULT_STARTUP_TIMEOUT: Duration = Duration::from_secs(30);
 pub(crate) const DEFAULT_TOOL_TIMEOUT: Duration = Duration::from_secs(300);
-
-pub(crate) const CODEX_APPS_RECONNECT_INITIAL_BACKOFF: Duration = Duration::from_secs(1);
-const CODEX_APPS_RECONNECT_MAX_BACKOFF: Duration = Duration::from_secs(30);
 
 const UNTRUSTED_CONNECTOR_META_KEYS: &[&str] = &[
     "connector_id",

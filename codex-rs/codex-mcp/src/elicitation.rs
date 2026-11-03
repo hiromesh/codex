@@ -23,8 +23,6 @@ use async_channel::Sender;
 use codex_protocol::approvals::ElicitationAbandonedEvent;
 use codex_protocol::approvals::ElicitationRequest;
 use codex_protocol::approvals::ElicitationRequestEvent;
-use codex_protocol::mcp::ClientMcpExtensions;
-use codex_protocol::mcp::OPENAI_ELICITATION_EXTENSION_ID;
 use codex_protocol::mcp::RequestId as ProtocolRequestId;
 use codex_protocol::mcp_approval_meta::APPROVAL_KIND_KEY;
 use codex_protocol::mcp_approval_meta::APPROVAL_KIND_TOOL_SUGGESTION;
@@ -46,9 +44,6 @@ use tokio::sync::oneshot;
 static NEXT_ELICITATION_REQUEST_ID: AtomicU64 = AtomicU64::new(0);
 
 const STRICT_AUTO_REVIEW_DECLINE_MESSAGE: &str = "Automated review of this operation failed. Do not proceed without asking the user for explicit approval.";
-
-#[path = "user_verification_elicitation.rs"]
-mod user_verification_elicitation;
 
 #[derive(Debug, Clone)]
 pub struct ElicitationReviewRequest {
@@ -429,14 +424,8 @@ impl ElicitationRequestManager {
         &self,
         server_name: String,
         tx_event: Option<Sender<Event>>,
-        client_mcp_extensions: &ClientMcpExtensions,
     ) -> SendElicitation {
         // Event receivers such as codex mcp-server do not necessarily handle verification.
-        // Only wait for a response when trusted host activation enabled this exact route.
-        let user_verification_enabled = client_mcp_extensions
-            .get(OPENAI_ELICITATION_EXTENSION_ID)
-            .and_then(|settings| settings.get("userVerification"))
-            .is_some_and(Value::is_object);
         let router = self.router.clone();
         let authority = self.authority.clone();
         Box::new(move |id, elicitation| {
@@ -449,36 +438,15 @@ impl ElicitationRequestManager {
                     .lock()
                     .ok()
                     .and_then(|authority| authority.clone());
-                if let Elicitation::UserVerification {
-                    meta,
-                    title,
-                    description,
-                    challenge,
-                } = elicitation
-                {
-                    if !user_verification_enabled {
-                        return Ok(ElicitationResponse {
-                            action: ElicitationAction::Cancel,
-                            content: None,
-                            meta: Some(
-                                codex_rmcp_client::UserVerificationReason::ApprovalUnavailable
-                                    .into_meta(),
-                            ),
-                        });
-                    }
-                    return user_verification_elicitation::route(
-                        router,
-                        tx_event,
-                        authority,
-                        server_name,
-                        ElicitationRequest::UserVerification {
-                            meta,
-                            title,
-                            description,
-                            challenge,
-                        },
-                    )
-                    .await;
+                if matches!(elicitation, Elicitation::UserVerification { .. }) {
+                    return Ok(ElicitationResponse {
+                        action: ElicitationAction::Cancel,
+                        content: None,
+                        meta: Some(
+                            codex_rmcp_client::UserVerificationReason::ApprovalUnavailable
+                                .into_meta(),
+                        ),
+                    });
                 }
                 if router.auto_deny() {
                     return Ok(ElicitationResponse {

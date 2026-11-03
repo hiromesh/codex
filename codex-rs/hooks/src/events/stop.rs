@@ -16,7 +16,6 @@ use super::common;
 use crate::engine::ClaudeHooksEngine;
 use crate::engine::ConfiguredHandler;
 use crate::engine::HandlerRunResult;
-use crate::engine::HandlerSourcePath;
 use crate::engine::dispatcher;
 use crate::engine::output_parser;
 use crate::schema::NullableString;
@@ -102,12 +101,6 @@ pub(crate) fn preview(
         .target
         .select_handlers(handlers)
         .into_iter()
-        .filter(|handler| {
-            !matches!(
-                handler.source_path,
-                HandlerSourcePath::ExecutorScoped { .. }
-            )
-        })
         .map(|handler| dispatcher::running_summary(&handler))
         .collect()
 }
@@ -125,15 +118,6 @@ pub(crate) async fn run(engine: &ClaudeHooksEngine, request: StopRequest) -> Sto
         };
     }
 
-    // Memory workers terminate on managed rejection rather than continuing the turn,
-    // so their executor cleanup must also run when a managed hook blocks completion.
-    let (executor_cleanup, matched): (Vec<_>, Vec<_>) = matched.into_iter().partition(|handler| {
-        matches!(request.target, StopHookTarget::MemoryConsolidation)
-            && matches!(
-                handler.source_path,
-                HandlerSourcePath::ExecutorScoped { .. }
-            )
-    });
     let input = match request.target {
         StopHookTarget::Stop | StopHookTarget::MemoryConsolidation => {
             let input = StopCommandInput {
@@ -208,19 +192,6 @@ pub(crate) async fn run(engine: &ClaudeHooksEngine, request: StopRequest) -> Sto
         parse_completed,
     )
     .await;
-
-    if !executor_cleanup.is_empty() {
-        dispatcher::execute_handlers_with_metadata(
-            engine,
-            executor_cleanup,
-            &input,
-            request.cwd.as_path(),
-            Some(request.turn_id),
-            request.request_metadata.as_ref(),
-            parse_completed,
-        )
-        .await;
-    }
 
     let aggregate = aggregate_results(results.iter().map(|result| &result.data));
 

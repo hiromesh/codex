@@ -7,7 +7,6 @@ use codex_analytics::SkillInvocation;
 use codex_analytics::SkillInvocationLocation;
 use codex_analytics::TrackEventsContext;
 use codex_analytics::build_track_events_context;
-use codex_core_plugins::PluginsManager;
 use codex_exec_server::ExecutorFileSystem;
 use codex_extension_api::SkillInvocationInput;
 use codex_extension_api::SkillInvocationKind;
@@ -19,10 +18,8 @@ use codex_skills::SkillMetadata;
 use codex_skills_extension::HostSkillsLoadInput;
 use codex_skills_extension::InjectedHostSkillPrompts;
 use codex_skills_extension::detect_implicit_skill_invocation;
-use codex_skills_extension::record_plugin_turn_usage;
 use codex_utils_absolute_path::AbsolutePathBuf;
 use codex_utils_path_uri::PathUri;
-use codex_utils_plugins::PluginSkillRoot;
 use std::collections::HashSet;
 use std::sync::Arc;
 use tokio::sync::Mutex;
@@ -31,23 +28,14 @@ use tokio::sync::Mutex;
 struct ImplicitSkillInvocations(Mutex<HashSet<String>>);
 
 #[cfg(test)]
-pub(crate) fn skills_load_input_from_config(
-    config: &Config,
-    effective_skill_roots: Vec<PluginSkillRoot>,
-) -> HostSkillsLoadInput {
-    HostSkillsLoadInput::new(
-        config.cwd.clone(),
-        effective_skill_roots,
-        config.config_layer_stack.clone(),
-    )
+pub(crate) fn skills_load_input_from_config(config: &Config) -> HostSkillsLoadInput {
+    HostSkillsLoadInput::new(config.cwd.clone(), config.config_layer_stack.clone())
 }
 
 /// Pair repository discovery inputs with their captured filesystem owner.
 /// Keep preparation synchronous so it adds no nested startup or resume future.
 pub(crate) fn skills_load_input_for_environments(
     config: &Config,
-    plugins_manager: &PluginsManager,
-    effective_skill_roots: Vec<PluginSkillRoot>,
     environments: &TurnEnvironmentSnapshot,
 ) -> (HostSkillsLoadInput, Option<Arc<dyn ExecutorFileSystem>>) {
     // Preserve primary-repository discovery independently of the host config cwd.
@@ -62,14 +50,7 @@ pub(crate) fn skills_load_input_for_environments(
         Some((cwd, fs)) => (cwd, Some(fs)),
         None => (config.cwd.clone(), None),
     };
-    let input = HostSkillsLoadInput::new(
-        cwd,
-        effective_skill_roots,
-        config.config_layer_stack.clone(),
-    )
-    .with_plugin_skill_snapshots(
-        plugins_manager.plugin_skill_snapshots_for_config(&config.plugins_config_input()),
-    );
+    let input = HostSkillsLoadInput::new(cwd, config.config_layer_stack.clone());
     (input, fs)
 }
 
@@ -88,13 +69,7 @@ pub(crate) async fn emit_explicit_skill_invocations(
     let reasoning_effort = turn_context.effective_reasoning_effort_for_tracing();
     for skill in mentioned_skills {
         let skill_name_tag = sanitize_metric_tag_value(skill.name.as_str());
-        let plugin_id_tag =
-            sanitize_metric_tag_value(skill.plugin_id.as_deref().unwrap_or("unattributed"));
         let status = if injected_skill_paths.contains(&skill.path_to_skills_md) {
-            record_plugin_turn_usage(
-                turn_context.extension_data.as_ref(),
-                skill.plugin_id.as_deref(),
-            );
             "ok"
         } else {
             "error"
@@ -106,7 +81,6 @@ pub(crate) async fn emit_explicit_skill_invocations(
                 ("status", status),
                 ("skill", skill_name_tag.as_str()),
                 ("invoke_type", "explicit"),
-                ("plugin_id", plugin_id_tag.as_str()),
                 ("model_slug", model_slug_tag.as_str()),
                 ("reasoning_effort", reasoning_effort.as_str()),
             ],
@@ -130,7 +104,7 @@ pub(crate) async fn emit_explicit_skill_invocations(
                 turn_id: &turn_context.sub_id,
                 skill_name: &skill.name,
                 scope: Some(skill.scope),
-                plugin_id: skill.plugin_id.as_deref(),
+                plugin_id: None,
                 invocation_type: SkillInvocationType::Explicit,
             });
         for contributor in sess.services.extensions.skill_invocation_contributors() {
@@ -155,8 +129,6 @@ pub(crate) async fn emit_explicit_skill_invocations(
                 path: skill.path_to_skills_md.clone(),
                 scope: skill.scope,
             },
-            plugin_id: skill.plugin_id.clone(),
-            remote_plugin_id: skill.remote_plugin_id.clone(),
             invocation_type: InvocationType::Explicit,
         })
         .collect();
@@ -218,18 +190,12 @@ pub(crate) async fn maybe_emit_implicit_skill_invocation(
                 SkillInvocationLocation::Host { scope, .. } => Some(*scope),
                 SkillInvocationLocation::Resource { scope, .. } => *scope,
             },
-            plugin_id: invocation.plugin_id.as_deref(),
+            plugin_id: None,
             invocation_type: SkillInvocationType::Implicit,
         });
     let skill_name_tag = sanitize_metric_tag_value(skill_name.as_str());
-    let plugin_id_tag =
-        sanitize_metric_tag_value(invocation.plugin_id.as_deref().unwrap_or("unattributed"));
     let model_slug_tag = sanitize_metric_tag_value(turn_context.model_info().slug.as_str());
     let reasoning_effort = turn_context.effective_reasoning_effort_for_tracing();
-    record_plugin_turn_usage(
-        turn_context.extension_data.as_ref(),
-        invocation.plugin_id.as_deref(),
-    );
 
     for contributor in sess.services.extensions.skill_invocation_contributors() {
         contributor
@@ -251,7 +217,6 @@ pub(crate) async fn maybe_emit_implicit_skill_invocation(
             ("status", "ok"),
             ("skill", skill_name_tag.as_str()),
             ("invoke_type", "implicit"),
-            ("plugin_id", plugin_id_tag.as_str()),
             ("model_slug", model_slug_tag.as_str()),
             ("reasoning_effort", reasoning_effort.as_str()),
         ],

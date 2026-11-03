@@ -1271,11 +1271,8 @@ impl Session {
             // Executor and orchestrator catalogs are supplied independently of host skills.
             HostSkillsSnapshot::new(Arc::new(SkillLoadOutcome::default()))
         } else {
-            let effective_skill_roots = plugin_outcome.effective_plugin_skill_roots();
             let (skills_input, fs) = crate::skills::skills_load_input_for_environments(
                 &per_turn_config,
-                &self.services.plugins_manager,
-                effective_skill_roots,
                 &turn_environments,
             );
             self.services

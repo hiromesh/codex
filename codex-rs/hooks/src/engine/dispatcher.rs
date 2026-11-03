@@ -83,9 +83,6 @@ pub(crate) fn running_summary(handler: &ConfiguredHandler) -> HookRunSummary {
         HandlerSourcePath::Environment {
             source_path: path, ..
         } => path.clone().into(),
-        HandlerSourcePath::ExecutorScoped { .. } => {
-            unreachable!("executor-scoped hooks do not produce public hook summaries")
-        }
     };
     HookRunSummary {
         builtin: handler.builtin,
@@ -126,19 +123,11 @@ pub(crate) async fn execute_handlers_with_metadata<T: 'static>(
     input: &Value,
     cwd: &Path,
     turn_id: Option<String>,
-    metadata: Option<&Map<String, Value>>,
+    _metadata: Option<&Map<String, Value>>,
     parse: fn(&ConfiguredHandler, HandlerRunResult, Option<String>) -> ParsedHandler<T>,
 ) -> Vec<ParsedHandler<T>> {
-    let mut executor_handlers = Vec::new();
     let mut pending = FuturesUnordered::new();
     for (configured_order, handler) in handlers.into_iter().enumerate() {
-        if matches!(
-            handler.source_path,
-            HandlerSourcePath::ExecutorScoped { .. }
-        ) {
-            executor_handlers.push(handler);
-            continue;
-        }
         let event_input = handler.source_path.event_input(input);
         if handler.execution_mode() == HookExecutionMode::Async {
             engine.command_runtime.schedule_async_hook(
@@ -162,42 +151,12 @@ pub(crate) async fn execute_handlers_with_metadata<T: 'static>(
 
     let mut completed = Vec::new();
     let mut completion_order = 0;
-    let mut should_stop = false;
-    let mut should_block = false;
     while let Some((configured_order, mut parsed)) = pending.next().await {
-        should_stop |= parsed.completed.run.status == HookRunStatus::Stopped;
-        should_block |= parsed.completed.run.status == HookRunStatus::Blocked;
         parsed.completion_order = completion_order;
         completion_order += 1;
         completed.push((configured_order, parsed));
     }
     completed.sort_by_key(|(configured_order, _)| *configured_order);
-
-    if should_stop || !should_block {
-        for handler in executor_handlers {
-            let task_engine = engine.clone();
-            let event_input = input.clone();
-            let cwd = cwd.to_path_buf();
-            let metadata = metadata.cloned();
-            engine.command_runtime.schedule_async_task(async move {
-                let result = execute_handler(
-                    &task_engine,
-                    &handler,
-                    &event_input,
-                    &cwd,
-                    metadata.as_ref(),
-                )
-                .await;
-                if let Some(error) = result.error {
-                    tracing::warn!(
-                        source_path = %handler.source_path,
-                        %error,
-                        "executor-scoped hook failed"
-                    );
-                }
-            });
-        }
-    }
 
     completed.into_iter().map(|(_, parsed)| parsed).collect()
 }
@@ -251,9 +210,6 @@ pub(crate) fn completed_summary(
         HandlerSourcePath::Environment {
             source_path: path, ..
         } => path.clone().into(),
-        HandlerSourcePath::ExecutorScoped { .. } => {
-            unreachable!("executor-scoped hooks do not produce public hook summaries")
-        }
     };
     HookRunSummary {
         builtin: handler.builtin,

@@ -9,7 +9,6 @@ use codex_protocol::protocol::HookRunSummary;
 use codex_utils_path_uri::PathUri;
 
 use crate::engine::ConfiguredHandler;
-use crate::engine::HandlerSourcePath;
 use crate::engine::dispatcher;
 use crate::output_spill::AdditionalContext;
 use codex_protocol::models::ContentItemMetadata;
@@ -78,12 +77,6 @@ pub(crate) fn serialization_failure_hook_events(
 ) -> Vec<HookCompletedEvent> {
     handlers
         .into_iter()
-        .filter(|handler| {
-            !matches!(
-                handler.source_path,
-                HandlerSourcePath::ExecutorScoped { .. }
-            )
-        })
         .map(|handler| {
             let mut run = dispatcher::running_summary(&handler);
             run.status = HookRunStatus::Failed;

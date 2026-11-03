@@ -29,7 +29,6 @@ use crate::host_roots::resolve_skill_roots;
 use crate::loader::HostSkillRoot;
 use crate::loader::HostSkillRootSnapshot;
 use crate::loader::MAX_CONCURRENT_ROOT_SCANS;
-use crate::loader::load_and_merge_host_skill_roots;
 use crate::loader::load_and_merge_host_skill_roots_with_request_snapshots;
 
 const CONFIG_SKILLS_CACHE_CAPACITY: usize = 32;

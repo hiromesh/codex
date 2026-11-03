@@ -15,7 +15,6 @@ use super::common;
 use crate::engine::ClaudeHooksEngine;
 use crate::engine::ConfiguredHandler;
 use crate::engine::HandlerRunResult;
-use crate::engine::HandlerSourcePath;
 use crate::engine::dispatcher;
 use crate::engine::output_parser;
 use crate::schema::InterruptCommandInput;
@@ -47,13 +46,6 @@ pub(crate) fn preview(handlers: &[ConfiguredHandler]) -> Vec<HookRunSummary> {
         /*matcher_input*/ None,
     )
     .into_iter()
-    // Executor-scoped hooks run asynchronously and do not emit public hook lifecycle events.
-    .filter(|handler| {
-        !matches!(
-            handler.source_path,
-            HandlerSourcePath::ExecutorScoped { .. }
-        )
-    })
     .map(|handler| dispatcher::running_summary(&handler))
     .collect()
 }

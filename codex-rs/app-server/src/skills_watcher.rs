@@ -109,12 +109,8 @@ impl SkillsWatcher {
             return WatchRegistration::default();
         }
 
-        let plugins_input = config.plugins_config_input();
-        let plugins_manager = thread_manager.plugins_manager();
-        let plugin_outcome = plugins_manager.plugins_for_config(&plugins_input).await;
         let skills_input = HostSkillsLoadInput::new(
             config.cwd.clone(),
-            plugin_outcome.effective_plugin_skill_roots(),
             config.config_layer_stack.clone(),
         );
         let roots = thread_manager

@@ -19,4 +19,3 @@ pub fn models_cache_entry(
         models,
     }
 }
-

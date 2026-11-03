@@ -620,7 +620,6 @@ pub(crate) struct AppServerClientMetadata {
 
 async fn warm_plugins_and_skills_for_session_init(
     config: Arc<Config>,
-    plugins_manager: Arc<PluginsManager>,
     skills_service: Arc<HostSkillsService>,
     turn_environments: &TurnEnvironmentSnapshot,
     extensions: &codex_extension_api::ExtensionRegistry<Config>,
@@ -630,21 +629,14 @@ async fn warm_plugins_and_skills_for_session_init(
     if crate::guardian::is_basic_session_source(session_source) {
         return Vec::new();
     }
-    let plugins_input = config.plugins_config_input();
-    let plugin_outcome = plugins_manager.plugins_for_config(&plugins_input).await;
     if config.features.enabled(Feature::SkipHostSkillDiscovery)
         && !extensions.requires_host_skill_discovery()
     {
         return Vec::new();
     }
 
-    let effective_skill_roots = plugin_outcome.effective_plugin_skill_roots();
-    let (skills_input, fs) = crate::skills::skills_load_input_for_environments(
-        &config,
-        &plugins_manager,
-        effective_skill_roots,
-        turn_environments,
-    );
+    let (skills_input, fs) =
+        crate::skills::skills_load_input_for_environments(&config, turn_environments);
     skills_service
         .snapshot_for_config(&skills_input, fs)
         .await
@@ -1477,7 +1469,6 @@ impl Session {
             // Keep discovery's future out of the large embedded startup/resume frame.
             let plugin_skill_warmup = Box::pin(warm_plugins_and_skills_for_session_init(
                 Arc::clone(&config),
-                Arc::clone(&plugins_manager),
                 Arc::clone(&skills_service),
                 &resolved_environments,
                 extensions.as_ref(),

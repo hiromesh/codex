@@ -29,7 +29,6 @@ use crate::guardian_v2::GuardianV2EventRequest;
 use crate::now_unix_millis;
 use codex_app_server_protocol::CodexErrorInfo;
 use codex_app_server_protocol::CommandExecutionSource;
-use codex_login::default_client::originator;
 use codex_protocol::approvals::NetworkApprovalProtocol;
 use codex_protocol::models::AdditionalPermissionProfile;
 use codex_protocol::models::SandboxPermissions;
@@ -812,7 +811,6 @@ pub(crate) struct CodexCommandExecutionEventParams {
     pub(crate) reasoning_effort: Option<String>,
     #[serde(flatten)]
     pub(crate) base: CodexToolItemEventBase,
-    pub(crate) script_path: Option<String>,
     pub(crate) command_execution_source: CommandExecutionSource,
     pub(crate) exit_code: Option<i32>,
     pub(crate) command_total_action_count: u64,

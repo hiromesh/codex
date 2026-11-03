@@ -22,4 +22,3 @@ impl std::fmt::Debug for BedrockAccessKeysAuth {
             .finish()
     }
 }
-

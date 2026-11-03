@@ -1476,7 +1476,6 @@ dependencies = [
  "codex-http-client",
  "codex-login",
  "codex-model-provider",
- "codex-plugin",
  "codex-protocol",
  "codex-state",
  "codex-utils-absolute-path",
@@ -2002,33 +2001,6 @@ dependencies = [
  "tokio",
  "tracing",
  "url",
-]
-
-[[package]]
-name = "codex-cloud-config"
-version = "0.0.0"
-dependencies = [
- "base64 0.22.1",
- "chrono",
- "codex-async-utils",
- "codex-backend-client",
- "codex-config",
- "codex-core",
- "codex-http-client",
- "codex-keyring-store",
- "codex-login",
- "codex-otel",
- "codex-protocol",
- "hmac 0.12.1",
- "pretty_assertions",
- "serde",
- "serde_json",
- "sha2 0.10.9",
- "tempfile",
- "thiserror 2.0.18",
- "tokio",
- "tracing",
- "wiremock",
 ]
 
 [[package]]
@@ -2825,32 +2797,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "codex-history-notes-extension"
-version = "0.0.0"
-dependencies = [
- "codex-analytics",
- "codex-client",
- "codex-config",
- "codex-core",
- "codex-extension-api",
- "codex-http-client",
- "codex-login",
- "codex-model-provider",
- "codex-model-provider-info",
- "codex-protocol",
- "codex-tools",
- "codex-utils-output-truncation",
- "core_test_support",
- "http 1.4.0",
- "insta",
- "pretty_assertions",
- "serde_json",
- "tempfile",
- "tokio",
- "wiremock",
-]
-
-[[package]]
 name = "codex-home"
 version = "0.0.0"
 dependencies = [
@@ -3257,14 +3203,12 @@ dependencies = [
  "codex-features",
  "codex-feedback",
  "codex-http-client",
- "codex-keyring-store",
  "codex-login",
  "codex-model-provider-info",
  "codex-models-manager",
  "codex-otel",
  "codex-protocol",
  "codex-response-debug-context",
- "codex-secrets",
  "codex-utils-cargo-bin",
  "codex-utils-process",
  "codex-utils-redacted-string",
@@ -3769,7 +3713,6 @@ dependencies = [
  "codex-analytics",
  "codex-attachment-store",
  "codex-config",
- "codex-core-plugin-common",
  "codex-exec-server",
  "codex-extension-api",
  "codex-mcp",
@@ -3782,7 +3725,6 @@ dependencies = [
  "codex-utils-absolute-path",
  "codex-utils-cargo-bin",
  "codex-utils-path-uri",
- "codex-utils-plugins",
  "codex-utils-string",
  "dirs",
  "dunce",
@@ -3882,7 +3824,6 @@ version = "0.0.0"
 dependencies = [
  "bitflags 2.13.1",
  "codex-attachment-store",
- "codex-connectors",
  "codex-extension-items",
  "codex-features",
  "codex-file-system",
@@ -3920,7 +3861,6 @@ dependencies = [
  "codex-arg0",
  "codex-backend-client",
  "codex-build-info",
- "codex-cloud-config",
  "codex-config",
  "codex-connectors",
  "codex-context-fragments",

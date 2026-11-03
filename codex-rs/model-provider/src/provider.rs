@@ -427,15 +427,9 @@ enum ModelsCacheConfig {
 }
 
 impl ConfiguredModelProvider {
-    fn new(
-        info: ModelProviderInfo,
-        auth_manager: Option<Arc<AuthManager>>,
-    ) -> Self {
+    fn new(info: ModelProviderInfo, auth_manager: Option<Arc<AuthManager>>) -> Self {
         let auth_manager = auth_manager_for_provider(auth_manager, &info);
-        Self {
-            info,
-            auth_manager,
-        }
+        Self { info, auth_manager }
     }
 
     async fn resolve_auth(
@@ -1126,4 +1120,3 @@ mod tests {
         }
     }
 }
-

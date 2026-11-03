@@ -36,9 +36,7 @@ pub(crate) fn collect_explicit_skill_mentions(
                 blocked_plain_names.insert(name.clone());
                 select_by_path(catalog, path, &mut seen, &mut selected);
             }
-            UserInput::Text { .. }
-            | UserInput::Image { .. }
-            | UserInput::LocalImage { .. } => {}
+            UserInput::Text { .. } | UserInput::Image { .. } | UserInput::LocalImage { .. } => {}
             UserInput::Mention { .. } => {}
             _ => {}
         }

@@ -207,7 +207,6 @@ impl ThreadAnalyticsState {
         }
         app_server_client
     }
-
 }
 
 #[derive(Clone, Copy)]
@@ -1252,7 +1251,7 @@ impl AnalyticsReducer {
 
     async fn ingest_turn_resolved_config(
         &mut self,
-        mut input: TurnResolvedConfigFact,
+        input: TurnResolvedConfigFact,
         out: &mut Vec<TrackEventRequest>,
     ) {
         let turn_id = input.turn_id.clone();
@@ -1901,7 +1900,7 @@ impl AnalyticsReducer {
                 if !first_notification {
                     return;
                 }
-                let Some((server, tool, plugin_id, connector_id)) = cua_identity else {
+                let Some((server, tool, connector_id)) = cua_identity else {
                     return;
                 };
                 let Some((connection_state, thread_state, thread_metadata)) = self
@@ -1946,7 +1945,6 @@ impl AnalyticsReducer {
                             started_at_ms,
                             mcp_server_name: server.to_string(),
                             mcp_tool_name: tool.to_string(),
-                            plugin_id: plugin_id.map(str::to_string),
                             connector_id: connector_id.map(str::to_string),
                         },
                     },
@@ -2160,54 +2158,6 @@ impl AnalyticsReducer {
             }
             _ => {}
         }
-    }
-
-    fn ingest_plugin_measurements(
-        &mut self,
-        input: PluginMeasurementsInput,
-        out: &mut Vec<TrackEventRequest>,
-    ) {
-        if input.rows.is_empty()
-            || input.rows.len() > MAX_PLUGIN_MEASUREMENTS_PER_BATCH
-            || !valid_plugin_measurement_identifier(&input.operation)
-        {
-            return;
-        }
-        let PluginMeasurementsInput {
-            thread_id,
-            turn_id,
-            item_id,
-            originator,
-            model_slug,
-            reasoning_effort,
-            plugin_id,
-            execution_id,
-            operation,
-            rows,
-        } = input;
-        out.extend(
-            rows.into_iter()
-                .filter(valid_plugin_measurement_row)
-                .map(|row| {
-                    TrackEventRequest::PluginMeasurement(CodexPluginMeasurementEventRequest {
-                        event_type: "codex_plugin_measurement_event",
-                        event_params: CodexPluginMeasurementEventParams {
-                            thread_id: thread_id.clone(),
-                            turn_id: turn_id.clone(),
-                            item_id: item_id.clone(),
-                            originator: originator.clone(),
-                            model_slug: model_slug.clone(),
-                            reasoning_effort: reasoning_effort.clone(),
-                            plugin_id: plugin_id.clone(),
-                            execution_id: execution_id.clone(),
-                            operation: operation.clone(),
-                            measurement_name: row.measurement_name,
-                            number_value: row.number_value,
-                            dimensions: (!row.dimensions.is_empty()).then_some(row.dimensions),
-                        },
-                    })
-                }),
-        );
     }
 
     fn emit_thread_initialized(
@@ -2654,13 +2604,10 @@ pub(crate) fn tracked_tool_item_id(item: &ThreadItemPayload) -> Option<&str> {
     }
 }
 
-fn cua_mcp_tool_identity(
-    item: &ThreadItemPayload,
-) -> Option<(&str, &str, Option<&str>, Option<&str>)> {
+fn cua_mcp_tool_identity(item: &ThreadItemPayload) -> Option<(&str, &str, Option<&str>)> {
     let ThreadItemPayload::McpToolCall {
         server,
         tool,
-        plugin_id,
         app_context,
         ..
     } = item
@@ -2673,7 +2620,6 @@ fn cua_mcp_tool_identity(
     (tool == "js" && is_node_repl_backed_connector(server, connector_id)).then_some((
         server,
         tool,
-        plugin_id.as_deref(),
         connector_id,
     ))
 }
@@ -2794,8 +2740,6 @@ fn tool_item_event(input: ToolItemEventInput<'_>) -> Option<TrackEventRequest> {
         ThreadItemPayload::CommandExecution {
             id,
             sandbox_type,
-            plugin_id,
-            script_path,
             source,
             status,
             command_actions,
@@ -2834,11 +2778,6 @@ fn tool_item_event(input: ToolItemEventInput<'_>) -> Option<TrackEventRequest> {
                         reasoning_effort: model_context
                             .and_then(|context| context.reasoning_effort.clone()),
                         base,
-                        plugin_id: plugin_id.clone(),
-                        script_path: safe_plugin_relative_script_path(
-                            plugin_id.as_deref(),
-                            script_path.as_deref(),
-                        ),
                         command_execution_source: *source,
                         exit_code: *exit_code,
                         command_total_action_count: action_counts.total,
@@ -2895,7 +2834,6 @@ fn tool_item_event(input: ToolItemEventInput<'_>) -> Option<TrackEventRequest> {
             status,
             error,
             duration_ms,
-            plugin_id,
             app_context,
             ..
         } => {
@@ -2927,7 +2865,6 @@ fn tool_item_event(input: ToolItemEventInput<'_>) -> Option<TrackEventRequest> {
                         mcp_server_name: server.clone(),
                         mcp_tool_name: tool.clone(),
                         mcp_error_present: error.is_some(),
-                        plugin_id: plugin_id.clone(),
                         connector_id: app_context
                             .as_ref()
                             .map(|app_context| app_context.connector_id.clone()),
@@ -3081,14 +3018,6 @@ fn tool_item_event(input: ToolItemEventInput<'_>) -> Option<TrackEventRequest> {
         }
         _ => None,
     }
-}
-
-fn safe_plugin_relative_script_path(
-    plugin_id: Option<&str>,
-    script_path: Option<&str>,
-) -> Option<String> {
-    let script_path = script_path.filter(|path| is_safe_plugin_relative_path(path))?;
-    plugin_id.map(|_| script_path.to_string())
 }
 
 struct ToolItemOutcome {
@@ -3601,7 +3530,6 @@ fn codex_turn_event_params(
         turn_id: _resolved_turn_id,
         thread_id: _resolved_thread_id,
         turn_metadata,
-        active_plugin_ids_at_turn_start,
         num_input_images: _resolved_num_input_images,
         submission_type,
         ephemeral,
@@ -3642,7 +3570,6 @@ fn codex_turn_event_params(
         thread_id,
         session_id: thread_metadata.session_id.clone(),
         turn_id,
-        active_plugin_ids_at_turn_start,
         root_turn_id: turn_metadata.root_turn_id(),
         turn_trigger: turn_metadata.turn_trigger(),
         codex_turn_source: turn_metadata.codex_turn_source(),

@@ -10,7 +10,6 @@ workspace = true
 [dependencies]
 bitflags = { workspace = true }
 codex-attachment-store = { workspace = true }
-codex-connectors = { workspace = true }
 codex-features = { workspace = true }
 codex-file-system = { workspace = true }
 codex-extension-items = { workspace = true }

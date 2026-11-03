@@ -112,15 +112,6 @@ impl std::fmt::Display for HandlerSourcePath {
             Self::Environment { source_path, .. } => {
                 write!(formatter, "{}", source_path.inferred_native_path_string())
             }
-            Self::ExecutorScoped {
-                environment_id,
-                manifest_path,
-                source_relative_path,
-                ..
-            } => write!(
-                formatter,
-                "{environment_id}:{manifest_path}:{source_relative_path}"
-            ),
         }
     }
 }
@@ -154,28 +145,23 @@ pub(crate) struct HandlerRunResult {
 impl ConfiguredHandler {
     /// Internal memory work runs policy and executor hooks, not user or project hooks.
     pub(crate) fn runs_for_memory_consolidation(&self) -> bool {
-        matches!(self.source_path, HandlerSourcePath::ExecutorScoped { .. })
-            || match self.source {
-                HookSource::User
-                | HookSource::Project
-                | HookSource::SessionFlags
-                | HookSource::Plugin => false,
-                HookSource::System
-                | HookSource::Mdm
-                | HookSource::CloudRequirements
-                | HookSource::CloudManagedConfig
-                | HookSource::LegacyManagedConfigFile
-                | HookSource::LegacyManagedConfigMdm
-                // Required hooks can have unknown attribution; retain them fail-closed.
-                | HookSource::Unknown => true,
-            }
+        match self.source {
+            HookSource::User
+            | HookSource::Project
+            | HookSource::SessionFlags
+            | HookSource::Plugin => false,
+            HookSource::System
+            | HookSource::Mdm
+            | HookSource::CloudRequirements
+            | HookSource::CloudManagedConfig
+            | HookSource::LegacyManagedConfigFile
+            | HookSource::LegacyManagedConfigMdm
+            // Required hooks can have unknown attribution; retain them fail-closed.
+            | HookSource::Unknown => true,
+        }
     }
 
     pub(crate) fn execution_mode(&self) -> HookExecutionMode {
-        if matches!(self.source_path, HandlerSourcePath::ExecutorScoped { .. }) {
-            return HookExecutionMode::Async;
-        }
-
         match self.kind {
             ConfiguredHandlerKind::Command { r#async: true, .. } => HookExecutionMode::Async,
             ConfiguredHandlerKind::Command { r#async: false, .. }

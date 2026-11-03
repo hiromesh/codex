@@ -63,4 +63,3 @@ pub(super) fn replacement(path: &Path) -> io::Result<tempfile::NamedTempFile<Fil
             .ok_or_else(|| io::Error::other("credential file has no parent"))?,
     )
 }
-

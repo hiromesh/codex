@@ -11,7 +11,6 @@ use std::sync::Weak;
 use std::time::Duration;
 
 use codex_async_utils::OrCancelExt;
-use codex_connectors::ConnectorRuntimeContextKey;
 use codex_login::AuthChangeState;
 use codex_login::AuthManager;
 use codex_rmcp_client::ElicitationResponse;
@@ -80,7 +79,6 @@ pub struct McpConnectionPool {
 pub(crate) struct ConnectionKey {
     pub(crate) server_name: String,
     pub(crate) identity: McpServerConnectionIdentity,
-    pub(crate) account: ConnectorRuntimeContextKey,
     pub(crate) auth_state: Option<(Arc<AuthManager>, AuthChangeState)>,
     pub(crate) startup_timeout: Duration,
     pub(crate) catalog_item_limit: usize,
@@ -90,7 +88,6 @@ impl PartialEq for ConnectionKey {
     fn eq(&self, other: &Self) -> bool {
         self.server_name == other.server_name
             && self.identity == other.identity
-            && self.account == other.account
             && self.startup_timeout == other.startup_timeout
             && self.catalog_item_limit == other.catalog_item_limit
             && match (&self.auth_state, &other.auth_state) {

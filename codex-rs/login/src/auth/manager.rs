@@ -481,7 +481,6 @@ impl CodexAuth {
             .map(workspace_switching::selected_workspace_tokens)
     }
 
-
     /// Consider this private to integration tests.
     pub fn create_dummy_chatgpt_auth_for_testing() -> Self {
         let auth_dot_json = AuthDotJson {
@@ -539,7 +538,6 @@ impl CodexAuth {
     }
 }
 
-
 impl ChatgptAuth {
     fn current_auth_json(&self) -> Option<AuthDotJson> {
         #[expect(clippy::unwrap_used)]
@@ -557,9 +555,7 @@ impl ChatgptAuth {
     fn client(&self) -> &HttpClient {
         &self.state.client
     }
-
 }
-
 
 pub const OPENAI_API_KEY_ENV_VAR: &str = "OPENAI_API_KEY";
 pub const CODEX_API_KEY_ENV_VAR: &str = "CODEX_API_KEY";
@@ -1902,7 +1898,6 @@ impl AuthManager {
         let cached = self.inner.read().ok()?;
         Some((cached.auth.clone()?, self.http_client_factory()))
     }
-
 
     /// Borrows a persisted account grant while excluding this manager's token refreshes.
     /// Release the lease after the IdP exchange, then check the grant before using its result.

@@ -59,10 +59,6 @@ impl<'a> PreparedSkillCatalog<'a> {
             .iter()
             .filter(|entry| entry.is_model_visible())
             .map(|entry| entry.name.as_str())
-            .filter(|name| {
-                name.split_once(':')
-                    .is_some_and(|(plugin, skill)| !plugin.is_empty() && !skill.is_empty())
-            })
             .collect();
 
         self.entries

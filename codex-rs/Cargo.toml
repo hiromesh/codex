@@ -24,7 +24,6 @@ members = [
     "codex-backend-openapi-models",
     "plugin-host",
     "codex-home",
-    "cloud-config",
     "cli",
     "collaboration-mode-templates",
     "connectors",
@@ -58,7 +57,6 @@ members = [
     "ext/goal",
     "ext/git-attribution",
     "ext/guardian-reviewer",
-    "ext/history-notes",
     "ext/items",
     "ext/memories",
     "ext/mcp",
@@ -167,7 +165,6 @@ codex-backend-client = { path = "backend-client" }
 codex-build-info = { path = "build-info" }
 codex-client = { path = "codex-client" }
 codex-collaboration-mode-templates = { path = "collaboration-mode-templates" }
-codex-cloud-config = { path = "cloud-config" }
 codex-plugin-host = { path = "plugin-host" }
 codex-home = { path = "codex-home" }
 codex-http-client = { path = "http-client" }
@@ -199,7 +196,6 @@ codex-multi-env-copy-file = { path = "ext/multi-env-copy-file" }
 codex-goal-extension = { path = "ext/goal" }
 codex-git-attribution = { path = "ext/git-attribution" }
 codex-guardian-reviewer = { path = "ext/guardian-reviewer" }
-codex-history-notes-extension = { path = "ext/history-notes" }
 codex-experimental-api-macros = { path = "codex-experimental-api-macros" }
 codex-features = { path = "features" }
 codex-feedback = { path = "feedback" }

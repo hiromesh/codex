@@ -35,7 +35,6 @@ use codex_response_debug_context::telemetry_transport_error_message;
 use http::HeaderMap;
 use tokio::time::timeout;
 
-use crate::auth::ResolvedProviderAuth;
 use crate::auth::resolve_provider_auth;
 use crate::auth::uses_fedramp_api_key;
 use crate::provider::resolve_api_provider;
@@ -826,10 +825,7 @@ mod tests {
             "us".into(),
         )]));
         let manager = OpenAiModelsManager::new_without_cache(
-            Arc::new(OpenAiModelsEndpoint::new(
-                provider,
-                Some(auth.clone()),
-                )),
+            Arc::new(OpenAiModelsEndpoint::new(provider, Some(auth.clone()))),
             Some(auth.clone()),
         );
         let catalog = manager
@@ -944,7 +940,7 @@ mod tests {
             let endpoint = Arc::new(OpenAiModelsEndpoint::new(
                 provider,
                 Some(auth_manager.clone()),
-                ));
+            ));
             let manager = OpenAiModelsManager::new(
                 home.path().to_path_buf(),
                 endpoint,
@@ -988,7 +984,7 @@ mod tests {
                     ..ModelProviderInfo::default()
                 },
                 /*auth_manager*/ None,
-                );
+            );
             let error = endpoint
                 .list_models(
                     "1.2.3",

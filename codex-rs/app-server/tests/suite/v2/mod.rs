@@ -65,10 +65,6 @@ mod experimental_feature_list;
 mod feedback;
 mod frozen_cloud_skills;
 mod fs;
-#[path = "gateway_oauth_tests.rs"]
-mod gateway_oauth;
-#[path = "gcp_setup_tests.rs"]
-mod gcp_setup;
 mod git_attribution;
 mod hooks_list;
 mod host_skills;

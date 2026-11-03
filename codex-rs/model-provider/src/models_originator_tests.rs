@@ -42,10 +42,7 @@ async fn originator_managers_share_api_key_discovery_policy() {
             .await;
     }
     let auth = AuthManager::from_auth_for_testing(CodexAuth::from_api_key("test-key"));
-    let endpoint = Arc::new(OpenAiModelsEndpoint::new(
-        provider,
-        Some(Arc::clone(&auth)),
-    ));
+    let endpoint = Arc::new(OpenAiModelsEndpoint::new(provider, Some(Arc::clone(&auth))));
     let manager = OpenAiModelsManager::new(home.path().to_path_buf(), endpoint, Some(auth));
     let work = manager.for_originator("codex_work_cca").unwrap();
     let bundled = codex_models_manager::bundled_models_response().unwrap();

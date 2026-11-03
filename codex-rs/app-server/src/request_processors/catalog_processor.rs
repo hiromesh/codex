@@ -570,16 +570,10 @@ impl CatalogRequestProcessor {
                             );
                         }
                     };
-                    let plugins_input = config.plugins_config_input();
-                    let plugins = plugins_manager.plugins_for_config(&plugins_input).await;
-                    let plugin_skill_snapshots =
-                        plugins_manager.plugin_skill_snapshots_for_config(&plugins_input);
                     let skills_input = codex_skills_extension::HostSkillsLoadInput::new(
                         config.cwd.clone(),
-                        plugins.effective_plugin_skill_roots(),
                         config.config_layer_stack,
-                    )
-                    .with_plugin_skill_snapshots(plugin_skill_snapshots);
+                    );
                     let snapshot = skills_request
                         .snapshot_for_cwd(&skills_input, force_reload, fs)
                         .await;

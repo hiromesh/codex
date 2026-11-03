@@ -4,7 +4,6 @@ use std::ffi::OsString;
 use std::path::PathBuf;
 use std::sync::Arc;
 
-use crate::mcp::CODEX_APPS_MCP_SERVER_NAME;
 use crate::runtime::McpRuntimeContext;
 use codex_api::SharedAuthProvider;
 use codex_config::AppToolApproval;
@@ -14,7 +13,6 @@ use codex_config::McpServerOAuthConfig;
 use codex_config::McpServerTransportConfig;
 use codex_config::types::AuthKeyringBackendKind;
 use codex_config::types::OAuthCredentialsStoreMode;
-use codex_connectors::ConnectorRuntimeContextKey;
 use codex_exec_server::Environment;
 use codex_login::CodexAuth;
 use codex_protocol::mcp::ClientMcpExtensions;
@@ -87,15 +85,13 @@ impl EffectiveMcpServer {
 
     /// Checks whether Core can discover the protocol of a local stdio server.
     ///
-    /// The reserved `codex_apps` server has a per-chat catalog. Servers with runtime or
-    /// enterprise-managed credentials need that chat's authentication state.
+    /// Servers with runtime or enterprise-managed credentials need that chat's
+    /// authentication state.
     pub(crate) fn can_discover_local_stdio(
         &self,
-        server_name: &str,
         runtime_auth_provider: Option<&SharedAuthProvider>,
     ) -> bool {
-        server_name != CODEX_APPS_MCP_SERVER_NAME
-            && self.config.is_local_environment()
+        self.config.is_local_environment()
             && runtime_auth_provider.is_none()
             && !matches!(self.config.auth, McpServerAuth::EmaAuth)
             && self
@@ -178,7 +174,6 @@ pub(crate) struct McpServerConnectionIdentity {
     referenced_environment_variables: Vec<(String, Option<OsString>)>,
     runtime_auth: Option<CodexAuth>,
     runtime_auth_token: Option<String>,
-    codex_apps_cache_identity: Option<(PathBuf, ConnectorRuntimeContextKey)>,
     client_elicitation_capability: ElicitationCapability,
     client_mcp_extensions: ClientMcpExtensions,
     agent_plugin: bool,
@@ -198,7 +193,6 @@ impl McpServerConnectionIdentity {
         runtime_context: &McpRuntimeContext,
         runtime_auth_provider: Option<&SharedAuthProvider>,
         auth: Option<&CodexAuth>,
-        codex_apps_cache_identity: Option<(PathBuf, ConnectorRuntimeContextKey)>,
         client_elicitation_capability: ElicitationCapability,
         client_mcp_extensions: ClientMcpExtensions,
         previous_identity: Option<&Self>,
@@ -306,7 +300,6 @@ impl McpServerConnectionIdentity {
             referenced_environment_variables,
             runtime_auth,
             runtime_auth_token,
-            codex_apps_cache_identity,
             client_elicitation_capability,
             client_mcp_extensions,
             agent_plugin: server.is_agent_plugin(),
@@ -342,7 +335,6 @@ impl McpServerConnectionIdentity {
             && self.referenced_environment_variables == other.referenced_environment_variables
             && same_runtime_auth
             && self.runtime_auth_token == other.runtime_auth_token
-            && self.codex_apps_cache_identity == other.codex_apps_cache_identity
             && self.client_elicitation_capability == other.client_elicitation_capability
             && self.client_mcp_extensions == other.client_mcp_extensions
             && self.agent_plugin == other.agent_plugin
