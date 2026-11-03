@@ -1,6 +1,3 @@
-#[path = "client_runtime_auth_tests.rs"]
-mod runtime_auth_tests;
-
 use super::AuthRequestTelemetryContext;
 use super::ModelClient;
 use super::NonIncrementalReason;
@@ -25,7 +22,6 @@ use codex_api::AgentIdentityTelemetry;
 use codex_api::ApiError;
 use codex_api::ResponseEvent;
 use codex_api::TransportError;
-use codex_features::RuntimeAuthMode;
 use codex_history::HistoryInitialization;
 use codex_http_client::HttpClientFactory;
 use codex_http_client::OutboundProxyPolicy;
@@ -76,10 +72,6 @@ use codex_rollout_trace::RawTraceEventPayload;
 use codex_rollout_trace::RolloutTrace;
 use codex_rollout_trace::TraceWriter;
 use codex_rollout_trace::replay_bundle;
-use codex_runtime_agent_instance::AgentHostAuthorization;
-use codex_runtime_agent_instance::RuntimeAuthManager;
-use codex_runtime_agent_instance::RuntimeRegistrationMetadata;
-use codex_runtime_agent_instance::RuntimeRole;
 use codex_tools::JsonSchema;
 use codex_tools::ResponsesApiTool;
 use codex_tools::ToolSpec;
@@ -152,13 +144,8 @@ fn test_model_provider() -> SharedModelProvider {
     test_model_client(SessionSource::Cli).state.provider.clone()
 }
 
-#[test_case::test_case(None; "credential_auth")]
-#[test_case::test_case(Some(RuntimeAuthMode::DualHeader); "dual_header")]
-#[test_case::test_case(Some(RuntimeAuthMode::AssertionOnly); "assertion_only")]
 #[tokio::test]
-async fn workspace_routed_http_rejects_redirects_without_a_routing_header(
-    runtime_mode: Option<RuntimeAuthMode>,
-) {
+async fn workspace_routed_http_rejects_redirects_without_a_routing_header() {
     use codex_client::HttpTransport;
     use codex_login::WorkspaceRouting;
     use codex_login::WorkspaceRoutingRequest;
@@ -204,36 +191,11 @@ async fn workspace_routed_http_rejects_redirects_without_a_routing_header(
             AuthManager::from_auth_for_testing(CodexAuth::create_dummy_chatgpt_auth_for_testing());
         let resolver: Arc<dyn WorkspaceRoutingResolver> = Arc::new(Routing(routing_override));
         manager.set_workspace_routing_resolver(Arc::downgrade(&resolver));
-        let registration = MockServer::start().await;
-        Mock::given(method("POST"))
-            .and(path("/register"))
-            .respond_with(ResponseTemplate::new(200).set_body_json(json!({
-                "runtime_agent_instance_id": "runtime-a",
-                "agent_host_id": "host-a",
-                "actor": {"kind": "chatgpt", "user_id": "user-a", "account_id": "account_id"},
-            })))
-            .mount(&registration)
-            .await;
-        let runtime = Arc::new(RuntimeAuthManager::new(
-            manager.clone(),
-            AgentHostAuthorization::InstallationId {
-                installation_id: uuid::Uuid::nil(),
-            },
-            RuntimeRegistrationMetadata {
-                harness: None,
-                harness_version: None,
-                role: RuntimeRole::OrchestratorAndExecutor,
-            },
-            format!("{}/register", registration.uri()).parse().unwrap(),
-        ));
         let mut client = test_model_client(SessionSource::Exec);
         Arc::get_mut(&mut client.state).unwrap().provider = create_model_provider(
             ModelProviderInfo::create_openai_provider(/*base_url*/ None),
             Some(manager),
         );
-        if let Some(mode) = runtime_mode {
-            client = client.with_runtime_auth(runtime, mode).unwrap();
-        }
         let mut setup = client
             .current_client_setup(super::ClientRouting::Workspace)
             .await

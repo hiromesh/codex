@@ -262,15 +262,6 @@ fn parse_feature_requirements(
             );
             continue;
         }
-        if key == Feature::GuardianThreadContext.key() {
-            push_feature_requirement_warning(
-                &mut startup_warnings,
-                format!(
-                    "Ignoring removed `features` requirement `{key}` from {source}; thread-owned Guardian context is always enabled."
-                ),
-            );
-            continue;
-        }
         if key == "auto_review" {
             pinned_features.insert(Feature::GuardianApproval, enabled);
             continue;

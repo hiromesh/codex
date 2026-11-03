@@ -2011,7 +2011,6 @@ dependencies = [
  "codex-git-attribution",
  "codex-git-utils",
  "codex-goal-extension",
- "codex-guardian-v2",
  "codex-history-notes-extension",
  "codex-home",
  "codex-hooks",
@@ -2704,7 +2703,6 @@ dependencies = [
  "codex-rmcp-client",
  "codex-rollout",
  "codex-rollout-trace",
- "codex-runtime-agent-instance",
  "codex-sandboxing",
  "codex-shell-command",
  "codex-skills",
@@ -3364,45 +3362,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "codex-guardian-v2"
-version = "0.0.0"
-dependencies = [
- "anyhow",
- "codex-analytics",
- "codex-api",
- "codex-config",
- "codex-context-fragments",
- "codex-core",
- "codex-extension-api",
- "codex-features",
- "codex-guardian-context",
- "codex-guardian-reviewer",
- "codex-history",
- "codex-http-client",
- "codex-login",
- "codex-model-provider",
- "codex-model-provider-info",
- "codex-prompts",
- "codex-protocol",
- "codex-protocol-test-support",
- "codex-utils-cargo-bin",
- "codex-websocket-client",
- "core_test_support",
- "dirs",
- "http 1.4.0",
- "insta",
- "pretty_assertions",
- "serde_json",
- "tempfile",
- "thiserror 2.0.18",
- "tokio",
- "tracing",
- "uuid",
- "wiremock",
- "zstd",
-]
-
-[[package]]
 name = "codex-history"
 version = "0.0.0"
 dependencies = [
@@ -3896,7 +3855,6 @@ dependencies = [
  "codex-otel",
  "codex-protocol",
  "codex-response-debug-context",
- "codex-runtime-agent-instance",
  "codex-secrets",
  "codex-utils-cargo-bin",
  "codex-utils-process",
@@ -4126,7 +4084,6 @@ dependencies = [
  "codex-context-fragments",
  "codex-execpolicy",
  "codex-git-utils",
- "codex-guardian-context",
  "codex-protocol",
  "codex-protocol-test-support",
  "codex-utils-absolute-path",
@@ -4337,32 +4294,6 @@ dependencies = [
  "tempfile",
  "tracing",
  "uuid",
-]
-
-[[package]]
-name = "codex-runtime-agent-instance"
-version = "0.0.0"
-dependencies = [
- "base64 0.22.1",
- "codex-agent-identity",
- "codex-api",
- "codex-features",
- "codex-http-client",
- "codex-login",
- "codex-utils-redacted-string",
- "ed25519-dalek",
- "http 1.4.0",
- "pretty_assertions",
- "rand 0.9.3",
- "serde",
- "serde_json",
- "tempfile",
- "thiserror 2.0.18",
- "tokio",
- "url",
- "uuid",
- "wiremock",
- "zeroize",
 ]
 
 [[package]]
@@ -5379,7 +5310,6 @@ dependencies = [
  "codex-exec-server",
  "codex-extension-api",
  "codex-features",
- "codex-guardian-v2",
  "codex-home",
  "codex-hooks",
  "codex-http-client",

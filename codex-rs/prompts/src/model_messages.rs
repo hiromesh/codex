@@ -13,13 +13,11 @@ use permissions::ResolvedApprovalMessages;
 use permissions::ResolvedPermissionMessages;
 
 mod collaboration;
-mod guardian;
 mod incremental_tools;
 mod multi_agent;
 pub(crate) mod permissions;
 
 pub use collaboration::ResolvedCollaborationModeMessages;
-pub use guardian::ResolvedAutoReviewMessages;
 pub use incremental_tools::ResolvedIncrementalToolMessages;
 pub use multi_agent::ResolvedMultiAgentMessages;
 
@@ -119,19 +117,6 @@ impl<'a> ResolvedModelMessages<'a> {
             self.catalog_messages
                 .and_then(|messages| messages.multi_agent.as_ref()),
         )
-    }
-
-    /// Resolves auto-review policy messages and rejection/timeout instructions.
-    pub fn auto_review(&self) -> ResolvedAutoReviewMessages<'a> {
-        ResolvedAutoReviewMessages::new(
-            self.catalog_messages
-                .and_then(|messages| messages.auto_review.as_ref()),
-        )
-    }
-
-    /// Resolves classifier instructions from catalog text or the bundled default.
-    pub fn guardian_classifier_instructions(&self) -> &'a str {
-        guardian::classifier_instructions(self.catalog_messages)
     }
 
     /// Resolves reminder text without selecting or validating runtime budget settings.

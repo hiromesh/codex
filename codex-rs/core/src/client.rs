@@ -71,7 +71,6 @@ use codex_api::auth_header_telemetry;
 use codex_api::build_session_headers;
 use codex_api::create_text_param_for_request;
 use codex_api::response_create_client_metadata;
-use codex_features::RuntimeAuthMode;
 use codex_http_client::ClientRouteClass;
 use codex_http_client::HttpClientFactory;
 use codex_login::AuthManager;
@@ -86,7 +85,6 @@ use codex_otel::WEBSOCKET_CONTINUATION_COUNT_METRIC;
 use codex_otel::current_span_w3c_trace_context;
 use codex_protocol::ResponseItemId;
 use codex_protocol::auth::AuthMode;
-use codex_runtime_agent_instance::RuntimeAuthManager;
 
 use codex_protocol::ThreadId;
 use codex_protocol::config_types::ReasoningSummary as ReasoningSummaryConfig;
@@ -147,7 +145,6 @@ use codex_login::auth_env_telemetry::collect_auth_env_telemetry;
 use codex_model_provider::AgentIdentitySessionFallback;
 use codex_model_provider::ProviderAuthScope;
 use codex_model_provider::ProviderUnauthorizedRecovery;
-use codex_model_provider::ResolvedProviderAuth;
 use codex_model_provider::ResponsesConnectionKey;
 use codex_model_provider::SharedModelProvider;
 use codex_model_provider::WorkspaceRoutingContext;
@@ -309,7 +306,6 @@ pub struct ModelClient {
     executed_tool_calls: Option<ExecutedToolCalls>,
     // Resolved once when the session is created, like other session feature flags.
     api_key_cyber_access_programs: cyber_access_program::ApiKeyCyberAccessPrograms,
-    runtime_auth: Option<(Arc<RuntimeAuthManager>, RuntimeAuthMode)>,
 }
 
 /// A turn-scoped streaming session created from a [`ModelClient`].
@@ -643,7 +639,6 @@ impl ModelClient {
             codex_responses_headers: None,
             event_sender: None,
             http_client_factory,
-            runtime_auth: None,
             restored_history: false,
             request_contributors,
             executed_tool_calls: None,
@@ -666,24 +661,6 @@ impl ModelClient {
     pub(crate) fn with_restored_history(mut self, restored_history: bool) -> Self {
         self.restored_history = restored_history;
         self
-    }
-
-    /// Use the harness-owned runtime for this first-party provider. The owner must share this
-    /// client's credential manager. Provider-specific overrides need their own runtime owner.
-    pub fn with_runtime_auth(
-        mut self,
-        manager: Arc<RuntimeAuthManager>,
-        mode: RuntimeAuthMode,
-    ) -> Result<Self> {
-        let info = self.state.provider.info();
-        codex_model_provider::validate_runtime_destination(info.base_url.as_deref())?;
-        codex_model_provider::validate_runtime_provider(
-            info,
-            self.auth_manager().as_ref(),
-            &manager,
-        )?;
-        self.runtime_auth = Some((manager, mode));
-        Ok(self)
     }
 
     pub(crate) fn with_session_context(
@@ -1202,76 +1179,13 @@ impl ModelClient {
     /// This centralizes setup used by both prewarm and normal request paths so they stay in
     /// lockstep when auth/provider resolution changes.
     async fn current_client_setup(&self, routing: ClientRouting) -> Result<CurrentClientSetup> {
-        if let Some((manager, mode)) = &self.runtime_auth {
-            let selected = codex_model_provider::select_runtime_auth(
-                manager,
-                &self.state.provider.info().build_header_map()?,
-            )
-            .await
-            .map_err(|error| self.state.provider.map_api_error(error.into()))?;
-            let auth = selected.auth().clone();
-            let auth_revision = Some(selected.change_state().generation);
-            let auth_owner_generation = Some(selected.change_state().owner_generation);
-            let api_provider = self.state.provider.api_provider_for_auth(Some(&auth))?;
-            let (api_provider, redirect_policy) = match routing {
-                ClientRouting::Workspace => {
-                    let resolved = self
-                        .state
-                        .provider
-                        .route_responses_api_provider(
-                            api_provider,
-                            Some(&auth),
-                            &self.state.workspace_routing,
-                        )
-                        .await?;
-                    (resolved.provider, resolved.redirect_policy)
-                }
-                ClientRouting::ConfiguredProvider => (api_provider, ClientRedirectPolicy::Default),
-            };
-            let runtime = selected.runtime();
-            codex_model_provider::validate_runtime_selectors(
-                &api_provider.headers,
-                runtime.actor().info(),
-            )?;
-            let runtime_id = Some(runtime.id().to_string());
-            let http_client_factory = selected.http_client_factory().clone();
-            let resolved_auth = self
-                .state
-                .provider
-                .compose_auth(ResolvedProviderAuth {
-                    auth: selected.clone().into_auth_provider(*mode),
-                    agent_identity_telemetry: None,
-                    runtime: Some(selected),
-                })
-                .await?;
-            tracing::debug!(runtime_auth_mode = ?mode, "selected runtime authentication");
-            return Ok(CurrentClientSetup {
-                auth: Some(auth),
-                auth_owner_generation,
-                auth_revision,
-                api_provider,
-                http_client_factory,
-                redirect_policy,
-                api_auth: resolved_auth.auth,
-                agent_identity_telemetry: None,
-                runtime_id,
-            });
-        }
         self.provider_client_setup(routing, &self.state.provider)
             .await
     }
 
-    // Realtime keeps provider auth until its runtime integration lands later in the stack.
+    // Realtime keeps provider auth; runtime authentication is not supported for this path.
     async fn realtime_client_setup(&self) -> Result<CurrentClientSetup> {
-        let provider = if self.state.provider.runtime_auth().is_some() {
-            create_model_provider(
-                self.state.provider.info().clone(),
-                self.state.provider.auth_manager(),
-            )
-        } else {
-            Arc::clone(&self.state.provider)
-        };
-        self.provider_client_setup(ClientRouting::ConfiguredProvider, &provider)
+        self.provider_client_setup(ClientRouting::ConfiguredProvider, &self.state.provider)
             .await
     }
 

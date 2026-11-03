@@ -16,17 +16,11 @@ use toml::Table;
 
 mod feature_configs;
 mod legacy;
-mod runtime_auth;
 pub use feature_configs::AsyncCompactionConfigToml;
 pub use feature_configs::ContextManagementConfigToml;
 pub use feature_configs::CurrentTimeReminderConfigToml;
 pub use feature_configs::CurrentTimeReminderDeliveryMode;
 pub use feature_configs::CurrentTimeSource;
-pub use feature_configs::GuardianV2ConfigToml;
-pub use feature_configs::GuardianV2ReviewScopeConfigToml;
-pub use feature_configs::GuardianV2TranscriptConfigToml;
-pub use feature_configs::GuardianV2TranscriptSource;
-pub use feature_configs::GuardianV3ConfigToml;
 pub use feature_configs::MultiAgentV2ConfigToml;
 pub use feature_configs::NetworkProxyConfigToml;
 pub use feature_configs::NetworkProxyDomainPermissionToml;
@@ -42,8 +36,6 @@ pub use feature_configs::TokenBudgetConfigToml;
 pub use feature_configs::ToolRegistryConfigToml;
 use legacy::LegacyFeatureToggles;
 pub use legacy::legacy_feature_keys;
-pub use runtime_auth::RuntimeAgentInstancesConfigToml;
-pub use runtime_auth::RuntimeAuthMode;
 
 /// High-level lifecycle stage for a feature.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -387,8 +379,6 @@ pub enum Feature {
     GuardianApproval,
     /// Forward private reviewer items and interruptions to raw-event observers.
     GuardianRecordedItems,
-    /// Removed compatibility flag for always-on thread-owned Guardian context.
-    GuardianThreadContext,
     /// Reuse encrypted parent compaction when restarting Guardian review sessions.
     /// When disabled, retain an independent review transcript across parent compaction.
     GuardianReuseParentCompaction,
@@ -404,12 +394,6 @@ pub enum Feature {
     GuardianTrustOrchestratorConnectors,
     /// Give Guardian access to the root conversation's message history tools.
     GuardianConversationHistoryTools,
-    /// Enable Guardian V2 automatic approval reviews.
-    GuardianV2,
-    /// Run Decisions alongside Guardian V2 for measurement without changing approvals.
-    GuardianV2DecisionsComparison,
-    /// Enable Guardian V3 integrations.
-    GuardianV3,
     /// Removed compatibility flag for the unused Guardian extension prototype.
     GuardianExt,
     /// Enable persisted thread goals and automatic goal continuation.
@@ -460,8 +444,6 @@ pub enum Feature {
     RetainClientToolOutputs,
     /// Use Agent Identity for ChatGPT-authenticated sessions.
     UseAgentIdentity,
-    /// Register an ephemeral runtime for OpenAI request authentication.
-    RuntimeAgentInstances,
     /// Enable workspace dependency support.
     WorkspaceDependencies,
 
@@ -728,13 +710,6 @@ impl Features {
                         Feature::UseLegacyLandlock,
                     );
                 }
-                "guardianv2.thread_context" => {
-                    self.record_legacy_usage_force(
-                        "features.guardianv2.thread_context",
-                        Feature::GuardianThreadContext,
-                    );
-                    continue;
-                }
                 _ => {}
             }
             if k == "imagegenext" && m.contains_key(Feature::ImageGeneration.key()) {
@@ -799,10 +774,6 @@ fn legacy_usage_notice(alias: &str, feature: Feature) -> (String, Option<String>
         Feature::ShellZshFork | Feature::UnifiedExecZshFork => (
             format!("`[features].{canonical}` is deprecated and ignored."),
             Some(format!("The patched zsh backend has been removed. Shell commands now use the standard shell executor. Remove `{canonical}` from [features] in config.toml or profile configuration files.")),
-        ),
-        Feature::GuardianThreadContext => (
-            "`[features.guardianv2].thread_context` is deprecated and ignored.".to_string(),
-            Some("Thread-owned Guardian context is always enabled. Remove `thread_context` from [features.guardianv2] in config.toml, including profile overrides.".to_string()),
         ),
         Feature::TranscriptV2 => (
             "`[features].transcript_v2` is deprecated and ignored.".to_string(),
@@ -888,14 +859,6 @@ pub struct FeaturesToml {
     pub tool_registry: Option<ToolRegistryConfigToml>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub non_prefixed_mcp_tool_names: Option<FeatureToml<NonPrefixedMcpToolNamesConfigToml>>,
-    #[serde(
-        default,
-        skip_serializing_if = "Option::is_none",
-        deserialize_with = "feature_configs::deserialize_guardian_v2_feature"
-    )]
-    pub guardianv2: Option<FeatureToml<GuardianV2ConfigToml>>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub guardianv3: Option<FeatureToml<GuardianV3ConfigToml>>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub multi_agent_v2: Option<FeatureToml<MultiAgentV2ConfigToml>>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -910,8 +873,6 @@ pub struct FeaturesToml {
     pub current_time_reminder: Option<FeatureToml<CurrentTimeReminderConfigToml>>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub sleep_tool: Option<FeatureToml<SleepToolConfigToml>>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub runtime_agent_instances: Option<FeatureToml<RuntimeAgentInstancesConfigToml>>,
     #[serde(default, rename = "apps_mcp_path_override", skip_serializing)]
     #[schemars(skip)]
     removed_apps_mcp_path_override: Option<FeatureToml<RemovedAppsMcpPathOverrideConfigToml>>,
@@ -945,17 +906,6 @@ impl FeaturesToml {
         {
             entries.insert(Feature::NonPrefixedMcpToolNames.key().to_string(), enabled);
         }
-        if let Some(enabled) = self.guardianv2.as_ref().and_then(FeatureToml::enabled) {
-            entries.insert(Feature::GuardianV2.key().to_string(), enabled);
-        }
-        if let Some(FeatureToml::Config(config)) = &self.guardianv2
-            && let Some(enabled) = config.thread_context
-        {
-            entries.insert(Feature::GuardianThreadContext.key().to_string(), enabled);
-        }
-        if let Some(enabled) = self.guardianv3.as_ref().and_then(FeatureToml::enabled) {
-            entries.insert(Feature::GuardianV3.key().to_string(), enabled);
-        }
         if let Some(enabled) = self.multi_agent_v2.as_ref().and_then(FeatureToml::enabled) {
             entries.insert(Feature::MultiAgentV2.key().to_string(), enabled);
         }
@@ -984,13 +934,6 @@ impl FeaturesToml {
         }
         if let Some(enabled) = self.sleep_tool.as_ref().and_then(FeatureToml::enabled) {
             entries.insert(Feature::SleepTool.key().to_string(), enabled);
-        }
-        if let Some(enabled) = self
-            .runtime_agent_instances
-            .as_ref()
-            .and_then(FeatureToml::enabled)
-        {
-            entries.insert(Feature::RuntimeAgentInstances.key().to_string(), enabled);
         }
         entries
     }
@@ -1903,12 +1846,6 @@ pub const FEATURES: &[FeatureSpec] = &[
         default_enabled: false,
     },
     FeatureSpec {
-        id: Feature::GuardianThreadContext,
-        key: "guardianv2.thread_context",
-        stage: Stage::Removed,
-        default_enabled: false,
-    },
-    FeatureSpec {
         id: Feature::GuardianReuseParentCompaction,
         key: "guardian_reuse_parent_compaction",
         stage: Stage::Stable,
@@ -1947,24 +1884,6 @@ pub const FEATURES: &[FeatureSpec] = &[
     FeatureSpec {
         id: Feature::GuardianConversationHistoryTools,
         key: "guardian_conversation_history_tools",
-        stage: Stage::UnderDevelopment,
-        default_enabled: false,
-    },
-    FeatureSpec {
-        id: Feature::GuardianV2,
-        key: "guardianv2",
-        stage: Stage::UnderDevelopment,
-        default_enabled: false,
-    },
-    FeatureSpec {
-        id: Feature::GuardianV2DecisionsComparison,
-        key: "guardianv2_decisions_comparison",
-        stage: Stage::UnderDevelopment,
-        default_enabled: false,
-    },
-    FeatureSpec {
-        id: Feature::GuardianV3,
-        key: "guardianv3",
         stage: Stage::UnderDevelopment,
         default_enabled: false,
     },
@@ -2165,12 +2084,6 @@ pub const FEATURES: &[FeatureSpec] = &[
     FeatureSpec {
         id: Feature::UseAgentIdentity,
         key: "use_agent_identity",
-        stage: Stage::UnderDevelopment,
-        default_enabled: false,
-    },
-    FeatureSpec {
-        id: Feature::RuntimeAgentInstances,
-        key: "runtime_agent_instances",
         stage: Stage::UnderDevelopment,
         default_enabled: false,
     },

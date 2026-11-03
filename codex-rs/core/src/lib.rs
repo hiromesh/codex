@@ -57,7 +57,6 @@ pub use codex_thread::GuardianAuthorizationVersion;
 pub use codex_thread::GuardianRootMessage;
 pub use codex_thread::GuardianRootSnapshot;
 pub use codex_thread::ThreadConfigSnapshot;
-pub use guardian::ScoreAuthorization as GuardianScoreAuthorization;
 pub use session::turn_context::TurnContext;
 pub use thread_startup_metadata::ThreadStartupMetadata;
 mod agent;
@@ -100,7 +99,6 @@ mod exec_policy;
 #[cfg(test)]
 mod git_info_tests;
 mod guardian;
-pub mod guardian_review;
 mod hook_environment_executor;
 mod hook_mcp_executor;
 mod hook_runtime;

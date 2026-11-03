@@ -3,8 +3,6 @@
 //! The TUI pairs pushes and pops on each screen's keyboard enhancement stack, but
 //! process exit gets a stronger reset so the parent shell does not inherit enhanced key
 //! reporting if a terminal misses the normal stack pop.
-//! Windows terminal detection has a deadline, including WSL interop process launch.
-//! Inconclusive detection keeps keyboard enhancements disabled on WSL.
 
 use std::fmt;
 use std::io::Write;
@@ -50,8 +48,8 @@ fn keyboard_enhancement_disabled_for(
     }
 
     // VS Code running a WSL shell can hide TERM_PROGRAM from the Linux process
-    // environment. If the Windows-side probe is inconclusive, avoid enabling the
-    // keyboard mode that can break dead-key composition in VS Code on WSL.
+    // environment. Disable the keyboard mode that can break dead-key composition
+    // whenever VS Code is detected on WSL.
     is_wsl
         && matches!(
             vscode_detection,
@@ -89,120 +87,14 @@ pub(super) fn running_in_vscode_terminal() -> bool {
 
 pub(crate) fn detect_vscode_terminal() -> VscodeDetection {
     if term_program_is_vscode(std::env::var("TERM_PROGRAM").ok().as_deref()) {
-        return VscodeDetection::VsCode;
-    }
-    vscode_terminal_detected(
-        std::env::var("TERM_PROGRAM").ok().as_deref(),
-        windows_vscode_detection(),
-    )
-}
-
-fn vscode_terminal_detected(
-    linux_term_program: Option<&str>,
-    windows_detection: VscodeDetection,
-) -> VscodeDetection {
-    if term_program_is_vscode(linux_term_program) {
         VscodeDetection::VsCode
     } else {
-        windows_detection
+        VscodeDetection::Other
     }
 }
 
 fn term_program_is_vscode(value: Option<&str>) -> bool {
     value.is_some_and(|value| value.eq_ignore_ascii_case("vscode"))
-}
-
-fn windows_vscode_detection() -> VscodeDetection {
-    #[cfg(target_os = "linux")]
-    {
-        static WINDOWS_VSCODE_DETECTION: std::sync::OnceLock<VscodeDetection> =
-            std::sync::OnceLock::new();
-        *WINDOWS_VSCODE_DETECTION.get_or_init(read_windows_vscode_detection)
-    }
-
-    #[cfg(not(target_os = "linux"))]
-    {
-        VscodeDetection::Unknown
-    }
-}
-
-#[cfg(target_os = "linux")]
-fn read_windows_vscode_detection() -> VscodeDetection {
-    if !running_in_wsl() {
-        return VscodeDetection::Other;
-    }
-    read_windows_vscode_detection_with_timeout(
-        || {
-            let executable = codex_utils_path::system_executable("cmd.exe")?;
-            std::process::Command::new(executable)
-                .args(["/d", "/s", "/c", "set TERM_PROGRAM"])
-                .stdin(std::process::Stdio::null())
-                .stdout(std::process::Stdio::piped())
-                .stderr(std::process::Stdio::null())
-                .spawn()
-                .ok()
-        },
-        std::time::Duration::from_secs(/*secs*/ 1),
-    )
-}
-
-#[cfg(any(target_os = "linux", all(test, unix)))]
-fn read_windows_vscode_detection_with_timeout(
-    spawn: impl FnOnce() -> Option<std::process::Child> + Send + 'static,
-    timeout: std::time::Duration,
-) -> VscodeDetection {
-    let deadline = std::time::Instant::now() + timeout;
-    let (sender, receiver) = std::sync::mpsc::channel();
-    // WSL interop can block inside spawn itself. Keep launch and cleanup off the
-    // startup thread; the OnceLock caches a timeout so this worker is not retried.
-    let worker = std::thread::Builder::new()
-        .name("windows-term-program".into())
-        .spawn(move || {
-            let output = (|| {
-                let mut child = spawn()?;
-                while std::time::Instant::now() < deadline {
-                    match child.try_wait() {
-                        Ok(Some(_)) => return child.wait_with_output().ok(),
-                        Ok(None) => {
-                            std::thread::sleep(std::time::Duration::from_millis(/*millis*/ 10))
-                        }
-                        Err(_) => break,
-                    }
-                }
-                let _ = child.kill();
-                let _ = child.wait();
-                None
-            })();
-            let _ = sender.send(output);
-        });
-    if worker.is_err() {
-        return VscodeDetection::Unknown;
-    }
-
-    let Ok(Some(output)) =
-        receiver.recv_timeout(deadline.saturating_duration_since(std::time::Instant::now()))
-    else {
-        return VscodeDetection::Unknown;
-    };
-    if !output.status.success() {
-        // `cmd.exe /c set TERM_PROGRAM` exits with 1 when the variable is absent.
-        return if output.status.code() == Some(1) {
-            VscodeDetection::Other
-        } else {
-            VscodeDetection::Unknown
-        };
-    }
-
-    let output = String::from_utf8_lossy(&output.stdout);
-    let term_program = output
-        .lines()
-        .find_map(|line| line.trim_end_matches('\r').strip_prefix("TERM_PROGRAM="))
-        .filter(|value| !value.trim().is_empty());
-    if term_program_is_vscode(term_program) {
-        VscodeDetection::VsCode
-    } else {
-        VscodeDetection::Other
-    }
 }
 
 /// Restore keyboard reporting and return the mouse policy from the same fresh tmux probe.
@@ -351,7 +243,6 @@ mod tests {
     use super::parse_bool_env;
     use super::tmux_session_detected;
     use super::tmux_should_enable_modify_other_keys_for;
-    use super::vscode_terminal_detected;
     use codex_terminal_detection::TerminalName;
     use crossterm::Command;
     use crossterm::event::PushKeyboardEnhancementFlags;
@@ -495,24 +386,6 @@ mod tests {
                 /*is_wsl*/ false,
                 detection
             ));
-        }
-    }
-
-    #[test]
-    fn vscode_terminal_detection_uses_linux_and_windows_term_program() {
-        for detection in [
-            VscodeDetection::VsCode,
-            VscodeDetection::Other,
-            VscodeDetection::Unknown,
-        ] {
-            assert_eq!(
-                vscode_terminal_detected(Some("vscode"), detection),
-                VscodeDetection::VsCode,
-            );
-            assert_eq!(
-                vscode_terminal_detected(/*linux_term_program*/ None, detection),
-                detection,
-            );
         }
     }
 

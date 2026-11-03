@@ -41,13 +41,6 @@ pub(super) fn apply_to_config(
     }
     apply_exact!(check_for_update_on_startup);
     apply_exact!(allow_login_shell);
-    if requirements
-        .approvals_reviewer
-        .can_set(&ApprovalsReviewer::User)
-        .is_err()
-    {
-        config.features.get_or_insert_default().guardianv2 = Some(FeatureToml::Enabled(false));
-    }
     apply_feedback_requirement(
         &mut config.feedback,
         requirements.feedback.as_ref(),

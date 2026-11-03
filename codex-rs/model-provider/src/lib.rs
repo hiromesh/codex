@@ -9,7 +9,6 @@ mod models_endpoint;
 mod models_identity;
 mod provider;
 mod request_preparation;
-mod runtime_auth;
 mod shared_state;
 pub mod test_support;
 mod workspace_routing;
@@ -52,10 +51,6 @@ pub use provider::provider_uses_first_party_auth_path;
 pub use provider::resolve_api_provider;
 
 pub use request_preparation::prepare_provider_request;
-pub use runtime_auth::select_runtime_auth;
-pub use runtime_auth::validate_runtime_destination;
-pub use runtime_auth::validate_runtime_provider;
-pub use runtime_auth::validate_runtime_selectors;
 
 #[cfg(test)]
 #[path = "workspace_routing_tests.rs"]

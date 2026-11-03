@@ -73,7 +73,6 @@ pub fn is_structured_feature_path<S: AsRef<str>>(path: &[S]) -> bool {
             "multi_agent_v2"
                 | "network_proxy"
                 | "sleep_tool"
-                | "runtime_agent_instances"
         )
 }
 

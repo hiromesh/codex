@@ -10,7 +10,6 @@ use codex_api::AuthError;
 use codex_api::AuthHeadersFuture;
 use codex_api::AuthProvider;
 use codex_api::SharedAuthProvider;
-use codex_features::RuntimeAuthMode;
 use codex_http_client::CHATGPT_ACCOUNT_ID_HEADER;
 use codex_login::AuthHeaders;
 use codex_login::AuthManager;
@@ -21,8 +20,6 @@ use codex_login::auth::AgentIdentityAuthPolicy;
 use codex_model_provider_info::ModelProviderInfo;
 use codex_protocol::error::CodexErr;
 use codex_protocol::protocol::SessionSource;
-use codex_runtime_agent_instance::RuntimeAuth;
-use codex_runtime_agent_instance::RuntimeAuthManager;
 use http::HeaderMap;
 use http::HeaderValue;
 
@@ -31,21 +28,16 @@ use crate::bearer_auth_provider::BearerAuthProvider;
 const BEDROCK_API_KEY_UNSUPPORTED_MESSAGE: &str =
     "Bedrock API key auth is only supported by the Amazon Bedrock model provider";
 
-/// Credential ownership and optional OpenAI runtime auth for one harness/thread context.
+/// Credential ownership for one harness/thread context.
 /// Publish these together so auxiliary clients cannot select another thread's credentials.
 #[derive(Clone, Debug)]
 pub struct ProviderAuthContext {
     pub credentials: Arc<AuthManager>,
-    pub runtime_auth: Option<(Arc<RuntimeAuthManager>, RuntimeAuthMode)>,
 }
 
 impl ProviderAuthContext {
     pub fn model_provider(&self, info: ModelProviderInfo) -> crate::SharedModelProvider {
-        crate::provider::create_model_provider_with_runtime(
-            info,
-            Some(Arc::clone(&self.credentials)),
-            self.runtime_auth.clone(),
-        )
+        crate::provider::create_model_provider(info, Some(Arc::clone(&self.credentials)))
     }
 }
 
@@ -76,7 +68,6 @@ impl AgentIdentitySessionFallback {
 pub struct ResolvedProviderAuth {
     pub auth: SharedAuthProvider,
     pub agent_identity_telemetry: Option<AgentIdentityTelemetry>,
-    pub runtime: Option<RuntimeAuth>,
 }
 
 impl ResolvedProviderAuth {
@@ -84,7 +75,6 @@ impl ResolvedProviderAuth {
         Self {
             auth,
             agent_identity_telemetry: None,
-            runtime: None,
         }
     }
 
@@ -93,7 +83,6 @@ impl ResolvedProviderAuth {
         Self {
             auth: Arc::new(AgentIdentityAuthProvider { auth }),
             agent_identity_telemetry: Some(agent_identity_telemetry),
-            runtime: None,
         }
     }
 }

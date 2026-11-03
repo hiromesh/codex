@@ -7,9 +7,6 @@ use codex_http_client::OutboundProxyPolicy;
 use codex_login::AuthCredentialsStoreMode;
 use codex_login::AuthKeyringBackendKind;
 use codex_login::AuthRouteConfig;
-use codex_runtime_agent_instance::AgentHostAuthorization;
-use codex_runtime_agent_instance::RuntimeRegistrationMetadata;
-use codex_runtime_agent_instance::RuntimeRole;
 use pretty_assertions::assert_eq;
 use serde_json::json;
 use wiremock::Mock;
@@ -20,13 +17,8 @@ use wiremock::matchers::method;
 use wiremock::matchers::path;
 
 #[tokio::test]
-async fn catalog_timeout_preserves_refreshed_tokens_with_and_without_runtime_auth() {
-    for mode in [
-        None,
-        Some(RuntimeAuthMode::DualHeader),
-        Some(RuntimeAuthMode::AssertionOnly),
-    ] {
-        let server = MockServer::start().await;
+async fn catalog_timeout_preserves_refreshed_tokens() {
+    let server = MockServer::start().await;
         let home = tempfile::tempdir().unwrap();
         let token = |expires| {
             let payload = json!({
@@ -88,18 +80,6 @@ async fn catalog_timeout_preserves_refreshed_tokens_with_and_without_runtime_aut
             .expect(0)
             .mount(&server)
             .await;
-        Mock::given(method("POST"))
-            .and(path("/register"))
-            .and(body_partial_json(
-                json!({"actor_auth": {"credential": new_token}}),
-            ))
-            .respond_with(ResponseTemplate::new(200).set_body_json(json!({
-                "runtime_agent_instance_id": "runtime-a", "agent_host_id": "host-a",
-                "actor": {"kind": "chatgpt", "user_id": "user-a", "account_id": "workspace-a"},
-            })))
-            .expect(u64::from(mode.is_some()))
-            .mount(&server)
-            .await;
         Mock::given(method("GET"))
             .and(path("/models"))
             .respond_with(ResponseTemplate::new(200).set_body_json(json!({"models": []})))
@@ -120,31 +100,13 @@ async fn catalog_timeout_preserves_refreshed_tokens_with_and_without_runtime_aut
             )
             .await,
         );
-        let runtime_auth = mode.map(|mode| {
-            (
-                Arc::new(RuntimeAuthManager::new(
-                    Arc::clone(&credentials),
-                    AgentHostAuthorization::InstallationId {
-                        installation_id: "00000000-0000-0000-0000-000000000000".parse().unwrap(),
-                    },
-                    RuntimeRegistrationMetadata {
-                        harness: None,
-                        harness_version: None,
-                        role: RuntimeRole::Orchestrator,
-                    },
-                    format!("{}/register", server.uri()).parse().unwrap(),
-                )),
-                mode,
-            )
-        });
         let mut info = ModelProviderInfo::create_openai_provider(Some(server.uri()));
         info.env_http_headers = None;
         let endpoint = OpenAiModelsEndpoint::new(
             info,
             Some(Arc::clone(&credentials)),
             /*gateway_auth_manager*/ None,
-        )
-        .with_runtime_auth(runtime_auth);
+        );
         let error = endpoint
             .list_models("test", factory.clone())
             .await
@@ -178,23 +140,9 @@ async fn catalog_timeout_preserves_refreshed_tokens_with_and_without_runtime_aut
             .iter()
             .find(|request| request.url.path() == "/models")
             .unwrap();
-        if mode == Some(RuntimeAuthMode::AssertionOnly) {
-            assert!(
-                models.headers["authorization"]
-                    .to_str()
-                    .unwrap()
-                    .starts_with("AgentAssertion ")
-            );
-        } else {
-            assert_eq!(
-                models.headers["authorization"],
-                format!("Bearer {new_token}")
-            );
-        }
         assert_eq!(
-            models.headers.contains_key("x-openai-agent-assertion"),
-            mode == Some(RuntimeAuthMode::DualHeader)
+            models.headers["authorization"],
+            format!("Bearer {new_token}")
         );
         server.verify().await;
-    }
 }
