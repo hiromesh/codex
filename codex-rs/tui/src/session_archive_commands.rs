@@ -270,9 +270,7 @@ pub(super) async fn start_app_server_for_session_command(
         .with_remote_cwd_override(cli.cwd.clone()));
     }
 
-    let workload_identity_selected = codex_login::is_workload_identity_selected();
     let reuse_implicit_local_daemon = !cli.no_daemon
-        && !workload_identity_selected
         && super::daemon_startup::config_exclusion(
             &cli_kv_overrides,
             &launch_loader_overrides,
@@ -289,7 +287,6 @@ pub(super) async fn start_app_server_for_session_command(
         explicit_remote_endpoint,
         default_daemon,
         reuse_implicit_local_daemon,
-        workload_identity_selected,
         std::env::var_os(codex_exec_server::CODEX_EXEC_SERVER_URL_ENV_VAR).as_deref(),
     )?;
     let remote_cwd_override = cli

@@ -8,7 +8,6 @@ mod agent_message_board;
 mod analytics;
 mod app_installed;
 mod app_list;
-mod app_read;
 mod application_network;
 #[path = "attached_thread_tests.rs"]
 mod attached_thread;
@@ -16,11 +15,8 @@ mod attestation;
 #[path = "auth_storage_originator_tests.rs"]
 mod auth_storage_originator;
 mod auto_env;
-#[path = "bedrock_gov_cloud_tests.rs"]
-mod bedrock_gov_cloud;
 #[path = "bedrock_service_tier_tests.rs"]
 mod bedrock_service_tier;
-mod bedrock_setup;
 mod client_metadata;
 mod collaboration_mode_list;
 #[cfg(unix)]
@@ -183,5 +179,4 @@ mod view_image;
 mod web_search;
 mod workspace_routing;
 
-mod user_verification;
 mod user_verification_mcp;

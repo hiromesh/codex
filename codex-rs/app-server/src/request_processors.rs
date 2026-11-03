@@ -309,7 +309,7 @@ use codex_backend_client::RateLimitResetCreditDetails as BackendRateLimitResetCr
 use codex_backend_client::RateLimitResetCreditsDetails as BackendRateLimitResetCreditsDetails;
 use codex_backend_client::RequestError as BackendRequestError;
 use codex_backend_client::TokenUsageProfile;
-use codex_chatgpt::connectors;
+use codex_core::connectors;
 use codex_config::CloudConfigBundleLoadError;
 use codex_config::CloudConfigBundleLoadErrorCode;
 use codex_config::ConfigLayerStack;

@@ -275,9 +275,6 @@ pub(super) async fn build_test_processor(
         config_warnings: Vec::new(),
         startup_warnings_tx: mpsc::unbounded_channel().0,
         session_source: SessionSource::VSCode,
-        user_verification: Arc::new(crate::user_verification::Service::new(Arc::clone(
-            &auth_manager,
-        ))),
         auth_manager,
         installation_id: "11111111-1111-4111-8111-111111111111".to_string(),
         rpc_transport: AppServerRpcTransport::Stdio,

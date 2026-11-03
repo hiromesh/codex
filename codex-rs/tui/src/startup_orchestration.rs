@@ -205,7 +205,6 @@ pub(super) async fn run_main_inner(
         &cli,
         &cli_kv_overrides,
         &launch_loader_overrides,
-        workload_identity_selected,
         std::env::var_os(codex_exec_server::CODEX_EXEC_SERVER_URL_ENV_VAR).as_deref(),
     );
     let reuse_implicit_local_daemon = daemon_exclusion.is_none();

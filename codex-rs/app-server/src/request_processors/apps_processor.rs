@@ -5,8 +5,6 @@ use codex_connectors::AppToolPolicyEvaluator;
 mod installed;
 mod read;
 
-pub(super) use read::APP_READ_MAX_IDS;
-
 pub(crate) struct AppsRequestProcessor {
     auth_manager: Arc<AuthManager>,
     thread_manager: Arc<ThreadManager>,
@@ -197,7 +195,7 @@ impl AppsRequestProcessor {
         let plugin_apps = connector_snapshot.connector_ids().to_vec();
         let (mut accessible_connectors, mut all_connectors) = tokio::join!(
             connectors::list_cached_accessible_connectors_from_mcp_tools(&config),
-            connectors::list_cached_all_connectors(&config, &plugin_apps)
+            load_cached_all_connectors(&config, &plugin_apps)
         );
         let cached_all_connectors = all_connectors.clone();
 
@@ -220,13 +218,9 @@ impl AppsRequestProcessor {
         let all_config = config.clone();
         let all_plugin_apps = plugin_apps.clone();
         tokio::spawn(async move {
-            let result = connectors::list_all_connectors_with_options(
-                &all_config,
-                force_refetch,
-                &all_plugin_apps,
-            )
-            .await
-            .map_err(|err| format!("failed to list apps: {err}"));
+            let result = Ok(load_cached_all_connectors(&all_config, &all_plugin_apps)
+                .await
+                .unwrap_or_default());
             let _ = tx.send(AppListLoadResult::Directory(result));
         });
 
@@ -390,14 +384,54 @@ enum AppListLoadResult {
     Directory(Result<Vec<AppInfo>, String>),
 }
 
+async fn load_cached_all_connectors(
+    config: &Config,
+    plugin_apps: &[codex_plugin::AppConnectorId],
+) -> Option<Vec<AppInfo>> {
+    let auth_manager =
+        AuthManager::shared_from_config(config, /*enable_codex_api_key_env*/ false)
+            .await
+            .ok()?;
+    let auth = auth_manager.auth().await?;
+    if !config
+        .features
+        .apps_enabled_for_auth(auth.uses_codex_backend())
+    {
+        return Some(Vec::new());
+    }
+    let cache_context = codex_connectors::ConnectorDirectoryCacheContext::new(
+        config.codex_home.to_path_buf(),
+        codex_connectors::ConnectorDirectoryCacheKey::new(
+            config.chatgpt_base_url.clone(),
+            auth.get_account_id(),
+            auth.get_chatgpt_user_id(),
+            auth.is_workspace_account(),
+        ),
+    );
+    let connectors = codex_connectors::cached_directory_connectors(&cache_context)?.to_vec();
+    Some(codex_connectors::merge::merge_plugin_connectors(
+        connectors,
+        plugin_apps
+            .iter()
+            .map(|connector_id| connector_id.0.clone()),
+    ))
+}
+
 fn merge_loaded_apps(
     all_connectors: Option<&[AppInfo]>,
     accessible_connectors: Option<&[AppInfo]>,
 ) -> Vec<AppInfo> {
     let all_connectors_loaded = all_connectors.is_some();
     let all = all_connectors.map_or_else(Vec::new, <[AppInfo]>::to_vec);
-    let accessible = accessible_connectors.map_or_else(Vec::new, <[AppInfo]>::to_vec);
-    connectors::merge_connectors_with_accessible(all, accessible, all_connectors_loaded)
+    let mut accessible = accessible_connectors.map_or_else(Vec::new, <[AppInfo]>::to_vec);
+    if all_connectors_loaded {
+        let connector_ids: HashSet<&str> = all
+            .iter()
+            .map(|connector| connector.id.as_str())
+            .collect();
+        accessible.retain(|connector| connector_ids.contains(connector.id.as_str()));
+    }
+    codex_connectors::merge::merge_connectors(all, accessible)
 }
 
 fn should_send_app_list_updated_notification(

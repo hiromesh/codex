@@ -145,7 +145,6 @@ fn reject_removed_permission_profile(request: &JSONRPCRequest) -> Result<(), JSO
 
 pub(crate) struct MessageProcessor {
     pub(crate) turn_admission: TurnAdmission,
-    user_verification: Arc<crate::user_verification::Service>,
     outgoing: Arc<OutgoingMessageSender>,
     startup_warnings: StartupWarnings,
     models_refresh_worker: ModelsRefreshWorker,
@@ -269,7 +268,6 @@ pub(crate) struct MessageProcessorArgs {
     pub(crate) startup_warnings_tx: mpsc::UnboundedSender<String>,
     pub(crate) session_source: SessionSource,
     pub(crate) auth_manager: Arc<AuthManager>,
-    pub(crate) user_verification: Arc<crate::user_verification::Service>,
     pub(crate) installation_id: String,
     pub(crate) rpc_transport: AppServerRpcTransport,
     pub(crate) remote_control_handle: Option<RemoteControlHandle>,
@@ -297,7 +295,6 @@ impl MessageProcessor {
             startup_warnings_tx,
             session_source,
             auth_manager,
-            user_verification,
             installation_id,
             rpc_transport,
             remote_control_handle,
@@ -308,7 +305,6 @@ impl MessageProcessor {
             codex_login::GatewayLoginControl::for_runtime(&auth_manager.runtime_config());
         gateway_login_control.require_explicit_login();
         let thread_state_manager = ThreadStateManager::new();
-        outgoing.watch_user_verification_auth(Arc::clone(&auth_manager));
         // The thread store is intentionally process-scoped. Config reloads can
         // affect per-thread behavior, but they must not move newly started,
         // resumed, or forked threads to a different persistence backend/root.
@@ -576,7 +572,6 @@ impl MessageProcessor {
             analytics_events_client.clone(),
             Arc::clone(&config),
             rpc_transport,
-            Arc::clone(&user_verification),
         );
         let external_agent_config_processor =
             ExternalAgentConfigRequestProcessor::new(ExternalAgentConfigRequestProcessorArgs {
@@ -598,7 +593,6 @@ impl MessageProcessor {
         );
         Self {
             turn_admission,
-            user_verification,
             outgoing,
             startup_warnings: StartupWarnings {
                 config: config_warnings,
@@ -896,9 +890,6 @@ impl MessageProcessor {
         self.account_processor
             .gateway_connection_closed(connection_id);
         self.request_serialization_queues.discard_closed().await;
-        self.outgoing
-            .disconnect_user_verification_connection(connection_id)
-            .await;
         session_state.mcp_event_streams.clear().await;
         if timeout(
             CONNECTION_RPC_DRAIN_TIMEOUT,
@@ -1112,53 +1103,26 @@ impl MessageProcessor {
             ClientRequest::Initialize { .. } => {
                 panic!("Initialize should be handled before initialized request dispatch");
             }
-            ClientRequest::UserVerificationCancel { params, .. } => {
-                self.outgoing
-                    .cancel_user_verification_request(&ConnectionRequestId {
-                        connection_id,
-                        request_id: params.request_id,
-                    })
-                    .await;
+            ClientRequest::UserVerificationCancel { .. } => {
                 Ok(Some(UserVerificationCancelResponse {}.into()))
             }
-            request @ (ClientRequest::UserVerificationStatus { .. }
-            | ClientRequest::UserVerificationEnroll { .. }
-            | ClientRequest::UserVerificationDelete { .. }
-            | ClientRequest::UserVerificationVerify { .. }) => {
-                return Box::pin(async {
-                    // Keep verification temporaries out of unrelated RPCs' stack frames.
-                    let operation = match request {
-                        ClientRequest::UserVerificationStatus { .. } => {
-                            crate::user_verification::Operation::Status
-                        }
-                        ClientRequest::UserVerificationEnroll { .. } => {
-                            crate::user_verification::Operation::Enroll
-                        }
-                        ClientRequest::UserVerificationDelete { .. } => {
-                            crate::user_verification::Operation::Delete
-                        }
-                        ClientRequest::UserVerificationVerify { params, .. } => {
-                            crate::user_verification::Operation::Verify(params)
-                        }
-                        _ => unreachable!("matched a user-verification request"),
-                    };
-                    let response = self
-                        .user_verification
-                        .handle(
-                            operation,
-                            Arc::clone(&session.rpc_gate),
-                            request_context.cancellation.clone(),
-                            session.origin,
-                        )
-                        .await?;
-                    let (payload, check) = response.into_parts();
-                    self.outgoing
-                        .send_response_as_checked(request_id.clone(), payload, check)
-                        .await;
-                    Ok(())
-                })
-                .await;
+            ClientRequest::UserVerificationStatus { .. } => {
+                Ok(Some(codex_app_server_protocol::UserVerificationStatusResponse {
+                    credential_id: None,
+                    unavailable_reason: Some(
+                        codex_app_server_protocol::UserVerificationUnavailableReason::ProviderUnavailable,
+                    ),
+                    unavailable_message: Some(
+                        "User verification is not available in this build.".to_string(),
+                    ),
+                }
+                .into()))
             }
+            ClientRequest::UserVerificationEnroll { .. }
+            | ClientRequest::UserVerificationDelete { .. }
+            | ClientRequest::UserVerificationVerify { .. } => Err(invalid_request(
+                "User verification is not available in this build.",
+            )),
             ClientRequest::ServerDiagnostics { .. } => Ok(Some(read_server_diagnostics().into())),
             ClientRequest::ConfigRead { params, .. } => self
                 .config_processor
@@ -1781,20 +1745,18 @@ impl MessageProcessor {
                     .login_account(request_id.clone(), params)
                     .await
             }
-            ClientRequest::BedrockDiscover { params, .. } => {
-                self.account_processor.bedrock_discover(params).await
-            }
-            ClientRequest::BedrockSetup { params, .. } => {
-                self.account_processor.bedrock_setup(params).await
-            }
+            ClientRequest::BedrockDiscover { .. } => Err(invalid_request(
+                "Amazon Bedrock setup is no longer supported.",
+            )),
+            ClientRequest::BedrockSetup { .. } => Err(invalid_request(
+                "Amazon Bedrock setup is no longer supported.",
+            )),
             ClientRequest::GcpSetup { params, .. } => {
                 handle_gcp_setup(&self.account_processor, params).await
             }
-            ClientRequest::BedrockCheckGovCloudRequirements { .. } => {
-                self.account_processor
-                    .bedrock_check_gov_cloud_requirements()
-                    .await
-            }
+            ClientRequest::BedrockCheckGovCloudRequirements { .. } => Err(invalid_request(
+                "Amazon Bedrock setup is no longer supported.",
+            )),
             ClientRequest::GatewayOAuthRead { .. } => {
                 Box::pin(self.account_processor.gateway_oauth_read())
                     .await

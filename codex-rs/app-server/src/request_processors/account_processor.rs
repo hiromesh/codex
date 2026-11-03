@@ -13,12 +13,9 @@ use codex_app_server_protocol::GetAccountRateLimitsParams;
 use codex_login::LoginOnboardingEntrypoint;
 use codex_login::login_with_bedrock_access_keys;
 use codex_mcp::ema_auth_scope;
-use codex_model_provider::is_supported_amazon_bedrock_region;
 use codex_otel::auth_storage::AuthStorageOriginator;
 use codex_rmcp_client::EnterpriseOAuthCredentialGuard;
 
-mod bedrock_gov_cloud;
-mod bedrock_setup;
 mod enterprise_login;
 mod gateway_oauth;
 mod gcp_setup;
@@ -346,9 +343,6 @@ impl AccountRequestProcessor {
         request_id: ConnectionRequestId,
         params: LoginAccountParams,
     ) -> Result<(), JSONRPCErrorError> {
-        if self.auth_manager.is_workload_identity_selected() {
-            return Err(self.configured_auth_owned_by_host_error());
-        }
         self.enterprise_login.cancel(/*login_id*/ None).await;
         match params {
             LoginAccountParams::ApiKey { api_key } => {
@@ -428,19 +422,10 @@ impl AccountRequestProcessor {
         )
     }
 
-    fn configured_auth_owned_by_host_error(&self) -> JSONRPCErrorError {
-        invalid_request(
-            "Configured external authentication is owned by the app-server host and cannot be changed through account RPCs.",
-        )
-    }
-
     fn ensure_provider_login_allowed(
         &self,
         provider: CloudLoginProvider,
     ) -> Result<(), JSONRPCErrorError> {
-        if self.auth_manager.is_workload_identity_selected() {
-            return Err(self.configured_auth_owned_by_host_error());
-        }
         if self.auth_manager.is_external_chatgpt_auth_active() {
             return Err(self.external_auth_active_error());
         }
@@ -544,11 +529,6 @@ impl AccountRequestProcessor {
                 }
             }
             let region = region.trim();
-            if !is_supported_amazon_bedrock_region(region) {
-                return Err(invalid_request(format!(
-                    "Amazon Bedrock does not support region `{region}`"
-                )));
-            }
 
             self.cancel_active_login().await;
             let write = prepare_bedrock_provider(
@@ -1027,9 +1007,6 @@ impl AccountRequestProcessor {
     }
 
     async fn logout_common(&self) -> std::result::Result<Option<AuthMode>, JSONRPCErrorError> {
-        if self.auth_manager.is_workload_identity_selected() {
-            return Err(self.configured_auth_owned_by_host_error());
-        }
         self.cancel_active_login().await;
         let config =
             logout_configured_account(&self.config_manager, &self.auth_manager, &self.config)
@@ -1127,14 +1104,10 @@ impl AccountRequestProcessor {
                         self.auth_manager.refresh_failure_for_auth(&auth).is_some();
                     let auth_mode = auth_mode_to_api(auth.api_auth_mode());
                     let (reported_auth_method, token_opt) =
-                        if self.auth_manager.is_workload_identity_selected()
-                            || matches!(
-                                auth,
-                                CodexAuth::Headers(_)
-                                    | CodexAuth::AgentIdentity(_)
-                                    | CodexAuth::PersonalAccessToken(_)
-                            )
-                            || include_token && permanent_refresh_failure
+                        if matches!(
+                            auth,
+                            CodexAuth::Headers(_) | CodexAuth::PersonalAccessToken(_)
+                        ) || include_token && permanent_refresh_failure
                         {
                             // Host-owned and metadata-bearing credentials are never exported.
                             (Some(auth_mode), None)

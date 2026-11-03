@@ -1,4 +1,3 @@
-use super::apps_processor::APP_READ_MAX_IDS;
 use super::config_processor::reload_user_config;
 use super::*;
 use crate::error_code::internal_error;
@@ -2160,24 +2159,6 @@ async fn load_plugin_app_summaries(
             )
             .fresh_records(&app_ids, /*include_tools*/ false),
         );
-        for app_ids in app_ids.chunks(APP_READ_MAX_IDS) {
-            match connectors::read_connector_metadata(
-                config, auth, app_ids, /*include_tools*/ false,
-            )
-            .await
-            {
-                Ok(result) => metadata_by_id.extend(
-                    result
-                        .apps
-                        .into_iter()
-                        .map(|metadata| (metadata.id.clone(), metadata)),
-                ),
-                Err(err) => {
-                    warn!("failed to load app metadata for plugin: {err:#}");
-                    break;
-                }
-            }
-        }
     }
 
     app_ids

@@ -148,7 +148,6 @@ mod thread_status;
 mod transport;
 mod turn_admission;
 mod turn_cost_worker;
-mod user_verification;
 mod user_verification_response;
 
 pub use crate::error_code::INPUT_TOO_LARGE_ERROR_CODE;
@@ -975,9 +974,6 @@ pub async fn run_main_with_transport_options(
             config_warnings,
             startup_warnings_tx,
             session_source,
-            user_verification: Arc::new(crate::user_verification::Service::new(Arc::clone(
-                &auth_manager,
-            ))),
             auth_manager,
             installation_id,
             rpc_transport: analytics_rpc_transport(&transport),

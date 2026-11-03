@@ -117,7 +117,6 @@ async fn list_apps_returns_empty_with_api_key_auth() -> Result<()> {
             openai_api_key: Some("test-api-key".to_string()),
             tokens: None,
             last_refresh: None,
-            agent_identity: None,
             personal_access_token: None,
             bedrock_api_key: None,
             bedrock_access_keys: None,

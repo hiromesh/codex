@@ -49,12 +49,22 @@ impl AppsRequestProcessor {
             .as_ref()
             .ok_or_else(|| internal_error("app/read requires ChatGPT auth".to_string()))?;
 
-        let connectors::ConnectorMetadataReadResult {
-            apps,
-            missing_app_ids,
-        } = connectors::read_connector_metadata(&config, auth, &app_ids, include_tools)
-            .await
-            .map_err(|err| internal_error(format!("failed to read app metadata: {err}")))?;
+        let store = codex_connectors::ConnectorMetadataStore::new(
+            config.chatgpt_base_url.clone(),
+            auth.get_account_id(),
+            auth.get_chatgpt_user_id(),
+            auth.is_workspace_account(),
+        );
+        let mut metadata_by_id = store.fresh_records(&app_ids, include_tools);
+        let missing_app_ids = app_ids
+            .iter()
+            .filter(|app_id| !metadata_by_id.contains_key(app_id.as_str()))
+            .cloned()
+            .collect();
+        let apps = app_ids
+            .iter()
+            .filter_map(|app_id| metadata_by_id.remove(app_id.as_str()))
+            .collect::<Vec<_>>();
         let loaded_plugins = self
             .thread_manager
             .plugins_manager()

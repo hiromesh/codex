@@ -197,7 +197,6 @@ pub fn write_chatgpt_auth(
         openai_api_key: None,
         tokens: Some(tokens),
         last_refresh,
-        agent_identity: None,
         personal_access_token: None,
         bedrock_api_key: None,
         bedrock_access_keys: None,

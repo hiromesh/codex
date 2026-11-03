@@ -17,7 +17,6 @@ use codex_login::default_client::SetOriginatorError;
 use codex_login::default_client::USER_AGENT_SUFFIX;
 use codex_login::default_client::set_default_client_residency_requirement;
 use codex_login::default_client::set_default_originator;
-use codex_login::is_workload_identity_selected;
 use codex_login::read_codex_access_token_from_env;
 use codex_utils_cli::CliConfigOverrides;
 use serde::Serialize;
@@ -83,9 +82,7 @@ async fn read_startup_config(
     strict_config: bool,
     startup: StartupConfigArgs,
 ) -> Result<StartupConfig, JSONRPCErrorError> {
-    if startup.startup_sign_out
-        && (is_workload_identity_selected() || read_codex_access_token_from_env().is_some())
-    {
+    if startup.startup_sign_out && read_codex_access_token_from_env().is_some() {
         return Err(crate::error_code::invalid_request(
             "Configured external authentication is owned by the app-server host and cannot be changed during startup recovery.",
         ));

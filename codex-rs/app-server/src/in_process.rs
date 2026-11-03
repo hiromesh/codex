@@ -523,9 +523,6 @@ async fn start_uninitialized(mut args: InProcessStartArgs) -> IoResult<InProcess
                 config_warnings: args.config_warnings,
                 startup_warnings_tx,
                 session_source: args.session_source,
-                user_verification: Arc::new(crate::user_verification::Service::new(Arc::clone(
-                    &auth_manager,
-                ))),
                 auth_manager,
                 installation_id,
                 rpc_transport: AppServerRpcTransport::InProcess,
