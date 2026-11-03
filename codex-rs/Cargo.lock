@@ -2614,30 +2614,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "codex-cloud-client"
-version = "0.0.0"
-dependencies = [
- "anyhow",
- "async-stream",
- "bytes",
- "codex-http-client",
- "futures",
- "http 1.4.0",
- "http-body-util",
- "hyper",
- "hyper-util",
- "pretty_assertions",
- "prost",
- "thiserror 2.0.18",
- "tokio",
- "tokio-rustls",
- "tonic",
- "tonic-prost",
- "tower",
- "url",
-]
-
-[[package]]
 name = "codex-cloud-config"
 version = "0.0.0"
 dependencies = [
@@ -3723,15 +3699,6 @@ dependencies = [
  "uuid",
  "wiremock",
  "zstd",
-]
-
-[[package]]
-name = "codex-guardian-v3"
-version = "0.0.0"
-dependencies = [
- "codex-message-board",
- "codex-protocol",
- "codex-state",
 ]
 
 [[package]]
@@ -5423,16 +5390,6 @@ dependencies = [
  "tempfile",
  "tokio",
  "winapi",
-]
-
-[[package]]
-name = "codex-utils-readiness"
-version = "0.0.0"
-dependencies = [
- "assert_matches",
- "thiserror 2.0.18",
- "time",
- "tokio",
 ]
 
 [[package]]
