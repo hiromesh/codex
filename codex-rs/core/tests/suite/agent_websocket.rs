@@ -174,12 +174,10 @@ async fn websocket_model_switch_to_responses_lite_omits_top_level_tools() -> Res
 
     let mut builder = test_codex()
         .with_model_info_override("gpt-5.2", |model_info| {
-            model_info.tool_mode = Some(ToolMode::CodeMode);
             model_info.node_repl_auto_review_required = true;
         })
         .with_model_info_override("gpt-5.4", |model_info| {
             model_info.use_responses_lite = true;
-            model_info.tool_mode = Some(ToolMode::CodeMode);
             model_info.node_repl_disabled = true;
         })
         .with_model("gpt-5.2");

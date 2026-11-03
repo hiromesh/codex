@@ -89,7 +89,6 @@ impl ToolLifecycleContributor for CommandRecorder {
 #[derive(Clone, Copy)]
 enum CommandCallMode {
     Direct,
-    CodeMode,
 }
 
 impl CommandCallMode {
@@ -98,11 +97,6 @@ impl CommandCallMode {
             Self::Direct => {
                 responses::ev_function_call(call_id, "exec_command", &arguments.to_string())
             }
-            Self::CodeMode => responses::ev_custom_tool_call(
-                call_id,
-                "exec",
-                &format!("text(await tools.exec_command({arguments}));"),
-            ),
         }
     }
 }
@@ -128,7 +122,6 @@ async fn start_command_turn(test: &TestCodex) -> Result<()> {
 }
 
 #[test_case(CommandCallMode::Direct; "direct")]
-#[test_case(CommandCallMode::CodeMode; "code_mode")]
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn command_start_receives_rewritten_command_and_executor_workdir(
     mode: CommandCallMode,
@@ -157,12 +150,7 @@ async fn command_start_receives_rewritten_command_and_executor_workdir(
             super::write_pre_tool_hook(home, "^Bash$", &hook_output)
                 .expect("write command-rewriting hook");
         })
-        .with_config(trust_discovered_hooks)
-        .with_config(move |config| {
-            if matches!(mode, CommandCallMode::CodeMode) {
-                let _ = config.features.enable(Feature::CodeMode);
-            }
-        });
+        .with_config(trust_discovered_hooks);
     let harness = TestCodexHarness::with_auto_env_builder(builder).await?;
     let (test, server) = (harness.test(), harness.server());
 
@@ -208,10 +196,7 @@ async fn command_start_receives_rewritten_command_and_executor_workdir(
     )
     .await;
     let request = follow_up.single_request();
-    let output = match mode {
-        CommandCallMode::Direct => request.function_call_output(call_id),
-        CommandCallMode::CodeMode => request.custom_tool_call_output(call_id),
-    };
+    let output = request.function_call_output(call_id);
     let begin = begin.unwrap_or_else(|| panic!("command did not start: {output}"));
 
     assert_eq!(begin.cwd, cwd);
@@ -259,7 +244,6 @@ impl ToolLifecycleContributor for BlockingCommandContributor {
 }
 
 #[test_case(CommandCallMode::Direct; "direct")]
-#[test_case(CommandCallMode::CodeMode; "code_mode")]
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn interrupting_command_preparation_does_not_start_the_command(
     mode: CommandCallMode,
@@ -281,13 +265,7 @@ async fn interrupting_command_preparation_does_not_start_the_command(
     extensions.tool_lifecycle_contributor(contributor.clone());
     let builder = test_codex()
         .with_extensions(Arc::new(extensions.build()))
-        .with_config(configure_command_test_permissions)
-        .with_config(move |config| {
-            if matches!(mode, CommandCallMode::CodeMode) {
-                let _ = config.features.enable(Feature::CodeMode);
-                let _ = config.features.enable(Feature::CodeModeInterrupt);
-            }
-        });
+        .with_config(configure_command_test_permissions);
     let harness = TestCodexHarness::with_auto_env_builder(builder).await?;
     let (test, server) = (harness.test(), harness.server());
     let command = match test_target_os() {
@@ -364,10 +342,7 @@ async fn interrupting_command_preparation_does_not_start_the_command(
     assert_eq!(process_id.as_deref(), Some("1000"));
     assert_eq!(exit_code, Some(0));
     let request = follow_up.single_request();
-    let output = match mode {
-        CommandCallMode::Direct => request.function_call_output(call_id),
-        CommandCallMode::CodeMode => request.custom_tool_call_output(call_id),
-    };
+    let output = request.function_call_output(call_id);
     assert!(
         output["output"]
             .to_string()

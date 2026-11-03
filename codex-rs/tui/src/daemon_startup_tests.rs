@@ -98,8 +98,7 @@ async fn daemon_feature_compatibility_respects_required_and_optional_attachment(
                     "explicit enable" => vec!["features.api_key_model_discovery=true"],
                     "mixed flags" => vec![
                         "features.zz_overridden=true",
-                        "features={api_key_model_discovery=false,code_mode_host=false,instant_interrupt=true}",
-                        "features.code_mode_host=true",
+                        "features={api_key_model_discovery=false,instant_interrupt=true}",
                     ],
                     "missing enabled" => vec!["features.zz_missing=true"],
                     _ => vec!["features.api_key_model_discovery=false"],
@@ -118,7 +117,6 @@ async fn daemon_feature_compatibility_respects_required_and_optional_attachment(
                 .await?;
             let features = [
                 (Feature::ApiKeyModelDiscovery, scenario != "explicit enable", "beta"),
-                (Feature::CodeModeHost, false, "beta"),
                 (Feature::InstantInterrupt, true, "beta"),
                 (Feature::RemoteCompactionV2, false, "stable"),
                 (Feature::ShellTool, false, "removed"),
@@ -215,10 +213,10 @@ async fn daemon_feature_compatibility_respects_required_and_optional_attachment(
                 if scenario == "mixed flags" {
                     assert_eq!(
                         error.restart_features,
-                        Some(std::collections::BTreeMap::from([
-                            ("api_key_model_discovery".to_string(), false),
-                            ("code_mode_host".to_string(), true),
-                        ]))
+                        Some(std::collections::BTreeMap::from([(
+                            "api_key_model_discovery".to_string(),
+                            false,
+                        )]))
                     );
                 }
                 let error = error.to_string();

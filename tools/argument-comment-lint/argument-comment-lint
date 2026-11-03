@@ -56,24 +56,6 @@
           "name": "argument-comment-lint-aarch64-unknown-linux-gnu.tar.gz"
         }
       ]
-    },
-    "windows-x86_64": {
-      "size": 3271160,
-      "hash": "blake3",
-      "digest": "a2d1c8f71d9acf3885dd469876a249b769dd93e117c7a43192994e18d43e9027",
-      "format": "zip",
-      "path": "argument-comment-lint/bin/argument-comment-lint.exe",
-      "providers": [
-        {
-          "url": "https://github.com/openai/codex/releases/download/rust-v0.164.0/argument-comment-lint-x86_64-pc-windows-msvc.zip"
-        },
-        {
-          "type": "github-release",
-          "repo": "https://github.com/openai/codex",
-          "tag": "rust-v0.164.0",
-          "name": "argument-comment-lint-x86_64-pc-windows-msvc.zip"
-        }
-      ]
     }
   }
 }

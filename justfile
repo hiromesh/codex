@@ -3,10 +3,9 @@ set positional-arguments
 export CODEX_REPO_ROOT := justfile_directory()
 export JUST_SHELL := justfile_directory() / "scripts/just-shell.py"
 set shell := ["python3", "-c", 'import os, runpy; runpy.run_path(os.environ["JUST_SHELL"], run_name="__main__")']
-set windows-shell := ["python", "-c", 'import os, runpy; runpy.run_path(os.environ["JUST_SHELL"], run_name="__main__")']
 
 rust_min_stack := "8388608" # 8 MiB
-python := if os_family() == "windows" { "python" } else { "python3" }
+python := "python3"
 
 # Display help
 help:
@@ -61,19 +60,6 @@ install:
     rustup show active-toolchain
     cargo fetch
 
-[windows]
-install:
-    #!powershell.exe -File
-    $pwsh = Get-Command pwsh.exe -ErrorAction SilentlyContinue
-    if (-not $pwsh) {
-        winget install --exact --id Microsoft.PowerShell --source winget --accept-package-agreements --accept-source-agreements
-        if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-    }
-    rustup show active-toolchain
-    if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-    cargo fetch
-    exit $LASTEXITCODE
-
 # Run nextest with --no-fail-fast so all tests are run.
 #
 # Run `cargo install --locked cargo-nextest` if you don't have it installed.
@@ -82,10 +68,6 @@ install:
 [unix]
 test *args:
     RUST_MIN_STACK={{ rust_min_stack }} NEXTEST_PROFILE=local cargo nextest run --no-fail-fast "$@"
-
-[windows]
-test *args:
-    $env:RUST_MIN_STACK = "{{ rust_min_stack }}"; $env:NEXTEST_PROFILE = "local"; cargo nextest run --no-fail-fast @($args | Select-Object -Skip 1)
 
 # Run from the repository root so scripts that resolve paths from `cwd` see
 # the same layout they use in GitHub Actions.
@@ -122,10 +104,6 @@ bench-e2e-smoke:
 bazel-codex *args:
     bazel run //codex-rs/cli:codex --run_under="cd $PWD &&" -- "$@"
 
-[windows]
-bazel-codex *args:
-    bazel run //codex-rs/cli:codex --run_under='cd /d "{{ invocation_directory_native() }}" &&' -- @($args | Select-Object -Skip 1)
-
 [no-cd]
 bazel-lock-update:
     bazel mod deps --lockfile_mode=update
@@ -134,10 +112,6 @@ bazel-lock-update:
 [unix]
 bazel-lock-check:
     {{ justfile_directory() }}/scripts/check-module-bazel-lock.sh
-
-[windows]
-bazel-lock-check:
-    bazel mod deps --lockfile_mode=error; if ($LASTEXITCODE -ne 0) { Write-Error "Unable to verify MODULE.bazel.lock; see the Bazel error above. If Bazel reports an out-of-date lockfile, run 'just bazel-lock-update' and commit the updated lockfile."; exit 1 }
 
 bazel-test:
     bazel test --test_tag_filters=-argument-comment-lint //... --keep_going
@@ -185,7 +159,3 @@ argument-comment-lint-from-source *args:
 [unix]
 log *args:
     if [ "${1:-}" = "--" ]; then shift; fi; cargo run -p codex-cli --bin logs_client -- "$@"
-
-[windows]
-log *args:
-    $forwarded_args = @($args | Select-Object -Skip 1); if ($forwarded_args.Count -gt 0 -and $forwarded_args[0] -eq "--") { $forwarded_args = @($forwarded_args | Select-Object -Skip 1) }; cargo run -p codex-cli --bin logs_client -- @forwarded_args

@@ -10,8 +10,8 @@ versioned prefix includes every release asset plus installer-facing
 objects are verified, the same metadata advances ``codex/channels/latest`` when
 the release is marked latest and ``codex/channels/prerelease`` for prereleases
 that are newer than its current version, or when that version is unreadable.
-Latest stable releases also update the mutable ``codex/install.sh`` and
-``codex/install.ps1`` bootstrap aliases from their verified versioned assets.
+Latest stable releases also update the mutable ``codex/install.sh`` bootstrap
+alias from the verified versioned asset.
 An older stable release cannot move these aliases or the latest channel back.
 """
 
@@ -38,7 +38,7 @@ BUCKET = "releases"
 PREFIX = "codex"
 REPOSITORY = "openai/codex"
 RELEASE_METADATA_NAME = "release.json"
-INSTALLER_NAMES = ("install.sh", "install.ps1")
+INSTALLER_NAMES = ("install.sh",)
 MAX_UPLOAD_WORKERS = 8
 CRC64_RE = re.compile(r"^[A-Za-z0-9+/]{11}=$")
 SHA256_RE = re.compile(r"^sha256:([0-9a-f]{64})$")

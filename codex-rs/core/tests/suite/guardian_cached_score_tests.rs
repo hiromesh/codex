@@ -374,24 +374,19 @@ enum ProbeCase {
     IncompleteAuthorization,
 }
 
-#[test_case::test_case(Some(false), false, "probe-item", ProbeCase::Standard, 0; "direct_low")]
-#[test_case::test_case(Some(true), false, "probe-item", ProbeCase::Standard, 1; "direct_review")]
-#[test_case::test_case(Some(false), true, "probe-item", ProbeCase::Standard, 0; "code_cell_low")]
-#[test_case::test_case(Some(true), true, "probe-item", ProbeCase::Standard, 2; "code_cell_review")]
-#[test_case::test_case(None, false, "probe-item", ProbeCase::Standard, 1; "missing_uses_async")]
-#[test_case::test_case(Some(false), false, "other-item", ProbeCase::Standard, 1; "mismatched_uses_async")]
-#[test_case::test_case(Some(false), false, "probe-item", ProbeCase::Escalated, 1; "explicit_escalation_still_reviews")]
-#[test_case::test_case(Some(false), false, "probe-item", ProbeCase::Rewrite, 1; "direct_hook_rewrite")]
-#[test_case::test_case(Some(false), true, "probe-item", ProbeCase::Rewrite, 2; "nested_hook_rewrite")]
-#[test_case::test_case(Some(true), false, "probe-item", ProbeCase::Interrupted, 1; "interrupted_direct_review")]
-#[test_case::test_case(Some(true), true, "probe-item", ProbeCase::Interrupted, 2; "interrupted_cell_review")]
-#[test_case::test_case(Some(false), false, "probe-item", ProbeCase::CatalogPolicy, 0; "catalog_low_without_legacy_flag")]
-#[test_case::test_case(Some(true), false, "probe-item", ProbeCase::CatalogPolicy, 1; "catalog_review_without_legacy_flag")]
-#[test_case::test_case(Some(false), false, "probe-item", ProbeCase::IncompleteAuthorization, 1; "incomplete_authorization_still_reviews")]
+#[test_case::test_case(Some(false), "probe-item", ProbeCase::Standard, 0; "direct_low")]
+#[test_case::test_case(Some(true), "probe-item", ProbeCase::Standard, 1; "direct_review")]
+#[test_case::test_case(None, "probe-item", ProbeCase::Standard, 1; "missing_uses_async")]
+#[test_case::test_case(Some(false), "other-item", ProbeCase::Standard, 1; "mismatched_uses_async")]
+#[test_case::test_case(Some(false), "probe-item", ProbeCase::Escalated, 1; "explicit_escalation_still_reviews")]
+#[test_case::test_case(Some(false), "probe-item", ProbeCase::Rewrite, 1; "direct_hook_rewrite")]
+#[test_case::test_case(Some(true), "probe-item", ProbeCase::Interrupted, 1; "interrupted_direct_review")]
+#[test_case::test_case(Some(false), "probe-item", ProbeCase::CatalogPolicy, 0; "catalog_low_without_legacy_flag")]
+#[test_case::test_case(Some(true), "probe-item", ProbeCase::CatalogPolicy, 1; "catalog_review_without_legacy_flag")]
+#[test_case::test_case(Some(false), "probe-item", ProbeCase::IncompleteAuthorization, 1; "incomplete_authorization_still_reviews")]
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn serving_assessment_replaces_async_scoring(
     requires_review: Option<bool>,
-    code_mode: bool,
     assessed_item: &str,
     scenario: ProbeCase,
     expected_reviews: u64,
@@ -413,21 +408,7 @@ async fn serving_assessment_replaces_async_scoring(
         arguments["sandbox_permissions"] = json!("require_escalated");
         arguments["justification"] = json!("Run the requested command outside the sandbox.");
     }
-    let mut tool = if code_mode {
-        responses::ev_custom_tool_call(
-            "call",
-            "exec",
-            &format!(
-                "const first = await tools.exec_command({arguments}); \
-             const second = await tools.exec_command({second_arguments}); \
-             if (first.exit_code !== 0 || second.exit_code !== 0) throw new Error('command failed'); \
-             text(first.output); text(second.output);",
-                second_arguments = json!({"cmd":"echo probe-policy-second", "login":false})
-            ),
-        )
-    } else {
-        ev_function_call("call", "exec_command", &arguments.to_string())
-    };
+    let mut tool = ev_function_call("call", "exec_command", &arguments.to_string());
     tool["item"]["id"] = json!("probe-item");
     let mut events = vec![ev_response_created("probe-response")];
     if let Some(requires_review) = requires_review {
@@ -463,7 +444,7 @@ async fn serving_assessment_replaces_async_scoring(
         || assessed_item != "probe-item"
         || scenario == ProbeCase::Rewrite;
     let expected_scores = if uses_async {
-        1..=if code_mode { 2 } else { 1 }
+        1..=1
     } else {
         0..=0
     };
@@ -531,7 +512,6 @@ async fn serving_assessment_replaces_async_scoring(
             config.approvals_reviewer = ApprovalsReviewer::AutoReview;
             config.permissions.approval_policy = Constrained::allow_any(AskForApproval::OnRequest);
             config.permissions.set_permission_profile(PermissionProfile::read_only()).expect("read-only permissions");
-            config.features.set_enabled(Feature::CodeMode, code_mode).expect("configure Code Mode");
         });
     let mut test = builder.build_with_auto_env(&server).await?;
     if scenario == ProbeCase::CatalogPolicy {
@@ -621,14 +601,7 @@ async fn serving_assessment_replaces_async_scoring(
     test.codex.shutdown_and_wait().await?;
     let requests = parent.requests();
     assert_eq!(requests.len(), 2);
-    let output = requests[1].call_output(
-        "call",
-        if code_mode {
-            "custom_tool_call_output"
-        } else {
-            "function_call_output"
-        },
-    );
+    let output = requests[1].call_output("call", "function_call_output");
     let output = output["output"].to_string();
     if scenario == ProbeCase::Rewrite {
         assert!(
@@ -636,17 +609,10 @@ async fn serving_assessment_replaces_async_scoring(
             "rewritten command ran: {output}"
         );
     }
-    if code_mode {
-        assert!(
-            output.contains("probe-policy-second"),
-            "both nested commands ran: {output}"
-        );
-    } else {
-        assert!(
-            output.contains("Process exited with code 0"),
-            "the direct command succeeded: {output}"
-        );
-    }
+    assert!(
+        output.contains("Process exited with code 0"),
+        "the direct command succeeded: {output}"
+    );
     assert!(
         output.contains("probe-policy"),
         "the assessed command ran: {output}"

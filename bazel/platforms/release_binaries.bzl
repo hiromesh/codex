@@ -7,8 +7,6 @@ _PLATFORM_TRIPLES = {
     "linux_amd64_musl": "x86_64-unknown-linux-musl",
     "macos_amd64": "x86_64-apple-darwin",
     "macos_arm64": "aarch64-apple-darwin",
-    "windows_amd64": "x86_64-pc-windows-msvc",
-    "windows_arm64": "aarch64-pc-windows-msvc",
 }
 
 PLATFORMS = _PLATFORM_TRIPLES.keys()

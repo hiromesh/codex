@@ -1,6 +1,6 @@
 load("@crates//:defs.bzl", "all_crate_deps")
 load("@rules_rust//rust:defs.bzl", "rust_binary")
-load("//:defs.bzl", "WINDOWS_RUSTC_LINK_FLAGS", "codex_rust_crate")
+load("//:defs.bzl", "codex_rust_crate")
 load("//bazel/rules:schema_bundle.bzl", "schema_sources")
 
 schema_sources(
@@ -76,7 +76,7 @@ rust_binary(
         # Debug metadata is unused by this short-lived build tool.
         "-Cdebuginfo=0",
         "-Cstrip=debuginfo",
-    ] + WINDOWS_RUSTC_LINK_FLAGS,
+    ],
     tags = ["manual"],
     visibility = ["//bazel/schema:__pkg__"],
     deps = all_crate_deps(

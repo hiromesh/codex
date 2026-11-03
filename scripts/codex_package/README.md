@@ -18,13 +18,13 @@ The builder creates a canonical Codex package directory:
 .
 ├── codex-package.json
 ├── bin
-│   ├── <entrypoint>[.exe]
-│   ├── codex-code-mode-host[.exe]
-│   └── codex-exec-server[.exe]
+│   ├── <entrypoint>
+│   ├── codex-code-mode-host
+│   └── codex-exec-server
 ├── codex-resources
 │   └── bwrap                             # Linux only
 └── codex-path
-    └── rg[.exe]
+    └── rg
 ```
 
 The package directory is the primary artifact. Archive formats such as
@@ -71,8 +71,7 @@ development/profiling builds and prebuilt inputs
 byte-for-byte, including signatures. Use `--strip all` to also strip prebuilt
 first-party executable copies, or `--strip none` to keep symbols in every package copy.
 Strip before production signing; `--strip all` is not appropriate for inputs
-whose release signatures must be preserved. Windows MSVC symbols are separate
-PDB files and are not included in the package.
+whose release signatures must be preserved.
 
 macOS uses `xcrun strip -S -x`, matching the release pipeline and preserving
 executable ad-hoc signatures. Linux uses `llvm-strip`, a target-prefixed GNU

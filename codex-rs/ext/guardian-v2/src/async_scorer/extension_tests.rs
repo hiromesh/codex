@@ -58,7 +58,6 @@ use codex_protocol::protocol::SessionSource;
 use codex_protocol::protocol::TruncationPolicy;
 use codex_protocol::security_risk::SecurityRiskScore;
 use core_test_support::ThreadIdle;
-use core_test_support::apps_test_server::HostedMessagingServer;
 use core_test_support::responses;
 use core_test_support::responses::WebSocketConnectionConfig;
 use core_test_support::responses::ev_assistant_message;
@@ -924,15 +923,9 @@ async fn sample_configured_conversation_history_with_source(
         guardian_config,
         model_defaults,
         source,
-        MessagingSetup::Disabled,
     )
     .await?;
     Ok((request, test, registry))
-}
-
-enum MessagingSetup {
-    Disabled,
-    CodeMode(String),
 }
 
 async fn sample_configured_conversation_history_with_delivery(
@@ -942,7 +935,6 @@ async fn sample_configured_conversation_history_with_delivery(
     guardian_config: &str,
     model_defaults: Option<GuardianV2ModelConfig>,
     source: ToolCallSource,
-    messaging: MessagingSetup,
 ) -> Result<(
     serde_json::Value,
     TestCodex,
@@ -955,12 +947,8 @@ async fn sample_configured_conversation_history_with_delivery(
         "{guardian_config}\n[features.guardianv2.review_scope]\ncomputer_use_only = false\n"
     );
     let has_model_defaults = model_defaults.is_some();
-    let code_mode = matches!(&messaging, MessagingSetup::CodeMode(_));
     let mut extensions = ExtensionRegistryBuilder::new();
     extensions.thread_lifecycle_contributor(Arc::new(ThreadIdle));
-    if let MessagingSetup::CodeMode(url) = messaging {
-        extensions.mcp_server_contributor(Arc::new(HostedMessagingServer(url)));
-    }
     let builder = test_codex()
         .with_extensions(Arc::new(extensions.build()))
         .with_auth(CodexAuth::create_dummy_chatgpt_auth_for_testing())
@@ -978,23 +966,12 @@ async fn sample_configured_conversation_history_with_delivery(
         .with_config(move |config| {
             config.approvals_reviewer = ApprovalsReviewer::AutoReview;
             config.guardian_policy_config = guardian_policy;
-            if code_mode {
-                for feature in [
-                    Feature::Apps,
-                    Feature::CodeMode,
-                    Feature::CodeModeInterrupt,
-                    Feature::Collab,
-                    Feature::MultiAgentV2,
-                ] {
-                    config.features.enable(feature).expect("enable Code Mode");
-                }
-            }
         })
         .with_pre_build_hook(move |home| {
             std::fs::write(home.join("config.toml"), guardian_config)
                 .expect("Guardian v2 configuration should be written");
         });
-    let builder = if let Some(model_defaults) = model_defaults {
+    let mut builder = if let Some(model_defaults) = model_defaults {
         builder.with_model_info_override("gpt-5.5", move |model| {
             model
                 .model_messages
@@ -1002,12 +979,6 @@ async fn sample_configured_conversation_history_with_delivery(
                 .expect("test model should expose model messages")
                 .guardian_v2 = Some(model_defaults);
         })
-    } else {
-        builder
-    };
-    let mut builder = if code_mode {
-        builder
-            .with_code_mode_host_program(codex_utils_cargo_bin::cargo_bin("codex-code-mode-host")?)
     } else {
         builder
     };
@@ -2664,9 +2635,6 @@ async fn stale_review_context_blocks_cached_approval_without_changing_authorizat
     }
     Ok(())
 }
-
-#[path = "extension_cached_delivery_tests.rs"]
-mod cached_delivery;
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn incompatible_compaction_blocks_cached_score_and_initial_cua_allowance() -> Result<()> {

@@ -629,8 +629,6 @@ async fn v2_child_idle_eviction_preserves_mail_and_followup_context() -> Result<
     MockResponsesConfig::new(&server.uri())
         .with_model("gpt-5.5")
         .enable_feature(Feature::MultiAgentV2)
-        .enable_feature(Feature::CodeMode)
-        .enable_feature(Feature::CodeModeHost)
         .with_root_config("thread_unload_delay_secs = 0")
         .with_extra_config(&format!(
             r#"[mcp_servers.fails_once]

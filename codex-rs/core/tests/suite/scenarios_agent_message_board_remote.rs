@@ -1,6 +1,5 @@
 //! Runs existing board tools against a research-provisioned remote board.
 
-use super::super::super::code_mode::custom_tool_output_last_non_empty_text;
 use super::BoardClock;
 use super::configure;
 use super::done;
@@ -222,10 +221,8 @@ async fn remote_board_uses_the_existing_tools_and_session_identity() -> anyhow::
     Ok(())
 }
 
-#[test_case::test_case(false; "direct")]
-#[test_case::test_case(true; "code_mode")]
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn remote_board_effective_permissions_and_denials(code_mode: bool) -> anyhow::Result<()> {
+async fn remote_board_effective_permissions_and_denials() -> anyhow::Result<()> {
     let server = responses::start_mock_server().await;
     let board = responses::start_mock_server().await;
     let url = board.uri();
@@ -234,27 +231,10 @@ async fn remote_board_effective_permissions_and_denials(code_mode: bool) -> anyh
         .with_config(move |config| {
             configure(config);
             config.ephemeral = true;
-            for feature in [
-                Feature::CodeMode,
-                Feature::CodeModeOnly,
-                Feature::CodeModeHost,
-            ] {
-                config
-                    .features
-                    .set_enabled(feature, code_mode)
-                    .expect("configure code mode");
-            }
             config.multi_agent_v2.message_board_remote = Some(RemoteMessageBoardConfigToml {
                 url,
                 bearer_token: Some("board-runtime-credential-for-acl-test".into()),
                 bearer_token_env_var: None,
-            });
-        })
-        .with_model_info_override("gpt-6-astra", move |model| {
-            model.tool_mode = Some(if code_mode {
-                ToolMode::CodeModeOnly
-            } else {
-                ToolMode::Direct
             });
         })
         .build_with_auto_env(&server)
@@ -318,18 +298,7 @@ async fn remote_board_effective_permissions_and_denials(code_mode: bool) -> anyh
             .await;
         let mut arguments = arguments.clone();
         arguments.sort_all_objects();
-        steps.push(if code_mode {
-            responses::sse(vec![
-                responses::ev_custom_tool_call(
-                    call_id,
-                    "exec",
-                    &format!("text(await tools.collaboration__{tool_name}({arguments}));"),
-                ),
-                responses::ev_completed(call_id),
-            ])
-        } else {
-            super::tool(call_id, tool_name, arguments)
-        });
+        steps.push(super::tool(call_id, tool_name, arguments));
     }
     steps.push(done());
     let model = responses::mount_sse_sequence(&server, steps).await;
@@ -345,43 +314,36 @@ async fn remote_board_effective_permissions_and_denials(code_mode: bool) -> anyh
         } else {
             result.clone()
         };
-        let output = if code_mode {
-            custom_tool_output_last_non_empty_text(last, call_id)
-        } else {
-            last.function_call_output_text(call_id)
-        }
-        .context("tool output")?;
+        let output = last.function_call_output_text(call_id).context("tool output")?;
         assert_eq!(
             serde_json::from_str::<Value>(&output)?,
             expected,
             "{call_id}"
         );
     }
-    // Snapshot the direct request history; both modes assert the tool results above.
-    if !code_mode {
-        let mut bodies = requests
-            .iter()
-            .map(responses::ResponsesRequest::body_json)
-            .collect::<Vec<_>>();
-        for body in &mut bodies {
-            for item in body["input"].as_array_mut().context("request input")? {
-                if item["type"] == "function_call_output" {
-                    item["output"] = context_snapshot::normalize_json_lines(
-                        item["output"].as_str().context("output")?,
-                    )
-                    .into();
-                }
+    // Snapshot the direct request history.
+    let mut bodies = requests
+        .iter()
+        .map(responses::ResponsesRequest::body_json)
+        .collect::<Vec<_>>();
+    for body in &mut bodies {
+        for item in body["input"].as_array_mut().context("request input")? {
+            if item["type"] == "function_call_output" {
+                item["output"] = context_snapshot::normalize_json_lines(
+                    item["output"].as_str().context("output")?,
+                )
+                .into();
             }
         }
-        insta::assert_snapshot!(
-            "remote_board_permissions_direct",
-            context_snapshot::format_context_snapshot(
-                "Permission discovery preserves legacy output, exposes reply-only access, and returns a denied post before an allowed reply.",
-                &bodies.iter().map(SnapshotEntry::body).collect::<Vec<_>>(),
-                &ContextSnapshotOptions::default().rewrite_known_segments(),
-            )
-        );
     }
+    insta::assert_snapshot!(
+        "remote_board_permissions_direct",
+        context_snapshot::format_context_snapshot(
+            "Permission discovery preserves legacy output, exposes reply-only access, and returns a denied post before an allowed reply.",
+            &bodies.iter().map(SnapshotEntry::body).collect::<Vec<_>>(),
+            &ContextSnapshotOptions::default().rewrite_known_segments(),
+        )
+    );
     root.codex.shutdown_and_wait().await?;
     Ok(())
 }

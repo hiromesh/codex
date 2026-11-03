@@ -32,7 +32,6 @@ use codex_protocol::request_user_input::RequestUserInputResponse;
 use codex_protocol::user_input::UserInput;
 use codex_thread_store::LoadThreadHistoryParams;
 use codex_tools::ToolName;
-use codex_tools::code_mode_name_for_tool_name;
 use core_test_support::ThreadIdle;
 use core_test_support::apps_test_server::HostedMessagingServer;
 use core_test_support::hooks::trust_discovered_hooks;
@@ -70,8 +69,6 @@ pub(super) mod root_handoff;
 
 #[path = "guardian_heartbeat_authorization.rs"]
 mod heartbeat;
-#[path = "guardian_pending_root_delivery.rs"]
-mod pending_root_delivery;
 
 const INITIAL_PROMPT: &str =
     "Spawn a worker to inspect the deployment. Do not delete production data.";
@@ -258,16 +255,6 @@ async fn mount_completion(
 #[test_case(RootAnswer::Complete, RootContext::Retained, MessagingOutcome::Block, MessagingTool::SingularConnector; "retained_user_message_connector_blocked_post_hook")]
 #[test_case(RootAnswer::Complete, RootContext::Retained, MessagingOutcome::CancelBeforeConfirmation, MessagingTool::SingularFlat; "retained_user_message_flat_cancelled_before_confirmation")]
 #[test_case(RootAnswer::Complete, RootContext::Retained, MessagingOutcome::Complete, MessagingTool::PluralConnector; "retained_user_messaging_connector")]
-#[test_case(RootAnswer::Complete, RootContext::Retained, MessagingOutcome::Complete, MessagingTool::CodeModeSingularConnector; "code_mode_user_message_connector")]
-#[test_case(RootAnswer::Complete, RootContext::Retained, MessagingOutcome::McpError, MessagingTool::CodeModeSingularConnector; "code_mode_user_message_connector_mcp_error")]
-#[test_case(RootAnswer::Complete, RootContext::Retained, MessagingOutcome::UntrustedMcp, MessagingTool::CodeModeSingularFlat; "code_mode_spoofed_project_mcp_send")]
-#[test_case(RootAnswer::Complete, RootContext::Retained, MessagingOutcome::SpoofedRawName, MessagingTool::CodeModeSingularConnector; "code_mode_spoofed_raw_apps_tool_name")]
-#[test_case(RootAnswer::Complete, RootContext::Retained, MessagingOutcome::Complete, MessagingTool::CodeModeSingularFlat; "code_mode_user_message_flat")]
-#[test_case(RootAnswer::Complete, RootContext::Retained, MessagingOutcome::Complete, MessagingTool::CodeModeSingularFlatBatch; "code_mode_user_message_flat_batch")]
-#[test_case(RootAnswer::Complete, RootContext::Retained, MessagingOutcome::UserBeforeDelivery, MessagingTool::CodeModeSingularConnector; "code_mode_user_reply_before_delivery")]
-#[test_case(RootAnswer::Complete, RootContext::Retained, MessagingOutcome::Block, MessagingTool::CodeModeSingularConnector; "code_mode_user_message_connector_blocked_post_hook")]
-#[test_case(RootAnswer::Complete, RootContext::Retained, MessagingOutcome::CancelPostHook, MessagingTool::CodeModeSingularConnector; "code_mode_user_message_connector_cancelled_post_hook")]
-#[test_case(RootAnswer::Complete, RootContext::Retained, MessagingOutcome::CancelBeforeConfirmation, MessagingTool::CodeModeSingularFlat; "code_mode_user_message_flat_cancelled_before_confirmation")]
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn guardian_subagent_review_preserves_late_root_user_authorization(
     root_answer: RootAnswer,
@@ -328,206 +315,6 @@ async fn mount_messaging_server(
         })
         .mount(server)
         .await;
-}
-
-async fn code_mode_messaging_fixture(
-    server: &wiremock::MockServer,
-    messaging_server: &wiremock::MockServer,
-    on_send: impl Fn() + Send + Sync + 'static,
-) -> Result<TestCodex> {
-    const TOOL: &str = "user_message_send_message";
-    mount_messaging_server(
-        messaging_server,
-        json!([messaging_tool_descriptor(TOOL, Some("user_message"))]),
-        move |request| {
-            assert_eq!(request["params"]["name"], TOOL);
-            assert_eq!(
-                request["params"]["arguments"],
-                json!({"text": ROOT_ASSISTANT_REPLY})
-            );
-            on_send();
-            (
-                json!({"content": [{"type": "text", "text": "Message sent."}]}),
-                None,
-            )
-        },
-    )
-    .await;
-    let messaging_url = format!("{}/user-messaging", messaging_server.uri());
-    let mut extensions = ExtensionRegistryBuilder::new();
-    extensions.thread_lifecycle_contributor(Arc::new(ThreadIdle));
-    extensions.mcp_server_contributor(Arc::new(HostedMessagingServer(messaging_url)));
-    let test = test_codex()
-        .with_extensions(Arc::new(extensions.build()))
-        .with_auth(CodexAuth::create_dummy_chatgpt_auth_for_testing())
-        .with_code_mode_host_program(codex_utils_cargo_bin::cargo_bin("codex-code-mode-host")?)
-        .with_config(move |config| {
-            for feature in [
-                Feature::Apps,
-                Feature::CodeMode,
-                Feature::CodeModeInterrupt,
-                Feature::Collab,
-                Feature::MultiAgentV2,
-            ] {
-                config.features.enable(feature).expect("enable feature");
-            }
-            config.permissions.approval_policy = Constrained::allow_any(AskForApproval::OnRequest);
-            config.approvals_reviewer = ApprovalsReviewer::AutoReview;
-            config.model_catalog =
-                Some(codex_models_manager::bundled_models_response().expect("valid catalog"));
-            config
-                .permissions
-                .set_permission_profile(PermissionProfile::workspace_write())
-                .expect("set workspace-write permissions");
-        })
-        .build_with_auto_env(server)
-        .await?;
-    wait_for_mcp_server(&test.codex, "codex_apps").await?;
-    allow_hosted_messaging_review(server).await;
-    Ok(test)
-}
-
-fn code_mode_message(text: &str) -> Value {
-    let code_tool = code_mode_name_for_tool_name(&ToolName::namespaced(
-        "mcp__codex_apps__user_message",
-        "_send_message",
-    ));
-    let code = format!("text(await tools.{code_tool}({}));", json!({"text": text}));
-    ev_custom_tool_call(MESSAGE_CALL_ID, "exec", &code)
-}
-
-pub(super) async fn code_mode_guardian_request_history() -> Result<Vec<ResponsesRequest>> {
-    use core_test_support::streaming_sse::StreamingSseChunk;
-    use core_test_support::streaming_sse::start_streaming_sse_server;
-
-    const REPLY: &str = "Yes, deploy the reviewed change.";
-    let server = start_mock_server().await;
-    let test = code_mode_messaging_fixture(&server, &server, || {}).await?;
-    let root = test.session_configured.thread_id;
-    for (stage, events) in [
-        (
-            0,
-            vec![
-                ev_response_created("root-spawn"),
-                ev_function_call_with_namespace(
-                    SPAWN_CALL_ID,
-                    "collaboration",
-                    "spawn_agent",
-                    &json!({"message": INITIAL_TASK, "task_name": "worker"}).to_string(),
-                ),
-                ev_completed("root-spawn"),
-            ],
-        ),
-        (
-            1,
-            vec![
-                ev_response_created("root-send"),
-                code_mode_message(ROOT_ASSISTANT_REPLY),
-                ev_completed("root-send"),
-            ],
-        ),
-        (2, vec![ev_completed("root-sent")]),
-        (3, vec![ev_completed("root-user-reply")]),
-    ] {
-        mount_sse_once_match(
-            &server,
-            move |request: &wiremock::Request| {
-                if !is_root_request(request, root) {
-                    return false;
-                }
-                let has_reply = contains_text(request, REPLY);
-                let has_spawn = has_call_output(request, SPAWN_CALL_ID);
-                let has_send = has_call_output(request, MESSAGE_CALL_ID);
-                match stage {
-                    0 => !has_spawn && !has_reply,
-                    1 => has_spawn && !has_send && !has_reply,
-                    2 => has_send && !has_reply,
-                    3 => has_reply,
-                    _ => unreachable!("root stage"),
-                }
-            },
-            sse(events),
-        )
-        .await;
-    }
-    let (release_worker, worker_gate) = tokio::sync::oneshot::channel();
-    let (hold_worker_completion, final_gate) = tokio::sync::oneshot::channel();
-    let (worker_stream, _) = start_streaming_sse_server(vec![
-        vec![StreamingSseChunk {
-            gate: Some(worker_gate),
-            body: sse(vec![
-                ev_response_created("worker-review"),
-                ev_function_call(
-                    WORKER_CALL_ID,
-                    "exec_command",
-                    &json!({
-                        "cmd": "true", "sandbox_permissions": "require_escalated",
-                        "justification": "Review the production deployment."
-                    })
-                    .to_string(),
-                ),
-                ev_completed("worker-review"),
-            ]),
-        }],
-        vec![StreamingSseChunk {
-            gate: Some(final_gate),
-            body: sse(vec![ev_completed("worker-finished")]),
-        }],
-    ])
-    .await;
-    wiremock::Mock::given(wiremock::matchers::method("POST"))
-        .and(wiremock::matchers::path("/v1/responses"))
-        .and(move |request: &wiremock::Request| is_worker_request(request, root))
-        .respond_with(
-            wiremock::ResponseTemplate::new(/*s*/ 307)
-                .insert_header("location", format!("{}/v1/responses", worker_stream.uri())),
-        )
-        .with_priority(/*p*/ 1)
-        .up_to_n_times(/*n*/ 2)
-        .mount(&server)
-        .await;
-    mount_sse_once_match(&server, |request: &wiremock::Request| {
-        request_body(request).is_some_and(|body| body["client_metadata"]["x-openai-subagent"] == "guardian")
-    }, sse(vec![ev_assistant_message("guardian-assessment", &json!({
-        "risk_level": "high", "user_authorization": "high", "outcome": "deny", "rationale": "Snapshot assessment."
-    }).to_string()), ev_completed("guardian-response")])).await;
-
-    test.submit_text_turn(INITIAL_PROMPT).await?;
-    ThreadIdle::wait(&test.codex).await;
-    test.submit_text_turn(REPLY).await?;
-    ThreadIdle::wait(&test.codex).await;
-    release_worker.send(()).expect("release worker");
-    tokio::time::timeout(
-        Duration::from_secs(/*secs*/ 10),
-        worker_stream.wait_for_request_count(/*count*/ 2),
-    )
-    .await?;
-    let requests = core_test_support::responses::received_responses_requests(&server).await;
-    let guardian_requests = requests
-        .iter()
-        .filter(|request| {
-            let body = request.body_json();
-            body["client_metadata"]["x-openai-subagent"] == "guardian"
-                && !is_hosted_messaging_review_body(&body)
-        })
-        .collect::<Vec<_>>();
-    assert_eq!(guardian_requests.len(), 1);
-    let prompt = guardian_requests[0].body_json().to_string();
-    let question = prompt
-        .find(&format!("assistant: {ROOT_ASSISTANT_REPLY}"))
-        .expect("confirmed assistant question");
-    let reply = prompt
-        .find(&format!("user: {REPLY}"))
-        .expect("real user reply");
-    assert!(question < reply);
-    let shutdown = test
-        .thread_manager
-        .shutdown_all_threads_bounded(Duration::from_secs(/*secs*/ 10))
-        .await;
-    assert!(shutdown.timed_out.is_empty());
-    drop(hold_worker_completion);
-    worker_stream.shutdown().await;
-    Ok(requests)
 }
 
 async fn run_guardian_subagent_review(
@@ -757,15 +544,9 @@ async fn run_guardian_subagent_review(
                         .expect("set messaging MCP server");
                 }
                 if code_mode {
-                    for feature in [Feature::CodeMode, Feature::CodeModeInterrupt] {
-                        config.features.enable(feature).expect("enable Code Mode");
-                    }
                     if !matches!(messaging_outcome, MessagingOutcome::UntrustedMcp) {
                         config.features.enable(Feature::Apps).expect("enable Apps");
                     }
-                } else {
-                    config.code_mode.direct_only_tool_namespaces =
-                        vec![messaging_namespace.to_owned()];
                 }
             }
             for feature in [
@@ -785,11 +566,6 @@ async fn run_guardian_subagent_review(
                 .set_permission_profile(PermissionProfile::workspace_write())
                 .expect("set workspace-write permissions");
         });
-    if code_mode {
-        builder = builder
-            .with_auth(CodexAuth::create_dummy_chatgpt_auth_for_testing())
-            .with_code_mode_host_program(codex_utils_cargo_bin::cargo_bin("codex-code-mode-host")?);
-    }
     let mut test = builder.build_with_auto_env(&server).await?;
     if matches!(root_context, RootContext::Migrating) {
         let mut checkpoint: CompactedItem = serde_json::from_value(json!({
@@ -1906,4 +1682,18 @@ async fn run_guardian_subagent_review(
         .await;
     assert!(shutdown.timed_out.is_empty());
     Ok(())
+}
+
+fn code_mode_name_for_tool_name(tool_name: &ToolName) -> String {
+    if tool_name.is_default_namespace() {
+        return tool_name.name.clone();
+    }
+
+    match tool_name.namespace.as_deref() {
+        Some(namespace) if namespace.ends_with('_') || tool_name.name.starts_with('_') => {
+            format!("{namespace}{}", tool_name.name)
+        }
+        Some(namespace) => format!("{namespace}__{}", tool_name.name),
+        None => tool_name.name.clone(),
+    }
 }

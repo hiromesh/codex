@@ -42,7 +42,6 @@ async fn spawned_dispatch_preserves_caller_context(level: LevelFilter) -> anyhow
         ToolRegistry::from_tools([]),
         Vec::new(),
         ToolMode::Direct,
-        BTreeMap::new(),
         /*tool_namespaces_info*/ None,
         &[],
     ));

@@ -316,12 +316,6 @@ async fn tool_start_receives_executed_mcp_call_for_connector(
 }
 
 #[derive(Clone, Copy)]
-enum McpCallMode {
-    Direct,
-    CodeMode,
-}
-
-#[derive(Clone, Copy)]
 enum McpResultProcessing {
     Unchanged,
     Replace,
@@ -355,14 +349,11 @@ impl ToolLifecycleContributor for BlockingMcpResultContributor {
     }
 }
 
-#[test_case(McpCallMode::Direct, McpResultProcessing::Unchanged; "direct_unchanged")]
-#[test_case(McpCallMode::Direct, McpResultProcessing::Replace; "direct_replaced")]
-#[test_case(McpCallMode::Direct, McpResultProcessing::Fail; "direct_error")]
-#[test_case(McpCallMode::CodeMode, McpResultProcessing::Replace; "code_mode_replaced")]
-#[test_case(McpCallMode::CodeMode, McpResultProcessing::Fail; "code_mode_error")]
+#[test_case(McpResultProcessing::Unchanged; "unchanged")]
+#[test_case(McpResultProcessing::Replace; "replaced")]
+#[test_case(McpResultProcessing::Fail; "error")]
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn mcp_result_processing_precedes_completion(
-    mode: McpCallMode,
     processing: McpResultProcessing,
 ) -> Result<()> {
     skip_if_no_network!(Ok(()));
@@ -411,29 +402,17 @@ async fn mcp_result_processing_precedes_completion(
     extensions.tool_lifecycle_contributor(contributor.clone());
     let test = apps_enabled_builder(apps_server.chatgpt_base_url)
         .with_extensions(Arc::new(extensions.build()))
-        .with_config(move |config| {
-            if matches!(mode, McpCallMode::CodeMode) {
-                let _ = config.features.enable(Feature::CodeMode);
-            }
-        })
         .build_with_auto_env(&server)
         .await?;
     wait_for_mcp_server(&test.codex, CODEX_APPS_MCP_SERVER_NAME).await?;
 
     let call_id = "mcp-result-call";
-    let call = match mode {
-        McpCallMode::Direct => responses::ev_function_call_with_namespace(
-            call_id,
-            SEARCH_CALENDAR_NAMESPACE,
-            SEARCH_CALENDAR_LIST_TOOL,
-            r#"{"query":"callback test"}"#,
-        ),
-        McpCallMode::CodeMode => responses::ev_custom_tool_call(
-            call_id,
-            "exec",
-            r#"text(await tools.mcp__codex_apps__calendar_list_events({query: "callback test"}));"#,
-        ),
-    };
+    let call = responses::ev_function_call_with_namespace(
+        call_id,
+        SEARCH_CALENDAR_NAMESPACE,
+        SEARCH_CALENDAR_LIST_TOOL,
+        r#"{"query":"callback test"}"#,
+    );
     responses::mount_sse_once(
         &server,
         responses::sse(vec![call, responses::ev_completed("first-response")]),
@@ -487,10 +466,7 @@ async fn mcp_result_processing_precedes_completion(
     .await;
 
     let request = follow_up.single_request();
-    let output = match mode {
-        McpCallMode::Direct => request.function_call_output(call_id),
-        McpCallMode::CodeMode => request.custom_tool_call_output(call_id),
-    };
+    let output = request.function_call_output(call_id);
     let output = output["output"].to_string();
     assert!(
         output.contains(

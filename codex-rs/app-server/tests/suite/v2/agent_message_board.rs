@@ -49,8 +49,6 @@ async fn board_tools_share_multi_agent_namespace(
         .unwrap_or_default();
     MockResponsesConfig::new(&server.uri())
         .enable_feature(Feature::AgentMessageBoard)
-        .disable_feature(Feature::CodeMode)
-        .disable_feature(Feature::CodeModeOnly)
         .with_extra_config(&format!(
             "[features.multi_agent_v2]\nenabled = true\n{namespace_config}\n\
              [features.tool_registry]\nerror_on_tool_collisions = true"

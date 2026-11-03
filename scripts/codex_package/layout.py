@@ -44,21 +44,13 @@ def build_package_dir(
     resources_dir.mkdir()
     path_dir.mkdir()
 
-    entrypoint_name = variant.entrypoint_name(spec)
-    copy_executable(
-        inputs.entrypoint_bin,
-        bin_dir / entrypoint_name,
-        is_windows=spec.is_windows,
-    )
-    copy_executable(
-        inputs.exec_server_bin,
-        bin_dir / f"codex-exec-server{spec.exe_suffix}",
-        is_windows=spec.is_windows,
-    )
-    copy_executable(inputs.rg_bin, path_dir / spec.rg_name, is_windows=spec.is_windows)
+    entrypoint_name = variant.entrypoint_name()
+    copy_executable(inputs.entrypoint_bin, bin_dir / entrypoint_name)
+    copy_executable(inputs.exec_server_bin, bin_dir / "codex-exec-server")
+    copy_executable(inputs.rg_bin, path_dir / "rg")
 
     if inputs.bwrap_bin is not None:
-        copy_executable(inputs.bwrap_bin, resources_dir / "bwrap", is_windows=False)
+        copy_executable(inputs.bwrap_bin, resources_dir / "bwrap")
 
     metadata = {
         "layoutVersion": LAYOUT_VERSION,
@@ -66,7 +58,7 @@ def build_package_dir(
         "target": spec.target,
         "variant": variant.name,
         "entrypoint": f"bin/{entrypoint_name}",
-        "execServer": f"bin/codex-exec-server{spec.exe_suffix}",
+        "execServer": "bin/codex-exec-server",
         "resourcesDir": "codex-resources",
         "pathDir": "codex-path",
     }
@@ -99,8 +91,8 @@ def validate_package_dir(
         "layoutVersion": LAYOUT_VERSION,
         "target": spec.target,
         "variant": variant.name,
-        "entrypoint": f"bin/{variant.entrypoint_name(spec)}",
-        "execServer": f"bin/codex-exec-server{spec.exe_suffix}",
+        "entrypoint": f"bin/{variant.entrypoint_name()}",
+        "execServer": "bin/codex-exec-server",
         "resourcesDir": "codex-resources",
         "pathDir": "codex-path",
     }
@@ -112,9 +104,9 @@ def validate_package_dir(
             )
 
     required_files = [
-        Path("bin") / variant.entrypoint_name(spec),
-        Path("bin") / f"codex-exec-server{spec.exe_suffix}",
-        Path("codex-path") / spec.rg_name,
+        Path("bin") / variant.entrypoint_name(),
+        Path("bin") / "codex-exec-server",
+        Path("codex-path") / "rg",
     ]
     executable_files = list(required_files)
 
@@ -127,19 +119,17 @@ def validate_package_dir(
         if not path.is_file():
             raise RuntimeError(f"Missing package file: {relative_file}")
 
-    if not spec.is_windows:
-        for relative_file in executable_files:
-            path = package_dir / relative_file
-            if not is_executable(path):
-                raise RuntimeError(f"Package file is not executable: {relative_file}")
+    for relative_file in executable_files:
+        path = package_dir / relative_file
+        if not is_executable(path):
+            raise RuntimeError(f"Package file is not executable: {relative_file}")
 
 
-def copy_executable(src: Path, dest: Path, *, is_windows: bool) -> None:
+def copy_executable(src: Path, dest: Path) -> None:
     dest.parent.mkdir(parents=True, exist_ok=True)
     shutil.copyfile(src, dest)
-    if not is_windows:
-        mode = dest.stat().st_mode
-        dest.chmod(mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
+    mode = dest.stat().st_mode
+    dest.chmod(mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
 
 
 def write_json(path: Path, value: object) -> None:

@@ -46,28 +46,6 @@
           "url": "https://github.com/bazelbuild/buildtools/releases/download/v8.5.1/buildifier-linux-amd64"
         }
       ]
-    },
-    "windows-aarch64": {
-      "size": 7451648,
-      "hash": "sha256",
-      "digest": "55a276ad8b1ff46be48bf64e432264034ea69a45aa3914e89c1d1936f5c2d85c",
-      "path": "buildifier.exe",
-      "providers": [
-        {
-          "url": "https://github.com/bazelbuild/buildtools/releases/download/v8.5.1/buildifier-windows-arm64.exe"
-        }
-      ]
-    },
-    "windows-x86_64": {
-      "size": 7861760,
-      "hash": "sha256",
-      "digest": "f4ecb9c73de2bc38b845d4ee27668f6248c4813a6647db4b4931a7556052e4e1",
-      "path": "buildifier.exe",
-      "providers": [
-        {
-          "url": "https://github.com/bazelbuild/buildtools/releases/download/v8.5.1/buildifier-windows-amd64.exe"
-        }
-      ]
     }
   }
 }

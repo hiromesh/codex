@@ -35,7 +35,6 @@ use codex_protocol::models::PermissionProfile;
 use codex_protocol::models::ResponseItem;
 use codex_protocol::openai_models::ApplyPatchToolType;
 use codex_protocol::openai_models::ApprovalMessages;
-use codex_protocol::openai_models::CodeModeToolMessages;
 use codex_protocol::openai_models::CollaborationModeMessages;
 use codex_protocol::openai_models::ConfigShellToolType;
 use codex_protocol::openai_models::ConfirmationPolicies;
@@ -631,120 +630,6 @@ async fn tool_result_history_keeps_originating_model_across_switch_and_replay() 
     Ok(())
 }
 
-#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn custom_tool_output_replay_preserves_originating_budget() -> Result<()> {
-    skip_if_no_network!(Ok(()));
-
-    let server = start_mock_server().await;
-    let test = step_settings_test()
-        .with_model(MODEL_B)
-        .with_config(|config| {
-            config.features.enable(Feature::CodeMode).unwrap();
-            for model in &mut config.model_catalog.as_mut().expect("models").models {
-                model.truncation_policy =
-                    TruncationPolicyConfig::tokens(if model.slug == MODEL_B { 400 } else { 100 });
-                model.tool_mode = Some(ToolMode::CodeModeOnly);
-                model.use_responses_lite = false;
-            }
-        })
-        .build_with_auto_env(&server)
-        .await?;
-    let responses = mount_sse_sequence(
-        &server,
-        vec![
-            sse(vec![
-                ev_response_created("resp-custom"),
-                ev_custom_tool_call(
-                    "call-custom",
-                    "exec",
-                    "text('diagnostic line\\n'.repeat(500));",
-                ),
-                ev_completed("resp-custom"),
-            ]),
-            sse_completed("resp-done"),
-        ],
-    )
-    .await;
-    test.submit_text_turn("collect diagnostics").await?;
-    let live_output = responses.requests()[1].custom_tool_call_output("call-custom");
-    let text = "diagnostic line\n".repeat(500);
-    let live_text = live_output["output"][1]["text"]
-        .as_str()
-        .expect("bounded custom output");
-    assert!(live_text.len() < text.len());
-    // A's smaller history budget would truncate this result again without the saved budget.
-    assert_ne!(
-        truncate_text(live_text, TruncationPolicy::Tokens(120)),
-        live_text
-    );
-
-    test.codex.shutdown_and_wait().await?;
-    let rollout_path = test.codex.rollout_path().expect("rollout path");
-    let history = codex_rollout::RolloutRecorder::get_rollout_history(&rollout_path).await?;
-    let saved = history
-        .get_rollout_items()
-        .iter()
-        .find_map(|item| match item {
-            RolloutItem::ResponseItem(envelope)
-                if matches!(&envelope.item, ResponseItem::CustomToolCallOutput { call_id, .. } if call_id == "call-custom") =>
-            {
-                Some(envelope)
-            }
-            _ => None,
-        })
-        .expect("saved custom output");
-    assert_eq!(
-        saved
-            .metadata
-            .as_ref()
-            .and_then(|metadata| metadata.history_truncation_token_limit),
-        Some(480)
-    );
-    assert_eq!(
-        serde_json::to_value(&saved.item)?["output"][1]["text"],
-        text
-    );
-
-    let mut replay_config = test.config.clone();
-    replay_config.model = Some(MODEL_A.to_string());
-    let resumed = test
-        .thread_manager
-        .resume_legacy_thread_from_rollout(
-            replay_config.clone(),
-            rollout_path.clone(),
-            codex_core::test_support::auth_manager_from_auth(CodexAuth::from_api_key("dummy")),
-            /*parent_trace*/ None,
-            ClientMcpExtensions::default(),
-        )
-        .await?
-        .thread;
-    let forked = test
-        .thread_manager
-        .fork_legacy_thread(
-            ForkSnapshot::Interrupted,
-            StartThreadOptions::new(replay_config),
-            rollout_path,
-        )
-        .await?
-        .thread;
-    for thread in [resumed, forked] {
-        let replay = mount_sse_once(&server, sse_completed("resp-replay")).await;
-        thread
-            .start_or_steer_turn(TurnInputRequest::user_input(vec![UserInput::Text {
-                text: "review saved diagnostics".to_string(),
-                text_elements: Vec::new(),
-            }]))
-            .await?;
-        wait_for_event(&thread, |event| matches!(event, EventMsg::TurnComplete(_))).await;
-        let request = replay.single_request();
-        assert_eq!(request.body_json()["model"], MODEL_A);
-        assert_eq!(request.custom_tool_call_output("call-custom"), live_output);
-        thread.shutdown_and_wait().await?;
-    }
-    Ok(())
-}
-
-#[derive(Clone, Copy)]
 enum SettingsTarget {
     Thread,
     Turn,
@@ -1717,103 +1602,6 @@ async fn captured_model_replans_tools_and_retains_the_issuing_request_router() -
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn captured_model_enables_and_executes_code_mode() -> Result<()> {
-    skip_if_no_network!(Ok(()));
-
-    let server = start_mock_server().await;
-    let responses = mount_sse_sequence(
-        &server,
-        vec![
-            paused_response("resp-a", "pause-a"),
-            sse(vec![
-                ev_response_created("resp-b"),
-                ev_custom_tool_call("code-b", "exec", "const result = await tools.view_image({path: 'step.png', detail: 'original'}); image(result)"),
-                ev_completed("resp-b"),
-            ]),
-            sse_completed("resp-b-result"),
-        ],
-    )
-    .await;
-    let test = direct_tool_settings_test()
-        .with_config(|config| {
-            config
-                .permissions
-                .set_permission_profile(PermissionProfile::Disabled)
-                .expect("test permissions");
-            for model in &mut config.model_catalog.as_mut().expect("models").models {
-                model.input_modalities = vec![codex_protocol::openai_models::InputModality::Text];
-                model.supports_image_detail_original = false;
-                if model.slug == MODEL_B {
-                    model
-                        .input_modalities
-                        .push(codex_protocol::openai_models::InputModality::Image);
-                    model.supports_image_detail_original = true;
-                    model.tool_mode = Some(ToolMode::CodeModeOnly);
-                }
-            }
-        })
-        .build_with_auto_env(&server)
-        .await?;
-    use base64::Engine;
-    let png = base64::engine::general_purpose::STANDARD.decode("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGP4z8DwHwAFAAH/iZk9HQAAAABJRU5ErkJggg==")?;
-    test.fs()
-        .write_file(
-            &test.workspace_path_uri("step.png")?,
-            png,
-            Default::default(),
-            /*sandbox*/ None,
-        )
-        .await?;
-    let paused = start_paused_turn(&test.codex).await?;
-    apply_turn_settings(
-        &test.codex,
-        &paused.turn_id,
-        TurnSettingsUpdate {
-            model: Some(MODEL_B.to_string()),
-            ..Default::default()
-        },
-    )
-    .await?;
-    answer_paused_turn(&test.codex, &paused.turn_id).await?;
-    wait_for_event(&test.codex, |event| {
-        matches!(event, EventMsg::TurnComplete(_))
-    })
-    .await;
-
-    let requests = responses.requests();
-    assert_eq!(
-        requests
-            .iter()
-            .map(|request| request.body_json()["model"].clone())
-            .collect::<Vec<_>>(),
-        vec![json!(MODEL_A), json!(MODEL_B), json!(MODEL_B)],
-    );
-    assert_eq!(
-        requests
-            .iter()
-            .map(|request| {
-                request.body_json()["tools"]
-                    .as_array()
-                    .expect("provider tools")
-                    .iter()
-                    .any(|tool| tool["type"] == "custom" && tool["name"] == "exec")
-            })
-            .collect::<Vec<_>>(),
-        vec![false, true, true],
-    );
-    let output = requests[2].custom_tool_call_output("code-b");
-    assert_eq!(
-        output["output"]
-            .as_array()
-            .expect("Code Mode output items")
-            .last()
-            .expect("Code Mode image output")["detail"],
-        json!("original"),
-    );
-    Ok(())
-}
-
-#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn response_metadata_uses_the_captured_step_after_a_turn_update() -> Result<()> {
     skip_if_no_network!(Ok(()));
 
@@ -2304,14 +2092,12 @@ async fn tool_messages_follow_mid_turn_model_changes() -> Result<()> {
             config.ephemeral = false;
             config.multi_agent_v2.expose_spawn_agent_model_overrides = false;
             config.multi_agent_v2.non_code_mode_only = true;
-            config.code_mode.disable_in_process_fallback = true;
             for model in &mut config
                 .model_catalog
                 .as_mut()
                 .expect("controlled model catalog")
                 .models
             {
-                model.tool_mode = Some(ToolMode::CodeMode);
                 model.use_responses_lite = false;
                 model
                     .experimental_supported_tools
@@ -2339,17 +2125,6 @@ async fn tool_messages_follow_mid_turn_model_changes() -> Result<()> {
                         interrupt_agent: tool_message("interrupt_agent"),
                         list_agents: tool_message("list_agents"),
                         post: tool_message("post"),
-                        ..Default::default()
-                    }),
-                    code_mode: Some(CodeModeToolMessages {
-                        exec: Some(ToolMessage {
-                            description: Some(format!("Exec description for {}.", model.slug)),
-                            ..Default::default()
-                        }),
-                        wait: Some(ToolMessage {
-                            description: Some(format!("Wait description for {}.", model.slug)),
-                            parameters: Some(wait_parameters(&model.slug).to_string()),
-                        }),
                         ..Default::default()
                     }),
                     ..Default::default()

@@ -856,7 +856,7 @@ mod tests {
         assert_eq!(
             serde_json::to_value(items[0].executed_tool_call_metadata()).unwrap()["executed_tool_calls"],
             json!([{
-                "name": codex_tools::code_mode_name_for_tool_name(&invocation.tool_name),
+                "name": "mcp__filesystem__read_file",
                 "arguments": { "path": "/tmp/notes.txt" },
                 "tool_result_metadata": { "provider/custom": { "items": [1, null] } },
             }]),

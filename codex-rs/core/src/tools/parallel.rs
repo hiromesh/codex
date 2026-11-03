@@ -645,15 +645,6 @@ mod tests {
             &registered.runtime.tool_name(),
             &ToolCallSource::Direct
         ));
-        for name in [
-            crate::tools::code_mode::PUBLIC_TOOL_NAME,
-            crate::tools::code_mode::WAIT_TOOL_NAME,
-        ] {
-            assert!(!direct_path_supported(
-                &codex_tools::ToolName::plain(name).with_default_namespace(),
-                &ToolCallSource::Direct
-            ));
-        }
         assert!(direct_path_supported(
             &codex_tools::ToolName::namespaced("mcp", "exec"),
             &ToolCallSource::Direct
@@ -819,7 +810,6 @@ mod tests {
             ToolRegistry::from_tools([handler]),
             Vec::new(),
             ToolMode::Direct,
-            BTreeMap::new(),
             /*tool_namespaces_info*/ None,
             &[],
         ));
@@ -1007,7 +997,6 @@ mod tests {
             ToolRegistry::from_tools([handler]),
             Vec::new(),
             ToolMode::Direct,
-            BTreeMap::new(),
             /*tool_namespaces_info*/ None,
             &[],
         ));

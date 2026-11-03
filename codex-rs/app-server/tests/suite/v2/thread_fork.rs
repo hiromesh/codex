@@ -3014,7 +3014,6 @@ async fn fork_option_disables_mcp_servers(
     let mut model = construct_model_info_offline("gpt-5.4", &config);
     model.use_responses_lite = responses_lite;
     model.supports_search_tool = false;
-    model.tool_mode = Some(codex_protocol::openai_models::ToolMode::CodeMode);
     let catalog = codex_home.path().join("catalog.json");
     std::fs::write(
         &catalog,

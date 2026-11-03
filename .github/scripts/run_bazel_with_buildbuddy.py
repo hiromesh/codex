@@ -20,7 +20,6 @@ REMOTE_EXECUTION_CONFIGS = {
     "--config=ci-linux",
     "--config=ci-macos",
     "--config=ci-v8",
-    "--config=ci-windows-cross",
 }
 # Honor either explicit setting so the wrapper never overrides the caller's
 # choice when it supplies the CI default below.
@@ -151,7 +150,7 @@ def bazel_args_with_remote_config(
 
         # Insert immediately after the Bazel command. This keeps wrapper-added
         # options out of positional payloads and lets later CI configs override
-        # shared RBE defaults such as the Windows cross-compilation exec platforms.
+        # shared RBE defaults.
         configured_args = [
             *args[: command_idx + 1],
             *remote_args,
@@ -204,12 +203,6 @@ def main() -> None:
         )
 
     command = bazel_command(*sys.argv[1:])
-    if os.name == "nt":
-        # Windows CRT exec can split arguments containing spaces and lose the
-        # eventual child exit status. Wait for Bazel and propagate its status.
-        result = subprocess.run(command, check=False)
-        raise SystemExit(result.returncode)
-
     os.execvp(command[0], command)
 
 

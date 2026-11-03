@@ -57,9 +57,6 @@ jobs:
       run:
         working-directory: codex-rs
     env:
-      # Windows ARM64 archives are built on Windows x64, while their shards run
-      # on native Windows ARM64. Key producer-side caches by the archive runner
-      # so the cross-compile build reuses the Windows x64 cache lineage.
       ARCHIVE_CACHE_RUNNER: ${{ inputs.archive_runner != '' && inputs.archive_runner || inputs.runner }}
       USE_SCCACHE: ${{ inputs.use_sccache && 'true' || 'false' }}
       CODEX_CI_PROFILE: ${{ inputs.profile }}
@@ -99,12 +96,6 @@ jobs:
       - uses: dtolnay/rust-toolchain@e081816240890017053eacbb1bdf337761dc5582 # 1.95.0
         with:
           targets: ${{ inputs.target }}
-
-      - name: Expose MSVC SDK environment (Windows)
-        if: ${{ runner.os == 'Windows' && inputs.target == 'aarch64-pc-windows-msvc' }}
-        uses: ./.github/actions/setup-msvc-env
-        with:
-          target: ${{ inputs.target }}
 
       - name: Compute lockfile hash
         id: lockhash
@@ -154,9 +145,6 @@ jobs:
         run: |
           set -euo pipefail
           wrapper="$(command -v sccache)"
-          if [[ "${RUNNER_OS}" == "Windows" ]] && command -v cygpath >/dev/null 2>&1; then
-            wrapper="$(cygpath -w "${wrapper}")"
-          fi
           echo "RUSTC_WRAPPER=${wrapper}" >> "$GITHUB_ENV"
           echo "CARGO_BUILD_RUSTC_WRAPPER=${wrapper}" >> "$GITHUB_ENV"
 
@@ -357,13 +345,6 @@ jobs:
           mkdir -p "$extract_dir"
           runtime_relative="$(cat "${RUNNER_TEMP}/nextest-archive/voice-runtime-path.txt")"
           export CODEX_TEST_VOICE_RUNTIME="$extract_dir/target/$runtime_relative"
-
-          if [[ "${RUNNER_OS}" == "Windows" ]]; then
-            archive_file="$(cygpath -w "${archive_file}")"
-            workspace_root="$(cygpath -w "${workspace_root}")"
-            extract_dir="$(cygpath -w "$extract_dir")"
-            CODEX_TEST_VOICE_RUNTIME="$(cygpath -w "$CODEX_TEST_VOICE_RUNTIME")"
-          fi
 
           if [[ "${RUNNER_OS}" == "Linux" ]]; then
             helper_dir="${RUNNER_TEMP}/${TEST_HELPERS_ARTIFACT}"

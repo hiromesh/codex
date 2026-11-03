@@ -30,11 +30,8 @@ runs:
         TARGET: ${{ inputs.target }}
         BUNDLE: ${{ inputs.bundle }}
         BUILD_MODE: ${{ inputs.build-mode }}
-        # Keep Git Bash from rewriting Bazel labels as Windows paths.
-        MSYS2_ARG_CONV_EXCL: "*"
       run: |
         python3 .github/scripts/run_bazel_with_buildbuddy.py build \
-          ${{ runner.os == 'Windows' && '--config=ci-windows-msvc' || '' }} \
           ${{ runner.os == 'macOS' && '--config=ci-macos --remote_download_toplevel --build_metadata=VISIBILITY=PRIVATE' || '' }} \
           "--platforms=@rules_rs//rs/platforms:$TARGET" \
           "--//codex-rs:runtime_package_build_mode=$BUILD_MODE" \

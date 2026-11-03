@@ -122,7 +122,6 @@ async fn vertex_requests_use_command_auth_with_namespaces_and_tool_search(
     let mut test = test_codex()
         .with_model_info_override(model, |model| {
             model.use_responses_lite = true;
-            model.tool_mode = Some(ToolMode::CodeModeOnly);
             model.apply_patch_tool_type = Some(ApplyPatchToolType::Freeform);
             model.supports_search_tool = true;
             model.multi_agent_version = Some(MultiAgentVersion::V2);

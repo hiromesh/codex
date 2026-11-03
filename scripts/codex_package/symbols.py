@@ -1,8 +1,8 @@
-"""Strip packaged Unix executables without modifying their build outputs.
+"""Strip packaged first-party executables without modifying their build outputs.
 
 Call only on package copies of first-party binaries. Prebuilt release inputs
 may already be signed, and resources such as bwrap have integrity hashes that
-must survive staging. Windows MSVC symbols live in separate PDB files.
+must survive staging.
 """
 
 import platform
@@ -15,9 +15,6 @@ from .targets import normalize_machine
 
 
 def strip_binary(binary: Path, spec: TargetSpec, *, tool: str | None = None) -> None:
-    if spec.is_windows:
-        return
-
     if spec.is_linux:
         # A host GNU strip may not understand a cross-compiled ELF architecture.
         # LLVM supports both packaged Linux architectures from any host.

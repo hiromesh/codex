@@ -204,8 +204,8 @@ def assemble_package(args: argparse.Namespace) -> Path:
     prepare_package_dir(package_dir, force=args.force)
     build_package_dir(package_dir, args.package_version, variant, spec, inputs)
     for filename, prebuilt in (
-        (variant.entrypoint_name(spec), args.entrypoint_bin),
-        (f"codex-exec-server{spec.exe_suffix}", args.exec_server_bin),
+        (variant.entrypoint_name(), args.entrypoint_bin),
+        ("codex-exec-server", args.exec_server_bin),
     ):
         if args.strip == "all" or (
             args.strip == "auto"

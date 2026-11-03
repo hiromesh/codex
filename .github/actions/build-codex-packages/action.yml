@@ -76,29 +76,6 @@ runs:
         target: ${{ inputs.target }}
         build-mode: ${{ inputs.build-mode }}
 
-    - name: Normalize Windows PDB filenames
-      if: ${{ runner.os == 'Windows' }}
-      shell: bash
-      working-directory: codex-rs
-      env:
-        TARGET: ${{ inputs.target }}
-      run: |
-        set -euo pipefail
-        release_dir="${CARGO_TARGET_DIR}/${TARGET}/release"
-        for binary in $NEEDED_BINARIES; do
-          expected_pdb="${release_dir}/${binary}.pdb"
-          if [[ -f "$expected_pdb" ]]; then
-            continue
-          fi
-
-          underscored_pdb="${release_dir}/${binary//-/_}.pdb"
-          if [[ ! -f "$underscored_pdb" ]]; then
-            echo "PDB for ${binary} not found at ${expected_pdb} or ${underscored_pdb}" >&2
-            exit 1
-          fi
-          cp "$underscored_pdb" "$expected_pdb"
-        done
-
     - name: Archive symbols and strip binaries
       shell: bash
       working-directory: codex-rs
@@ -126,15 +103,11 @@ runs:
         target="${TARGET}"
         release_dir="${CARGO_TARGET_DIR}/${target}/release"
         archive_dir="${GITHUB_WORKSPACE}/dist/${target}"
-        exe_suffix=""
-        if [[ "$RUNNER_OS" == "Windows" ]]; then
-          exe_suffix=".exe"
-        fi
 
         package_args=(
           --target "$target"
-          --code-mode-host-bin "${release_dir}/codex-code-mode-host${exe_suffix}"
-          --exec-server-bin "${release_dir}/codex-exec-server${exe_suffix}"
+          --code-mode-host-bin "${release_dir}/codex-code-mode-host"
+          --exec-server-bin "${release_dir}/codex-exec-server"
           --cargo-profile release
           --package-version "$CODEX_PACKAGE_VERSION"
           --force
@@ -146,7 +119,7 @@ runs:
         python3 "${PACKAGE_SOURCE_ROOT}/scripts/build_codex_package.py" \
           "${package_args[@]}" \
           --variant codex \
-          --entrypoint-bin "${release_dir}/codex${exe_suffix}" \
+          --entrypoint-bin "${release_dir}/codex" \
           --package-dir "${RUNNER_TEMP}/codex-package-${target}" \
           --archive-output "${archive_dir}/codex-package-${target}.tar.gz" \
           --archive-output "${archive_dir}/codex-package-${target}.tar.zst"
@@ -154,7 +127,7 @@ runs:
         python3 "${PACKAGE_SOURCE_ROOT}/scripts/build_codex_package.py" \
           "${package_args[@]}" \
           --variant codex-app-server \
-          --entrypoint-bin "${release_dir}/codex-app-server${exe_suffix}" \
+          --entrypoint-bin "${release_dir}/codex-app-server" \
           --package-dir "${RUNNER_TEMP}/codex-app-server-package-${target}" \
           --archive-output "${archive_dir}/codex-app-server-package-${target}.tar.gz" \
           --archive-output "${archive_dir}/codex-app-server-package-${target}.tar.zst"
@@ -164,7 +137,7 @@ runs:
       working-directory: codex-rs
       env:
         TARGET: ${{ inputs.target }}
-        PYTHONPATH: ${{ github.workspace }}/sdk/python/src${{ runner.os == 'Windows' && ';' || ':' }}${{ github.workspace }}/sdk/python/tests
+        PYTHONPATH: ${{ github.workspace }}/sdk/python/src:${{ github.workspace }}/sdk/python/tests
         PACKAGE_SOURCE_ROOT: ${{ steps.package_setup.outputs.source_root }}
       run: |
         set -euo pipefail
@@ -184,8 +157,7 @@ runs:
           exit 1
         fi
 
-        # Windows setup helpers can finish background ACL work after pytest exits.
-        # Separate roots keep the next run from deleting their executables.
+        # Separate roots keep the next run from deleting packaged executables.
         uv run --frozen pytest "${pytest_args[@]}" \
           --basetemp "${GITHUB_WORKSPACE}/codex-rs/target/package-smoke-gzip-tmp" \
           --compression gzip \

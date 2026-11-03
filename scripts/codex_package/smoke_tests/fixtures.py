@@ -141,16 +141,6 @@ def package(
     compression = request.config.getoption("compression")
     target = request.config.getoption("package_target")
     directory = tmp_path_factory.mktemp(f"codex-package-smoke-{compression}")
-    if "windows" in target:
-        # pytest's 0700 directories have protected ACLs, so restricted-token
-        # sandboxes need read/execute access to reach the packaged binaries.
-        for path in (directory.parent, directory):
-            subprocess.run(
-                ["icacls", str(path), "/grant", "*S-1-1-0:(OI)(CI)(RX)"],
-                check=True,
-                capture_output=True,
-                text=True,
-            )
     package = SmokePackage.from_archives(
         directory,
         target,
@@ -220,8 +210,7 @@ def code_mode_host_debug_symbols(
             binary: f"/{binary}.dSYM/Contents/Resources/DWARF/" for binary in binaries
         }
     else:
-        extension = "pdb" if "windows" in target else "debug"
-        markers = {binary: f"/{binary}.{extension}" for binary in binaries}
+        markers = {binary: f"/{binary}.debug" for binary in binaries}
 
     destination = tmp_path_factory.mktemp("codex-debug-symbols")
     found: set[str] = set()

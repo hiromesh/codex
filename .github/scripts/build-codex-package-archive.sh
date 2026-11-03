@@ -87,7 +87,7 @@ if [[ -z "$target" || -z "$bundle" || -z "$entrypoint_dir" || -z "$archive_dir" 
   usage >&2
   exit 1
 fi
-if [[ ( -n "$voice_release_dir" || -n "$release_version" ) && ( -z "$voice_release_dir" || -z "$release_version" || "$bundle" != "primary" || ( "$target" != *-apple-darwin && "$target" != *-unknown-linux-musl && "$target" != *-pc-windows-msvc ) ) ]]; then
+if [[ ( -n "$voice_release_dir" || -n "$release_version" ) && ( -z "$voice_release_dir" || -z "$release_version" || "$bundle" != "primary" || ( "$target" != *-apple-darwin && "$target" != *-unknown-linux-musl ) ) ]]; then
   echo "Voice resources require a primary supported release package version" >&2
   exit 1
 fi
@@ -109,16 +109,9 @@ case "$bundle" in
     ;;
 esac
 
-exe_suffix=""
-case "$target" in
-  *windows*)
-    exe_suffix=".exe"
-    ;;
-esac
+resource_args+=(--exec-server-bin "${entrypoint_dir%/}/codex-exec-server")
 
-resource_args+=(--exec-server-bin "${entrypoint_dir%/}/codex-exec-server${exe_suffix}")
-
-code_mode_host_bin="${entrypoint_dir%/}/codex-code-mode-host${exe_suffix}"
+code_mode_host_bin="${entrypoint_dir%/}/codex-code-mode-host"
 if [[ "$code_mode_host_bin_provided" == "false" && -f "$code_mode_host_bin" ]]; then
   resource_args+=(--code-mode-host-bin "$code_mode_host_bin")
 fi
@@ -148,8 +141,9 @@ else
   python_bin="python"
 fi
 
-if ! command -v zstd >/dev/null 2>&1 && [[ -x "${repo_root}/.github/workflows/zstd" ]]; then
-  export PATH="${repo_root}/.github/workflows:${PATH}"
+if ! command -v zstd >/dev/null 2>&1; then
+  echo "zstd is required to write release archives" >&2
+  exit 1
 fi
 
 mkdir -p "$archive_dir"
@@ -162,7 +156,7 @@ python_args=(
   "${repo_root}/scripts/build_codex_package.py"
   --target "$target"
   --variant "$variant"
-  --entrypoint-bin "${entrypoint_dir%/}/${entrypoint_name}${exe_suffix}"
+  --entrypoint-bin "${entrypoint_dir%/}/${entrypoint_name}"
   --cargo-profile release
   --package-dir "$package_dir"
 )
@@ -183,7 +177,7 @@ if [[ -n "$voice_release_dir" ]]; then
   fi
   voice_package="${RUNNER_TEMP:-/tmp}/${archive_stem}-voice-${target}"
   rm -rf "$voice_package"
-  voice_helper="${voice_release_dir%/}/codex-voice-host${exe_suffix}"
+  voice_helper="${voice_release_dir%/}/codex-voice-host"
   "$python_bin" "${repo_root}/third_party/voice/assemble_package.py" \
     --package "$package_dir" \
     --helper "$voice_helper" \

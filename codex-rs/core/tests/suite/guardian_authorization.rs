@@ -160,18 +160,13 @@ async fn guardian_revalidates_owning_session_before_allow(
             config
                 .set_legacy_sandbox_policy(SandboxPolicy::new_workspace_write_policy())
                 .expect("set sandbox policy");
-            for feature in [
-                Feature::CodeMode,
-                Feature::CodeModeInterrupt,
-                Feature::DefaultModeRequestUserInput,
-            ] {
+            for feature in [Feature::DefaultModeRequestUserInput] {
                 config
                     .features
                     .enable(feature)
                     .expect("enable test feature");
             }
         })
-        .with_code_mode_host_program(codex_utils_cargo_bin::cargo_bin("codex-code-mode-host")?)
         .build_with_auto_env(&server)
         .await?;
     if review_mode == GuardianContextMode::Legacy {

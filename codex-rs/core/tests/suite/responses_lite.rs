@@ -16,7 +16,6 @@ use codex_protocol::config_types::WebSearchMode;
 use codex_protocol::models::ImageDetail;
 use codex_protocol::models::ImageReference;
 use codex_protocol::openai_models::InputModality;
-use codex_protocol::openai_models::ToolMode;
 use codex_protocol::protocol::EventMsg;
 use codex_protocol::protocol::Op;
 use codex_protocol::user_input::UserInput;
@@ -109,11 +108,9 @@ async fn base_instructions_use_input_items(responses_lite: bool) -> Result<()> {
         test_codex()
             .with_model_info_override("gpt-5.4", move |model_info| {
                 model_info.use_responses_lite = responses_lite;
-                model_info.tool_mode = Some(ToolMode::CodeMode);
             })
             .with_config(|config| {
                 config.base_instructions = Some("test instructions".to_string());
-                config.code_mode.disable_in_process_fallback = true;
             })
     };
     let test = builder().build(&server).await?;
@@ -237,11 +234,9 @@ async fn responses_lite_includes_tool_namespaces_info_when_enabled() -> Result<(
     let mut builder = apps_enabled_builder(apps_server.chatgpt_base_url)
         .with_model_info_override("gpt-5.4", |model_info| {
             model_info.use_responses_lite = true;
-            model_info.tool_mode = Some(ToolMode::CodeMode);
             model_info.supports_search_tool = false;
         })
         .with_config(|config| {
-            config.code_mode.disable_in_process_fallback = true;
             config.tool_registry.turn_metadata_includes_tool_info = true;
         });
     let test = builder.build_with_auto_env(&server).await?;
@@ -265,7 +260,6 @@ async fn responses_lite_includes_tool_namespaces_info_when_enabled() -> Result<(
             "name": SEARCH_CALENDAR_CREATE_TOOL,
             "direct": true,
             "deferred": false,
-            "code_mode_name": "mcp__codex_apps__calendar_create_event",
             "source": {
                 "kind": "mcp",
                 "server_name": "codex_apps",

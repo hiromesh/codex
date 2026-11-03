@@ -8,11 +8,6 @@ import zipfile
 from collections.abc import Callable
 from pathlib import Path
 
-from .targets import REPO_ROOT
-
-
-ZSTD_DOTSLASH = REPO_ROOT / ".github" / "workflows" / "zstd"
-
 
 def write_archive(package_dir: Path, archive_path: Path, *, force: bool) -> None:
     if is_relative_to(archive_path, package_dir):
@@ -82,20 +77,15 @@ def write_tar_zst_archive(package_dir: Path, archive_path: Path) -> None:
 
 def resolve_zstd_command(
     *,
-    dotslash_manifest: Path = ZSTD_DOTSLASH,
     which: Callable[[str], str | None] = shutil.which,
 ) -> list[str]:
     zstd = which("zstd")
     if zstd is not None:
         return [zstd]
 
-    dotslash = which("dotslash")
-    if dotslash is not None and dotslash_manifest.is_file():
-        return [dotslash, str(dotslash_manifest)]
-
     raise RuntimeError(
-        "zstd is required to write .tar.zst archives. Install zstd, or install "
-        f"DotSlash so the repository wrapper can run: {dotslash_manifest}"
+        "zstd is required to write .tar.zst archives. Install zstd and ensure "
+        "it is on PATH."
     )
 
 

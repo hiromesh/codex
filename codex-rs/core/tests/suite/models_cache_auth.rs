@@ -129,7 +129,6 @@ async fn auth_rotation_refreshes_before_turn_with_best_effort(
     model.max_context_window = Some(481_000);
     model.effective_context_window_percent = 100;
     model.use_responses_lite = true;
-    model.tool_mode = Some(ToolMode::CodeModeOnly);
     let succeeds = matches!(outcome, RefreshOutcome::Success);
     let stalls_auth = matches!(outcome, RefreshOutcome::AuthTimeout);
     let expected_context_window = if succeeds {

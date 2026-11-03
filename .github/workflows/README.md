@@ -14,7 +14,7 @@ The workflows in this directory are split so that pull requests get fast, review
 - `rust-ci.yml` keeps the Cargo-native PR checks intentionally small:
   - `cargo fmt --check`
   - `cargo shear`
-  - `argument-comment-lint` on Linux, macOS, and Windows
+  - `argument-comment-lint` on Linux and macOS
   - `tools/argument-comment-lint` package tests when the lint or its workflow wiring changes
 
 ## Post-Merge On `main`
@@ -25,7 +25,6 @@ The workflows in this directory are split so that pull requests get fast, review
   It keeps the heavier checks off the PR path while still validating them after merge:
   - the full Cargo `clippy` matrix
   - the full Cargo `nextest` matrix via per-platform archive-backed shards
-  - Windows ARM64 nextest archives cross-compiled on Windows x64, then replayed on native Windows ARM64 shards
   - release-profile Cargo builds
   - cross-platform `argument-comment-lint`
   - Linux remote-env tests

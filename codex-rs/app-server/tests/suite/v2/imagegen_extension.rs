@@ -1302,7 +1302,6 @@ fn create_config_toml(
         .with_root_config(&format!("chatgpt_base_url = \"{server_uri}\""))
         .with_provider_config("supports_websockets = false\nrequires_openai_auth = true");
     if matches!(mode, ImagegenTestMode::CodeModeOnly) {
-        config = config.enable_feature(Feature::CodeModeOnly);
     }
     config.write(codex_home)
 }

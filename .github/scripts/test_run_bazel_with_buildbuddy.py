@@ -81,23 +81,6 @@ class RunBazelWithBuildBuddyTest(unittest.TestCase):
                 ],
             )
 
-    def test_windows_cross_ci_configuration_follows_remote_configuration(self) -> None:
-        env = {"BUILDBUDDY_API_KEY": "fork-token"}
-
-        self.assertEqual(
-            run_bazel_with_buildbuddy.bazel_args_with_remote_config(
-                ["build", "--config=ci-windows-cross", "//codex-rs/cli:codex"],
-                env,
-            ),
-            [
-                "build",
-                "--config=buildbuddy-generic-rbe",
-                "--remote_header=x-buildbuddy-api-key=fork-token",
-                "--config=ci-windows-cross",
-                "//codex-rs/cli:codex",
-            ],
-        )
-
     def test_query_remote_configuration_is_inserted_before_expression(self) -> None:
         expression = 'kind("rust_library rule", //codex-rs/...)'
         env = {"BUILDBUDDY_API_KEY": "fork-token"}
@@ -108,7 +91,7 @@ class RunBazelWithBuildBuddyTest(unittest.TestCase):
                     run_bazel_with_buildbuddy.bazel_args_with_remote_config(
                         [
                             command,
-                            "--config=ci-windows-cross",
+                            "--config=ci-linux",
                             "--output=label",
                             expression,
                         ],
@@ -118,7 +101,7 @@ class RunBazelWithBuildBuddyTest(unittest.TestCase):
                         command,
                         "--config=buildbuddy-generic-rbe",
                         "--remote_header=x-buildbuddy-api-key=fork-token",
-                        "--config=ci-windows-cross",
+                        "--config=ci-linux",
                         "--output=label",
                         expression,
                     ],
@@ -257,9 +240,7 @@ class RunBazelWithBuildBuddyTest(unittest.TestCase):
         )
 
     def test_main_preserves_spaced_argument_and_child_exit_status(self) -> None:
-        spaced_arg = (
-            r"--test_env=PATH=C:\Program Files\PowerShell\7;C:\Program Files\Git\bin"
-        )
+        spaced_arg = r"--test_env=PATH=/opt/Program Files/tools:/usr/local/bin"
         child_code = (
             f"import sys; sys.exit(37 if sys.argv[1] == {spaced_arg!r} else 91)"
         )

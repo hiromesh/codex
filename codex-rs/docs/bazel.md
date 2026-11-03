@@ -117,8 +117,6 @@ CI configurations determine whether builds and tests execute remotely:
 | `ci-linux`          | `*-rbe`       | Remote host | Remote host |
 | `ci-v8`             | `*-rbe`       | Remote host | Remote host |
 | `ci-macos`          | `*-rbe`       | Remote host | Local       |
-| `ci-windows-cross`  | `*-rbe`       | Remote host | Local       |
-| `ci-windows`        | non-RBE       | Local       | Local       |
 | Keyless CI fallback | none          | Local       | Local       |
 
 To exercise the generic remote configuration with your key:

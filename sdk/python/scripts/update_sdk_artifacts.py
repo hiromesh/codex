@@ -3,7 +3,6 @@
 import argparse
 import importlib.util
 import json
-import platform
 import re
 import runpy
 import shutil
@@ -47,12 +46,8 @@ def schema_bundle_path(schema_dir: Path) -> Path:
     return schema_dir / "codex_app_server_protocol.v2.schemas.json"
 
 
-def _is_windows() -> bool:
-    return platform.system().lower().startswith("win")
-
-
 def runtime_binary_name() -> str:
-    return "codex.exe" if _is_windows() else "codex"
+    return "codex"
 
 
 def staged_runtime_package_root(root: Path) -> Path:

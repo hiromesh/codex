@@ -193,26 +193,6 @@ fn uses_reserved_image_gen_namespace() {
 }
 
 #[test]
-fn imagegen_code_mode_declaration_describes_generated_image_result() {
-    let spec = imagegen_tool_spec();
-    let definitions = codex_tools::collect_code_mode_tool_definitions(
-        [&spec],
-        /*code_mode_input_schema_max_bytes*/ None,
-    );
-    let [definition] = definitions.as_slice() else {
-        panic!("imagegen should produce one code-mode declaration");
-    };
-    let (_, return_type) = definition
-        .description
-        .rsplit_once("): Promise<")
-        .expect("imagegen declaration should return a promise");
-    assert_eq!(
-        return_type,
-        "{ image_url: string; output_hint?: string; }>; };\n```"
-    );
-}
-
-#[test]
 fn imagegen_output_schema_does_not_change_direct_api_serialization() {
     let spec = imagegen_tool_spec();
     let mut without_output_schema = spec.clone();

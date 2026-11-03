@@ -25,7 +25,6 @@ use std::sync::Mutex;
 use test_case::test_case;
 
 #[test_case(ToolMode::Direct; "direct")]
-#[test_case(ToolMode::CodeModeOnly; "code_mode")]
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn mcp_resource_messages(tool_mode: ToolMode) -> Result<()> {
     skip_if_no_network!(Ok(()));
@@ -66,11 +65,6 @@ async fn mcp_resource_messages(tool_mode: ToolMode) -> Result<()> {
     let test = test_codex()
         .with_config(move |config| {
             super::configure_scenario_catalog(config);
-            config.code_mode.disable_in_process_fallback = true;
-            config
-                .features
-                .enable(Feature::CodeModeHost)
-                .expect("enable Code Mode host");
             config
                 .mcp_servers
                 .set(HashMap::from([(
@@ -97,23 +91,11 @@ async fn mcp_resource_messages(tool_mode: ToolMode) -> Result<()> {
         .await?;
     wait_for_mcp_server(&test.codex, "resources").await?;
     let mut events = vec![responses::ev_response_created("resources-response")];
-    events.extend(if tool_mode == ToolMode::CodeModeOnly {
-        let script = calls
-            .iter()
-            .map(|(name, arguments)| format!("text(await tools.{name}({arguments}));"))
-            .collect::<Vec<_>>()
-            .join("\n");
-        vec![responses::ev_custom_tool_call(
-            "resources-call",
-            "exec",
-            &script,
-        )]
-    } else {
+    events.extend(
         calls
             .iter()
-            .map(|(name, arguments)| responses::ev_function_call(name, name, arguments))
-            .collect()
-    });
+            .map(|(name, arguments)| responses::ev_function_call(name, name, arguments)),
+    );
     events.push(responses::ev_completed("resources-response"));
     let mock = responses::mount_sse_sequence(
         &server,
@@ -126,28 +108,20 @@ async fn mcp_resource_messages(tool_mode: ToolMode) -> Result<()> {
     assert_eq!(requests.len(), 2);
     let body = requests[0].body_json();
     for (name, message) in &messages {
-        if tool_mode == ToolMode::CodeModeOnly {
-            assert!(
-                requests[0]
-                    .body_contains_text(message["description"].as_str().expect("description"))
-            );
-            assert!(requests[0].body_contains_text(&format!("Catalog server for {name}.")));
-        } else {
-            let tool = body["tools"]
-                .as_array()
-                .expect("tools")
-                .iter()
-                .find(|tool| tool["name"] == *name)
-                .expect("resource tool");
-            assert_eq!(
-                tool,
-                &json!({
-                    "type": "function", "name": name, "description": message["description"],
-                    "parameters": serde_json::from_str::<serde_json::Value>(message["parameters"].as_str().expect("parameters"))?,
-                    "strict": false,
-                })
-            );
-        }
+        let tool = body["tools"]
+            .as_array()
+            .expect("tools")
+            .iter()
+            .find(|tool| tool["name"] == *name)
+            .expect("resource tool");
+        assert_eq!(
+            tool,
+            &json!({
+                "type": "function", "name": name, "description": message["description"],
+                "parameters": serde_json::from_str::<serde_json::Value>(message["parameters"].as_str().expect("parameters"))?,
+                "strict": false,
+            })
+        );
     }
     assert!(requests[1].body_contains_text("Example Note"));
     assert!(requests[1].body_contains_text("memo://codex/{slug}"));
@@ -155,110 +129,6 @@ async fn mcp_resource_messages(tool_mode: ToolMode) -> Result<()> {
         requests[1]
             .body_contains_text("This is a sample MCP resource served by the rmcp test server.")
     );
-    if tool_mode == ToolMode::CodeModeOnly {
-        insta::assert_snapshot!(
-            "mcp_resource_messages",
-            context_snapshot::format_request_history_snapshot(
-                "Catalog resource descriptions and parameter guidance accompany discovery and reading through Code Mode.",
-                &requests,
-                &ContextSnapshotOptions::default().include_request_settings(),
-            )
-        );
-    }
     Ok(())
 }
 
-#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn resource_helpers_across_server_changes() -> Result<()> {
-    let server = responses::start_mock_server().await;
-    let mcp = responses::start_mock_server().await;
-    // Empty tools isolate the resource helper definitions from the separate
-    // deferred and MCP type guidance when the first server comes and goes.
-    let empty_server =
-        AppsTestServer::mount_with_tools(&mcp, Arc::new(Mutex::new(Vec::new()))).await?;
-    let test = test_codex()
-        .with_config(move |config| {
-            super::configure_scenario_catalog(config);
-            config.code_mode.disable_in_process_fallback = true;
-            config.features.enable(Feature::CodeModeHost).unwrap();
-        })
-        .with_model_info_override("gpt-6-astra", |model| {
-            model.tool_mode = Some(ToolMode::CodeModeOnly);
-            model.use_responses_lite = false;
-        })
-        .build_with_auto_env(&server)
-        .await?;
-    let script = r#"text(await tools.list_mcp_resources({}));
-    text(await tools.list_mcp_resource_templates({}));
-    try {
-      await tools.read_mcp_resource({ server: "missing", uri: "memo://missing" });
-    } catch (error) {
-      text(String(error));
-    }"#;
-    let mut events = Vec::new();
-    for phase in ["before", "registered", "removed"] {
-        events.push(responses::sse(vec![
-            responses::ev_custom_tool_call(phase, "exec", script),
-            responses::ev_completed(phase),
-        ]));
-        events.push(responses::sse_completed(&format!("{phase}-done")));
-    }
-    let mock = responses::mount_sse_sequence(&server, events).await;
-    test.submit_turn("Inspect resources without any configured server.")
-        .await?;
-    let current = test.codex.config().await;
-    let mut next = current.as_ref().clone();
-    next.mcp_servers.set(HashMap::from([(
-        "resources".to_string(),
-        serde_json::from_value(json!({
-            "url": format!("{}/api/codex/ps/mcp", empty_server.chatgpt_base_url),
-        }))?,
-    )]))?;
-    assert_eq!(
-        test.codex.refresh_mcp_config(current, next).await,
-        ConfigRefreshOutcome::Published,
-    );
-    let startup = wait_for_event_match(&test.codex, |event| match event {
-        EventMsg::McpStartupUpdate(update)
-            if update.server == "resources"
-                && !matches!(update.status, McpStartupStatus::Starting) =>
-        {
-            Some(update.status.clone())
-        }
-        _ => None,
-    })
-    .await;
-    assert!(matches!(startup, McpStartupStatus::Ready), "{startup:?}");
-    test.submit_turn("Inspect resources with one server.")
-        .await?;
-    let current = test.codex.config().await;
-    let mut next = current.as_ref().clone();
-    next.mcp_servers.set(HashMap::new())?;
-    assert_eq!(
-        test.codex.refresh_mcp_config(current, next).await,
-        ConfigRefreshOutcome::Published,
-    );
-    test.submit_turn("Inspect resources after removing the last server.")
-        .await?;
-    let requests = mock.requests();
-    let tools = requests
-        .iter()
-        .map(|request| request.body_json()["tools"].clone())
-        .collect::<Vec<_>>();
-    assert_eq!(requests.len(), 6);
-    assert_eq!(tools, vec![tools[0].clone(); requests.len()]);
-    for (request, phase) in
-        requests
-            .iter()
-            .skip(1)
-            .step_by(2)
-            .zip(["before", "registered", "removed"])
-    {
-        let output = request.custom_tool_call_output(phase).to_string();
-        assert!(output.contains(r#"{\"resources\":[]}"#), "{output}");
-        assert!(output.contains(r#"{\"resourceTemplates\":[]}"#), "{output}");
-        assert!(output.contains("unknown MCP server 'missing'"), "{output}");
-    }
-    test.codex.shutdown_and_wait().await?;
-    Ok(())
-}

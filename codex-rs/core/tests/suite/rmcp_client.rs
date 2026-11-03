@@ -1164,13 +1164,12 @@ async fn discovers_and_calls_new_mcp_tool_in_same_turn(
 ) -> anyhow::Result<()> {
     skip_if_no_network!(Ok(()));
     skip_if_wine_exec!(Ok(()), "requires a Windows test_stdio_server binary");
-    mcp_tool_discovery_scenario(ToolMode::Direct, invalidation, enabled)
+    mcp_tool_discovery_scenario(invalidation, enabled)
         .await
         .map(|_| ())
 }
 
 pub(super) async fn mcp_tool_discovery_scenario(
-    tool_mode: ToolMode,
     invalidation: Option<&'static str>,
     enabled: bool,
 ) -> anyhow::Result<Vec<responses::ResponsesRequest>> {
@@ -1178,11 +1177,6 @@ pub(super) async fn mcp_tool_discovery_scenario(
     let command = remote_aware_stdio_server_bin()?;
     let test = test_codex()
         .with_config(move |config| {
-            config.code_mode.disable_in_process_fallback = true;
-            config
-                .features
-                .enable(Feature::CodeModeHost)
-                .expect("enable Code Mode host");
             if enabled {
                 config
                     .features
@@ -1207,7 +1201,6 @@ pub(super) async fn mcp_tool_discovery_scenario(
             );
         })
         .with_model_info_override("gpt-5.5", move |model| {
-            model.tool_mode = Some(tool_mode);
             model.supports_search_tool = false;
             model.use_responses_lite = false;
         })
@@ -1222,15 +1215,8 @@ pub(super) async fn mcp_tool_discovery_scenario(
         if !enabled && tool == "echo" {
             break;
         }
-        let call = if tool_mode == ToolMode::CodeModeOnly {
-            responses::ev_custom_tool_call(
-                call_id,
-                "exec",
-                &format!("text(await tools.mcp__discovery__{tool}({arguments}));"),
-            )
-        } else {
-            responses::ev_function_call_with_namespace(call_id, "mcp__discovery", tool, arguments)
-        };
+        let call =
+            responses::ev_function_call_with_namespace(call_id, "mcp__discovery", tool, arguments);
         mocks.push(
             responses::mount_sse_once(
                 &server,
@@ -1250,44 +1236,35 @@ pub(super) async fn mcp_tool_discovery_scenario(
         .iter()
         .map(responses::ResponseMock::single_request)
         .collect::<Vec<_>>();
-    if tool_mode == ToolMode::Direct {
-        assert!(
-            requests[0]
-                .tool_by_name("mcp__discovery", "search_tools")
-                .is_some()
-        );
+    assert!(
+        requests[0]
+            .tool_by_name("mcp__discovery", "search_tools")
+            .is_some()
+    );
+    assert_eq!(
+        requests[0].tool_by_name("mcp__discovery", "echo").is_some(),
+        invalidation == Some("startup")
+    );
+    if !enabled {
         assert_eq!(
-            requests[0].tool_by_name("mcp__discovery", "echo").is_some(),
-            invalidation == Some("startup")
+            requests[1].body_json()["tools"],
+            requests[0].body_json()["tools"]
         );
-        if !enabled {
-            assert_eq!(
-                requests[1].body_json()["tools"],
-                requests[0].body_json()["tools"]
-            );
-            return Ok(requests);
-        }
-        assert!(requests[1].tool_by_name("mcp__discovery", "echo").is_some());
-        let output = requests[2]
-            .function_call_output_text("invoke")
-            .expect("echo output");
-        let (_, payload) = output
-            .split_once("\nOutput:\n")
-            .expect("wrapped MCP output");
-        assert_eq!(
-            serde_json::from_str::<Value>(payload)?,
-            json!({
-                "echo": "ECHOING: hello", "env": "discovered",
-            })
-        );
-    } else {
-        assert!(
-            requests[2]
-                .custom_tool_call_output("invoke")
-                .to_string()
-                .contains("ECHOING: hello")
-        );
+        return Ok(requests);
     }
+    assert!(requests[1].tool_by_name("mcp__discovery", "echo").is_some());
+    let output = requests[2]
+        .function_call_output_text("invoke")
+        .expect("echo output");
+    let (_, payload) = output
+        .split_once("\nOutput:\n")
+        .expect("wrapped MCP output");
+    assert_eq!(
+        serde_json::from_str::<Value>(payload)?,
+        json!({
+            "echo": "ECHOING: hello", "env": "discovered",
+        })
+    );
     Ok(requests)
 }
 
@@ -1912,9 +1889,6 @@ async fn startup_prewarm_connects_before_delayed_mcp_tools_then_reuses_socket(
         .with_model_info_override("gpt-5.4", move |model| {
             model.supports_search_tool = false;
             model.use_responses_lite = use_responses_lite;
-            if use_responses_lite {
-                model.tool_mode = Some(ToolMode::CodeMode);
-            }
             model.service_tiers.push(ModelServiceTier {
                 id: service_tier.to_string(),
                 name: "Fast".to_string(),

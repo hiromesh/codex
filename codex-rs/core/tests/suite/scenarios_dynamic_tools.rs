@@ -8,10 +8,6 @@ fn configure_dynamic_tool_scenario(config: &mut Config) {
     config.model = Some("gpt-6-astra".into());
     configure_scenario_catalog(config);
     config.include_environment_context = false;
-    config
-        .features
-        .disable(Feature::CodeMode)
-        .expect("disable code mode");
     let model = config
         .model_catalog
         .as_mut()

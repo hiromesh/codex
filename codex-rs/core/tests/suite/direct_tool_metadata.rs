@@ -82,14 +82,6 @@ async fn message_budget_sheds_arguments_without_losing_inventory_completeness(
             .expect("disable token budget");
         config
             .features
-            .disable(Feature::CodeModeOnly)
-            .expect("disable code-mode-only tools");
-        config
-            .features
-            .disable(Feature::CodeMode)
-            .expect("disable code mode");
-        config
-            .features
             .enable(Feature::ExecutedToolCallMetadata)
             .expect("enable tool-call metadata");
         config.update_plan_enabled = true;
@@ -751,14 +743,6 @@ async fn direct_metadata_limit_respects_provider_support(
             .features
             .enable(Feature::ExecutedToolCallMetadata)
             .expect("enable executed tool call metadata");
-        config
-            .features
-            .disable(Feature::CodeMode)
-            .expect("disable code mode");
-        config
-            .features
-            .disable(Feature::CodeModeOnly)
-            .expect("disable code-mode-only tools");
     };
     let mut builder = search_capable_apps_builder(apps.chatgpt_base_url.clone())
         .with_config(configure_metadata.clone());

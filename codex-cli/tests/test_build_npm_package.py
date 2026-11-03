@@ -27,21 +27,20 @@ class NpmPackageTest(unittest.TestCase):
                 root = Path(temp)
                 target = platform["target_triple"]
                 source = root / "vendor" / target
-                suffix = ".exe" if platform["os"] == "win32" else ""
                 metadata = {
                     "layoutVersion": 1,
                     "variant": "codex",
                     "version": "1.2.3",
                     "target": target,
-                    "entrypoint": f"bin/codex{suffix}",
-                    "execServer": f"bin/codex-exec-server{suffix}",
+                    "entrypoint": "bin/codex",
+                    "execServer": "bin/codex-exec-server",
                     "resourcesDir": "codex-resources",
                     "pathDir": "codex-path",
                 }
                 files = [
                     metadata["entrypoint"],
                     metadata["execServer"],
-                    f"codex-path/rg{suffix}",
+                    "codex-path/rg",
                 ]
                 if platform["os"] == "linux":
                     files.append("codex-resources/bwrap")

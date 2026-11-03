@@ -14,9 +14,6 @@ manual_rust_test_targets="$(
     --output=label \
     -- 'kind("rust_test rule", attr(tags, "manual", //codex-rs/...))'
 )"
-if [[ "${RUNNER_OS:-}" != "Windows" ]]; then
-  manual_rust_test_targets="$(printf '%s\n' "${manual_rust_test_targets}" | grep -v -- '-windows-cross-bin$' || true)"
-fi
 
 # Convert semantic lint opt-outs into negative target patterns so wildcard
 # builds do not analyze toolchains used only by those wrappers.

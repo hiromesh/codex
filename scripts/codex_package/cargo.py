@@ -61,12 +61,12 @@ def build_source_binaries(
     outputs = SourceBuildOutputs(
         entrypoint_bin=resolve_output_path(
             entrypoint_bin,
-            output_dir / variant.entrypoint_name(spec),
+            output_dir / variant.entrypoint_name(),
         ),
         exec_server_bin=(
             exec_server_bin.resolve()
             if exec_server_bin is not None
-            else output_dir / f"codex-exec-server{spec.exe_suffix}"
+            else output_dir / "codex-exec-server"
         ),
         bwrap_bin=resolve_output_path(
             bwrap_bin,

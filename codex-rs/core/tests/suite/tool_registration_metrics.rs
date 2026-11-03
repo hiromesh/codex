@@ -200,7 +200,6 @@ async fn sampling_records_tool_registrations_once_across_stream_retry() -> Resul
             ("direct_model_only".to_string(), (1, 1.0)),
             ("deferred".to_string(), (1, 1.0)),
             ("deferred_model_only".to_string(), (1, 0.0)),
-            ("code_mode_only".to_string(), (1, 0.0)),
             ("hidden".to_string(), (1, 0.0)),
         ])
     );

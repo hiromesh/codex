@@ -16,11 +16,6 @@ query_args=("${@:1:$#-2}")
 query_expression="${@: -1}"
 
 run_bazel() {
-  if [[ "${RUNNER_OS:-}" == "Windows" ]]; then
-    MSYS2_ARG_CONV_EXCL='*' "$(dirname "${BASH_SOURCE[0]}")/run_bazel_with_buildbuddy.py" "$@"
-    return
-  fi
-
   "$(dirname "${BASH_SOURCE[0]}")/run_bazel_with_buildbuddy.py" "$@"
 }
 

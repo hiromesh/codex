@@ -25,7 +25,7 @@ def fetch_rg(
         manifest_path=manifest_path,
         artifact_label="ripgrep",
         cache_key=f"{spec.target}-rg",
-        dest_name=spec.rg_name,
+        dest_name="rg",
     )
     if rg_bin is None:
         raise AssertionError("ripgrep is required for all package targets")

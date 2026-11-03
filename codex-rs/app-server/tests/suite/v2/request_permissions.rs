@@ -64,7 +64,6 @@ async fn code_mode_uses_permissions_approved_in_the_same_cell(
         .with_sandbox_mode("read-only")
         .with_root_config(r#"approvals_reviewer = "user""#)
         .enable_feature(Feature::RequestPermissionsTool)
-        .enable_feature(Feature::CodeModeOnly)
         .enable_feature(Feature::GuardianApproval)
         .write(codex_home.path())?;
     write_models_cache_with_models(codex_home.path(), vec![model_info_from_slug("gpt-5.4")])
@@ -262,7 +261,6 @@ async fn steps_capture_permission_grants_and_preserve_their_scope(
         .with_sandbox_mode("read-only")
         .with_root_config(r#"approvals_reviewer = "user""#)
         .enable_feature(Feature::RequestPermissionsTool)
-        .enable_feature(Feature::CodeModeOnly)
         .write(codex_home.path())?;
     let mut model = model_info_from_slug("gpt-5.4");
     model.apply_patch_tool_type = Some(ApplyPatchToolType::Freeform);
@@ -511,7 +509,6 @@ async fn background_cell_uses_permissions_requested_after_next_turn_starts(
         .with_sandbox_mode("read-only")
         .with_root_config(r#"approvals_reviewer = "user""#)
         .enable_feature(Feature::RequestPermissionsTool)
-        .enable_feature(Feature::CodeModeOnly)
         .enable_feature(Feature::GuardianApproval)
         .write(codex_home.path())?;
     let mut model = model_info_from_slug("gpt-5.4");

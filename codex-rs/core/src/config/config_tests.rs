@@ -664,50 +664,6 @@ async fn load_config_resolves_update_plan_enabled() -> std::io::Result<()> {
     }
     Ok(())
 }
-
-#[tokio::test]
-async fn load_config_resolves_code_mode_config() -> std::io::Result<()> {
-    let codex_home = tempdir()?;
-    let config_toml: ConfigToml = toml::from_str(
-        r#"
-[features.code_mode]
-enabled = true
-default_exec_yield_time_ms = 10000
-experimental_show_cell_overhead = true
-tool_input_schema_max_bytes = 36000
-excluded_tool_namespaces = ["mcp__codex_apps", "multi_agent_v1"]
-direct_only_tool_namespaces = ["mcp__history", "mcp__notes"]
-
-[features.code_mode_host]
-enabled = true
-disable_in_process_fallback = true
-"#,
-    )
-    .expect("TOML deserialization should succeed");
-    let config = Config::load_from_base_config_with_overrides(
-        config_toml,
-        ConfigOverrides::default(),
-        codex_home.abs(),
-    )
-    .await?;
-
-    assert_eq!(config.code_mode.default_exec_yield_time_ms, 10_000);
-    assert!(config.code_mode.experimental_show_cell_overhead);
-    assert_eq!(config.code_mode.tool_input_schema_max_bytes, Some(36_000));
-    assert_eq!(
-        config.code_mode.excluded_tool_namespaces,
-        vec!["mcp__codex_apps".to_string(), "multi_agent_v1".to_string()]
-    );
-    assert_eq!(
-        config.code_mode.direct_only_tool_namespaces,
-        vec!["mcp__history".to_string(), "mcp__notes".to_string()]
-    );
-    assert!(config.code_mode.disable_in_process_fallback);
-    assert!(config.features.enabled(Feature::CodeMode));
-    assert!(config.features.enabled(Feature::CodeModeHost));
-    Ok(())
-}
-
 #[tokio::test]
 async fn load_config_resolves_tool_registry_config() -> std::io::Result<()> {
     let codex_home = tempdir()?;
@@ -742,7 +698,6 @@ async fn load_config_resolves_tool_registry_config() -> std::io::Result<()> {
             config.tool_registry.turn_metadata_includes_tool_info,
             turn_metadata_includes_tool_info
         );
-        assert!(!config.features.enabled(Feature::CodeMode));
     }
 
     Ok(())

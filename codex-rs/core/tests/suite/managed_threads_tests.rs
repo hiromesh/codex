@@ -260,10 +260,6 @@ async fn startup_allowlist_controls_advertising_and_execution(
     let fixture = test_codex()
         .with_config(|config| {
             config.update_plan_enabled = true;
-            config
-                .features
-                .disable(codex_features::Feature::CodeMode)
-                .expect("disable Code Mode for direct-tool assertions");
         })
         .build_with_auto_env(&server)
         .await?;
@@ -368,10 +364,6 @@ async fn startup_tool_policy_controls_additional_permission_parameters(
     let server = responses::start_mock_server().await;
     let fixture = test_codex()
         .with_config(|config| {
-            config
-                .features
-                .disable(codex_features::Feature::CodeMode)
-                .expect("disable Code Mode for direct-tool assertions");
             config
                 .features
                 .enable(codex_features::Feature::ExecPermissionApprovals)

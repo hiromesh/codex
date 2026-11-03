@@ -69,7 +69,6 @@ async fn dispatch_revokes_access_and_holds_call_id_through_callbacks() -> anyhow
         registry,
         vec![],
         ToolMode::Direct,
-        Default::default(),
         /*tool_namespaces_info*/ None,
         &[],
     );

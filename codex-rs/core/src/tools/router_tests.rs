@@ -415,15 +415,6 @@ async fn mcp_parallel_support_uses_handler_data() -> anyhow::Result<()> {
                     "query_with_delay",
                 ))
             },
-            RegisteredTool {
-                exposure: ToolExposure::CodeModeOnly,
-                ..mcp_runtime(mcp_tool_info(
-                    "nested_echo",
-                    /*supports_parallel_tool_calls*/ true,
-                    "mcp__nested_echo__",
-                    "query_with_delay",
-                ))
-            },
         ],
         Vec::new(),
         session.dynamic_tools().await.as_ref(),

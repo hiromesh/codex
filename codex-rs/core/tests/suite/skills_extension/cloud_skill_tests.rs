@@ -4,8 +4,6 @@ use super::*;
 use pretty_assertions::assert_eq;
 use tokio::sync::Mutex;
 
-#[path = "yielded_skill_tests.rs"]
-mod yielded_skill_tests;
 
 struct FakeCloudSkillProvider {
     catalog: SkillCatalog,
@@ -69,7 +67,6 @@ async fn explicit_only_cloud_skill_is_hidden_but_can_be_invoked() -> Result<()> 
     const REFERENCED_RESOURCE: &str = "skill://demo/explicit-only/references/guide.md";
     const READ_CALL_ID: &str = "read-explicit-only-resource";
     const LIST_CALL_ID: &str = "list-model-visible-skills";
-    const CODE_MODE_LIST_CALL_ID: &str = "list-skills-through-code-mode";
     const CONTINUATION_CALL_ID: &str = "read-explicit-only-resource-continuation";
     const MAIN_READ_CALL_ID: &str = "read-explicit-only-main";
     const REPEATED_MAIN_READ_CALL_ID: &str = "read-explicit-only-main-again";
@@ -104,12 +101,6 @@ async fn explicit_only_cloud_skill_is_hidden_but_can_be_invoked() -> Result<()> 
                     "skills",
                     "list",
                     &json!({ "authority": { "kind": "cloud" } }).to_string(),
-                ),
-                responses::ev_custom_tool_call(
-                    CODE_MODE_LIST_CALL_ID,
-                    "exec",
-                    r#"const result = await tools.skills__list({ authority: { kind: "cloud" } });
-text({ names: result.skills.map(skill => skill.name), warnings: result.warnings, next_cursor: result.next_cursor });"#,
                 ),
                 ev_completed("resp-1"),
             ]),
@@ -184,16 +175,7 @@ text({ names: result.skills.map(skill => skill.name), warnings: result.warnings,
         .with_config(|config| {
             config.include_skill_instructions = true;
             config.cloud_skill_enabled = true;
-            config
-                .features
-                .enable(Feature::CodeMode)
-                .expect("code mode should be configurable in tests");
-            config
-                .features
-                .enable(Feature::CodeModeHost)
-                .expect("code mode host should be configurable in tests");
-        })
-        .with_code_mode_host_program(codex_utils_cargo_bin::cargo_bin("codex-code-mode-host")?);
+        });
     let test = builder.build_with_auto_env(&server).await?;
 
     test.submit_turn("Use $demo:explicit-only.").await?;
@@ -259,22 +241,6 @@ text({ names: result.skills.map(skill => skill.name), warnings: result.warnings,
     let mut list_output = requests[1]
         .function_call_output_text(LIST_CALL_ID)
         .expect("skills.list should return the model-visible catalog");
-    let code_mode_output = requests[1].custom_tool_call_output(CODE_MODE_LIST_CALL_ID);
-    let code_mode_text = code_mode_output["output"]
-        .as_array()
-        .and_then(|items| items.last())
-        .and_then(|item| item["text"].as_str())
-        .ok_or_else(|| {
-            anyhow::anyhow!("Code Mode should return its skills.list result: {code_mode_output}")
-        })?;
-    assert_eq!(
-        serde_json::from_str::<Value>(code_mode_text)?,
-        json!({
-            "names": ["demo:alpha-visible", "demo:bravo-visible-skill", "demo:visible"],
-            "warnings": [],
-            "next_cursor": null,
-        })
-    );
     let events = wait_for_analytics_events(&server, "skill_invocation", /*expected_count*/ 1).await;
     assert_eq!(events.len(), 1);
     assert_eq!(events[0]["skill_name"], "demo:explicit-only");

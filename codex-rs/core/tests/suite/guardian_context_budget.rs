@@ -286,17 +286,6 @@ async fn review_respects_complete_context_budget(
                 prefill_token_weight: 1.0,
             });
         });
-    if matches!(
-        reviewer_response,
-        ReviewerResponse::ToolContinuation
-            | ReviewerResponse::CachedCompactionContinuation
-            | ReviewerResponse::FileImageContinuation
-            | ReviewerResponse::UncompactableContinuation
-            | ReviewerResponse::CompactionError
-    ) {
-        builder = builder
-            .with_code_mode_host_program(codex_utils_cargo_bin::cargo_bin("codex-code-mode-host")?);
-    }
     let image_store = Arc::new(RecordingFileAttachmentStore::default());
     if matches!(reviewer_response, ReviewerResponse::FileImageContinuation) {
         builder = builder.with_image_store(image_store.clone());

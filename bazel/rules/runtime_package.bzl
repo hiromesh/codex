@@ -60,13 +60,6 @@ def _release_profile_impl(settings, attr):
     elif attr.platform_os == "linux":
         # Compatibility with the Cargo musl release: aws-lc jitter can hang.
         profile["//command_line_option:copt"] += ["-DDISABLE_CPU_JITTER_ENTROPY"]
-    elif attr.platform_os == "windows" and "@platforms//os:windows" in HOST_CONSTRAINTS:
-        # Native MSVC supplies the SDK and host tools for both architectures.
-        profile["//command_line_option:host_platform"] = "//:local_windows_msvc"
-        profile["//command_line_option:extra_toolchains"] += [
-            "@local_config_cc//:cc-toolchain-x64_windows",
-            "@local_config_cc//:cc-toolchain-arm64_windows",
-        ]
     return profile
 
 _release_profile = transition(
@@ -87,7 +80,7 @@ def _runtime_binary_files_impl(ctx):
 
     # Use the binary's target configuration, including cross builds. Linux keeps
     # DWARF inside the executable until the existing packaging strip pass.
-    for group, suffix in [("pdb_file", ".pdb"), ("dsym_folder", ".dSYM")]:
+    for group, suffix in [("dsym_folder", ".dSYM")]:
         symbols = getattr(binary[OutputGroupInfo], group, depset()).to_list()
         if not symbols and group == ctx.attr.symbol_group:
             fail("Missing %s for %s" % (group, binary.label))
@@ -162,7 +155,6 @@ def release_binary(binary, name = "release", macos_x86_64_minimum_os = "10.12", 
         platform_os = select({
             "@platforms//os:macos": "macos",
             "@platforms//os:linux": "linux",
-            "@platforms//os:windows": "windows",
         }),
         macos_minimum_os = select({
             "@platforms//cpu:aarch64": "11.0",
@@ -170,7 +162,6 @@ def release_binary(binary, name = "release", macos_x86_64_minimum_os = "10.12", 
         }),
         symbol_group = select({
             "@platforms//os:macos": "dsym_folder",
-            "@platforms//os:windows": "pdb_file",
             "//conditions:default": "",
         }),
         **kwargs

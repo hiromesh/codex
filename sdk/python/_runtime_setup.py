@@ -110,11 +110,6 @@ def platform_asset_name() -> str:
             return "codex-package-aarch64-unknown-linux-musl.tar.gz"
         if machine in {"x86_64", "amd64"}:
             return "codex-package-x86_64-unknown-linux-musl.tar.gz"
-    elif system == "windows":
-        if machine in {"aarch64", "arm64"}:
-            return "codex-package-aarch64-pc-windows-msvc.tar.gz"
-        if machine in {"x86_64", "amd64"}:
-            return "codex-package-x86_64-pc-windows-msvc.tar.gz"
 
     raise RuntimeSetupError(
         f"Unsupported runtime artifact platform: system={platform.system()!r}, "
