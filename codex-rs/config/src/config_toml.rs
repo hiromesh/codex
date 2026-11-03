@@ -35,11 +35,8 @@ use codex_features::FeaturesToml;
 use codex_model_provider_info::AMAZON_BEDROCK_PROVIDER_ID;
 use codex_model_provider_info::AMAZON_BEDROCK_RUNTIME_PROVIDER_ID;
 use codex_model_provider_info::GCP_PROVIDER_ID;
-use codex_model_provider_info::LEGACY_OLLAMA_CHAT_PROVIDER_ID;
 use codex_model_provider_info::LMSTUDIO_OSS_PROVIDER_ID;
 use codex_model_provider_info::ModelProviderInfo;
-use codex_model_provider_info::OLLAMA_CHAT_PROVIDER_REMOVED_ERROR;
-use codex_model_provider_info::OLLAMA_OSS_PROVIDER_ID;
 use codex_model_provider_info::OPENAI_PROVIDER_ID;
 use codex_protocol::config_types::AutoCompactTokenLimitScope;
 use codex_protocol::config_types::ForcedLoginMethod;
@@ -62,12 +59,11 @@ use serde::Serialize;
 use serde::de::Error as SerdeError;
 use serde_json::Value as JsonValue;
 
-const RESERVED_MODEL_PROVIDER_IDS: [&str; 6] = [
+const RESERVED_MODEL_PROVIDER_IDS: [&str; 5] = [
     AMAZON_BEDROCK_PROVIDER_ID,
     AMAZON_BEDROCK_RUNTIME_PROVIDER_ID,
     GCP_PROVIDER_ID,
     OPENAI_PROVIDER_ID,
-    OLLAMA_OSS_PROVIDER_ID,
     LMSTUDIO_OSS_PROVIDER_ID,
 ];
 
@@ -558,7 +554,7 @@ pub struct ConfigToml {
 
     pub experimental_compact_prompt_file: Option<AbsolutePathBuf>,
     pub experimental_use_unified_exec_tool: Option<bool>,
-    /// Preferred OSS provider for local models, e.g. "lmstudio" or "ollama".
+    /// Preferred OSS provider for local models, e.g. "lmstudio".
     pub oss_provider: Option<String>,
 }
 
@@ -1000,15 +996,11 @@ mod bedrock_runtime_tests;
 
 pub fn validate_oss_provider(provider: &str) -> std::io::Result<()> {
     match provider {
-        LMSTUDIO_OSS_PROVIDER_ID | OLLAMA_OSS_PROVIDER_ID => Ok(()),
-        LEGACY_OLLAMA_CHAT_PROVIDER_ID => Err(std::io::Error::new(
-            std::io::ErrorKind::InvalidInput,
-            OLLAMA_CHAT_PROVIDER_REMOVED_ERROR,
-        )),
+        LMSTUDIO_OSS_PROVIDER_ID => Ok(()),
         _ => Err(std::io::Error::new(
             std::io::ErrorKind::InvalidInput,
             format!(
-                "Invalid OSS provider '{provider}'. Must be one of: {LMSTUDIO_OSS_PROVIDER_ID}, {OLLAMA_OSS_PROVIDER_ID}"
+                "Invalid OSS provider '{provider}'. Must be one of: {LMSTUDIO_OSS_PROVIDER_ID}"
             ),
         )),
     }

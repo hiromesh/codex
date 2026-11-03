@@ -286,8 +286,8 @@ async fn run_command_under_sandbox(
         Some(spec) => Some(
             spec.start_proxy(
                 &permission_profile,
-                codex_network_proxy::ManagedProxyRouting::SharedIngress,
-                codex_network_proxy::LocalBindingPolicy::DefaultFalse,
+                codex_core::config::ManagedProxyRouting::SharedIngress,
+                codex_core::config::LocalBindingPolicy::DefaultFalse,
                 /*policy_decider*/ None,
                 /*blocked_request_observer*/ None,
                 managed_network_requirements_enabled,

@@ -88,9 +88,7 @@ use codex_model_provider::ChatgptBaseUrl;
 use codex_model_provider::DEFAULT_CHATGPT_BASE_URL;
 use codex_model_provider::ProviderCapabilities;
 use codex_model_provider_info::GCP_PROVIDER_ID;
-use codex_model_provider_info::LEGACY_OLLAMA_CHAT_PROVIDER_ID;
 use codex_model_provider_info::ModelProviderInfo;
-use codex_model_provider_info::OLLAMA_CHAT_PROVIDER_REMOVED_ERROR;
 use codex_model_provider_info::built_in_model_providers;
 use codex_model_provider_info::merge_configured_model_providers;
 use codex_models_manager::ModelsManagerConfig;
@@ -185,6 +183,8 @@ pub use codex_config::Constrained;
 pub use codex_config::ConstraintError;
 pub use codex_config::ConstraintResult;
 pub use codex_config::LoaderOverrides;
+pub use codex_network_proxy::LocalBindingPolicy;
+pub use codex_network_proxy::ManagedProxyRouting;
 pub use codex_network_proxy::NetworkProxyAuditMetadata;
 use codex_sandboxing::compatibility_sandbox_policy_for_permission_profile;
 pub use codex_sandboxing::system_bwrap_warning;
@@ -3915,12 +3915,10 @@ impl Config {
         let model_provider = model_providers
             .get(&model_provider_id)
             .ok_or_else(|| {
-                let message = if model_provider_id == LEGACY_OLLAMA_CHAT_PROVIDER_ID {
-                    OLLAMA_CHAT_PROVIDER_REMOVED_ERROR.to_string()
-                } else {
-                    format!("Model provider `{model_provider_id}` not found")
-                };
-                std::io::Error::new(std::io::ErrorKind::NotFound, message)
+                std::io::Error::new(
+                    std::io::ErrorKind::NotFound,
+                    format!("Model provider `{model_provider_id}` not found"),
+                )
             })?
             .clone();
 

@@ -17,9 +17,7 @@ use crate::render::renderable::RenderableItem;
 use codex_http_client::HttpClient;
 use codex_http_client::HttpClientBuilder;
 use codex_model_provider_info::DEFAULT_LMSTUDIO_PORT;
-use codex_model_provider_info::DEFAULT_OLLAMA_PORT;
 use codex_model_provider_info::LMSTUDIO_OSS_PROVIDER_ID;
-use codex_model_provider_info::OLLAMA_OSS_PROVIDER_ID;
 use crossterm::event::Event;
 use crossterm::event::KeyCode;
 use crossterm::event::KeyEvent;
@@ -45,7 +43,7 @@ use ratatui::widgets::WidgetRef;
 use ratatui::widgets::Wrap;
 use std::time::Duration;
 
-#[derive(Clone)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum ProviderStatus {
     Running,
     NotRunning,
@@ -70,12 +68,6 @@ static OSS_SELECT_OPTIONS: LazyLock<Vec<SelectOption>> = LazyLock::new(|| {
             key: KeyCode::Char('l'),
             provider_id: LMSTUDIO_OSS_PROVIDER_ID,
         },
-        SelectOption {
-            label: Line::from(vec!["O".underlined(), "llama".into()]),
-            description: "Local Ollama server (Responses API, default port 11434)",
-            key: KeyCode::Char('o'),
-            provider_id: OLLAMA_OSS_PROVIDER_ID,
-        },
     ]
 });
 
@@ -93,7 +85,7 @@ const MOVE_RIGHT_KEYS: [KeyBinding; 2] = [
 
 pub struct OssSelectionWidget<'a> {
     select_options: &'a Vec<SelectOption>,
-    provider_statuses: [ProviderStatus; 2],
+    provider_statuses: [ProviderStatus; 1],
 
     /// Currently selected index in *select* mode.
     selected_option: usize,
@@ -106,10 +98,10 @@ pub struct OssSelectionWidget<'a> {
 }
 
 impl OssSelectionWidget<'_> {
-    fn new(lmstudio_status: ProviderStatus, ollama_status: ProviderStatus) -> Self {
+    fn new(lmstudio_status: ProviderStatus) -> Self {
         Self {
             select_options: &OSS_SELECT_OPTIONS,
-            provider_statuses: [lmstudio_status, ollama_status],
+            provider_statuses: [lmstudio_status],
             selected_option: 0,
             done: false,
             selection: None,
@@ -171,11 +163,10 @@ impl OssSelectionWidget<'_> {
                 self.send_decision(LMSTUDIO_OSS_PROVIDER_ID.to_string());
             }
             KeyEvent {
-                code: KeyCode::Char('1' | '2'),
+                code: KeyCode::Char('1'),
                 ..
             } => {
-                let index = usize::from(key_event.code == KeyCode::Char('2'));
-                self.send_decision(self.select_options[index].provider_id.to_string());
+                self.send_decision(self.select_options[0].provider_id.to_string());
             }
             KeyEvent { code, .. } => {
                 let other = code;
@@ -278,10 +269,7 @@ pub(crate) struct OssProviderSelection {
 
 pub(crate) enum OssProviderDetection {
     AutoSelected(OssProviderSelection),
-    NeedsSelection {
-        lmstudio_status: ProviderStatus,
-        ollama_status: ProviderStatus,
-    },
+    NeedsSelection { lmstudio_status: ProviderStatus },
 }
 
 /// Probe local providers without suspending the interactive startup composer.
@@ -294,37 +282,22 @@ pub(crate) async fn detect_oss_provider() -> OssProviderDetection {
 
     // Check provider statuses first
     let lmstudio_status = check_lmstudio_status(&client).await;
-    let ollama_status = check_ollama_status(&client).await;
 
-    // Autoselect if only one is running
-    match (&lmstudio_status, &ollama_status) {
-        (ProviderStatus::Running, ProviderStatus::NotRunning) => {
-            let provider = LMSTUDIO_OSS_PROVIDER_ID.to_string();
-            OssProviderDetection::AutoSelected(OssProviderSelection {
-                provider,
-                manually_selected: false,
-            })
-        }
-        (ProviderStatus::NotRunning, ProviderStatus::Running) => {
-            let provider = OLLAMA_OSS_PROVIDER_ID.to_string();
-            OssProviderDetection::AutoSelected(OssProviderSelection {
-                provider,
-                manually_selected: false,
-            })
-        }
-        _ => OssProviderDetection::NeedsSelection {
-            lmstudio_status,
-            ollama_status,
-        },
+    if lmstudio_status == ProviderStatus::Running {
+        OssProviderDetection::AutoSelected(OssProviderSelection {
+            provider: LMSTUDIO_OSS_PROVIDER_ID.to_string(),
+            manually_selected: false,
+        })
+    } else {
+        OssProviderDetection::NeedsSelection { lmstudio_status }
     }
 }
 
 /// Run the actionable provider picker after provider discovery requires a user decision.
 pub(crate) async fn select_oss_provider(
     lmstudio_status: ProviderStatus,
-    ollama_status: ProviderStatus,
 ) -> io::Result<OssProviderSelection> {
-    let mut widget = OssSelectionWidget::new(lmstudio_status, ollama_status);
+    let mut widget = OssSelectionWidget::new(lmstudio_status);
 
     enable_raw_mode()?;
     let mut stdout = io::stdout();
@@ -369,14 +342,6 @@ async fn check_lmstudio_status(client: &HttpClient) -> ProviderStatus {
     }
 }
 
-async fn check_ollama_status(client: &HttpClient) -> ProviderStatus {
-    match check_port_status(client, DEFAULT_OLLAMA_PORT).await {
-        Ok(true) => ProviderStatus::Running,
-        Ok(false) => ProviderStatus::NotRunning,
-        Err(_) => ProviderStatus::Unknown,
-    }
-}
-
 async fn check_port_status(client: &HttpClient, port: u16) -> io::Result<bool> {
     let url = format!("http://localhost:{port}");
 
@@ -397,7 +362,7 @@ mod tests {
 
     #[test]
     fn ctrl_h_l_move_provider_selection() {
-        let mut widget = OssSelectionWidget::new(ProviderStatus::Unknown, ProviderStatus::Unknown);
+        let mut widget = OssSelectionWidget::new(ProviderStatus::Unknown);
 
         assert_eq!(widget.selected_option, 0);
         widget.handle_key_event(KeyEvent::new(KeyCode::Char('l'), KeyModifiers::CONTROL));

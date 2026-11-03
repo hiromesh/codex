@@ -442,15 +442,12 @@ pub(super) async fn run_main_inner(
                 .await?
             {
                 oss_selection::OssProviderDetection::AutoSelected(selection) => selection,
-                oss_selection::OssProviderDetection::NeedsSelection {
-                    lmstudio_status,
-                    ollama_status,
-                } => {
+                oss_selection::OssProviderDetection::NeedsSelection { lmstudio_status } => {
                     startup_draft.flush_pending_events().await?;
                     startup_draft
                         .tui_mut()
                         .with_restored(crate::tui::TerminalHandoff::Restore, || {
-                            oss_selection::select_oss_provider(lmstudio_status, ollama_status)
+                            oss_selection::select_oss_provider(lmstudio_status)
                         })
                         .await?
                 }

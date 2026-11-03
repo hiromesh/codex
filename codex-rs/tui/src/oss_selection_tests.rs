@@ -7,42 +7,22 @@ use ratatui::widgets::FrameExt;
 
 #[test]
 fn provider_picker_snapshots() {
-    for (name, lmstudio, ollama, width, height, selected) in [
+    for (name, lmstudio, width, height) in [
         (
             "oss_providers_stopped",
             ProviderStatus::NotRunning,
-            ProviderStatus::NotRunning,
             80,
             24,
-            0,
         ),
-        (
-            "oss_providers_running",
-            ProviderStatus::Running,
-            ProviderStatus::Running,
-            80,
-            24,
-            1,
-        ),
+        ("oss_providers_running", ProviderStatus::Running, 80, 24),
         (
             "oss_providers_unknown_narrow",
             ProviderStatus::Unknown,
-            ProviderStatus::Unknown,
             40,
             16,
-            0,
-        ),
-        (
-            "oss_providers_mixed_short",
-            ProviderStatus::NotRunning,
-            ProviderStatus::Running,
-            28,
-            12,
-            1,
         ),
     ] {
-        let mut widget = OssSelectionWidget::new(lmstudio, ollama);
-        widget.selected_option = selected;
+        let widget = OssSelectionWidget::new(lmstudio);
         let mut terminal = Terminal::new(VT100Backend::new(width, height)).expect("terminal");
         terminal
             .draw(|frame| frame.render_widget_ref(&widget, frame.area()))
@@ -59,9 +39,9 @@ fn navigation_wraps_without_confirming() {
         KeyEvent::new(KeyCode::Char('j'), KeyModifiers::NONE),
         KeyEvent::new(KeyCode::Char('k'), KeyModifiers::NONE),
     ] {
-        let mut widget = OssSelectionWidget::new(ProviderStatus::Running, ProviderStatus::Running);
+        let mut widget = OssSelectionWidget::new(ProviderStatus::Running);
         assert_eq!(widget.handle_key_event(event), None);
-        assert_eq!((widget.selected_option, widget.is_complete()), (1, false));
+        assert_eq!((widget.selected_option, widget.is_complete()), (0, false));
         assert_eq!(widget.handle_key_event(event), None);
         assert_eq!((widget.selected_option, widget.is_complete()), (0, false));
     }
@@ -69,16 +49,10 @@ fn navigation_wraps_without_confirming() {
 
 #[test]
 fn shortcuts_select_the_provider_even_when_unavailable() {
-    for (key, provider) in [
-        ('1', LMSTUDIO_OSS_PROVIDER_ID),
-        ('2', OLLAMA_OSS_PROVIDER_ID),
-    ] {
-        let mut widget =
-            OssSelectionWidget::new(ProviderStatus::NotRunning, ProviderStatus::NotRunning);
-        assert_eq!(
-            widget.handle_key_event(KeyEvent::new(KeyCode::Char(key), KeyModifiers::NONE)),
-            Some(provider.to_string())
-        );
-        assert!(widget.is_complete());
-    }
+    let mut widget = OssSelectionWidget::new(ProviderStatus::NotRunning);
+    assert_eq!(
+        widget.handle_key_event(KeyEvent::new(KeyCode::Char('1'), KeyModifiers::NONE)),
+        Some(LMSTUDIO_OSS_PROVIDER_ID.to_string())
+    );
+    assert!(widget.is_complete());
 }
