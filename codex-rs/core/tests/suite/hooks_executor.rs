@@ -358,7 +358,6 @@ async fn thread_lists_the_environment_hook_that_blocks_a_turn() -> Result<()> {
         [[UserPromptSubmit.hooks]]
         type = "command"
         command = "echo blocked-by-listed-hook >&2; exit 2"
-        command_windows = "Write-Error 'blocked-by-listed-hook'; exit 2"
     "#,
     )?;
     thread.environment_ready(&selection, config).await?;

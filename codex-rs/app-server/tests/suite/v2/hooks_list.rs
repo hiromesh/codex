@@ -61,7 +61,6 @@ fn command_hook_hash(
             matcher: matcher.map(ToOwned::to_owned),
             hooks: vec![codex_config::HookHandlerConfig::Command {
                 command: command.to_string(),
-                command_windows: None,
                 timeout_sec: Some(timeout_sec),
                 r#async,
                 status_message: status_message.map(ToOwned::to_owned),

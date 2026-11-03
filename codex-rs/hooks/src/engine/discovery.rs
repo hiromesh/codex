@@ -524,7 +524,7 @@ pub fn validate_environment_hooks(
 
 fn append_environment_hooks(
     discovered: &mut DiscoveryResult,
-    mut source: crate::EnvironmentHookSource,
+    source: crate::EnvironmentHookSource,
     display_order: &mut i64,
 ) {
     let path = synthetic_layer_path(&format!(

@@ -99,7 +99,6 @@ matcher = "auto"
 [[hooks.PreCompact.hooks]]
 type = "command"
 command = """printf '%s' '{"continue":false}'"""
-command_windows = """Write-Output '{"continue":false}'"""
 "#,
             );
     }

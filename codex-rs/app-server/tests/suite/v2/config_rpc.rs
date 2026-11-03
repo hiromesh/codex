@@ -294,7 +294,6 @@ statusMessage = "Scanning file"
         vec![
             ConfiguredHookHandler::Command {
                 command: "echo managed".to_string(),
-                command_windows: None,
                 timeout_sec: None,
                 r#async: false,
                 status_message: None,
