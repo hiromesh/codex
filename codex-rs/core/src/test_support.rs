@@ -32,7 +32,6 @@ use codex_protocol::protocol::SessionSource;
 use once_cell::sync::Lazy;
 
 use crate::ThreadManager;
-pub use crate::code_mode_host::ProcessOwnedGrpcCodeModeSessionProvider;
 use crate::config::Config;
 use crate::responses_metadata::CodexResponsesMetadata;
 use crate::responses_metadata::CodexResponsesRequestKind;
@@ -153,14 +152,6 @@ pub fn auth_manager_from_auth(auth: CodexAuth) -> Arc<AuthManager> {
 
 pub fn auth_manager_from_auth_with_home(auth: CodexAuth, codex_home: PathBuf) -> Arc<AuthManager> {
     AuthManager::from_auth_for_testing_with_home(auth, codex_home)
-}
-
-pub fn with_code_mode_host_program(
-    thread_manager: ThreadManager,
-    host_program: PathBuf,
-    config: &crate::config::Config,
-) -> ThreadManager {
-    thread_manager.with_code_mode_host_program_for_tests(host_program, config)
 }
 
 pub fn thread_manager_with_models_provider(

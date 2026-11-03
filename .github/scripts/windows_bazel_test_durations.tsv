@@ -239,13 +239,6 @@
 //codex-rs/utils/output-truncation:output-truncation-unit-tests	60
 //codex-rs/utils/plugins:plugins-unit-tests	36
 //codex-rs/utils/sandbox-summary:sandbox-summary-unit-tests	66
-//codex-rs/windows-sandbox-rs:codex-command-runner-bin-unit-tests	1
-//codex-rs/windows-sandbox-rs:codex-windows-managed-deny-probe-bin-unit-tests	1
-//codex-rs/windows-sandbox-rs:codex-windows-sandbox-setup-bin-unit-tests	1
-//codex-rs/windows-sandbox-rs:windows-sandbox-rs-helper_manifest-test-windows-cross	1
-//codex-rs/windows-sandbox-rs:windows-sandbox-rs-unit-tests	23
-//codex-rs/windows-sandbox-service:codex-windows-sandbox-service-bin-unit-tests	46
-//codex-rs/windows-sandbox-service:windows-sandbox-service-unit-tests	12
 //codex-rs/worktree:worktree-settings-test-windows-cross	59
 //codex-rs/worktree:worktree-unit-tests	76
 //codex-rs/worktree:worktree-worktree-test-windows-cross	92

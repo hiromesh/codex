@@ -214,8 +214,6 @@ def code_mode_host_debug_symbols(
         "codex-code-mode-host",
         "codex-exec-server",
     }
-    if "windows" in target:
-        binaries.update({"codex-command-runner", "codex-windows-sandbox-setup"})
 
     if "apple-darwin" in target:
         markers = {

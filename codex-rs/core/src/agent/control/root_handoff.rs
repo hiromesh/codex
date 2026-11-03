@@ -16,10 +16,11 @@ pub(super) fn handoff_boundaries(
 ) -> Vec<RetainedContextOrder> {
     let configured_handoff_names = ["spawn_agent", "send_message", "followup_task"].map(|name| {
         (
-            codex_tools::code_mode_name_for_tool_name(&ToolName::new(
+            crate::tools::flat_tool_name(&ToolName::new(
                 tool_namespace.map(str::to_owned),
                 name,
-            )),
+            ))
+            .into_owned(),
             name,
         )
     });

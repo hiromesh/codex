@@ -50,24 +50,6 @@ pub fn features_schema(schema_gen: &mut SchemaGenerator) -> Schema {
         if feature.id == codex_features::Feature::Artifact {
             continue;
         }
-        if feature.id == codex_features::Feature::CodeMode {
-            validation.properties.insert(
-                feature.key.to_string(),
-                schema_gen.subschema_for::<codex_features::FeatureToml<
-                    codex_features::CodeModeConfigToml,
-                >>(),
-            );
-            continue;
-        }
-        if feature.id == codex_features::Feature::CodeModeHost {
-            validation.properties.insert(
-                feature.key.to_string(),
-                schema_gen.subschema_for::<codex_features::FeatureToml<
-                    codex_features::CodeModeHostConfigToml,
-                >>(),
-            );
-            continue;
-        }
         if feature.id == codex_features::Feature::NonPrefixedMcpToolNames {
             validation.properties.insert(
                 feature.key.to_string(),

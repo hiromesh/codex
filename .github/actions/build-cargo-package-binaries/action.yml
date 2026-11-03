@@ -85,11 +85,6 @@ runs:
         target_no_jitter="${target_no_jitter//-/_}"
         echo "${target_no_jitter}=1" >> "$GITHUB_ENV"
 
-    - name: Configure rusty_v8 artifact overrides and verify checksums
-      uses: ./.github/actions/setup-rusty-v8
-      with:
-        target: ${{ inputs.target }}
-
     - name: Configure MSVC environment
       if: ${{ runner.os == 'Windows' }}
       uses: ./.github/actions/setup-msvc-env

@@ -90,7 +90,6 @@ impl McpHandlerDefinition {
 
 pub struct McpHandler {
     definition: Arc<McpHandlerDefinition>,
-    code_mode_tool_definitions: OnceLock<(Option<usize>, Vec<codex_code_mode::ToolDefinition>)>,
 }
 
 #[cfg(test)]
@@ -122,10 +121,7 @@ impl McpHandler {
 
 impl McpHandler {
     pub(crate) fn from_definition(definition: Arc<McpHandlerDefinition>) -> Self {
-        Self {
-            definition,
-            code_mode_tool_definitions: OnceLock::new(),
-        }
+        Self { definition }
     }
 
     pub(crate) fn tool_info(&self) -> &ToolInfo {
@@ -324,24 +320,6 @@ impl CoreToolRuntime for McpHandler {
 
     fn immutable_spec(&self) -> Option<&Arc<ToolSpec>> {
         Some(&self.definition.spec)
-    }
-
-    fn cached_code_mode_definitions(
-        &self,
-        code_mode_input_schema_max_bytes: Option<usize>,
-    ) -> Option<&[codex_code_mode::ToolDefinition]> {
-        let (cached_budget, definitions) = self.code_mode_tool_definitions.get_or_init(|| {
-            let mut definitions = codex_tools::collect_code_mode_tool_definitions(
-                std::iter::once(self.definition.spec.as_ref()),
-                code_mode_input_schema_max_bytes,
-            );
-            for definition in &mut definitions {
-                definition.input_schema = None;
-                definition.output_schema = None;
-            }
-            (code_mode_input_schema_max_bytes, definitions)
-        });
-        (*cached_budget == code_mode_input_schema_max_bytes).then_some(definitions.as_slice())
     }
 
     fn wait_until_ready<'a>(&'a self, session: &'a Arc<Session>) -> Option<BoxFuture<'a, ()>> {
@@ -848,7 +826,7 @@ mod tests {
         );
 
         // Nested MCP result metadata still reaches the owning Code Mode cell.
-        let cell_id = codex_code_mode::CellId::new("mcp-cell".to_string());
+        let cell_id = crate::tools::context::CellId::new("mcp-cell".to_string());
         recorder.start_cell(&cell_id, "exec-mcp-post");
         let mut invocation = invocation;
         invocation.source = ToolCallSource::CodeMode {
@@ -883,33 +861,6 @@ mod tests {
                 "tool_result_metadata": { "provider/custom": { "items": [1, null] } },
             }]),
         );
-    }
-
-    #[test]
-    fn mcp_code_mode_definitions_are_cached_lazily() {
-        let handler = McpHandler::new(tool_info("filesystem", "mcp__filesystem", "read_file"))
-            .expect("MCP tool spec should build");
-
-        assert!(handler.code_mode_tool_definitions.get().is_none());
-        assert!(Arc::ptr_eq(
-            handler
-                .immutable_spec()
-                .expect("MCP spec should be immutable"),
-            &handler.definition.spec,
-        ));
-
-        let first = handler
-            .cached_code_mode_definitions(/*code_mode_input_schema_max_bytes*/ None)
-            .expect("MCP definitions should be cached");
-        assert_eq!(first.len(), 1);
-        assert!(first[0].input_schema.is_none());
-        assert!(first[0].output_schema.is_none());
-
-        let second = handler
-            .cached_code_mode_definitions(/*code_mode_input_schema_max_bytes*/ None)
-            .expect("MCP definitions should be cached");
-        assert!(std::ptr::eq(first, second));
-        assert!(handler.cached_code_mode_definitions(Some(32_000)).is_none());
     }
 
     #[test]

@@ -78,7 +78,6 @@ use codex_app_server_protocol::ThreadSampleCancelResponse;
 use codex_app_server_protocol::UserVerificationCancelResponse;
 use codex_app_server_protocol::experimental_required_message;
 use codex_arg0::Arg0DispatchPaths;
-use codex_code_mode::CodeModeSessionProvider;
 use codex_core::ThreadManager;
 use codex_core::config::Config;
 use codex_core::config::ThreadStoreConfig;
@@ -274,7 +273,6 @@ pub(crate) struct MessageProcessorArgs {
     pub(crate) auth_manager: Arc<AuthManager>,
     pub(crate) user_verification: Arc<crate::user_verification::Service>,
     pub(crate) installation_id: String,
-    pub(crate) code_mode_session_provider: Option<Arc<dyn CodeModeSessionProvider>>,
     pub(crate) rpc_transport: AppServerRpcTransport,
     pub(crate) remote_control_handle: Option<RemoteControlHandle>,
     /// `None` skips startup tasks; otherwise preserve the initial config-loading path.
@@ -303,7 +301,6 @@ impl MessageProcessor {
             auth_manager,
             user_verification,
             installation_id,
-            code_mode_session_provider,
             rpc_transport,
             remote_control_handle,
             plugin_startup_tasks,
@@ -394,10 +391,7 @@ impl MessageProcessor {
                     Some(time_provider)
                 },
             );
-            match code_mode_session_provider {
-                Some(provider) => manager.with_code_mode_session_provider(provider),
-                None => manager,
-            }
+            manager
         });
         let model_catalog = Arc::new(crate::model_catalog::ModelCatalog::new(
             config_manager.clone(),

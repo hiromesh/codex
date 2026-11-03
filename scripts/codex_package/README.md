@@ -22,9 +22,7 @@ The builder creates a canonical Codex package directory:
 │   ├── codex-code-mode-host[.exe]
 │   └── codex-exec-server[.exe]
 ├── codex-resources
-│   ├── bwrap                             # Linux only
-│   ├── codex-command-runner.exe          # Windows only
-│   └── codex-windows-sandbox-setup.exe   # Windows only
+│   └── bwrap                             # Linux only
 └── codex-path
     └── rg[.exe]
 ```
@@ -56,8 +54,6 @@ override was provided:
 - all targets: `codex-code-mode-host`, unless `--code-mode-host-bin` is provided
 - all targets: `codex-exec-server`, unless `--exec-server-bin` is provided
 - Linux targets: `bwrap`, unless `--bwrap-bin` is provided
-- Windows targets: `codex-command-runner` and `codex-windows-sandbox-setup`,
-  unless the corresponding prebuilt helper flags are provided
 
 The default cargo profile is `dev-small` because local iteration should favor
 fast, small builds. Release jobs should pass `--cargo-profile release` and an
@@ -87,17 +83,9 @@ Third-party resources are copied unchanged. In particular, never strip `bwrap`
 after its integrity digest has been embedded in Codex.
 
 Release jobs that already built package resource binaries should also pass the
-corresponding resource flags: `--bwrap-bin` for Linux packages, and
-`--codex-command-runner-bin` plus `--codex-windows-sandbox-setup-bin` for
-Windows packages. This keeps package archive creation as a pure staging step
-after signing instead of rebuilding resources.
-
-When the builder source-builds an entrypoint for a Darwin or Linux target, it
-downloads and verifies the matching Codex-built V8 release pair before invoking
-Cargo and sets `RUSTY_V8_ARCHIVE` plus `RUSTY_V8_SRC_BINDING_PATH` for that
-build. Windows targets keep Cargo's release-build MSVC artifact path. Explicit
-overrides remain authoritative when both variables are already set. Set
-`V8_FROM_SOURCE=1` to leave the build with the `v8` crate source-build path.
+corresponding resource flag: `--bwrap-bin` for Linux packages. This keeps
+package archive creation as a pure staging step after signing instead of
+rebuilding resources.
 
 `rg` is not built from this repository, so the builder fetches it from the
 DotSlash manifest at `scripts/codex_package/rg`. Downloaded archives are cached

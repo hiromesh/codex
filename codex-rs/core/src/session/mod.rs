@@ -244,7 +244,6 @@ use codex_protocol::error::Result as CodexResult;
 use codex_protocol::exec_output::StreamOutput;
 
 pub(crate) mod async_compaction;
-mod code_mode_warning;
 mod config_refresh;
 pub(crate) mod context_window;
 mod daemon_recovery;
@@ -284,7 +283,6 @@ pub(crate) mod turn_context;
 mod turn_input;
 mod turn_suspension;
 mod world_state;
-use self::code_mode_warning::unsupported_code_mode_warning;
 pub(crate) use self::environment::ThreadEnvironmentDefaults;
 #[cfg(test)]
 use self::handlers::submission_dispatch_span;
@@ -511,7 +509,6 @@ pub(crate) struct SessionSpawnArgs {
     pub(crate) skills_service: Arc<HostSkillsService>,
     pub(crate) plugins_manager: Arc<PluginsManager>,
     pub(crate) mcp_manager: Arc<McpManager>,
-    pub(crate) code_mode_session_provider: Arc<dyn codex_code_mode::CodeModeSessionProvider>,
     pub(crate) extensions: Arc<codex_extension_api::ExtensionRegistry<crate::config::Config>>,
     pub(crate) conversation_history: InitialHistory,
     pub(crate) resume_preparation: Option<ThreadStoreResumePreparation>,
@@ -632,7 +629,6 @@ impl Session {
             skills_service,
             plugins_manager,
             mcp_manager,
-            code_mode_session_provider,
             extensions,
             conversation_history,
             resume_preparation,
@@ -1015,7 +1011,6 @@ impl Session {
             skills_service,
             plugins_manager,
             mcp_manager.clone(),
-            code_mode_session_provider,
             extensions,
             thread_extension_init,
             client_mcp_extensions,

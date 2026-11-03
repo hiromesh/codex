@@ -1023,13 +1023,6 @@
       "description": "A model-facing surface on which a tool can be exposed.",
       "oneOf": [
         {
-          "description": "Nested tools available to Code Mode scripts.",
-          "enum": [
-            "code_mode"
-          ],
-          "type": "string"
-        },
-        {
           "description": "Tools discovered later through tool search.",
           "enum": [
             "deferred"

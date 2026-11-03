@@ -32,7 +32,7 @@ fn package(root: &Path, version: &str) -> PathBuf {
     let bin = root.join("bin/codex");
     codex_utils_cargo_bin::write_executable(&bin, &format!("#!/bin/sh\necho 'codex {version}'\n"))
         .expect("codex executable");
-    for file in ["bin/codex-code-mode-host", "codex-path/rg"] {
+    for file in ["codex-path/rg"] {
         codex_utils_cargo_bin::write_executable(&root.join(file), "runtime")
             .expect("executable helper");
     }
@@ -159,7 +159,7 @@ async fn incomplete_source_fails_without_selecting_it() {
     let temp = tempfile::TempDir::new().expect("temp");
     let source = temp.path().join("package");
     let bin = package(&source, "0.152.0");
-    std::fs::remove_file(source.join("bin/codex-code-mode-host")).expect("remove helper");
+    std::fs::remove_file(source.join("codex-path/rg")).expect("remove helper");
     let home = temp.path().join("home");
     let error = prepare_from_package(
         &daemon(&home),
@@ -171,7 +171,7 @@ async fn incomplete_source_fails_without_selecting_it() {
     )
     .await
     .expect_err("incomplete package");
-    assert!(error.to_string().contains("bin/codex-code-mode-host"));
+    assert!(error.to_string().contains("codex-path/rg"));
     assert!(!home.join("packages/app-server-daemon/current").exists());
 }
 

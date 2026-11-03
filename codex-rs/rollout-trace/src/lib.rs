@@ -7,7 +7,6 @@
 //! See `README.md` for the system diagram and reducer model.
 
 mod bundle;
-mod code_cell;
 mod compaction;
 mod inference;
 mod mcp;
@@ -22,8 +21,6 @@ mod writer;
 
 /// Conventional reduced-state cache name written next to a raw trace bundle.
 pub use bundle::REDUCED_STATE_FILE_NAME;
-/// No-op-capable handle for recording one code-mode runtime cell.
-pub use code_cell::CodeCellTraceContext;
 /// Raw checkpoint payload for a remote compaction install event.
 pub use compaction::CompactionCheckpointTracePayload;
 /// No-op-capable handle for recording remote-compaction requests.

@@ -2,8 +2,6 @@
 #![deny(clippy::print_stdout, clippy::print_stderr)]
 
 use codex_arg0::Arg0DispatchPaths;
-use codex_code_mode::CodeModeSessionProvider;
-use codex_code_mode::GrpcCodeModeSessionProvider;
 use codex_config::LoaderOverrides;
 use codex_config::NoopThreadConfigLoader;
 use codex_core::config::Config;
@@ -101,7 +99,6 @@ mod app_server_tracing;
 mod attestation;
 mod auth_mode;
 mod bespoke_event_handling;
-mod code_mode_host;
 mod codex_home_metrics;
 mod command_exec;
 mod config_layer;
@@ -154,8 +151,6 @@ mod turn_cost_worker;
 mod user_verification;
 mod user_verification_response;
 
-pub use crate::code_mode_host::AppServerCodeModeHostArgs;
-pub use crate::code_mode_host::CodeModeHostTransport;
 pub use crate::error_code::INPUT_TOO_LARGE_ERROR_CODE;
 pub use crate::error_code::INVALID_PARAMS_ERROR_CODE;
 pub use crate::transport::AppServerTransport;
@@ -485,7 +480,6 @@ pub enum PluginStartupTasks {
 pub struct AppServerRuntimeOptions {
     /// Optional host-owned frozen cloud skill catalog and resources, loaded once at startup.
     pub cloud_skills_snapshot: Option<std::path::PathBuf>,
-    pub code_mode_host_transport: CodeModeHostTransport,
     pub plugin_startup_tasks: PluginStartupTasks,
     pub remote_control_startup_mode: RemoteControlStartupMode,
     pub install_shutdown_signal_handler: bool,
@@ -496,7 +490,6 @@ impl Default for AppServerRuntimeOptions {
     fn default() -> Self {
         Self {
             cloud_skills_snapshot: None,
-            code_mode_host_transport: CodeModeHostTransport::Local,
             plugin_startup_tasks: PluginStartupTasks::Start,
             remote_control_startup_mode: RemoteControlStartupMode::ResolvePersisted,
             install_shutdown_signal_handler: true,
@@ -610,24 +603,6 @@ pub async fn run_main_with_transport_options(
     let local_runtime_paths = local_runtime_paths.with_allowed_symlinked_codex_home(
         codex_config::allowed_symlinked_codex_home(&config.config_layer_stack, &config.codex_home),
     );
-    let code_mode_session_provider: Option<Arc<dyn CodeModeSessionProvider>> =
-        match &runtime_options.code_mode_host_transport {
-            CodeModeHostTransport::Local => None,
-            CodeModeHostTransport::Grpc(url) => {
-                if !config.features.enabled(Feature::CodeModeHost) {
-                    return Err(std::io::Error::new(
-                        ErrorKind::InvalidInput,
-                        "remote code-mode host requires the code_mode_host feature to be enabled",
-                    ));
-                }
-                Some(Arc::new(
-                    GrpcCodeModeSessionProvider::with_http_client_factory(
-                        url.to_string(),
-                        config.http_client_factory(),
-                    ),
-                ))
-            }
-        };
     // Executor credentials belong to the selected environment, not the current account.
     // Each request and connection still acquires a revocable application-policy permit.
     let environment_http_client_factory = config
@@ -1026,7 +1001,6 @@ pub async fn run_main_with_transport_options(
             ))),
             auth_manager,
             installation_id,
-            code_mode_session_provider,
             rpc_transport: analytics_rpc_transport(&transport),
             remote_control_handle: Some(remote_control_handle.clone()),
             plugin_startup_tasks: matches!(

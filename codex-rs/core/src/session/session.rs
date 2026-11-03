@@ -841,7 +841,6 @@ impl Session {
         skills_service: Arc<HostSkillsService>,
         plugins_manager: Arc<PluginsManager>,
         mcp_manager: Arc<McpManager>,
-        code_mode_session_provider: Arc<dyn codex_code_mode::CodeModeSessionProvider>,
         extensions: Arc<codex_extension_api::ExtensionRegistry<crate::config::Config>>,
         mut thread_extension_init: ExtensionDataInit,
         client_mcp_extensions: ClientMcpExtensions,
@@ -1884,12 +1883,6 @@ impl Session {
                     crate::cyber_access_program::ApiKeyCyberAccessPrograms::from_config(&config),
                 ),
                 executed_tool_calls: executed_tool_calls.clone(),
-                code_mode_service: crate::tools::code_mode::CodeModeService::new(
-                    thread_id,
-                    Arc::clone(&code_mode_session_provider),
-                    &config.code_mode,
-                    executed_tool_calls,
-                ),
                 tool_search_handler_cache: Default::default(),
                 turn_environments: Arc::clone(&turn_environments),
             };

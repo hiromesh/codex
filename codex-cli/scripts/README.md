@@ -20,9 +20,9 @@ that are later published under platform-specific dist-tags.
 
 The npm variants omit the standalone `codex-exec-server` executable and its
 `execServer` manifest entry to keep uploads within npm's package size limit.
-They retain `codex exec-server` through the CLI, the code-mode host, and the
-platform sandbox helpers. Canonical release archives retain the standalone
-executor; npm staging changes only the package copy.
+They retain `codex exec-server` through the CLI and the platform sandbox helpers.
+Canonical release archives retain the standalone executor; npm staging changes
+only the package copy.
 
 Direct `build_npm_package.py` invocations are still useful for package-specific
 debugging, but native packages expect `--vendor-src` to point at a prehydrated

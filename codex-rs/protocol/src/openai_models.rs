@@ -355,8 +355,6 @@ pub enum TruncationMode {
 #[serde(rename_all = "snake_case")]
 pub enum ToolMode {
     Direct,
-    CodeMode,
-    CodeModeOnly,
 }
 
 fn deserialize_optional_model_selector<'de, D, T>(deserializer: D) -> Result<Option<T>, D::Error>
@@ -660,8 +658,6 @@ pub struct ToolMessages {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub multi_agent: Option<MultiAgentToolMessages>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub code_mode: Option<CodeModeToolMessages>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub mcp_resources: Option<McpResourceToolMessages>,
 }
 
@@ -772,28 +768,6 @@ pub struct McpResourceToolMessages {
     pub list_mcp_resource_templates: Option<ToolMessage>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub read_mcp_resource: Option<ToolMessage>,
-}
-
-/// Model-owned instructions for Code Mode's exec and wait tools.
-#[derive(Debug, Default, Serialize, Deserialize, Clone, PartialEq, Eq, TS, JsonSchema)]
-pub struct CodeModeToolMessages {
-    /// Instructional template supporting `{{ default_exec_yield_time_ms }}` and `{{ image_helper }}`.
-    /// Runtime tool declarations are appended. Unknown placeholders remain literal.
-    /// Exec accepts raw JavaScript; `parameters` is not consumed and its grammar is unchanged.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub exec: Option<ToolMessage>,
-    /// Complete description and JSON parameter schema, selected independently.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub wait: Option<ToolMessage>,
-    /// Literal guidance appended when deferred nested tools exist.
-    /// Missing or null uses bundled text; an empty string omits the section.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub deferred_nested_tools_guidance: Option<String>,
-    /// Literal shared TypeScript definitions, emitted when Code Mode Only exposes MCP results.
-    /// Missing or null uses bundled definitions; an empty string omits the section.
-    /// Custom definitions must remain compatible with the generated tool declarations.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub mcp_typescript_preamble: Option<String>,
 }
 
 /// Model-owned defaults for the context-window token-budget feature.
@@ -2063,11 +2037,11 @@ mod tests {
             .expect("model info should be an object");
         object.insert(
             "tool_mode".to_string(),
-            serde_json::Value::String("code_mode_only".to_string()),
+            serde_json::Value::String("direct".to_string()),
         );
         let model = serde_json::from_value::<ModelInfo>(value).expect("deserialize model info");
 
-        assert_eq!(model.tool_mode, Some(ToolMode::CodeModeOnly));
+        assert_eq!(model.tool_mode, Some(ToolMode::Direct));
     }
 
     #[test]

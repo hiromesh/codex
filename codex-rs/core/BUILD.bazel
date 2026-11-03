@@ -9,14 +9,10 @@ codex_rust_crate(
     ],
     extra_binaries = [
         "//codex-rs/bwrap:bwrap",
-        "//codex-rs/code-mode-host:codex-code-mode-host",
         "//codex-rs/linux-sandbox:codex-linux-sandbox",
         "//codex-rs/rmcp-client:test_stdio_server",
         "//codex-rs/rmcp-client:test_streamable_http_server",
         "//codex-rs/cli:codex",
-        "//codex-rs/windows-sandbox-rs:codex-command-runner",
-        "//codex-rs/windows-sandbox-rs:codex-windows-managed-deny-probe",
-        "//codex-rs/windows-sandbox-rs:codex-windows-sandbox-setup",
     ],
     integration_compile_data_extra = glob(["assets/**"]) + [
         "//codex-rs/prompts:templates/permissions/approval_policy/on_request_rule_request_permission.md",

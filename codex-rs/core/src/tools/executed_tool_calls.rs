@@ -16,7 +16,6 @@ use std::sync::Weak;
 use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::Ordering;
 
-use codex_code_mode::CellId;
 use codex_features::Feature;
 use codex_features::Features;
 use codex_history::InitialHistory;
@@ -35,6 +34,7 @@ use serde_json::Value as JsonValue;
 
 use crate::session::session::Session;
 use crate::session::step_context::StepContext;
+use crate::tools::context::CellId;
 use crate::tools::context::ToolCallSource;
 use crate::tools::context::ToolOutput;
 use crate::tools::context::ToolPayload;
@@ -701,20 +701,12 @@ impl ExecutedToolCalls {
     }
 }
 
-fn is_code_mode_wrapper(call: &ToolCall, source: &ToolCallSource, tool_mode: ToolMode) -> bool {
-    matches!(source, ToolCallSource::Direct)
-        && matches!(tool_mode, ToolMode::CodeMode | ToolMode::CodeModeOnly)
-        && call.tool_name.is_default_namespace()
-        && matches!(
-            (call.tool_name.name.as_str(), &call.payload),
-            (
-                crate::tools::code_mode::PUBLIC_TOOL_NAME,
-                ToolPayload::Custom { .. }
-            ) | (
-                crate::tools::code_mode::WAIT_TOOL_NAME,
-                ToolPayload::Function { .. }
-            )
-        )
+fn is_code_mode_wrapper(
+    _call: &ToolCall,
+    _source: &ToolCallSource,
+    _tool_mode: ToolMode,
+) -> bool {
+    false
 }
 
 fn recorded_call(call: &ToolCall) -> (ExecutedToolCall, usize) {
@@ -725,7 +717,7 @@ fn recorded_call(call: &ToolCall) -> (ExecutedToolCall, usize) {
             serialized_json_bytes(arguments).unwrap_or(usize::MAX)
         }
     };
-    let name = codex_tools::code_mode_name_for_tool_name(&call.tool_name);
+    let name = crate::tools::flat_tool_name(&call.tool_name).into_owned();
     let arguments = match &call.payload {
         ToolPayload::Function { arguments } => {
             serde_json::from_str(arguments).unwrap_or_else(|_| JsonValue::String(arguments.clone()))

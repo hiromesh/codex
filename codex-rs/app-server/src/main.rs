@@ -1,7 +1,6 @@
 #![recursion_limit = "256"]
 
 use clap::Parser;
-use codex_app_server::AppServerCodeModeHostArgs;
 use codex_app_server::AppServerRuntimeOptions;
 use codex_app_server::AppServerTransport;
 use codex_app_server::PluginStartupTasks;
@@ -35,9 +34,6 @@ struct AppServerArgs {
     cloud_skills_snapshot: Option<PathBuf>,
     #[command(flatten)]
     config_overrides: CliConfigOverrides,
-
-    #[command(flatten)]
-    code_mode_host: AppServerCodeModeHostArgs,
 
     /// Transport endpoint URL. Supported values: `stdio://` (default),
     /// `unix://`, `unix://PATH`, `ws://IP:PORT`, `off`.
@@ -85,7 +81,6 @@ fn main() -> anyhow::Result<()> {
         let AppServerArgs {
             cloud_skills_snapshot,
             config_overrides,
-            code_mode_host,
             listen,
             session_source,
             auth,
@@ -106,7 +101,6 @@ fn main() -> anyhow::Result<()> {
         let auth = auth.try_into_settings()?;
         let mut runtime_options = AppServerRuntimeOptions {
             cloud_skills_snapshot,
-            code_mode_host_transport: code_mode_host.into(),
             managed_daemon,
             ..Default::default()
         };

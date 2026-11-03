@@ -528,7 +528,6 @@ async fn start_uninitialized(mut args: InProcessStartArgs) -> IoResult<InProcess
                 ))),
                 auth_manager,
                 installation_id,
-                code_mode_session_provider: None,
                 rpc_transport: AppServerRpcTransport::InProcess,
                 remote_control_handle: None,
                 plugin_startup_tasks: Some(PluginStartupConfig::Current),

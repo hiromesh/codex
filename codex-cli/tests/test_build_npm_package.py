@@ -45,13 +45,6 @@ class NpmPackageTest(unittest.TestCase):
                 ]
                 if platform["os"] == "linux":
                     files.append("codex-resources/bwrap")
-                elif platform["os"] == "win32":
-                    files.extend(
-                        [
-                            "codex-resources/codex-command-runner.exe",
-                            "codex-resources/codex-windows-sandbox-setup.exe",
-                        ]
-                    )
                 for name in files:
                     destination = source / name
                     destination.parent.mkdir(parents=True, exist_ok=True)

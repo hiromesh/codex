@@ -6735,7 +6735,6 @@ class Tool(BaseModel):
 
 
 class ToolExposureSurface(Enum):
-    code_mode = "code_mode"
     deferred = "deferred"
     direct = "direct"
 

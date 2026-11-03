@@ -24,7 +24,6 @@ runs:
       working-directory: codex-rs
       env:
         BASE_BINARIES: "codex codex-app-server codex-code-mode-host codex-exec-server"
-        WINDOWS_ONLY_BINARIES: "codex-command-runner codex-windows-sandbox-setup"
         BUILD_MODE: ${{ inputs.build-mode }}
         BUILD_SYSTEM: ${{ inputs.build-system }}
         PACKAGE_ACTION_PATH: ${{ github.action_path }}
@@ -33,9 +32,6 @@ runs:
         package_source_root="$(cd "${PACKAGE_ACTION_PATH}/../../.." && pwd)"
         echo "source_root=$package_source_root" >> "$GITHUB_OUTPUT"
         needed_binaries="$BASE_BINARIES"
-        if [[ "$RUNNER_OS" == "Windows" ]]; then
-          needed_binaries+=" $WINDOWS_ONLY_BINARIES"
-        fi
         echo "NEEDED_BINARIES=$needed_binaries" >> "$GITHUB_ENV"
         case "$BUILD_SYSTEM" in
           cargo|bazel) ;;
@@ -145,12 +141,6 @@ runs:
         )
         if [[ "$RUNNER_OS" == "Linux" ]]; then
           package_args+=(--bwrap-bin "${release_dir}/bwrap")
-        fi
-        if [[ "$RUNNER_OS" == "Windows" ]]; then
-          package_args+=(
-            --codex-command-runner-bin "${release_dir}/codex-command-runner.exe"
-            --codex-windows-sandbox-setup-bin "${release_dir}/codex-windows-sandbox-setup.exe"
-          )
         fi
 
         python3 "${PACKAGE_SOURCE_ROOT}/scripts/build_codex_package.py" \

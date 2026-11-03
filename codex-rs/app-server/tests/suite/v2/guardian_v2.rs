@@ -90,9 +90,6 @@ mod model_tests;
 #[path = "guardian_policy_tests.rs"]
 mod policy;
 
-#[path = "guardian_code_mode_tests.rs"]
-mod code_mode;
-
 #[path = "guardian_action_budget_tests.rs"]
 mod action_budget;
 

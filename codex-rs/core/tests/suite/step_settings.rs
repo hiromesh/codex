@@ -119,7 +119,6 @@ use super::rmcp_client::remote_aware_stdio_server_bin;
 
 #[path = "step_settings/agent_spawn_tests.rs"]
 mod agent_spawn;
-mod code_mode_notifications;
 mod environment_selection;
 
 const MODEL_A: &str = "step-settings-a";

@@ -9,86 +9,6 @@ use std::fs;
 const TEST_RESOURCE_NAME: &str = "codex-test-helper";
 
 #[test]
-fn code_mode_host_program_prefers_package_resource_over_legacy_binary() -> std::io::Result<()> {
-    let package_dir = tempfile::tempdir()?;
-    let bin_dir = package_dir.path().join(BIN_DIRNAME);
-    let resources_dir = package_dir.path().join(RESOURCES_DIRNAME);
-    fs::create_dir_all(&bin_dir)?;
-    fs::create_dir_all(&resources_dir)?;
-    fs::write(package_dir.path().join(PACKAGE_METADATA_FILENAME), "{}")?;
-    let exe_path = bin_dir.join(if cfg!(windows) { "codex.exe" } else { "codex" });
-    let resource_host = resources_dir.join(CODE_MODE_HOST_EXECUTABLE_NAME);
-    fs::write(&exe_path, "")?;
-    fs::write(bin_dir.join(CODE_MODE_HOST_EXECUTABLE_NAME), "legacy host")?;
-    fs::write(&resource_host, "managed host")?;
-
-    let context = InstallContext::from_exe(
-        /*is_macos*/ false,
-        /*current_exe*/ Some(&exe_path),
-        /*method_override*/ None,
-    );
-
-    assert_eq!(
-        context.code_mode_host_program(),
-        AbsolutePathBuf::from_absolute_path(resource_host.canonicalize()?)?.into_path_buf()
-    );
-    Ok(())
-}
-
-#[test]
-fn code_mode_host_program_uses_package_resource_without_legacy_binary() -> std::io::Result<()> {
-    let package_dir = tempfile::tempdir()?;
-    let bin_dir = package_dir.path().join(BIN_DIRNAME);
-    let resources_dir = package_dir.path().join(RESOURCES_DIRNAME);
-    fs::create_dir_all(&bin_dir)?;
-    fs::create_dir_all(&resources_dir)?;
-    fs::write(package_dir.path().join(PACKAGE_METADATA_FILENAME), "{}")?;
-    let exe_path = bin_dir.join(if cfg!(windows) { "codex.exe" } else { "codex" });
-    let resource_host = resources_dir.join(CODE_MODE_HOST_EXECUTABLE_NAME);
-    fs::write(&exe_path, "")?;
-    fs::write(&resource_host, "managed host")?;
-
-    let context = InstallContext::from_exe(
-        /*is_macos*/ false,
-        /*current_exe*/ Some(&exe_path),
-        /*method_override*/ None,
-    );
-
-    assert_eq!(
-        context.code_mode_host_program(),
-        AbsolutePathBuf::from_absolute_path(resource_host.canonicalize()?)?.into_path_buf()
-    );
-    Ok(())
-}
-
-#[test]
-fn code_mode_host_program_ignores_resource_directory_and_uses_legacy_binary() -> std::io::Result<()>
-{
-    let package_dir = tempfile::tempdir()?;
-    let bin_dir = package_dir.path().join(BIN_DIRNAME);
-    let resources_dir = package_dir.path().join(RESOURCES_DIRNAME);
-    fs::create_dir_all(&bin_dir)?;
-    fs::create_dir_all(resources_dir.join(CODE_MODE_HOST_EXECUTABLE_NAME))?;
-    fs::write(package_dir.path().join(PACKAGE_METADATA_FILENAME), "{}")?;
-    let exe_path = bin_dir.join(if cfg!(windows) { "codex.exe" } else { "codex" });
-    let legacy_host = bin_dir.join(CODE_MODE_HOST_EXECUTABLE_NAME);
-    fs::write(&exe_path, "")?;
-    fs::write(&legacy_host, "legacy host")?;
-
-    let context = InstallContext::from_exe(
-        /*is_macos*/ false,
-        /*current_exe*/ Some(&exe_path),
-        /*method_override*/ None,
-    );
-
-    assert_eq!(
-        context.code_mode_host_program(),
-        AbsolutePathBuf::from_absolute_path(legacy_host.canonicalize()?)?.into_path_buf()
-    );
-    Ok(())
-}
-
-#[test]
 fn detects_standalone_install_from_release_layout() -> std::io::Result<()> {
     let codex_home = tempfile::tempdir()?;
     let release_dir = codex_home
@@ -249,36 +169,6 @@ fn detects_package_layout_independently_from_install_method() -> std::io::Result
     Ok(())
 }
 
-#[cfg(unix)]
-#[test]
-fn code_mode_host_program_accepts_symlinks_to_files() -> std::io::Result<()> {
-    let package_dir = tempfile::tempdir()?;
-    let bin_dir = package_dir.path().join(BIN_DIRNAME);
-    fs::create_dir_all(&bin_dir)?;
-    fs::write(package_dir.path().join(PACKAGE_METADATA_FILENAME), "{}")?;
-    let exe_path = bin_dir.join("codex");
-    let executable_target = package_dir.path().join("host-target");
-    let executable_path = bin_dir.join(CODE_MODE_HOST_EXECUTABLE_NAME);
-    fs::write(&exe_path, "")?;
-    fs::write(&executable_target, "")?;
-    std::os::unix::fs::symlink(&executable_target, &executable_path)?;
-    let canonical_bin_dir = AbsolutePathBuf::from_absolute_path(bin_dir.canonicalize()?)?;
-
-    let context = InstallContext::from_exe(
-        /*is_macos*/ false,
-        /*current_exe*/ Some(&exe_path),
-        /*method_override*/ None,
-    );
-
-    assert_eq!(
-        context.code_mode_host_program_from_exe(Some(&exe_path)),
-        canonical_bin_dir
-            .join(CODE_MODE_HOST_EXECUTABLE_NAME)
-            .into_path_buf()
-    );
-    Ok(())
-}
-
 #[test]
 fn standalone_package_layout_keeps_standalone_install_method() -> std::io::Result<()> {
     let codex_home = tempfile::tempdir()?;
@@ -414,32 +304,6 @@ fn bundled_file_lookups_ignore_directories() -> std::io::Result<()> {
     assert_eq!(context.rg_command(), default_rg_command());
     assert_eq!(context.bundled_resource(TEST_RESOURCE_NAME), None);
     Ok(())
-}
-
-#[test]
-fn code_mode_host_program_is_next_to_the_executable_even_when_missing() {
-    let context = InstallContext {
-        method: InstallMethod::Other,
-        package_layout: None,
-    };
-
-    assert_eq!(
-        context.code_mode_host_program_from_exe(Some(Path::new("/opt/codex/bin/codex"))),
-        PathBuf::from("/opt/codex/bin").join(CODE_MODE_HOST_EXECUTABLE_NAME)
-    );
-}
-
-#[test]
-fn code_mode_host_program_falls_back_to_its_name_when_executable_is_unknown() {
-    let context = InstallContext {
-        method: InstallMethod::Other,
-        package_layout: None,
-    };
-
-    assert_eq!(
-        context.code_mode_host_program_from_exe(/*current_exe*/ None),
-        PathBuf::from(CODE_MODE_HOST_EXECUTABLE_NAME)
-    );
 }
 
 #[test]

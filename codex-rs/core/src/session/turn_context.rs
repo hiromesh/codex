@@ -326,7 +326,6 @@ pub struct TurnContext {
     pub(crate) trace_id: Option<String>,
     /// Call state at turn creation; model requests use the `StepContext` snapshot.
     pub(crate) realtime_active: bool,
-    pub(crate) code_mode_available: bool,
     /// Turn-scoped configuration. Read step-specific settings such as service tier and
     /// approvals reviewer from the corresponding `StepContext` instead.
     pub config: Arc<Config>,
@@ -424,7 +423,6 @@ impl TurnContext {
             sub_id,
             trace_id: current_span_trace_id(),
             realtime_active: self.realtime_active,
-            code_mode_available: self.code_mode_available,
             configured_token_budget: config.token_budget.clone(),
             use_model_token_budget_defaults: config.features.enabled(Feature::TokenBudget)
                 && !has_explicit_settings(&config),
@@ -836,7 +834,6 @@ impl TurnContext {
             sub_id: self.sub_id.clone(),
             trace_id: self.trace_id.clone(),
             realtime_active: self.realtime_active,
-            code_mode_available: self.code_mode_available,
             config: Arc::new(config),
             configured_token_budget: self.configured_token_budget.clone(),
             use_model_token_budget_defaults: self.use_model_token_budget_defaults,
@@ -1120,7 +1117,6 @@ impl Session {
             sub_id,
             trace_id: current_span_trace_id(),
             realtime_active: false,
-            code_mode_available: true,
             config: per_turn_config,
             configured_token_budget,
             use_model_token_budget_defaults,
@@ -1371,7 +1367,6 @@ impl Session {
             sub_id,
             skills_snapshot,
         );
-        turn_context.code_mode_available = self.services.code_mode_service.is_available();
         turn_context.extension_data.insert(trusted_plugin_roots);
         turn_context.active_host_plugin_identities = Some(
             plugin_outcome
@@ -1419,28 +1414,6 @@ impl Session {
                 }),
             )
             .await;
-        }
-
-        if !tc.code_mode_available
-            && matches!(
-                crate::tools::requested_tool_mode(tc, tc.model_info()),
-                codex_protocol::openai_models::ToolMode::CodeMode
-                    | codex_protocol::openai_models::ToolMode::CodeModeOnly
-            )
-            && let Some(message) = self
-                .services
-                .code_mode_service
-                .take_unavailable_warning(crate::tools::effective_tool_mode(tc, tc.model_info()))
-        {
-            self.send_event(tc, EventMsg::Warning(WarningEvent { message }))
-                .await;
-        }
-
-        if let Some(message) =
-            unsupported_code_mode_warning(tc.model_info(), tc.config.features.get())
-        {
-            self.send_event(tc, EventMsg::Warning(WarningEvent { message }))
-                .await;
         }
     }
 

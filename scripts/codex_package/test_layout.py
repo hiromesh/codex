@@ -102,8 +102,6 @@ int main(void) {
                     "bin/codex.exe": b"signed CLI",
                     "bin/codex-code-mode-host.exe": b"signed code mode host",
                     "bin/codex-exec-server.exe": b"signed executor",
-                    "codex-resources/codex-command-runner.exe": b"signed runner",
-                    "codex-resources/codex-windows-sandbox-setup.exe": b"signed setup",
                     "codex-resources/voice/bin/codex-voice-host.exe": b"signed voice host",
                     "codex-resources/voice/bin/gstreamer-1.0-0.dll": b"signed audio DLL",
                     "codex-resources/voice/NOTICE.md": b"license notices",
@@ -136,11 +134,6 @@ int main(void) {
                 files["codex-code-mode-host.exe"] = files.pop(
                     "bin/codex-code-mode-host.exe"
                 )
-                for helper in (
-                    "codex-command-runner.exe",
-                    "codex-windows-sandbox-setup.exe",
-                ):
-                    files[helper] = files[f"codex-resources/{helper}"]
                 actual = {
                     str(path.relative_to(package)).replace("\\", "/"): path.read_bytes()
                     for path in package.rglob("*")
@@ -180,8 +173,6 @@ int main(void) {
                             exec_server_bin=rg_bin,
                             rg_bin=rg_bin,
                             bwrap_bin=None,
-                            codex_command_runner_bin=None,
-                            codex_windows_sandbox_setup_bin=None,
                         )
 
                         build_package_dir(package_dir, "1.2.3", variant, spec, inputs)
@@ -235,8 +226,6 @@ int main(void) {
                 exec_server_bin=touch_executable(root / "codex-exec-server"),
                 rg_bin=touch_executable(root / "rg"),
                 bwrap_bin=touch_executable(root / "bwrap"),
-                codex_command_runner_bin=None,
-                codex_windows_sandbox_setup_bin=None,
             )
 
             build_package_dir(

@@ -11,8 +11,6 @@ Usage: build-codex-package-archive.sh \
   [--bwrap-bin <path>] \
   [--code-mode-host-bin <path>] \
   [--rg-bin <path>] \
-  [--codex-command-runner-bin <path>] \
-  [--codex-windows-sandbox-setup-bin <path>] \
   [--voice-release-dir <path> --release-version <release-version>] \
   [--target-suffixed-entrypoint]
 EOF
@@ -26,8 +24,6 @@ target_suffixed_entrypoint="false"
 resource_args=()
 bwrap_bin_provided="false"
 code_mode_host_bin_provided="false"
-command_runner_bin_provided="false"
-sandbox_setup_bin_provided="false"
 voice_release_dir=""
 release_version=""
 
@@ -61,22 +57,6 @@ while [[ $# -gt 0 ]]; do
       ;;
     --rg-bin)
       resource_args+=(--rg-bin "${2:?--rg-bin requires a value}")
-      shift 2
-      ;;
-    --codex-command-runner-bin)
-      resource_args+=(
-        --codex-command-runner-bin
-        "${2:?--codex-command-runner-bin requires a value}"
-      )
-      command_runner_bin_provided="true"
-      shift 2
-      ;;
-    --codex-windows-sandbox-setup-bin)
-      resource_args+=(
-        --codex-windows-sandbox-setup-bin
-        "${2:?--codex-windows-sandbox-setup-bin requires a value}"
-      )
-      sandbox_setup_bin_provided="true"
       shift 2
       ;;
     --target-suffixed-entrypoint)
@@ -153,16 +133,6 @@ case "$target" in
     bwrap_bin="${entrypoint_dir%/}/bwrap"
     if [[ "$bwrap_bin_provided" == "false" && -f "$bwrap_bin" ]]; then
       resource_args+=(--bwrap-bin "$bwrap_bin")
-    fi
-    ;;
-  *windows*)
-    command_runner_bin="${entrypoint_dir%/}/codex-command-runner.exe"
-    sandbox_setup_bin="${entrypoint_dir%/}/codex-windows-sandbox-setup.exe"
-    if [[ "$command_runner_bin_provided" == "false" && -f "$command_runner_bin" ]]; then
-      resource_args+=(--codex-command-runner-bin "$command_runner_bin")
-    fi
-    if [[ "$sandbox_setup_bin_provided" == "false" && -f "$sandbox_setup_bin" ]]; then
-      resource_args+=(--codex-windows-sandbox-setup-bin "$sandbox_setup_bin")
     fi
     ;;
 esac

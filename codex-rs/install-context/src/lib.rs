@@ -8,11 +8,6 @@ use semver::Version;
 use serde::Deserialize;
 
 const BIN_DIRNAME: &str = "bin";
-const CODE_MODE_HOST_EXECUTABLE_NAME: &str = if cfg!(windows) {
-    "codex-code-mode-host.exe"
-} else {
-    "codex-code-mode-host"
-};
 const PACKAGE_METADATA_FILENAME: &str = "codex-package.json";
 const PATH_DIRNAME: &str = "codex-path";
 const RELEASES_DIRNAME: &str = "releases";
@@ -170,38 +165,6 @@ impl InstallContext {
         }
 
         default_rg_command()
-    }
-
-    pub fn code_mode_host_program(&self) -> PathBuf {
-        // prefer the one packed under codex-resources
-        self.bundled_resource(CODE_MODE_HOST_EXECUTABLE_NAME)
-            .map_or_else(
-                || self.code_mode_host_program_from_exe(std::env::current_exe().ok().as_deref()),
-                AbsolutePathBuf::into_path_buf,
-            )
-    }
-
-    fn code_mode_host_program_from_exe(&self, current_exe: Option<&Path>) -> PathBuf {
-        let executable_dir = if let Some(package_layout) = &self.package_layout {
-            Some(package_layout.bin_dir.clone())
-        } else if let InstallMethod::Standalone { release_dir, .. } = &self.method {
-            Some(release_dir.clone())
-        } else {
-            current_exe
-                .and_then(Path::parent)
-                .and_then(canonical_absolute_path)
-        };
-        if let Some(executable_dir) = executable_dir {
-            let executable = executable_dir.join(CODE_MODE_HOST_EXECUTABLE_NAME);
-            if executable.is_file() {
-                return executable.into_path_buf();
-            }
-        }
-
-        current_exe
-            .and_then(Path::parent)
-            .map(|parent| parent.join(CODE_MODE_HOST_EXECUTABLE_NAME))
-            .unwrap_or_else(|| PathBuf::from(CODE_MODE_HOST_EXECUTABLE_NAME))
     }
 
     pub fn bundled_resource(&self, file_name: impl AsRef<Path>) -> Option<AbsolutePathBuf> {

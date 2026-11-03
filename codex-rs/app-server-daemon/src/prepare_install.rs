@@ -251,13 +251,7 @@ async fn prepare_from_package(
     let digest = if winget {
         std::fs::create_dir_all(stage.path().join("bin"))?;
         #[cfg(windows)]
-        for (from, to) in [
-            (staged_exe, Path::new(entrypoint)),
-            (
-                Path::new("codex-code-mode-host.exe"),
-                Path::new("bin/codex-code-mode-host.exe"),
-            ),
-        ] {
+        for (from, to) in [(staged_exe, Path::new(entrypoint))] {
             windows::publish_release(&stage.path().join(from), &stage.path().join(to)).await?;
             if let Some(digest) = staged_digests.remove(from) {
                 staged_digests.insert(to.to_path_buf(), digest);

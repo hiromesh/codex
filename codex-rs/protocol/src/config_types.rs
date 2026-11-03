@@ -398,8 +398,6 @@ impl WebSearchMode {
 #[serde(rename_all = "snake_case")]
 #[strum(serialize_all = "snake_case")]
 pub enum ToolExposureSurface {
-    /// Nested tools available to Code Mode scripts.
-    CodeMode,
     /// Tools discovered later through tool search.
     Deferred,
     /// Tools present in the model's initial tool list.

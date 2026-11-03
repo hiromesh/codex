@@ -133,14 +133,6 @@ def create_parser() -> argparse.ArgumentParser:
         ),
     )
     parser.add_argument(
-        "--code-mode-host-bin",
-        type=Path,
-        help=(
-            "Optional prebuilt codex-code-mode-host executable. If omitted, "
-            "the host is built with Cargo."
-        ),
-    )
-    parser.add_argument(
         "--exec-server-bin",
         type=Path,
         help="Optional prebuilt codex-exec-server executable. If omitted, build it with Cargo.",
@@ -151,24 +143,6 @@ def create_parser() -> argparse.ArgumentParser:
         help=(
             "Optional prebuilt Linux bwrap executable. If omitted for Linux "
             "targets, bwrap is built with Cargo."
-        ),
-    )
-    parser.add_argument(
-        "--codex-command-runner-bin",
-        type=Path,
-        help=(
-            "Optional prebuilt Windows codex-command-runner.exe executable. "
-            "If omitted for Windows targets, codex-command-runner is built "
-            "with Cargo."
-        ),
-    )
-    parser.add_argument(
-        "--codex-windows-sandbox-setup-bin",
-        type=Path,
-        help=(
-            "Optional prebuilt Windows codex-windows-sandbox-setup.exe "
-            "executable. If omitted for Windows targets, "
-            "codex-windows-sandbox-setup is built with Cargo."
         ),
     )
     parser.add_argument(
@@ -210,11 +184,6 @@ def assemble_package(args: argparse.Namespace) -> Path:
             "prebuilt entrypoint executable",
             "--entrypoint-bin",
         ),
-        code_mode_host_bin=resolve_optional_input_path(
-            args.code_mode_host_bin,
-            "prebuilt code-mode host executable",
-            "--code-mode-host-bin",
-        ),
         exec_server_bin=resolve_optional_input_path(
             args.exec_server_bin,
             "prebuilt executor executable",
@@ -225,31 +194,17 @@ def assemble_package(args: argparse.Namespace) -> Path:
             "prebuilt Linux bwrap executable",
             "--bwrap-bin",
         ),
-        codex_command_runner_bin=resolve_optional_input_path(
-            args.codex_command_runner_bin,
-            "prebuilt Windows codex-command-runner.exe executable",
-            "--codex-command-runner-bin",
-        ),
-        codex_windows_sandbox_setup_bin=resolve_optional_input_path(
-            args.codex_windows_sandbox_setup_bin,
-            "prebuilt Windows codex-windows-sandbox-setup.exe executable",
-            "--codex-windows-sandbox-setup-bin",
-        ),
     )
     inputs = PackageInputs(
         entrypoint_bin=source_outputs.entrypoint_bin,
-        code_mode_host_bin=source_outputs.code_mode_host_bin,
         exec_server_bin=source_outputs.exec_server_bin,
         rg_bin=resolve_rg_bin(spec, args.rg_bin),
         bwrap_bin=source_outputs.bwrap_bin,
-        codex_command_runner_bin=source_outputs.codex_command_runner_bin,
-        codex_windows_sandbox_setup_bin=source_outputs.codex_windows_sandbox_setup_bin,
     )
     prepare_package_dir(package_dir, force=args.force)
     build_package_dir(package_dir, args.package_version, variant, spec, inputs)
     for filename, prebuilt in (
         (variant.entrypoint_name(spec), args.entrypoint_bin),
-        (f"codex-code-mode-host{spec.exe_suffix}", args.code_mode_host_bin),
         (f"codex-exec-server{spec.exe_suffix}", args.exec_server_bin),
     ):
         if args.strip == "all" or (

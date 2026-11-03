@@ -64,9 +64,6 @@ struct DirectToolTiming {
 // Remove this boundary when CodeMode and subagent dependencies have runtime capture.
 fn direct_path_supported(tool_name: &codex_tools::ToolName, source: &ToolCallSource) -> bool {
     !(matches!(source, ToolCallSource::CodeMode { .. })
-        || (tool_name.is_default_namespace()
-            && matches!(tool_name.name.as_str(),
-                crate::tools::code_mode::PUBLIC_TOOL_NAME | crate::tools::code_mode::WAIT_TOOL_NAME))
         // Multi-agent tool namespaces can be overridden by the tool catalog.
         || matches!(tool_name.name.as_str(), "spawn_agent" | "send_input"
             | "close_agent" | "resume_agent" | "wait_agent" | "list_agents"

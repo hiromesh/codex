@@ -213,7 +213,6 @@ pub(crate) struct TurnToolNamespaceInfo {
 pub(crate) struct TurnToolFunctionInfo {
     pub(crate) name: String,
     pub(crate) direct: bool,
-    pub(crate) code_mode_name: Option<String>,
     pub(crate) deferred: bool,
     pub(crate) source: TurnToolSource,
 }

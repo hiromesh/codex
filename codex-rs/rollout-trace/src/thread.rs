@@ -18,7 +18,6 @@ use tracing::warn;
 use uuid::Uuid;
 
 use crate::AgentThreadId;
-use crate::CodeCellTraceContext;
 use crate::CodexTurnId;
 use crate::CompactionId;
 use crate::CompactionTraceContext;
@@ -359,36 +358,6 @@ impl ThreadTraceContext {
                 thread_id: context.thread_id.clone(),
             },
         );
-    }
-
-    /// Starts a first-class code-mode cell lifecycle and returns its trace handle.
-    pub fn start_code_cell_trace(
-        &self,
-        codex_turn_id: impl Into<CodexTurnId>,
-        runtime_cell_id: impl Into<String>,
-        model_visible_call_id: impl Into<String>,
-        source_js: impl Into<String>,
-    ) -> CodeCellTraceContext {
-        let context = self.code_cell_trace_context(codex_turn_id, runtime_cell_id);
-        context.record_started(model_visible_call_id, source_js);
-        context
-    }
-
-    /// Builds a trace handle for an already-started code-mode runtime cell.
-    pub fn code_cell_trace_context(
-        &self,
-        codex_turn_id: impl Into<CodexTurnId>,
-        runtime_cell_id: impl Into<String>,
-    ) -> CodeCellTraceContext {
-        let ThreadTraceContextState::Enabled(context) = &self.state else {
-            return CodeCellTraceContext::disabled();
-        };
-        CodeCellTraceContext::enabled(
-            Arc::clone(&context.writer),
-            context.thread_id.clone(),
-            codex_turn_id,
-            runtime_cell_id,
-        )
     }
 
     /// Starts one dispatch-level tool lifecycle and returns its trace handle.

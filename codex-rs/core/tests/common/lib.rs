@@ -25,8 +25,6 @@ use std::path::Path;
 use std::path::PathBuf;
 
 pub mod apps_test_server;
-#[cfg(unix)]
-pub mod code_mode_host;
 pub mod context_snapshot;
 pub mod exec_server;
 pub mod hooks;

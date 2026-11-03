@@ -481,10 +481,7 @@ function Test-OldStandaloneBinLayout {
 
     $knownFiles = @(
         "codex.exe",
-        "rg.exe",
-        "codex-command-runner.exe",
-        "codex-windows-sandbox.exe",
-        "codex-windows-sandbox-setup.exe"
+        "rg.exe"
     )
     foreach ($child in Get-ChildItem -LiteralPath $VisibleBinDir -Force) {
         if ($child.PSIsContainer) {
@@ -767,10 +764,7 @@ function Test-PackageContentsAreComplete {
     $expectedFiles = @(
         "codex-package.json",
         "bin\codex.exe",
-        "bin\codex-code-mode-host.exe",
-        "codex-path\rg.exe",
-        "codex-resources\codex-command-runner.exe",
-        "codex-resources\codex-windows-sandbox-setup.exe"
+        "codex-path\rg.exe"
     )
     try {
         $metadataPath = $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath((Join-Path $PackageDir "codex-package.json"))
@@ -802,8 +796,6 @@ function Test-LegacyPlatformNpmContentsAreComplete {
 
     $expectedFiles = @(
         "codex.exe",
-        "codex-resources\codex-command-runner.exe",
-        "codex-resources\codex-windows-sandbox-setup.exe",
         "codex-resources\rg.exe"
     )
     foreach ($name in $expectedFiles) {
@@ -1123,8 +1115,6 @@ try {
                 New-Item -ItemType Directory -Force -Path $resourcesDir | Out-Null
                 $copyMap = @{
                     "codex/codex.exe" = "codex.exe"
-                    "codex/codex-command-runner.exe" = "codex-resources\codex-command-runner.exe"
-                    "codex/codex-windows-sandbox-setup.exe" = "codex-resources\codex-windows-sandbox-setup.exe"
                     "path/rg.exe" = "codex-resources\rg.exe"
                 }
 

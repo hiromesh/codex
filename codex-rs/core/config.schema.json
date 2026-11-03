@@ -689,58 +689,6 @@
       },
       "type": "object"
     },
-    "CodeModeConfigToml": {
-      "additionalProperties": false,
-      "properties": {
-        "default_exec_yield_time_ms": {
-          "description": "Default yield timeout for code-mode exec calls, in milliseconds.",
-          "format": "uint64",
-          "minimum": 0.0,
-          "type": "integer"
-        },
-        "direct_only_tool_namespaces": {
-          "description": "Exact tool namespaces to expose only as direct model tools. These tools bypass deferral, remain top-level in code-mode-only sessions, and are omitted from the nested code-mode tool surface.",
-          "items": {
-            "type": "string"
-          },
-          "type": "array"
-        },
-        "enabled": {
-          "type": "boolean"
-        },
-        "excluded_tool_namespaces": {
-          "description": "Exact tool namespaces to omit from the code-mode nested tool surface.",
-          "items": {
-            "type": "string"
-          },
-          "type": "array"
-        },
-        "experimental_show_cell_overhead": {
-          "description": "Show handler duration, code-mode host duration, and harness overhead in each code-mode cell response. Experimental: this option and the response format may change or be removed.",
-          "type": "boolean"
-        },
-        "tool_input_schema_max_bytes": {
-          "description": "Maximum UTF-8 bytes per rendered tool input type, with a 16,000-byte minimum and default. For ordinary MCP tools, this is also at least their server's explicitly configured input limit.",
-          "format": "uint",
-          "minimum": 1.0,
-          "type": "integer"
-        }
-      },
-      "type": "object"
-    },
-    "CodeModeHostConfigToml": {
-      "additionalProperties": false,
-      "properties": {
-        "disable_in_process_fallback": {
-          "description": "Keep code mode fail-closed when the standalone host is unavailable.",
-          "type": "boolean"
-        },
-        "enabled": {
-          "type": "boolean"
-        }
-      },
-      "type": "object"
-    },
     "ComputerUseConfigToml": {
       "additionalProperties": false,
       "properties": {
@@ -913,39 +861,6 @@
               "type": "boolean"
             },
             "cli_daybreak": {
-              "type": "boolean"
-            },
-            "code_mode": {
-              "$ref": "#/definitions/FeatureToml_for_CodeModeConfigToml"
-            },
-            "code_mode_buffered_exec": {
-              "type": "boolean"
-            },
-            "code_mode_host": {
-              "$ref": "#/definitions/FeatureToml_for_CodeModeHostConfigToml"
-            },
-            "code_mode_host_grpc": {
-              "type": "boolean"
-            },
-            "code_mode_host_output_truncation": {
-              "type": "boolean"
-            },
-            "code_mode_interrupt": {
-              "type": "boolean"
-            },
-            "code_mode_only": {
-              "type": "boolean"
-            },
-            "code_mode_only_strict_3p_tools": {
-              "type": "boolean"
-            },
-            "code_mode_prewarm": {
-              "type": "boolean"
-            },
-            "code_mode_tool_description_first": {
-              "type": "boolean"
-            },
-            "code_mode_tool_search": {
               "type": "boolean"
             },
             "codex_apps_mcp_2026_07_28": {
@@ -1781,26 +1696,6 @@
         },
         {
           "$ref": "#/definitions/AsyncCompactionConfigToml"
-        }
-      ]
-    },
-    "FeatureToml_for_CodeModeConfigToml": {
-      "anyOf": [
-        {
-          "type": "boolean"
-        },
-        {
-          "$ref": "#/definitions/CodeModeConfigToml"
-        }
-      ]
-    },
-    "FeatureToml_for_CodeModeHostConfigToml": {
-      "anyOf": [
-        {
-          "type": "boolean"
-        },
-        {
-          "$ref": "#/definitions/CodeModeHostConfigToml"
         }
       ]
     },
@@ -4936,13 +4831,6 @@
       "description": "A model-facing surface on which a tool can be exposed.",
       "oneOf": [
         {
-          "description": "Nested tools available to Code Mode scripts.",
-          "enum": [
-            "code_mode"
-          ],
-          "type": "string"
-        },
-        {
           "description": "Tools discovered later through tool search.",
           "enum": [
             "deferred"
@@ -7624,39 +7512,6 @@
           "type": "boolean"
         },
         "cli_daybreak": {
-          "type": "boolean"
-        },
-        "code_mode": {
-          "$ref": "#/definitions/FeatureToml_for_CodeModeConfigToml"
-        },
-        "code_mode_buffered_exec": {
-          "type": "boolean"
-        },
-        "code_mode_host": {
-          "$ref": "#/definitions/FeatureToml_for_CodeModeHostConfigToml"
-        },
-        "code_mode_host_grpc": {
-          "type": "boolean"
-        },
-        "code_mode_host_output_truncation": {
-          "type": "boolean"
-        },
-        "code_mode_interrupt": {
-          "type": "boolean"
-        },
-        "code_mode_only": {
-          "type": "boolean"
-        },
-        "code_mode_only_strict_3p_tools": {
-          "type": "boolean"
-        },
-        "code_mode_prewarm": {
-          "type": "boolean"
-        },
-        "code_mode_tool_description_first": {
-          "type": "boolean"
-        },
-        "code_mode_tool_search": {
           "type": "boolean"
         },
         "codex_apps_mcp_2026_07_28": {

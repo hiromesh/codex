@@ -7,7 +7,6 @@ use schemars::JsonSchema;
 use serde::Deserialize;
 use serde::Serialize;
 use std::collections::BTreeMap;
-use std::num::NonZeroUsize;
 
 /// Connection to a board provisioned by the research host.
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, JsonSchema)]
@@ -31,55 +30,6 @@ pub struct ToolRegistryConfigToml {
     /// Include authoritative tool information in per-turn request metadata.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub turn_metadata_includes_tool_info: Option<bool>,
-}
-
-#[derive(Serialize, Deserialize, Debug, Clone, Default, PartialEq, Eq, JsonSchema)]
-#[serde(deny_unknown_fields)]
-pub struct CodeModeConfigToml {
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub enabled: Option<bool>,
-    /// Default yield timeout for code-mode exec calls, in milliseconds.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub default_exec_yield_time_ms: Option<u64>,
-    /// Show handler duration, code-mode host duration, and harness overhead
-    /// in each code-mode cell response.
-    /// Experimental: this option and the response format may change or be removed.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub experimental_show_cell_overhead: Option<bool>,
-    /// Maximum UTF-8 bytes per rendered tool input type, with a 16,000-byte minimum and default.
-    /// For ordinary MCP tools, this is also at least their server's explicitly configured input limit.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub tool_input_schema_max_bytes: Option<NonZeroUsize>,
-    /// Exact tool namespaces to omit from the code-mode nested tool surface.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub excluded_tool_namespaces: Option<Vec<String>>,
-    /// Exact tool namespaces to expose only as direct model tools.
-    /// These tools bypass deferral, remain top-level in code-mode-only sessions, and are omitted
-    /// from the nested code-mode tool surface.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub direct_only_tool_namespaces: Option<Vec<String>>,
-}
-
-impl FeatureConfig for CodeModeConfigToml {
-    fn enabled(&self) -> Option<bool> {
-        self.enabled
-    }
-}
-
-#[derive(Serialize, Deserialize, Debug, Clone, Default, PartialEq, Eq, JsonSchema)]
-#[serde(deny_unknown_fields)]
-pub struct CodeModeHostConfigToml {
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub enabled: Option<bool>,
-    /// Keep code mode fail-closed when the standalone host is unavailable.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub disable_in_process_fallback: Option<bool>,
-}
-
-impl FeatureConfig for CodeModeHostConfigToml {
-    fn enabled(&self) -> Option<bool> {
-        self.enabled
-    }
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, Default, PartialEq, Eq, JsonSchema)]

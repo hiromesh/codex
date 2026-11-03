@@ -331,17 +331,6 @@ pub(super) async fn shutdown_session_runtime(sess: &Arc<Session>) {
         .unified_exec_manager
         .terminate_all_processes()
         .await;
-    if let Err(err) = sess.services.code_mode_service.shutdown().await {
-        sess.services.local_agent_runtime.record_shutdown_failure(
-            AgentTreeShutdownFailure::operation_failed(
-                "session_shutdown",
-                "code_mode",
-                Some(sess.thread_id),
-                "code_mode_error",
-            ),
-        );
-        warn!("failed to shutdown code mode session: {err}");
-    }
     sess.stop_mcp_prewarm_worker().await;
     {
         let _refresh = sess.mcp_refresh.acquire().await;

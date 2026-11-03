@@ -1814,11 +1814,6 @@ async fn run_sampling_request(
         Arc::clone(&step_context),
         Arc::clone(&turn_diff_tracker),
     );
-    let _code_mode_worker = sess.services.code_mode_service.start_turn_worker(
-        &sess,
-        Arc::clone(&step_context),
-        Arc::clone(&turn_diff_tracker),
-    );
     let max_retries = turn_context.provider.info().stream_max_retries();
     let incremental_tools = sess
         .current_window_uses_incremental_tools(&step_context)

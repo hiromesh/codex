@@ -65,6 +65,20 @@ pub enum ToolCallSource {
     },
 }
 
+/// Runtime cell identifier retained for tool-call provenance tracking.
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+pub(crate) struct CellId(String);
+
+impl CellId {
+    pub(crate) fn new(id: String) -> Self {
+        Self(id)
+    }
+
+    pub(crate) fn as_str(&self) -> &str {
+        &self.0
+    }
+}
+
 /// Targets captured from the original call. Environments follow the order declared by the tool.
 #[derive(Clone, Default)]
 pub(crate) enum ToolEnvironments {
@@ -136,12 +150,8 @@ pub(crate) struct ToolCallOrigin {
 impl ToolInvocation {
     /// Returns the item and window that requested this call or started its code-mode cell.
     pub(crate) async fn originating_call(&self) -> Option<ToolCallOrigin> {
-        if let ToolCallSource::CodeMode { cell_id, .. } = &self.source {
-            return self
-                .session
-                .services
-                .code_mode_service
-                .cell_originating_call(&codex_code_mode::CellId::new(cell_id.clone()));
+        if let ToolCallSource::CodeMode { .. } = &self.source {
+            return None;
         }
 
         let item_id = self

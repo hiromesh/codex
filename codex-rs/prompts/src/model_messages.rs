@@ -3,7 +3,6 @@
 //! Prompt composition and runtime settings remain with consumers; each accessor
 //! selects and resolves only the requested message family.
 
-use codex_protocol::openai_models::CodeModeToolMessages;
 use codex_protocol::openai_models::ConfirmationPolicies;
 use codex_protocol::openai_models::IndirectDescriptionPrefixes;
 use codex_protocol::openai_models::McpResourceToolMessages;
@@ -245,21 +244,6 @@ impl<'a> ResolvedModelMessages<'a> {
                 .and_then(|messages| messages.tools.as_ref())
                 .and_then(|tools| tools.incremental_tools.as_ref()),
         )
-    }
-
-    /// Selects Code Mode messages; bundled text and runtime composition belong to the tool owner.
-    pub fn code_mode(&self) -> Option<&'a CodeModeToolMessages> {
-        self.catalog_messages?.tools.as_ref()?.code_mode.as_ref()
-    }
-
-    /// Selects wait's complete description.
-    pub fn code_mode_wait_description_override(&self) -> Option<&'a str> {
-        self.code_mode()?.wait.as_ref()?.description.as_deref()
-    }
-
-    /// Selects wait's parameter schema. Exec uses a harness-owned freeform grammar.
-    pub fn code_mode_wait_parameters_override(&self) -> Option<&'a str> {
-        self.code_mode()?.wait.as_ref()?.parameters.as_deref()
     }
 
     /// Resolves persistent-mode instructions without deciding whether the mode is active.

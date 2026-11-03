@@ -421,7 +421,6 @@ pub struct TestCodexBuilder {
     user_instructions_provider: Option<Arc<dyn UserInstructionsProvider>>,
     supports_openai_form_elicitation: bool,
     external_time_provider: Option<Arc<dyn TimeProvider>>,
-    code_mode_host_program: Option<PathBuf>,
     history_mode: Option<ThreadHistoryMode>,
     models_manager: Option<SharedModelsManager>,
     thread_store: Option<Arc<dyn ThreadStore>>,
@@ -596,11 +595,6 @@ impl TestCodexBuilder {
 
     pub fn with_external_time_provider(mut self, provider: Arc<dyn TimeProvider>) -> Self {
         self.external_time_provider = Some(provider);
-        self
-    }
-
-    pub fn with_code_mode_host_program(mut self, host_program: PathBuf) -> Self {
-        self.code_mode_host_program = Some(host_program);
         self
     }
 
@@ -860,10 +854,6 @@ impl TestCodexBuilder {
             .models_manager
             .clone()
             .unwrap_or_else(|| codex_core::build_models_manager(&config, auth_manager.clone()));
-        let code_mode_host_program = self
-            .code_mode_host_program
-            .take()
-            .or_else(|| codex_utils_cargo_bin::cargo_bin("codex-code-mode-host").ok());
         let thread_manager = Arc::new_cyclic(|manager| {
             let mut extensions = self.extensions.to_builder();
             codex_core::install_agent_message_board(&mut extensions, manager.clone());
@@ -895,17 +885,7 @@ impl TestCodexBuilder {
                 Some(configure) => configure(thread_manager),
                 None => thread_manager,
             };
-            if config.features.enabled(Feature::CodeModeHost)
-                && let Some(code_mode_host_program) = code_mode_host_program
-            {
-                codex_core::test_support::with_code_mode_host_program(
-                    thread_manager,
-                    code_mode_host_program,
-                    &config,
-                )
-            } else {
-                thread_manager
-            }
+            thread_manager
         });
         let user_shell_override = self.user_shell_override.clone();
         let client_mcp_extensions = || {
@@ -1562,7 +1542,6 @@ pub fn test_codex() -> TestCodexBuilder {
         user_instructions_provider: None,
         supports_openai_form_elicitation: false,
         external_time_provider: None,
-        code_mode_host_program: None,
         // These fixtures exercise legacy-only resume/fork helpers; store-default tests opt out.
         history_mode: Some(ThreadHistoryMode::Legacy),
         models_manager: None,

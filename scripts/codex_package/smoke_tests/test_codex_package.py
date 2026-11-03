@@ -10,9 +10,7 @@ ROOT_OF_EXTRACTED_PACKAGE
 ├── codex-path
 │   └── rg[.exe]
 └── codex-resources
-    ├── bwrap                             # Linux only
-    ├── codex-command-runner.exe          # Windows only
-    ├── codex-windows-sandbox-setup.exe   # Windows only
+    └── bwrap                             # Linux only
 
 Debug symbols for all shipped binaries arrive in a separate companion archive.
 Each package contains one entrypoint, not both codex and codex-app-server.

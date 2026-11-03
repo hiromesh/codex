@@ -440,10 +440,8 @@ fn code_mode_input_matches_output(
             ResponseItem::CustomToolCallOutput { .. },
         ) => {
             call_id == origin
-                && crate::tools::code_mode::is_exec_tool_name(&codex_tools::ToolName::new(
-                    namespace.clone(),
-                    name,
-                ))
+                && name == "exec"
+                && codex_tools::ToolName::new(namespace.clone(), name).is_default_namespace()
         }
         (
             ResponseItem::FunctionCall {
@@ -456,7 +454,7 @@ fn code_mode_input_matches_output(
             ResponseItem::FunctionCallOutput { .. },
         ) => {
             call_id != origin
-                && name == crate::tools::code_mode::WAIT_TOOL_NAME
+                && name == "wait"
                 && codex_tools::ToolName::new(namespace.clone(), name).is_default_namespace()
                 && serde_json::from_str::<JsonValue>(arguments).is_ok_and(|arguments| {
                     arguments.get("cell_id").and_then(JsonValue::as_str)

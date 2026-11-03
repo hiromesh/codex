@@ -51,11 +51,6 @@ def build_package_dir(
         is_windows=spec.is_windows,
     )
     copy_executable(
-        inputs.code_mode_host_bin,
-        bin_dir / f"codex-code-mode-host{spec.exe_suffix}",
-        is_windows=spec.is_windows,
-    )
-    copy_executable(
         inputs.exec_server_bin,
         bin_dir / f"codex-exec-server{spec.exe_suffix}",
         is_windows=spec.is_windows,
@@ -64,20 +59,6 @@ def build_package_dir(
 
     if inputs.bwrap_bin is not None:
         copy_executable(inputs.bwrap_bin, resources_dir / "bwrap", is_windows=False)
-
-    if inputs.codex_command_runner_bin is not None:
-        copy_executable(
-            inputs.codex_command_runner_bin,
-            resources_dir / "codex-command-runner.exe",
-            is_windows=True,
-        )
-
-    if inputs.codex_windows_sandbox_setup_bin is not None:
-        copy_executable(
-            inputs.codex_windows_sandbox_setup_bin,
-            resources_dir / "codex-windows-sandbox-setup.exe",
-            is_windows=True,
-        )
 
     metadata = {
         "layoutVersion": LAYOUT_VERSION,
@@ -132,7 +113,6 @@ def validate_package_dir(
 
     required_files = [
         Path("bin") / variant.entrypoint_name(spec),
-        Path("bin") / f"codex-code-mode-host{spec.exe_suffix}",
         Path("bin") / f"codex-exec-server{spec.exe_suffix}",
         Path("codex-path") / spec.rg_name,
     ]
@@ -141,14 +121,6 @@ def validate_package_dir(
     if spec.is_linux:
         required_files.append(Path("codex-resources") / "bwrap")
         executable_files.append(Path("codex-resources") / "bwrap")
-
-    if spec.is_windows:
-        required_files.extend(
-            [
-                Path("codex-resources") / "codex-command-runner.exe",
-                Path("codex-resources") / "codex-windows-sandbox-setup.exe",
-            ]
-        )
 
     for relative_file in required_files:
         path = package_dir / relative_file

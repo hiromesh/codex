@@ -37,11 +37,7 @@ fn packaged_daemon_launch(action: &str, initial: InitialDaemon) -> Result<()> {
         package.join("bin/codex"),
     )?;
     daemon.codex = package.join("bin/codex");
-    for helper in [
-        "bin/codex-code-mode-host",
-        "codex-path/rg",
-        "codex-resources/bwrap",
-    ] {
+    for helper in ["codex-path/rg", "codex-resources/bwrap"] {
         codex_utils_cargo_bin::write_executable(&package.join(helper), "runtime fixture")?;
     }
     let target = format!(
@@ -135,7 +131,7 @@ fn packaged_daemon_launch(action: &str, initial: InitialDaemon) -> Result<()> {
             assert!(!current.exists());
         }
 
-        std::fs::remove_file(package.join("bin/codex-code-mode-host"))?;
+        std::fs::remove_file(package.join("codex-path/rg"))?;
         let invalid = daemon
             .command()
             .args(["app-server", "daemon", "update", "--from-cli", "--yes"])
@@ -147,7 +143,7 @@ fn packaged_daemon_launch(action: &str, initial: InitialDaemon) -> Result<()> {
             assert!(!current.exists());
         }
         codex_utils_cargo_bin::write_executable(
-            &package.join("bin/codex-code-mode-host"),
+            &package.join("codex-path/rg"),
             "replacement helper",
         )?;
         let replaced = daemon
@@ -179,12 +175,12 @@ fn packaged_daemon_launch(action: &str, initial: InitialDaemon) -> Result<()> {
         assert!(!dedicated.join("auto-update-version").exists());
         assert_eq!(std::fs::read(state.join("settings.json"))?, settings_before);
         assert_eq!(
-            std::fs::read(current.join("bin/codex-code-mode-host"))?,
+            std::fs::read(current.join("codex-path/rg"))?,
             b"replacement helper"
         );
         if initial == InitialDaemon::Missing {
             assert_eq!(
-                std::fs::read(original.join("bin/codex-code-mode-host"))?,
+                std::fs::read(original.join("codex-path/rg"))?,
                 b"runtime fixture"
             );
         }

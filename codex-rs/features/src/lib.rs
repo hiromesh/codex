@@ -18,8 +18,6 @@ mod feature_configs;
 mod legacy;
 mod runtime_auth;
 pub use feature_configs::AsyncCompactionConfigToml;
-pub use feature_configs::CodeModeConfigToml;
-pub use feature_configs::CodeModeHostConfigToml;
 pub use feature_configs::ContextManagementConfigToml;
 pub use feature_configs::CurrentTimeReminderConfigToml;
 pub use feature_configs::CurrentTimeReminderDeliveryMode;
@@ -140,29 +138,6 @@ pub enum Feature {
     UntrustedAsToolOutput,
     /// Record model-attempted tool calls in internal Responses metadata.
     ExecutedToolCallMetadata,
-    /// Enable JavaScript code mode backed by the standalone host process.
-    CodeMode,
-    /// Expose ranked tool discovery inside JavaScript code mode.
-    CodeModeToolSearch,
-    /// Removed compatibility flag for the configurable code-mode exec yield timeout.
-    CodeModeBufferedExec,
-    /// Run JavaScript code mode in the standalone host process.
-    CodeModeHost,
-    /// Use gRPC over stdio for the process-owned code-mode host.
-    CodeModeHostGrpc,
-    /// Truncate output in the process-owned code-mode host before sending it to Core.
-    CodeModeHostOutputTruncation,
-    /// Establish the code-mode host connection during session startup.
-    CodeModePrewarm,
-    /// Terminate active code mode cells when their turn is interrupted.
-    CodeModeInterrupt,
-    /// Removed compatibility flag for Code Mode tool description ordering.
-    CodeModeToolDescriptionFirst,
-    /// Restrict model-visible tools to code mode entrypoints (`exec`, `wait`).
-    CodeModeOnly,
-    /// Keep eligible MCP/app and dynamic tools deferred in exec, only in Code Mode Only.
-    /// Ignores deferLoading, omit_tools_from, and namespace skip settings.
-    CodeModeOnlyStrictThirdPartyTools,
     /// Use the single unified PTY-backed exec tool.
     UnifiedExec,
     /// Allow unified exec commands to allocate an interactive terminal.
@@ -823,11 +798,7 @@ impl Features {
         self.enabled.iter().copied().collect()
     }
 
-    pub fn normalize_dependencies(&mut self) {
-        if self.enabled(Feature::CodeModeOnly) && !self.enabled(Feature::CodeMode) {
-            self.enable(Feature::CodeMode);
-        }
-    }
+    pub fn normalize_dependencies(&mut self) {}
 }
 
 fn legacy_usage_notice(alias: &str, feature: Feature) -> (String, Option<String>) {
@@ -924,10 +895,6 @@ pub struct FeaturesToml {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub tool_registry: Option<ToolRegistryConfigToml>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub code_mode: Option<FeatureToml<CodeModeConfigToml>>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub code_mode_host: Option<FeatureToml<CodeModeHostConfigToml>>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub non_prefixed_mcp_tool_names: Option<FeatureToml<NonPrefixedMcpToolNamesConfigToml>>,
     #[serde(
         default,
@@ -978,12 +945,6 @@ impl FeaturesToml {
             .and_then(FeatureToml::enabled)
         {
             entries.insert(Feature::AsyncCompaction.key().to_string(), enabled);
-        }
-        if let Some(enabled) = self.code_mode.as_ref().and_then(FeatureToml::enabled) {
-            entries.insert(Feature::CodeMode.key().to_string(), enabled);
-        }
-        if let Some(enabled) = self.code_mode_host.as_ref().and_then(FeatureToml::enabled) {
-            entries.insert(Feature::CodeModeHost.key().to_string(), enabled);
         }
         if let Some(enabled) = self
             .non_prefixed_mcp_tool_names
@@ -1258,60 +1219,6 @@ pub const FEATURES: &[FeatureSpec] = &[
         default_enabled: false,
     },
     FeatureSpec {
-        id: Feature::CodeMode,
-        key: "code_mode",
-        stage: Stage::UnderDevelopment,
-        default_enabled: false,
-    },
-    FeatureSpec {
-        id: Feature::CodeModeToolSearch,
-        key: "code_mode_tool_search",
-        stage: Stage::UnderDevelopment,
-        default_enabled: false,
-    },
-    FeatureSpec {
-        id: Feature::CodeModeBufferedExec,
-        key: "code_mode_buffered_exec",
-        stage: Stage::Removed,
-        default_enabled: false,
-    },
-    FeatureSpec {
-        id: Feature::CodeModeHost,
-        key: "code_mode_host",
-        stage: Stage::Stable,
-        default_enabled: true,
-    },
-    FeatureSpec {
-        id: Feature::CodeModeHostGrpc,
-        key: "code_mode_host_grpc",
-        stage: Stage::UnderDevelopment,
-        default_enabled: false,
-    },
-    FeatureSpec {
-        id: Feature::CodeModeHostOutputTruncation,
-        key: "code_mode_host_output_truncation",
-        stage: Stage::UnderDevelopment,
-        default_enabled: false,
-    },
-    FeatureSpec {
-        id: Feature::CodeModePrewarm,
-        key: "code_mode_prewarm",
-        stage: Stage::UnderDevelopment,
-        default_enabled: false,
-    },
-    FeatureSpec {
-        id: Feature::CodeModeInterrupt,
-        key: "code_mode_interrupt",
-        stage: Stage::Stable,
-        default_enabled: true,
-    },
-    FeatureSpec {
-        id: Feature::CodeModeToolDescriptionFirst,
-        key: "code_mode_tool_description_first",
-        stage: Stage::Removed,
-        default_enabled: false,
-    },
-    FeatureSpec {
         id: Feature::InstantInterrupt,
         key: "instant_interrupt",
         stage: Stage::UnderDevelopment,
@@ -1320,18 +1227,6 @@ pub const FEATURES: &[FeatureSpec] = &[
     FeatureSpec {
         id: Feature::InterruptOnCancel,
         key: "interrupt_on_cancel",
-        stage: Stage::UnderDevelopment,
-        default_enabled: false,
-    },
-    FeatureSpec {
-        id: Feature::CodeModeOnly,
-        key: "code_mode_only",
-        stage: Stage::UnderDevelopment,
-        default_enabled: false,
-    },
-    FeatureSpec {
-        id: Feature::CodeModeOnlyStrictThirdPartyTools,
-        key: "code_mode_only_strict_3p_tools",
         stage: Stage::UnderDevelopment,
         default_enabled: false,
     },

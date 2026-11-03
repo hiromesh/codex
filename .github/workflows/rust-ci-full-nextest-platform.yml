@@ -201,30 +201,19 @@ jobs:
             --archive-file "${archive_dir}/${NEXTEST_ARCHIVE_FILE}"
 
       - name: Build runtime test helpers
-        if: ${{ runner.os == 'Linux' || runner.os == 'Windows' }}
+        if: ${{ runner.os == 'Linux' }}
         shell: bash
         run: |
           set -euo pipefail
           helper_dir="${RUNNER_TEMP}/${TEST_HELPERS_ARTIFACT}"
           mkdir -p "${helper_dir}"
 
-          if [[ "${RUNNER_OS}" == "Linux" ]]; then
-            cargo build \
-              --target "${CODEX_CI_TARGET}" \
-              --profile "${CODEX_CI_PROFILE}" \
-              -p codex-linux-sandbox \
-              --bin codex-linux-sandbox
-            cp "${CARGO_TARGET_DIR}/${CODEX_CI_TARGET}/${CODEX_CI_PROFILE}/codex-linux-sandbox" "${helper_dir}/"
-          else
-            cargo build \
-              --target "${CODEX_CI_TARGET}" \
-              --profile "${CODEX_CI_PROFILE}" \
-              -p codex-windows-sandbox \
-              --bin codex-windows-sandbox-setup \
-              --bin codex-command-runner
-            cp "${CARGO_TARGET_DIR}/${CODEX_CI_TARGET}/${CODEX_CI_PROFILE}/codex-windows-sandbox-setup.exe" "${helper_dir}/"
-            cp "${CARGO_TARGET_DIR}/${CODEX_CI_TARGET}/${CODEX_CI_PROFILE}/codex-command-runner.exe" "${helper_dir}/"
-          fi
+          cargo build \
+            --target "${CODEX_CI_TARGET}" \
+            --profile "${CODEX_CI_PROFILE}" \
+            -p codex-linux-sandbox \
+            --bin codex-linux-sandbox
+          cp "${CARGO_TARGET_DIR}/${CODEX_CI_TARGET}/${CODEX_CI_PROFILE}/codex-linux-sandbox" "${helper_dir}/"
 
       - name: Upload Cargo timings (nextest)
         if: always()
@@ -243,7 +232,7 @@ jobs:
           retention-days: 1
 
       - name: Upload runtime test helpers
-        if: ${{ runner.os == 'Linux' || runner.os == 'Windows' }}
+        if: ${{ runner.os == 'Linux' }}
         uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
         with:
           name: ${{ env.TEST_HELPERS_ARTIFACT }}
@@ -351,7 +340,7 @@ jobs:
           path: ${{ runner.temp }}/nextest-archive
 
       - name: Download runtime test helpers
-        if: ${{ runner.os == 'Linux' || runner.os == 'Windows' }}
+        if: ${{ runner.os == 'Linux' }}
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           name: ${{ env.TEST_HELPERS_ARTIFACT }}
@@ -382,12 +371,6 @@ jobs:
             mkdir -p "${helper_target_dir}"
             cp "${helper_dir}/codex-linux-sandbox" "${helper_target_dir}/"
             chmod +x "${helper_target_dir}/codex-linux-sandbox"
-          elif [[ "${RUNNER_OS}" == "Windows" ]]; then
-            helper_dir="${RUNNER_TEMP}/${TEST_HELPERS_ARTIFACT}"
-            helper_target_dir="${CARGO_TARGET_DIR}/${CODEX_CI_TARGET}/${CODEX_CI_PROFILE}"
-            mkdir -p "${helper_target_dir}"
-            cp "${helper_dir}/codex-windows-sandbox-setup.exe" "${helper_target_dir}/"
-            cp "${helper_dir}/codex-command-runner.exe" "${helper_target_dir}/"
           fi
 
           nextest_args=(
@@ -409,15 +392,6 @@ jobs:
               env
               "CARGO_BIN_EXE_codex-linux-sandbox=${sandbox_helper}"
               "CARGO_BIN_EXE_codex_linux_sandbox=${sandbox_helper}"
-              cargo nextest "${nextest_args[@]}"
-            )
-          elif [[ "${RUNNER_OS}" == "Windows" ]]; then
-            setup_helper="$(cygpath -w "${helper_target_dir}/codex-windows-sandbox-setup.exe")"
-            command_runner="$(cygpath -w "${helper_target_dir}/codex-command-runner.exe")"
-            test_command=(
-              env
-              "CARGO_BIN_EXE_codex_windows_sandbox_setup=${setup_helper}"
-              "CARGO_BIN_EXE_codex_command_runner=${command_runner}"
               cargo nextest "${nextest_args[@]}"
             )
           fi

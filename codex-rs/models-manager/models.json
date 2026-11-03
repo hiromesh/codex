@@ -17,7 +17,6 @@
         "limit": 10000
       },
       "supports_parallel_tool_calls": true,
-      "tool_mode": "code_mode_only",
       "multi_agent_version": "v2",
       "multi_agent_reasoning_effort": "xhigh",
       "use_responses_lite": true,
@@ -190,7 +189,6 @@
         "limit": 10000
       },
       "supports_parallel_tool_calls": true,
-      "tool_mode": "code_mode_only",
       "multi_agent_version": "v2",
       "multi_agent_reasoning_effort": "xhigh",
       "use_responses_lite": true,
@@ -366,7 +364,6 @@
         "mode": "tokens"
       },
       "supports_parallel_tool_calls": true,
-      "tool_mode": "code_mode_only",
       "multi_agent_version": "v2",
       "multi_agent_reasoning_effort": "xhigh",
       "use_responses_lite": true,
@@ -542,7 +539,6 @@
         "limit": 10000
       },
       "supports_parallel_tool_calls": true,
-      "tool_mode": "code_mode_only",
       "multi_agent_version": "v2",
       "multi_agent_reasoning_effort": null,
       "use_responses_lite": true,
@@ -713,7 +709,6 @@
         "limit": 10000
       },
       "supports_parallel_tool_calls": true,
-      "tool_mode": "code_mode_only",
       "multi_agent_version": "v2",
       "multi_agent_reasoning_effort": null,
       "use_responses_lite": true,
@@ -880,7 +875,6 @@
         "limit": 10000
       },
       "supports_parallel_tool_calls": true,
-      "tool_mode": "code_mode_only",
       "multi_agent_version": "v2",
       "multi_agent_reasoning_effort": null,
       "use_responses_lite": true,
@@ -1021,7 +1015,6 @@
         "limit": 10000
       },
       "supports_parallel_tool_calls": true,
-      "tool_mode": "code_mode_only",
       "multi_agent_version": "v2",
       "multi_agent_reasoning_effort": null,
       "use_responses_lite": true,
@@ -1162,7 +1155,6 @@
         "limit": 10000
       },
       "supports_parallel_tool_calls": true,
-      "tool_mode": "code_mode_only",
       "multi_agent_version": "v1",
       "multi_agent_reasoning_effort": null,
       "use_responses_lite": true,
@@ -1303,7 +1295,6 @@
         "limit": 10000
       },
       "supports_parallel_tool_calls": true,
-      "tool_mode": "code_mode_only",
       "multi_agent_version": "v2",
       "use_responses_lite": true,
       "include_skills_usage_instructions": false,
@@ -1419,7 +1410,6 @@
         "limit": 10000
       },
       "supports_parallel_tool_calls": true,
-      "tool_mode": "code_mode_only",
       "multi_agent_version": "v2",
       "use_responses_lite": true,
       "include_skills_usage_instructions": false,
@@ -1654,7 +1644,6 @@
         "limit": 10000
       },
       "supports_parallel_tool_calls": true,
-      "tool_mode": "code_mode_only",
       "multi_agent_version": "v1",
       "multi_agent_reasoning_effort": null,
       "use_responses_lite": true,

@@ -24,8 +24,6 @@ members = [
     "features",
     "install-context",
     "codex-backend-openapi-models",
-    "code-mode",
-    "code-mode-protocol",
     "plugin-host",
     "codex-home",
     "cloud-config",
@@ -190,8 +188,6 @@ codex-chatgpt = { path = "chatgpt" }
 codex-client = { path = "codex-client" }
 codex-collaboration-mode-templates = { path = "collaboration-mode-templates" }
 codex-cloud-config = { path = "cloud-config" }
-codex-code-mode = { path = "code-mode" }
-codex-code-mode-protocol = { path = "code-mode-protocol" }
 codex-plugin-host = { path = "plugin-host" }
 codex-home = { path = "codex-home" }
 codex-http-client = { path = "http-client" }
