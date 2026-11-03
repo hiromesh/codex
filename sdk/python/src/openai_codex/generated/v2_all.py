@@ -968,7 +968,6 @@ class CommandConfiguredHookHandler(BaseModel):
     ] = None
     async_: Annotated[bool, Field(alias="async")]
     command: str
-    command_windows: Annotated[str | None, Field(alias="commandWindows")] = None
     status_message: Annotated[str | None, Field(alias="statusMessage")] = None
     timeout_sec: Annotated[int | None, Field(alias="timeoutSec", ge=0)] = None
     type: Annotated[Literal["command"], Field(title="CommandConfiguredHookHandlerType")]

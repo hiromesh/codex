@@ -625,12 +625,6 @@
             "command": {
               "type": "string"
             },
-            "commandWindows": {
-              "type": [
-                "string",
-                "null"
-              ]
-            },
             "statusMessage": {
               "type": [
                 "string",
