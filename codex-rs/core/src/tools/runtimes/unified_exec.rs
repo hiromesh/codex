@@ -6,9 +6,7 @@ the process manager to spawn PTYs once an ExecRequest is prepared.
 */
 use crate::exec::ExecCapturePolicy;
 use crate::exec::ExecExpiration;
-use crate::guardian::GUARDIAN_REVIEW_TIMEOUT;
-use crate::guardian::GuardianNetworkAccessTrigger;
-use crate::guardian::routes_approval_policy_to_guardian;
+use crate::guardian::NetworkAccessTrigger;
 use crate::plugins::metrics::sidecar_for_command;
 use crate::sandboxing::ExecOptions;
 use crate::sandboxing::ExecServerEnvConfig;
@@ -219,7 +217,7 @@ impl<'a> ToolRuntime<UnifiedExecRequest<'_>, UnifiedExecAttempt> for UnifiedExec
         Some(NetworkApprovalSpec {
             network,
             tool_name: ctx.tool_name.clone(),
-            trigger: GuardianNetworkAccessTrigger {
+            trigger: NetworkAccessTrigger {
                 call_id: ctx.call_id.clone(),
                 tool_name: flat_tool_name(&ctx.tool_name).into_owned(),
                 command: prepared.resolved.command.clone(),
@@ -335,27 +333,6 @@ impl<'a> ToolRuntime<UnifiedExecRequest<'_>, UnifiedExecAttempt> for UnifiedExec
                     &launch.proxy,
                 )
                 .await;
-                if routes_approval_policy_to_guardian(
-                    ctx.step_context.settings.approval_policy(),
-                    ctx.step_context.settings.approvals_reviewer(),
-                ) && network
-                    .remote_policy_decider(launch.proxy.allow_local_binding)
-                    .is_some()
-                {
-                    let timeout = ctx
-                        .session
-                        .hooks()
-                        .max_permission_request_timeout()
-                        .saturating_add(GUARDIAN_REVIEW_TIMEOUT)
-                        .saturating_add(REMOTE_NETWORK_POLICY_DECISION_MARGIN);
-                    launch.policy_decision_timeout_ms =
-                        Some(u64::try_from(timeout.as_millis()).map_err(|_| {
-                            ToolError::Rejected(
-                                "remote network policy decision timeout exceeds protocol limit"
-                                    .to_string(),
-                            )
-                        })?);
-                }
                 (env, None, launch.proxy.enabled.then_some(launch))
             }
             Some(network) => {

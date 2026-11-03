@@ -82,10 +82,7 @@ pub(super) async fn spawn_review_thread(
                 .or_else(|| config.service_tier.clone()),
         )
     };
-    let auto_review_enabled = crate::guardian::routes_approval_policy_to_guardian(
-        per_turn_config.permissions.approval_policy.value(),
-        per_turn_config.approvals_reviewer,
-    );
+    let auto_review_enabled = false;
     // The original config may retain a requested tier unsupported by the parent
     // model. Resolve it against the review model and the shared feature gate.
     selected.collaboration_mode.settings.model = model.clone();

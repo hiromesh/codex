@@ -203,9 +203,6 @@ pub(crate) async fn run_turn(
         .is_none();
     let auto_summarization_enabled =
         auto_compaction_enabled && !turn_context.config.features.enabled(Feature::TokenBudget);
-    if crate::guardian::is_basic_session_source(&turn_context.session_source) {
-        crate::guardian::check_pending_guardian_input(&sess, &turn_context).await?;
-    }
     // Record results from hooks that finished after the previous turn before this turn's user prompt.
     drain_async_hook_results(&sess, &turn_context, /*before_user_prompt*/ true).await;
 
@@ -358,48 +355,6 @@ pub(crate) async fn run_turn(
     if run_pending_session_start_hooks(&sess, &turn_context).await {
         return Ok(None);
     }
-    if crate::guardian::is_basic_session_source(&turn_context.session_source)
-        && let Err(error) = crate::guardian::finalize_guardian_input(
-            &sess,
-            &first_step_context,
-            &mut input,
-            codex_guardian_context::HistoryTruncation::Preserve,
-        )
-        .await
-    {
-        // Token-budget compaction resets history, which can discard the evidence
-        // referenced by a pending delta review. Leave budget failures unreusable.
-        if !auto_summarization_enabled
-            || !matches!(error.details(), CodexErrorDetails::ContextWindowExceeded)
-        {
-            return Err(error);
-        }
-        // Incoming evidence can overflow even below the normal history
-        // threshold. Keep it pending while compacting, then select once more.
-        sess.services
-            .thread_extension_data
-            .insert(crate::guardian::ExhaustedReviewBudget::Compacting);
-        run_auto_compact(
-            &sess,
-            Arc::clone(&first_step_context),
-            Arc::clone(&first_step_context),
-            &mut client_session,
-            CompactionReason::ContextLimit,
-            CompactionPhase::PreTurn,
-            /*candidate*/ None,
-        )
-        .await?;
-        world_state = sess
-            .record_context_updates_and_set_reference_context_item(first_step_context.as_ref())
-            .await?;
-        crate::guardian::finalize_guardian_input(
-            &sess,
-            &first_step_context,
-            &mut input,
-            codex_guardian_context::HistoryTruncation::Allow,
-        )
-        .await?;
-    }
     let mut can_drain_pending_input = input.is_empty();
     if run_hooks_and_record_inputs(
         &sess,
@@ -486,7 +441,6 @@ pub(crate) async fn run_turn(
     // 2. After auto-compact, while a model/tool continuation is pending.
 
     let mut next_step_context = Some(first_step_context);
-    let mut guardian_budget_compacted = false;
     loop {
         // Note that pending_input would be something like a message the user
         // submitted through the UI while the model was running. Though the UI
@@ -605,7 +559,6 @@ pub(crate) async fn run_turn(
         .await;
         match sampling_request_result {
             Ok((sampling_request_output, notify_messages)) => {
-                guardian_budget_compacted = false;
                 let SamplingRequestResult {
                     needs_follow_up: model_needs_follow_up,
                     last_agent_message: sampling_request_last_agent_message,
@@ -858,37 +811,6 @@ pub(crate) async fn run_turn(
                 }
                 continue;
             }
-            Err(err)
-                if auto_summarization_enabled
-                    && matches!(err.details(), CodexErrorDetails::ContextWindowExceeded)
-                    && !guardian_budget_compacted
-                    && sess
-                        .services
-                        .thread_extension_data
-                        .get::<crate::guardian::ExhaustedReviewBudget>()
-                        .is_some() =>
-            {
-                // Tool continuations can also cross the complete-request limit.
-                // Only summarizing compaction preserves the action and evidence;
-                // token-budget resets must fail closed and retire the reviewer.
-                // Retry once per model step, so ineffective compaction cannot loop.
-                guardian_budget_compacted = true;
-                sess.services
-                    .thread_extension_data
-                    .insert(crate::guardian::ExhaustedReviewBudget::Compacting);
-                run_auto_compact(
-                    &sess,
-                    Arc::clone(&step_context),
-                    Arc::clone(&step_context),
-                    &mut client_session,
-                    CompactionReason::ContextLimit,
-                    CompactionPhase::MidTurn,
-                    /*candidate*/ None,
-                )
-                .await?;
-                can_drain_pending_input = false;
-                continue;
-            }
             Err(err) if matches!(err.details(), CodexErrorDetails::TurnAborted) => {
                 return Err(err);
             }
@@ -970,20 +892,6 @@ pub(crate) async fn run_hooks_and_record_inputs(
     persist_context: PersistContext,
 ) -> CodexResult<bool> {
     let rejected_uploaded_audio = input.iter().any(turn_input_has_uploaded_audio_file);
-    // Cancellation can reach this path before Guardian's tools and context are
-    // resolved. Only finalized evidence may enter reusable reviewer history.
-    if sess
-        .services
-        .thread_extension_data
-        .get::<crate::guardian::PendingReviewContext>()
-        .is_some()
-    {
-        return if rejected_uploaded_audio {
-            Err(uploaded_audio_disabled_error())
-        } else {
-            Ok(false)
-        };
-    }
     let mut blocked_input = false;
     let mut accepted_user_input = false;
     for input_item in input {
@@ -1233,7 +1141,7 @@ async fn build_skills_and_plugins(
         turn_context,
         cancellation_token,
         &mentioned_skills,
-        Some(sess.mcp_elicitation_reviewer()),
+        None,
     )
     .await;
 
@@ -1599,12 +1507,6 @@ async fn run_auto_compact(
     candidate: Option<Box<BackgroundCompactionCandidate>>,
 ) -> CodexResult<bool> {
     let turn_context = &step_context.turn;
-    if matches!(phase, CompactionPhase::PreTurn)
-        && crate::guardian::is_basic_session_source(&turn_context.session_source)
-        && !crate::guardian::should_compact_guardian_input(sess)?
-    {
-        return Ok(false);
-    }
     let world_state = Arc::new(
         sess.build_world_state_for_step(&replacement_step_context, /*new_window*/ true)
             .await?,
@@ -1855,15 +1757,6 @@ async fn run_sampling_request(
         let responses_metadata = sess
             .responses_metadata(step_context.as_ref(), CodexResponsesRequestKind::Turn)
             .await;
-        if crate::guardian::is_basic_session_source(&turn_context.session_source) {
-            crate::guardian::prepare_guardian_prompt(
-                &sess,
-                &mut prompt,
-                step_context.as_ref(),
-                &responses_metadata,
-            )
-            .await?;
-        }
         if first_attempt && turn_context.config.notify.is_some() {
             notify_messages = legacy_notify_input_messages(&prompt.input);
         }
@@ -2808,22 +2701,9 @@ async fn try_run_sampling_request(
         run_model_request_hooks(&sess, &step_context, &hooks, PreModelRequest).await;
     }
     let sampling_timing_guard = turn_context.turn_timing_state.begin_sampling();
-    let mut response_id_for_assessment = None;
-    let mut pending_assessment: Option<codex_api::GuardianAssessment> = None;
     let mut response_completed = false;
     let mut request_token_usage = None;
     let mut includes_reasoning = step_context.settings.model_info.use_responses_lite;
-    // Catalog policies can enable adaptive review independently of the legacy scorer flag.
-    // Capture evidence whenever Guardian is available; the reviewer resolves the policy.
-    let assessment_authorization = if turn_context
-        .config
-        .features
-        .enabled(Feature::GuardianApproval)
-    {
-        Some(crate::guardian::ScoreAuthorization::for_session(&sess, &Default::default()).await)
-    } else {
-        None
-    };
     let stream = client_session
         .stream(
             &prompt,
@@ -2990,32 +2870,13 @@ async fn try_run_sampling_request(
 
         match event {
             ResponseEvent::Created { response_id } => {
-                response_id_for_assessment.clone_from(&response_id);
                 if let Some(response_id) = response_id {
-                    turn_context
-                        .extension_data
-                        .insert(crate::guardian::ParentResponse {
-                            id: response_id.clone(),
-                            routing_affinity: stream.routing_affinity.clone(),
-                        });
                     turn_context
                         .extension_data
                         .insert(codex_api::ResponseId(response_id));
                 }
             }
             ResponseEvent::OutputItemDone(mut item) => {
-                // Serving emits one final value immediately before this item's completion.
-                // After this handoff, the invocation/cell owns it independently of the stream.
-                let assessment = pending_assessment
-                    .take()
-                    .filter(|value| item.id().is_some_and(|id| id.as_str() == value.item_id))
-                    .zip(assessment_authorization.as_ref())
-                    .map(|(value, authorization)| {
-                        Arc::new(crate::guardian::ServingAssessment {
-                            requires_review: value.requires_review,
-                            authorization: authorization.clone(),
-                        })
-                    });
                 assign_missing_streamed_response_item_id(&mut item, active_item.as_ref());
                 sess.reserve_assistant_message_order(&turn_context, &item)
                     .await;
@@ -3076,9 +2937,6 @@ async fn try_run_sampling_request(
                 }
 
                 let mut tool_runtime = tool_runtime.clone();
-                if assessment.is_some() {
-                    Arc::make_mut(&mut tool_runtime.step_context).serving_assessment = assessment;
-                }
                 let mut ctx = HandleOutputCtx {
                     sess: sess.clone(),
                     step_context: Arc::clone(&step_context),
@@ -3281,11 +3139,7 @@ async fn try_run_sampling_request(
                 sess.emit_turn_moderation_metadata(&turn_context, metadata)
                     .await;
             }
-            ResponseEvent::GuardianAssessment(assessment) => {
-                if response_id_for_assessment.as_deref() == Some(assessment.response_id.as_str()) {
-                    pending_assessment = Some(assessment);
-                }
-            }
+            ResponseEvent::GuardianAssessment(_) => {}
             ResponseEvent::SafetyBuffering(buffering) => {
                 sess.send_event(
                     &turn_context,

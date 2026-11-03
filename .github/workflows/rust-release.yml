@@ -64,7 +64,6 @@ jobs:
     environment:
       name: bazel
       deployment: false
-    # Linux releases also build the native voice runtime in this job.
     timeout-minutes: 120
     permissions:
       contents: read
@@ -261,8 +260,8 @@ jobs:
           export STABLE_GIT_COMMIT
           cargo build --target "$target" --release --timings "${build_args[@]}"
 
-      - name: Prepare Bazel for release binaries or Linux voice
-        if: matrix.build-system == 'bazel' || (matrix.bundle == 'primary' && contains(matrix.target, 'linux'))
+      - name: Prepare Bazel for release binaries
+        if: matrix.build-system == 'bazel'
         uses: ./.github/actions/prepare-bazel-ci
         with:
           target: ${{ matrix.target }}
@@ -314,34 +313,6 @@ jobs:
           name: ${{ matrix.artifact_name }}-symbols${{ env.ARTIFACT_SUFFIX }}
           path: codex-rs/symbols-dist/${{ matrix.artifact_name }}/*
           if-no-files-found: error
-
-      - name: Build Linux voice runtime
-        if: ${{ matrix.bundle == 'primary' && contains(matrix.target, 'linux') }}
-        shell: bash
-        env:
-          APP_TARGET: ${{ matrix.target }}
-          # Use local Bazel while BuildBuddy credentials are unavailable.
-          BUILDBUDDY_API_KEY: ""
-        run: |
-          set -euo pipefail
-          cd "$GITHUB_WORKSPACE"
-          voice_target="${APP_TARGET%-musl}-gnu"
-          case "$voice_target" in
-            aarch64-unknown-linux-gnu) prefix=linux_aarch64 ;;
-            x86_64-unknown-linux-gnu) prefix=linux_x86_64 ;;
-            *) exit 1 ;;
-          esac
-          python3 .github/scripts/run_bazel_with_buildbuddy.py build --config=release \
-            //codex-rs/voice-host:codex-voice-host //third_party/voice:native_runtime
-          source="bazel-bin/third_party/voice/native_runtime_${prefix}"
-          output="${RUNNER_TEMP}/signed-voice/${APP_TARGET}"
-          mkdir -p "$output"
-          python3 third_party/voice/release_runtime.py stage \
-            --target "$voice_target" --source "$source" --output "$output/runtime"
-          cp bazel-bin/codex-rs/voice-host/codex-voice-host "$output/codex-voice-host"
-          chmod 0755 "$output/codex-voice-host"
-          python3 third_party/voice/release_runtime.py seal \
-            --target "$voice_target" --output "$output/runtime"
 
       - if: ${{ runner.os == 'macOS' }}
         name: Stage unsigned macOS artifacts
@@ -416,25 +387,11 @@ jobs:
           BUNDLE: ${{ matrix.bundle }}
         run: |
           set -euo pipefail
-          voice_args=()
-          if [[ "$BUNDLE" == "primary" && "$TARGET" == *-unknown-linux-musl ]]; then
-            voice_args+=(--voice-release-dir "${RUNNER_TEMP}/signed-voice/${TARGET}")
-            voice_args+=(--release-version "${GITHUB_REF_NAME#rust-v}")
-          fi
           bash "${GITHUB_WORKSPACE}/.github/scripts/build-codex-package-archive.sh" \
             --target "$TARGET" \
             --bundle "$BUNDLE" \
             --entrypoint-dir "target/${TARGET}/release" \
-            --archive-dir "dist/${TARGET}" \
-            "${voice_args[@]}"
-
-      - name: Cosign Linux voice package archives
-        if: ${{ matrix.bundle == 'primary' && contains(matrix.target, 'linux') }}
-        uses: ./.github/actions/linux-code-sign
-        with:
-          target: ${{ matrix.target }}
-          artifacts-dir: ${{ github.workspace }}/codex-rs/dist/${{ matrix.target }}
-          binaries: codex-package-${{ matrix.target }}.tar.gz codex-package-${{ matrix.target }}.tar.zst
+            --archive-dir "dist/${TARGET}"
 
       - name: Set up Python release tools
         if: ${{ matrix.build-system == 'cargo' && matrix.bundle == 'primary' && runner.os != 'macOS' }}
@@ -468,21 +425,13 @@ jobs:
           esac
 
           # Keep the existing manylinux_2_17 wheel compatible with older glibc.
-          # GNU voice libraries belong in the signed release package archives,
-          # but their minimum glibc version is not covered by this wheel tag.
-          wheel_archives="${RUNNER_TEMP}/voice-free-wheel/${{ matrix.target }}"
+          wheel_archives="${RUNNER_TEMP}/python-wheel-archive/${{ matrix.target }}"
           bash "${GITHUB_WORKSPACE}/.github/scripts/build-codex-package-archive.sh" \
             --target "${{ matrix.target }}" \
             --bundle primary \
             --entrypoint-dir "target/${{ matrix.target }}/release" \
             --archive-dir "$wheel_archives"
           wheel_archive="${wheel_archives}/codex-package-${{ matrix.target }}.tar.gz"
-          python3 - "$wheel_archive" <<'PY'
-          import sys
-          import tarfile
-          with tarfile.open(sys.argv[1]) as archive:
-              assert not any("codex-resources/voice/" in item.name for item in archive)
-          PY
 
           stage_dir="${RUNNER_TEMP}/openai-codex-cli-bin-${{ matrix.target }}"
           wheel_dir="${GITHUB_WORKSPACE}/python-runtime-dist/${{ matrix.target }}"
@@ -563,74 +512,9 @@ jobs:
           path: |
             codex-rs/dist/${{ matrix.target }}/*
 
-  build-macos-voice:
-    needs: tag-check
-    name: Build voice runtime - ${{ matrix.target }}
-    runs-on: ${{ matrix.runner }}
-    environment:
-      name: bazel
-      deployment: false
-    timeout-minutes: 120
-    permissions:
-      contents: read
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - target: aarch64-apple-darwin
-            runner: macos-15
-            prefix: macos_aarch64
-          - target: x86_64-apple-darwin
-            runner: macos-15-intel
-            prefix: macos_x86_64
-    steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-        with:
-          persist-credentials: false
-      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
-        with:
-          python-version: "3.12"
-      - name: Prepare Bazel CI
-        uses: ./.github/actions/prepare-bazel-ci
-        with:
-          target: ${{ matrix.target }}
-          cache-scope: bazel-release-primary
-      - name: Build matching helper and native runtime
-        shell: bash
-        env:
-          TARGET: ${{ matrix.target }}
-          PREFIX: ${{ matrix.prefix }}
-          # Use local Bazel while BuildBuddy credentials are unavailable.
-          BUILDBUDDY_API_KEY: ""
-        run: |
-          set -euo pipefail
-          # Release tags bump Cargo.toml without rewriting the workspace lockfile.
-          # Refresh workspace versions before Bazel reads the Cargo dependency graph.
-          (cd codex-rs && cargo update --workspace)
-          python3 .github/scripts/run_bazel_with_buildbuddy.py build --config=release \
-            --macos_minimum_os=14.0 //codex-rs/voice-host:codex-voice-host //third_party/voice:native_runtime
-          runtime="bazel-bin/third_party/voice/native_runtime_${PREFIX}"
-          PYTHONPATH=third_party/voice python3 - "$runtime" "$TARGET" <<'PY'
-          from pathlib import Path
-          import sys
-          from package_runtime import runtime_files
-          runtime_files(Path(sys.argv[1]).resolve(strict=True), sys.argv[2])
-          PY
-          mkdir -p "voice-unsigned/${TARGET}"
-          cp -R "$runtime" "voice-unsigned/${TARGET}/runtime"
-          # GNU tar extraction and signing need writable copies of Bazel outputs.
-          chmod -R u+w "voice-unsigned/${TARGET}/runtime"
-          cp bazel-bin/codex-rs/voice-host/codex-voice-host "voice-unsigned/${TARGET}/codex-voice-host"
-          tar -C "voice-unsigned/${TARGET}" -czf "voice-unsigned-${TARGET}.tar.gz" runtime codex-voice-host
-      - uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
-        with:
-          name: voice-${{ matrix.target }}-unsigned
-          path: voice-unsigned-${{ matrix.target }}.tar.gz
-          if-no-files-found: error
-
   sign-macos-binaries:
-    needs: [build, build-macos-voice]
-    if: ${{ always() && needs.build.result == 'success' && needs.build-macos-voice.result == 'success' }}
+    needs: build
+    if: ${{ always() && needs.build.result == 'success' }}
     name: Sign macOS binaries - ${{ matrix.target }} - ${{ matrix.bundle }} - ${{ matrix.build-system }}
     runs-on: ubuntu-latest
     timeout-minutes: 45

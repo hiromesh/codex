@@ -865,22 +865,6 @@ impl ToolRegistry {
             Err(PreToolUseError::Cancelled(err)) => return Err(err),
         }
 
-        if let Some(assessment) = &invocation.step_context.serving_assessment {
-            let mut assessment = assessment.as_ref().clone();
-            match crate::guardian::tool_permission_context(&invocation) {
-                Ok(permissions) => assessment.authorization.permissions = permissions,
-                Err(_) => assessment.requires_review = true,
-            }
-            Arc::make_mut(&mut invocation.step_context).serving_assessment =
-                Some(Arc::new(assessment));
-        }
-
-        if registered_tool.native_review == NativeReview::Required
-            && let Err(err) = super::review_native_tool_call(&invocation).await
-        {
-            return Err(fail_before_execution(&invocation, err).await);
-        }
-
         let invocation_guard = reservation.activate(&invocation);
         if tool.mcp_server_name().is_none() {
             notify_tool_start(&invocation, /*mcp_tool*/ None)
@@ -1107,9 +1091,6 @@ pub(crate) async fn apply_pre_tool_use(
             let mut updated = tool
                 .with_updated_hook_input(invocation.clone(), input)
                 .map_err(PreToolUseError::Failed)?;
-            if updated.payload != invocation.payload {
-                Arc::make_mut(&mut updated.step_context).serving_assessment = None;
-            }
             *invocation = updated;
             Ok(())
         }

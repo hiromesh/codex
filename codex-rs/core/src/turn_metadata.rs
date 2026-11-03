@@ -68,10 +68,7 @@ impl<'a> ExecutionMetadata<'a> {
             model: settings.model_info.slug.as_str(),
             reasoning_effort: settings.effective_reasoning_effort(),
             node_repl_disabled: settings.model_info.node_repl_disabled,
-            auto_review_enabled: crate::guardian::routes_approval_policy_to_guardian(
-                settings.approval_policy(),
-                settings.approvals_reviewer(),
-            ),
+            auto_review_enabled: false,
             node_repl_auto_review_required: settings.model_info.computer_use_review_required(),
         }
     }
@@ -460,14 +457,8 @@ impl TurnMetadataState {
             .read()
             .unwrap_or_else(std::sync::PoisonError::into_inner)
             .clone();
-        // Extract Guardian's internal parent before filtering configured metadata keys.
         // Ordinary app-server client metadata stays in `extra`.
-        let parent_response_id =
-            if self.subagent_header.as_deref() == Some(crate::guardian::GUARDIAN_REVIEWER_NAME) {
-                extra.remove("parent_response_id")
-            } else {
-                None
-            };
+        let parent_response_id = None;
         for key in self
             .responses_api_metadata
             .read()

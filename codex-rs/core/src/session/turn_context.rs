@@ -1043,10 +1043,7 @@ impl Session {
         let permission_profile = environments.permission_profile_or_else(|| {
             per_turn_config.permissions.effective_permission_profile()
         });
-        let auto_review_enabled = crate::guardian::routes_approval_policy_to_guardian(
-            per_turn_config.permissions.approval_policy.value(),
-            per_turn_config.approvals_reviewer,
-        );
+        let auto_review_enabled = false;
         let per_turn_config = Arc::new(per_turn_config);
         let turn_metadata_state = Arc::new(TurnMetadataState::new(
             session_id.to_string(),

@@ -90,7 +90,7 @@ jobs:
           set -euo pipefail
           if command -v apt-get >/dev/null 2>&1; then
             sudo apt-get update -y
-            sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends build-essential pkg-config libcap-dev libasound2-dev bubblewrap
+            sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends build-essential pkg-config libcap-dev bubblewrap
           fi
 
       - uses: dtolnay/rust-toolchain@e081816240890017053eacbb1bdf337761dc5582 # 1.95.0
@@ -164,11 +164,6 @@ jobs:
           tool: nextest
           version: 0.9.103
 
-      - name: Set up native voice dependencies
-        uses: ./third_party/voice/cargo-ci/setup
-        with:
-          target: ${{ inputs.target }}
-
       - name: Build nextest archive
         shell: bash
         run: |
@@ -181,8 +176,7 @@ jobs:
             free -h
             export CARGO_BUILD_JOBS=4
           fi
-          printf '%s\n' "$CODEX_VOICE_RUNTIME_RELATIVE" > "$archive_dir/voice-runtime-path.txt"
-          cargo nextest --tool-config-file "codex-voice:$CODEX_VOICE_NEXTEST_CONFIG" archive \
+          cargo nextest archive \
             --target "${CODEX_CI_TARGET}" \
             --cargo-profile "${CODEX_CI_PROFILE}" \
             --timings \
@@ -297,7 +291,7 @@ jobs:
           set -euo pipefail
           if command -v apt-get >/dev/null 2>&1; then
             sudo apt-get update -y
-            sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends pkg-config libcap-dev libasound2-dev bubblewrap
+            sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends pkg-config libcap-dev bubblewrap
           fi
 
       - uses: dtolnay/rust-toolchain@e081816240890017053eacbb1bdf337761dc5582 # 1.95.0
@@ -343,8 +337,6 @@ jobs:
           workspace_root="$(pwd)"
           extract_dir="${RUNNER_TEMP}/nextest-extracted"
           mkdir -p "$extract_dir"
-          runtime_relative="$(cat "${RUNNER_TEMP}/nextest-archive/voice-runtime-path.txt")"
-          export CODEX_TEST_VOICE_RUNTIME="$extract_dir/target/$runtime_relative"
 
           if [[ "${RUNNER_OS}" == "Linux" ]]; then
             helper_dir="${RUNNER_TEMP}/${TEST_HELPERS_ARTIFACT}"

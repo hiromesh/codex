@@ -309,7 +309,6 @@ use self::turn_context::TurnContext;
 mod rollout_reconstruction_tests;
 
 use crate::exec_policy::ExecPolicyUpdateError;
-use crate::guardian::GuardianReviewSessionManager;
 use crate::mcp::McpEnvironmentScope;
 use crate::mcp::McpManager;
 use crate::mcp::McpThreadIdentity;
@@ -1861,7 +1860,7 @@ impl Session {
         let rollout_reconstruction::RolloutReconstruction {
             mut history,
             retained_context,
-            guardian_history,
+            guardian_history: _,
             last_started_turn_id,
             previous_turn_settings,
             reference_context_item,
@@ -1906,21 +1905,6 @@ impl Session {
             .zip(metadata)
             .map(|(item, metadata)| ResponseItemEnvelope { item, metadata })
             .collect();
-        // Ordinary replay needs no reviewer or network refresh. Only an opaque
-        // checkpoint can make reconstruction depend on reviewer compatibility.
-        let reviewer_compaction_hash = if codex_history::CompactionCheckpoint::latest(&history)
-            .is_some_and(codex_history::CompactionCheckpoint::is_usable)
-            && turn_context
-                .config
-                .features
-                .enabled(Feature::GuardianReuseParentCompaction)
-        {
-            let context = crate::guardian::GuardianReviewContext::from(turn_context);
-            let (_, reviewer) = crate::guardian::resolve_review_model(self, &context).await;
-            reviewer.comp_hash.clone()
-        } else {
-            None
-        };
         {
             let mut state = self.state.lock().await;
             state.replace_annotated_history(
@@ -1930,8 +1914,8 @@ impl Session {
             );
             state.history.restore_review_context(
                 Some(&retained_context),
-                guardian_history.as_ref(),
-                reviewer_compaction_hash.as_deref(),
+                /*checkpoint*/ None,
+                /*reviewer_compaction_hash*/ None,
             );
             state.last_started_turn_id = last_started_turn_id;
             state.turn_attribution = turn_attribution;
@@ -2480,21 +2464,6 @@ impl Session {
             ));
     }
 
-    /// Returns the reviewer pool installed by the Guardian extension.
-    pub(crate) fn guardian_review_session(&self) -> Option<Arc<GuardianReviewSessionManager>> {
-        self.services
-            .thread_extension_data
-            .get::<GuardianReviewSessionManager>()
-    }
-
-    pub(crate) async fn is_private_guardian_reviewer(&self) -> bool {
-        self.state
-            .lock()
-            .await
-            .session_configuration
-            .trusted_guardian_reviewer
-    }
-
     pub(crate) async fn emit_turn_started(&self, turn_context: &TurnContext, task_kind: TaskKind) {
         let event = TurnStartedEvent {
             turn_attribution: (task_kind == TaskKind::Regular).then(|| turn_context.attribution()),
@@ -2542,24 +2511,6 @@ impl Session {
             id: turn_context.sub_id.clone(),
             msg,
         };
-        // Private reviewers have no app-server listener; publicly resumed Guardian threads do.
-        if matches!(
-            &turn_context.session_source,
-            SessionSource::SubAgent(SubAgentSource::Other(name))
-                if name == crate::guardian::GUARDIAN_REVIEWER_NAME
-        ) && self.services.analytics_events_client.is_enabled()
-            && turn_context.parent_thread_id.is_some()
-            && self
-                .state
-                .lock()
-                .await
-                .session_configuration
-                .trusted_guardian_reviewer
-        {
-            self.services
-                .analytics_events_client
-                .track_guardian_session_event(self.thread_id, &event);
-        }
         self.send_event_raw(event).await;
         self.maybe_notify_parent_of_terminal_turn(turn_context, &legacy_source)
             .await;
@@ -2731,9 +2682,6 @@ impl Session {
     }
 
     async fn send_event_raw_with_persistence(&self, event: Event, persist: bool) {
-        let flush_guardian_completion = persist
-            && matches!(event.msg, EventMsg::TurnComplete(_))
-            && self.is_private_guardian_reviewer().await;
         // Keep realtime reduction, canonical append, and delivery in the same order.
         // This lock must not acquire SessionState or ActiveTurn: event producers can
         // already hold those locks. Host presentation policies are synchronous.
@@ -2772,11 +2720,6 @@ impl Session {
             && let Err(error) = self.send_realtime_history_effects(&event.id, effects).await
         {
             warn!("failed to persist realtime history: {error}");
-        }
-        // Save the completed review and its terminal event together before the parent sees
-        // the decision. Turn completion skips its separate before/after barriers for this case.
-        if flush_guardian_completion && let Err(err) = self.flush_rollout().await {
-            warn!("failed to flush completed Guardian review: {err}");
         }
         self.deliver_event_raw(event).await;
     }
@@ -3297,77 +3240,9 @@ impl Session {
             | AskForApproval::Granular(_) => {}
         }
 
-        let action = request.approval_action(&call_id, &turn_context.sub_id);
         let requested_permissions = request.permissions;
         let sandbox_context = environment.sandbox_context(/*additional_permissions*/ None);
         let context = sandbox_context.policy_context();
-        {
-            let approval_context = ApprovalContext {
-                exec_requirement: None,
-                review_context: crate::guardian::GuardianReviewContext::from(step_context),
-                cancellation_token: Some(cancellation_token.clone()),
-                call_id: call_id.clone(),
-                tool_name: ToolName::plain("request_permissions"),
-                strict_auto_review: false,
-                approval_reason: None,
-                retry_reason: None,
-                network_approval_context: None,
-            };
-            let decision = tokio::select! {
-                biased;
-                _ = cancellation_token.cancelled() => return None,
-                decision = self.request_guardian_approval(
-                    action,
-                    &approval_context,
-                ) => decision,
-            };
-            if let Some(decision) = decision {
-                let (permissions, scope) = match decision {
-                    ReviewDecision::Approved
-                    | ReviewDecision::ApprovedExecpolicyAmendment { .. }
-                    | ReviewDecision::NetworkPolicyAmendment {
-                        network_policy_amendment:
-                            NetworkPolicyAmendment {
-                                action: NetworkPolicyRuleAction::Allow,
-                                ..
-                            },
-                    } => (requested_permissions.clone(), PermissionGrantScope::Turn),
-                    ReviewDecision::ApprovedForSession => {
-                        (requested_permissions.clone(), PermissionGrantScope::Session)
-                    }
-                    ReviewDecision::ApprovedMcpPolicyAmendment
-                    | ReviewDecision::NetworkPolicyAmendment {
-                        network_policy_amendment:
-                            NetworkPolicyAmendment {
-                                action: NetworkPolicyRuleAction::Deny,
-                                ..
-                            },
-                    }
-                    | ReviewDecision::Abort
-                    | ReviewDecision::Denied { .. }
-                    | ReviewDecision::TimedOut => (
-                        RequestPermissionProfile::default(),
-                        PermissionGrantScope::Turn,
-                    ),
-                };
-                let response = RequestPermissionsResponse {
-                    permissions,
-                    scope,
-                    strict_auto_review: false,
-                };
-                let response = Self::normalize_request_permissions_response(
-                    requested_permissions,
-                    response,
-                    &context,
-                );
-                self.record_granted_request_permissions_for_turn(
-                    &response,
-                    &environment.selection.environment_id,
-                    turn_context,
-                );
-                return Some(response);
-            }
-        }
 
         let _elicitation = self.services.elicitations.register();
         let (tx_response, rx_response) = oneshot::channel();
@@ -4274,7 +4149,6 @@ impl Session {
         }
         let (executor_hook_sources, mcp, tool_router, extension_data) = prepared_tools??;
         Ok(Arc::new(StepContext {
-            serving_assessment: None,
             preempt: turn_context
                 .config
                 .features

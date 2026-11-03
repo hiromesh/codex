@@ -1,6 +1,6 @@
 use crate::config::NetworkProxySpec;
 use crate::environment_selection::TurnEnvironmentSnapshot;
-use crate::guardian::GuardianNetworkAccessTrigger;
+use crate::guardian::NetworkAccessTrigger;
 use crate::guardian::GuardianReviewContext;
 use crate::network_policy_decision::denied_network_policy_message;
 use crate::session::session::Session;

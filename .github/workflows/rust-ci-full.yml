@@ -114,33 +114,7 @@ jobs:
           target: ${{ runner.os }}
 
   # --- CI to validate on different os/targets --------------------------------
-  cargo_voice_inputs:
-    name: Cargo voice inputs - ${{ matrix.target }}
-    runs-on: ${{ matrix.runner }}
-    environment:
-      name: bazel
-      deployment: false
-    permissions:
-      contents: read
-    timeout-minutes: 120
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - { target: x86_64-unknown-linux-gnu, runner: ubuntu-24.04 }
-          - { target: aarch64-unknown-linux-gnu, runner: ubuntu-24.04-arm }
-          - { target: x86_64-apple-darwin, runner: macos-15-intel }
-          - { target: aarch64-apple-darwin, runner: macos-15 }
-    steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-        with:
-          persist-credentials: false
-      - uses: ./third_party/voice/cargo-ci/produce
-        with:
-          target: ${{ matrix.target }}
-
   lint_build:
-    needs: cargo_voice_inputs
     if: &lint_build_if ${{ !cancelled() }}
     name: &lint_build_name Lint/Build — ${{ matrix.runner }} - ${{ matrix.target }}${{ matrix.profile == 'release' && ' (release)' || '' }}
     runs-on: &lint_build_runner ${{ matrix.runs_on || matrix.runner }}
@@ -199,7 +173,7 @@ jobs:
           set -euo pipefail
           if command -v apt-get >/dev/null 2>&1; then
             sudo apt-get update -y
-            sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends build-essential pkg-config libcap-dev libasound2-dev
+            sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends build-essential pkg-config libcap-dev
           fi
       - uses: dtolnay/rust-toolchain@e081816240890017053eacbb1bdf337761dc5582 # 1.95.0
         with:
@@ -315,12 +289,6 @@ jobs:
           APT_INSTALL_ARGS: --no-install-recommends
         shell: bash
         run: bash "${GITHUB_WORKSPACE}/.github/scripts/install-musl-build-tools.sh"
-
-      - name: Set up native voice dependencies
-        if: ${{ !endsWith(matrix.target, '-musl') }}
-        uses: ./third_party/voice/cargo-ci/setup
-        with:
-          target: ${{ matrix.target }}
 
       - name: Install cargo-chef
         if: ${{ matrix.profile == 'release' }}
@@ -439,7 +407,6 @@ jobs:
     steps: *lint_build_steps
 
   tests_macos_aarch64:
-    needs: cargo_voice_inputs
     if: ${{ !cancelled() }}
     name: Tests — macos-15-xlarge - aarch64-apple-darwin
     uses: ./.github/workflows/rust-ci-full-nextest-platform.yml
@@ -452,7 +419,6 @@ jobs:
     secrets: inherit
 
   tests_linux_x64_remote:
-    needs: cargo_voice_inputs
     if: ${{ !cancelled() }}
     name: Tests — ubuntu-24.04 - x86_64-unknown-linux-gnu (remote)
     uses: ./.github/workflows/rust-ci-full-nextest-platform.yml
@@ -468,7 +434,6 @@ jobs:
     secrets: inherit
 
   tests_linux_arm64:
-    needs: cargo_voice_inputs
     if: ${{ !cancelled() }}
     name: Tests — ubuntu-24.04-arm - aarch64-unknown-linux-gnu
     uses: ./.github/workflows/rust-ci-full-nextest-platform.yml
@@ -491,7 +456,6 @@ jobs:
         cargo_shear,
         argument_comment_lint_package,
         argument_comment_lint_prebuilt,
-        cargo_voice_inputs,
         lint_build,
         lint_build_musl,
         tests_macos_aarch64,
@@ -517,7 +481,6 @@ jobs:
           [[ '${{ needs.argument_comment_lint_prebuilt.result }}' == 'success' ]] || { echo 'argument_comment_lint_prebuilt failed'; exit 1; }
           [[ '${{ needs.general.result }}' == 'success' ]] || { echo 'general failed'; exit 1; }
           [[ '${{ needs.cargo_shear.result }}' == 'success' ]] || { echo 'cargo_shear failed'; exit 1; }
-          [[ '${{ needs.cargo_voice_inputs.result }}' == 'success' ]] || { echo 'cargo_voice_inputs failed'; exit 1; }
           [[ '${{ needs.lint_build.result }}' == 'success' ]] || { echo 'lint_build failed'; exit 1; }
           [[ '${{ needs.lint_build_musl.result }}' == 'success' ]] || { echo 'lint_build_musl failed'; exit 1; }
           [[ '${{ needs.tests_macos_aarch64.result }}' == 'success' ]] || { echo 'tests_macos_aarch64 failed'; exit 1; }

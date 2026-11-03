@@ -925,48 +925,6 @@ impl UnifiedExecProcessManager {
             entry.stdin_approval(context, request.input, strict_auto_review)?
         };
         if let Some((approval, approval_reason)) = approval {
-            let unreviewable_input_error = || {
-                UnifiedExecError::StdinApproval(ToolError::Rejected(
-                    "terminal input and permission details are too large to review safely; use a smaller input or start a new terminal with fewer grants".to_string(),
-                ))
-            };
-            let mut reviewed = codex_guardian_reviewer::guardian_approval_request_to_json(
-                &approval
-                    .clone()
-                    .into_guardian_request(/*exec_command_cwd_convention*/ None)
-                    .map_err(|err| {
-                        UnifiedExecError::StdinApproval(ToolError::Rejected(err.to_string()))
-                    })?,
-            )
-            .map_err(|_| unreviewable_input_error())?;
-            // Launch context uses Guardian's normal request budget, not the stdin limit.
-            if let Some(fields) = reviewed.as_object_mut() {
-                fields.remove("original_command");
-            }
-            let reviewed =
-                serde_json::to_string_pretty(&reviewed).map_err(|_| unreviewable_input_error())?;
-            // Bound the input and permission details plus their reason, including
-            // JSON escaping. Reject, never execute an unreviewed tail.
-            let oversized =
-                reviewed.len().saturating_add(approval_reason.len()) > MAX_STDIN_APPROVAL_BYTES;
-            let size_check_result = if oversized {
-                "over_limit"
-            } else {
-                "within_limit"
-            };
-            let input_kind = if request.input.chars().all(char::is_control) {
-                "control"
-            } else {
-                "text"
-            };
-            context.step_context.session_telemetry.counter(
-                "codex.unified_exec.stdin_review.size_check",
-                /*inc*/ 1,
-                &[("result", size_check_result), ("input_kind", input_kind)],
-            );
-            if oversized {
-                return Err(unreviewable_input_error());
-            }
             let approval_context = ApprovalContext {
                 exec_requirement: None,
                 review_context: GuardianReviewContext::from(&context.step_context),

@@ -79,9 +79,6 @@ common --jobs=30
 # configurations include this group; CI configs override TestRunner below
 # when tests must remain local on their runner.
 common:remote --strategy=remote
-# Native Mac voice actions need the local Apple tools; Linux remains remote.
-common:macos --strategy=VoiceNativePrefix=remote,sandboxed,local
-common:macos --strategy=VoiceNativeRuntime=remote,sandboxed,local
 common:remote --extra_execution_platforms=//:rbe
 common:remote --jobs=800
 # TODO(team): Evaluate if this actually helps, zbarsky is not sure, everything seems bottlenecked on `core` either way.
@@ -194,7 +191,7 @@ build:release --@rules_rust//rust/settings:extra_exec_rustc_flag=-Cdebug-asserti
 # Opt in for target and host dependencies; normal Bazel builds keep defaults.
 build:release --features=cargo-release-profile
 build:release --host_features=cargo-release-profile
-# Bubblewrap and voice set release options on their own native rules.
+# Bubblewrap sets release options on its own native rules.
 
 # Optional per-user local overrides.
 try-import %workspace%/user.bazelrc

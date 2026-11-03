@@ -26,6 +26,22 @@ pub(crate) const AUTO_REVIEW_DENIED_ACTION_APPROVAL_DEVELOPER_PREFIX: &str =
 pub(crate) const GUARDIAN_MAX_ROOT_MESSAGE_TOKENS: usize = 900;
 pub(crate) const GUARDIAN_REVIEWER_NAME: &str = "guardian";
 
+/// Describes the tool call that triggered a network access approval request.
+#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize)]
+pub(crate) struct NetworkAccessTrigger {
+    pub(crate) call_id: String,
+    pub(crate) tool_name: String,
+    pub(crate) command: Vec<String>,
+    pub(crate) cwd: codex_utils_path_uri::PathUri,
+    pub(crate) sandbox_permissions: crate::sandboxing::SandboxPermissions,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub(crate) additional_permissions: Option<codex_protocol::models::AdditionalPermissionProfile>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub(crate) justification: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub(crate) tty: Option<bool>,
+}
+
 pub(crate) fn guardian_truncate_text(content: &str, token_cap: usize) -> (String, bool) {
     (
         codex_guardian_context::truncate_text(content, token_cap),

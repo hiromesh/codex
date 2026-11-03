@@ -11,7 +11,6 @@ Usage: build-codex-package-archive.sh \
   [--bwrap-bin <path>] \
   [--code-mode-host-bin <path>] \
   [--rg-bin <path>] \
-  [--voice-release-dir <path> --release-version <release-version>] \
   [--target-suffixed-entrypoint]
 EOF
 }
@@ -24,8 +23,6 @@ target_suffixed_entrypoint="false"
 resource_args=()
 bwrap_bin_provided="false"
 code_mode_host_bin_provided="false"
-voice_release_dir=""
-release_version=""
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -63,14 +60,6 @@ while [[ $# -gt 0 ]]; do
       target_suffixed_entrypoint="true"
       shift
       ;;
-    --voice-release-dir)
-      voice_release_dir="${2:?--voice-release-dir requires a value}"
-      shift 2
-      ;;
-    --release-version)
-      release_version="${2:?--release-version requires a value}"
-      shift 2
-      ;;
     -h|--help)
       usage
       exit 0
@@ -85,10 +74,6 @@ done
 
 if [[ -z "$target" || -z "$bundle" || -z "$entrypoint_dir" || -z "$archive_dir" ]]; then
   usage >&2
-  exit 1
-fi
-if [[ ( -n "$voice_release_dir" || -n "$release_version" ) && ( -z "$voice_release_dir" || -z "$release_version" || "$bundle" != "primary" || ( "$target" != *-apple-darwin && "$target" != *-unknown-linux-musl ) ) ]]; then
-  echo "Voice resources require a primary supported release package version" >&2
   exit 1
 fi
 
@@ -159,10 +144,9 @@ python_args=(
   --entrypoint-bin "${entrypoint_dir%/}/${entrypoint_name}"
   --cargo-profile release
   --package-dir "$package_dir"
+  --archive-output "$gzip_archive_path"
+  --archive-output "$zstd_archive_path"
 )
-if [[ -z "$voice_release_dir" ]]; then
-  python_args+=(--archive-output "$gzip_archive_path" --archive-output "$zstd_archive_path")
-fi
 if ((${#resource_args[@]} > 0)); then
   python_args+=("${resource_args[@]}")
 fi
@@ -170,30 +154,3 @@ python_args+=(--force)
 
 "$python_bin" "${python_args[@]}"
 
-if [[ -n "$voice_release_dir" ]]; then
-  voice_target="$target"
-  if [[ "$target" == *-unknown-linux-musl ]]; then
-    voice_target="${target%-musl}-gnu"
-  fi
-  voice_package="${RUNNER_TEMP:-/tmp}/${archive_stem}-voice-${target}"
-  rm -rf "$voice_package"
-  voice_helper="${voice_release_dir%/}/codex-voice-host"
-  "$python_bin" "${repo_root}/third_party/voice/assemble_package.py" \
-    --package "$package_dir" \
-    --helper "$voice_helper" \
-    --runtime "${voice_release_dir%/}/runtime" \
-    --voice-target "$voice_target" \
-    --build-commit "$(git -C "$repo_root" rev-parse HEAD)" \
-    --release-version "$release_version" \
-    --output "$voice_package"
-  PYTHONPATH="${repo_root}/scripts" "$python_bin" - \
-    "$voice_package" "$gzip_archive_path" "$zstd_archive_path" <<'PY'
-import sys
-from pathlib import Path
-from codex_package.archive import write_archive
-
-package = Path(sys.argv[1])
-for archive in sys.argv[2:]:
-    write_archive(package, Path(archive), force=True)
-PY
-fi

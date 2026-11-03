@@ -708,18 +708,6 @@ impl Session {
             request_kind,
         );
         ExecutionMetadata::from_settings(&step_context.settings).apply_to(&mut responses_metadata);
-        responses_metadata.guardian_recorded_items = self.parent_observer_event_tx.get().is_some();
-        if responses_metadata.subagent_header.as_deref()
-            == Some(crate::guardian::GUARDIAN_REVIEWER_NAME)
-            && let Some(pending) = self
-                .services
-                .thread_extension_data
-                .get::<crate::guardian::PendingReviewRouting>()
-            && let Some(parent) = &pending.0
-            && responses_metadata.parent_response_id.as_deref() == Some(parent.id.as_str())
-        {
-            responses_metadata.parent_routing_affinity = parent.routing_affinity.clone();
-        }
         responses_metadata.tool_namespaces_info = if step_context
             .turn
             .config
@@ -1042,14 +1030,7 @@ impl Session {
         thread_extension_init.insert(Arc::unwrap_or_clone(model_info.model));
         let tool_policy = thread_extension_init
             .get::<codex_extension_api::ToolPolicy>()
-            .unwrap_or_else(|| {
-                // Older reviewer rollouts predate the explicit startup policy.
-                if crate::guardian::is_basic_session_source(&session_configuration.session_source) {
-                    Arc::new(codex_guardian_reviewer::reviewer_tool_policy())
-                } else {
-                    Arc::default()
-                }
-            });
+            .unwrap_or_default();
         let mcp_thread_init = thread_extension_init.clone();
         let thread_extension_data = codex_extension_api::ExtensionData::new_with_init(
             thread_id.to_string(),
@@ -1853,11 +1834,7 @@ impl Session {
                 ))
                 .with_session_context(
                     prompt_cache_key,
-                    crate::guardian::prompt_cache_key_override_for_review_session(
-                        &session_configuration.session_source,
-                        session_configuration.parent_thread_id,
-                    )
-                    .or(fork_cache_key),
+                    fork_cache_key,
                     tx_event.clone(),
                     codex_responses_headers,
                     crate::cyber_access_program::ApiKeyCyberAccessPrograms::from_config(&config),

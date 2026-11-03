@@ -6,8 +6,6 @@ use crate::config::Config;
 use crate::config::edit::ConfigEdit;
 use crate::config::edit::ConfigEditsBuilder;
 use crate::connectors;
-use crate::guardian::GuardianApprovalRequest;
-use crate::guardian::GuardianMcpAnnotations;
 use crate::guardian::GuardianReviewContext;
 use crate::mcp_openai_file::rewrite_mcp_tool_arguments_for_openai_files;
 use crate::mcp_tool_approval_templates::RenderedMcpToolApprovalParam;
@@ -266,7 +264,6 @@ pub(crate) async fn handle_mcp_tool_call(
         &call_id,
         &invocation,
         metadata.clone(),
-        GuardianReviewContext::from(step_context),
     );
     notify_mcp_tool_call_started(
         sess.as_ref(),
@@ -1250,7 +1247,6 @@ pub(crate) struct McpToolApprovalMetadata {
 pub(crate) struct McpToolApprovalContext {
     pub(crate) invocation: Option<McpInvocation>,
     pub(crate) metadata: McpToolApprovalMetadata,
-    pub(crate) review_context: GuardianReviewContext,
 }
 
 impl Session {
@@ -1259,7 +1255,6 @@ impl Session {
         call_id: &str,
         invocation: &McpInvocation,
         metadata: McpToolApprovalMetadata,
-        review_context: GuardianReviewContext,
     ) -> Arc<McpToolApprovalContext> {
         let key = (invocation.server.clone(), call_id.to_string());
         let metadata = Arc::new(McpToolApprovalContext {
@@ -1267,7 +1262,6 @@ impl Session {
                 || is_node_repl_backed_server(&invocation.server))
             .then(|| invocation.clone()),
             metadata,
-            review_context,
         });
         let mut registry = self
             .mcp_tool_approval_metadata
@@ -1557,17 +1551,6 @@ async fn maybe_request_mcp_tool_approval(
 ) -> Option<McpToolApproval> {
     let turn_context = &step_context.turn;
     let strict_auto_review = turn_context.strict_auto_review_enabled();
-    let approvals_reviewer = connectors::mcp_approvals_reviewer_from_layers(
-        &config.config_layer_stack,
-        step_context
-            .settings
-            .mcp_approvals_reviewer_override
-            .unwrap_or(config.approvals_reviewer),
-        Some(turn_context.model_info().slug.as_str()),
-        &invocation.server,
-        metadata.connector_id.as_deref(),
-        metadata.link_id.as_deref(),
-    );
     if !strict_auto_review
         && mcp_permission_prompt_is_auto_approved(
             config.approval_policy.value(),
@@ -1617,17 +1600,8 @@ async fn maybe_request_mcp_tool_approval(
             .flatten(),
         tool_title: metadata.tool_title.clone(),
         tool_description: metadata.tool_description.clone(),
-        annotations: metadata
-            .annotations
-            .as_ref()
-            .map(|annotations| GuardianMcpAnnotations {
-                destructive_hint: annotations.destructive_hint,
-                open_world_hint: annotations.open_world_hint,
-                read_only_hint: annotations.read_only_hint,
-            }),
         hook_tool_name: hook_tool_name.clone(),
         approval_policy: config.approval_policy.value(),
-        reviewer: approvals_reviewer,
         approval_mode: policy.mode,
         allow_session_remember: session_approval_key.is_some(),
         allow_persistent_approval: persistent_approval_key.is_some(),
@@ -1865,34 +1839,6 @@ fn persistent_mcp_tool_approval_key(
     approval_mode: AppToolApproval,
 ) -> Option<McpToolApprovalKey> {
     session_mcp_tool_approval_key(invocation, metadata, approval_mode)
-}
-
-pub(crate) fn build_guardian_mcp_tool_review_request(
-    call_id: &str,
-    invocation: &McpInvocation,
-    metadata: Option<&McpToolApprovalMetadata>,
-) -> GuardianApprovalRequest {
-    GuardianApprovalRequest::McpToolCall {
-        id: call_id.to_string(),
-        server: invocation.server.clone(),
-        tool_name: invocation.tool.clone(),
-        arguments: invocation.arguments.clone(),
-        connector_id: metadata.and_then(|metadata| metadata.connector_id.clone()),
-        connector_name: metadata.and_then(|metadata| metadata.connector_name.clone()),
-        connector_description: metadata.and_then(|metadata| metadata.connector_description.clone()),
-        connected_account_email: (invocation.server == CODEX_APPS_MCP_SERVER_NAME)
-            .then(|| metadata.and_then(|metadata| metadata.connected_account_email.clone()))
-            .flatten(),
-        tool_title: metadata.and_then(|metadata| metadata.tool_title.clone()),
-        tool_description: metadata.and_then(|metadata| metadata.tool_description.clone()),
-        annotations: metadata
-            .and_then(|metadata| metadata.annotations.as_ref())
-            .map(|annotations| GuardianMcpAnnotations {
-                destructive_hint: annotations.destructive_hint,
-                open_world_hint: annotations.open_world_hint,
-                read_only_hint: annotations.read_only_hint,
-            }),
-    }
 }
 
 fn app_tool_policy(
