@@ -18,30 +18,6 @@ impl ChatWidget {
         self.request_redraw();
     }
 
-    pub(super) fn on_image_generation_begin(&mut self) {
-        self.flush_answer_stream_with_separator();
-        if self.bottom_pane.is_task_running() {
-            self.bottom_pane.ensure_status_indicator();
-        }
-    }
-
-    pub(super) fn on_image_generation_end(
-        &mut self,
-        call_id: String,
-        status: String,
-        revised_prompt: Option<String>,
-        saved_path: Option<AbsolutePathBuf>,
-    ) {
-        self.flush_answer_stream_with_separator();
-        self.add_to_history(history_cell::new_image_generation_call(
-            call_id,
-            &status,
-            revised_prompt,
-            saved_path,
-        ));
-        self.request_redraw();
-    }
-
     pub(super) fn on_file_change_completed(&mut self, item: ThreadItemPayload) {
         self.defer_or_handle(
             item,

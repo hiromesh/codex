@@ -324,8 +324,6 @@ fn activity_metadata_is_retained_without_including_outputs() -> color_eyre::Resu
             {"type": "agentMessage", "id": "assistant-1", "text": assistant_text, "phase": "commentary"},
             {"type": "webSearch", "id": "web-1", "query": "latest docs", "action": null},
             {"type": "sleep", "id": "sleep-1", "durationMs": 1000},
-            {"type": "imageGeneration", "id": "image-1", "status": "completed",
-                "revisedPrompt": "a cat", "result": "image bytes"},
             {"type": "enteredReviewMode", "id": "review-1", "review": "review changes"},
             {"type": "functionCallOutput", "id": "delegation-1", "name": "send_message_to_thread",
                 "namespace": "codex_tui", "output": delegated_prompt("source-2", "Follow <up> & report")}
@@ -357,8 +355,6 @@ fn activity_metadata_is_retained_without_including_outputs() -> color_eyre::Resu
             {"type": "agentMessage", "id": "assistant-1", "text": assistant_text, "phase": "commentary"},
             {"type": "webSearch", "id": "web-1", "query": "latest docs", "action": null},
             {"type": "sleep", "id": "sleep-1", "durationMs": 1000},
-            {"type": "imageGeneration", "id": "image-1", "status": "completed",
-                "revisedPrompt": "a cat", "savedPath": null},
             {"type": "enteredReviewMode", "id": "review-1", "review": "review changes"},
             {"type": "functionCallOutput", "id": "delegation-1", "name": "send_message_to_thread",
                 "namespace": "codex_tui", "codexDelegation": {
@@ -396,45 +392,6 @@ fn activity_metadata_is_retained_without_including_outputs() -> color_eyre::Resu
     assert_eq!(
         no_outputs["items"][8]["result"],
         json!({"text": "", "truncated": true, "originalChars": 11})
-    );
-    Ok(())
-}
-
-/// File-backed generated images retain their reference when task output is requested without
-/// exposing that output when the caller asks for metadata only.
-#[test]
-fn file_backed_image_generation_is_retained_as_a_reference() -> color_eyre::Result<()> {
-    let turn: Turn = serde_json::from_value(json!({
-        "id": "turn-1",
-        "status": "completed",
-        "items": [{
-            "type": "imageGeneration",
-            "id": "image-1",
-            "status": "completed",
-            "fileId": "file-generated-image"
-        }]
-    }))?;
-
-    assert_eq!(
-        turn_summary(&turn, /*include_outputs*/ true, DEFAULT_OUTPUT_CHARS)["items"][0],
-        json!({
-            "type": "imageGeneration",
-            "id": "image-1",
-            "status": "completed",
-            "revisedPrompt": null,
-            "savedPath": null,
-            "fileId": "file-generated-image"
-        })
-    );
-    assert_eq!(
-        turn_summary(&turn, /*include_outputs*/ false, DEFAULT_OUTPUT_CHARS)["items"][0],
-        json!({
-            "type": "imageGeneration",
-            "id": "image-1",
-            "status": "completed",
-            "revisedPrompt": null,
-            "savedPath": null
-        })
     );
     Ok(())
 }

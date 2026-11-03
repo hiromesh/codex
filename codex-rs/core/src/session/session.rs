@@ -771,12 +771,7 @@ impl Session {
             context_window_id: Some(context_window_id),
             mcp_attribution: Some(self.services.executed_tool_calls.mcp_attribution_snapshot()),
             analytics_enabled: Some(self.services.analytics_events_client.is_enabled()),
-            history_ingest_requested: turn_context
-                .config
-                .token_budget
-                .as_ref()
-                .is_some_and(|config| config.use_history_notes_extension)
-                .then_some(true),
+            history_ingest_requested: None,
             forked_from_ordinal_exclusive: self
                 .forked_from_ordinal_exclusive
                 .filter(|_| responses_metadata.forked_from_thread_id.is_some()),

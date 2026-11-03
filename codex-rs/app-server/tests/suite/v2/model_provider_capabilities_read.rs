@@ -26,7 +26,6 @@ async fn read_default_provider_capabilities() -> Result<()> {
         timeout(DEFAULT_TIMEOUT, mcp.read_response(request_id)).await??;
 
     let expected = ModelProviderCapabilitiesReadResponse {
-        image_generation: true,
         web_search: true,
     };
     assert_eq!(received, expected);
@@ -54,7 +53,6 @@ async fn read_amazon_bedrock_provider_capabilities() -> Result<()> {
         timeout(DEFAULT_TIMEOUT, mcp.read_response(request_id)).await??;
 
     let expected = ModelProviderCapabilitiesReadResponse {
-        image_generation: false,
         web_search: true,
     };
     assert_eq!(received, expected);
@@ -83,7 +81,6 @@ async fn read_amazon_bedrock_runtime_provider_capabilities() -> Result<()> {
     assert_eq!(
         received,
         ModelProviderCapabilitiesReadResponse {
-            image_generation: false,
             web_search: false,
         }
     );

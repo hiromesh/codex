@@ -262,19 +262,13 @@ mod tests {
     use std::sync::Arc;
 
     use codex_extension_items::ExtensionItem;
-    use codex_extension_items::image_generation::GeneratedImageRef;
-    use codex_extension_items::image_generation::ImageGenerationItem;
     use codex_extension_items::web_search::WebSearchItem;
     use codex_protocol::items::TurnItem;
     use codex_protocol::models::ContentItem;
     use codex_protocol::models::ResponseItem;
     use codex_protocol::protocol::EventMsg;
-    use codex_protocol::protocol::ImageGenerationBeginEvent;
-    use codex_protocol::protocol::ImageGenerationEndEvent;
     use codex_tools::ExtensionTurnItem;
     use codex_tools::ToolCallSource as ExtensionToolCallSource;
-    use codex_utils_absolute_path::test_support::PathExt;
-    use codex_utils_absolute_path::test_support::test_path_buf;
     use codex_utils_path_uri::PathUri;
     use core_test_support::responses::strip_response_item_id;
     use core_test_support::responses::strip_response_item_ids;
@@ -599,95 +593,5 @@ mod tests {
                 results: None,
             }
         );
-    }
-
-    #[tokio::test]
-    async fn image_generation_publication_preserves_extension_saved_path() {
-        let (session, turn, rx) = crate::session::tests::make_session_and_context_with_rx().await;
-        let expected_path = test_path_buf("/tmp/extension-claimed.png").abs();
-        let emitter = CoreTurnItemEmitter {
-            session: Arc::downgrade(&session),
-            turn: Arc::downgrade(&turn),
-        };
-        let expected_started_item = ExtensionItem::ImageGeneration(ImageGenerationItem {
-            id: "call-image".to_string(),
-            status: "in_progress".to_string(),
-            revised_prompt: None,
-            image: GeneratedImageRef::Inline {
-                result: String::new(),
-            },
-            transparent_background: None,
-            failure: None,
-            saved_path: None,
-            input_images: Vec::new(),
-            imagegen_request_id: None,
-            generation_id: None,
-        });
-        let expected_completed_item = ExtensionItem::ImageGeneration(ImageGenerationItem {
-            id: "call-image".to_string(),
-            status: "completed".to_string(),
-            revised_prompt: Some("A tiny blue square".to_string()),
-            image: GeneratedImageRef::Inline {
-                result: "cG5n".to_string(),
-            },
-            transparent_background: Some(true),
-            failure: None,
-            saved_path: Some(expected_path.clone()),
-            input_images: Vec::new(),
-            imagegen_request_id: None,
-            generation_id: None,
-        });
-        codex_tools::TurnItemEmitter::emit_started(
-            &emitter,
-            ExtensionTurnItem {
-                item: expected_started_item.clone(),
-                legacy_events: vec![EventMsg::ImageGenerationBegin(ImageGenerationBeginEvent {
-                    call_id: "call-image".to_string(),
-                })],
-            },
-        )
-        .await;
-        codex_tools::TurnItemEmitter::emit_completed(
-            &emitter,
-            ExtensionTurnItem {
-                item: expected_completed_item.clone(),
-                legacy_events: vec![EventMsg::ImageGenerationEnd(ImageGenerationEndEvent {
-                    call_id: "call-image".to_string(),
-                    status: "completed".to_string(),
-                    revised_prompt: Some("A tiny blue square".to_string()),
-                    image: GeneratedImageRef::Inline {
-                        result: "cG5n".to_string(),
-                    },
-                    transparent_background: Some(true),
-                    failure: None,
-                    saved_path: Some(expected_path.clone()),
-                    input_images: Vec::new(),
-                    generation_id: None,
-                })],
-            },
-        )
-        .await;
-
-        let started = rx.recv().await.expect("item started event");
-        let EventMsg::ItemStarted(started) = started.msg else {
-            panic!("expected item started event");
-        };
-        let TurnItem::Extension(started_item) = started.item else {
-            panic!("expected extension item");
-        };
-        let begin = rx.recv().await.expect("legacy image start event");
-        assert!(matches!(begin.msg, EventMsg::ImageGenerationBegin(_)));
-        let completed = rx.recv().await.expect("item completed event");
-        let EventMsg::ItemCompleted(completed) = completed.msg else {
-            panic!("expected item completed event");
-        };
-        let TurnItem::Extension(completed_item) = completed.item else {
-            panic!("expected extension item");
-        };
-        let end = rx.recv().await.expect("legacy image end event");
-        assert!(matches!(end.msg, EventMsg::ImageGenerationEnd(_)));
-
-        assert_eq!(started_item, expected_started_item);
-        assert_eq!(completed_item, expected_completed_item);
     }
 }

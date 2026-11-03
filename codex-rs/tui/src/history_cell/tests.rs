@@ -575,30 +575,6 @@ fn raw_mode_toggle_transcript_snapshot() {
     insta::assert_snapshot!("raw_mode_toggle_transcript", rendered);
 }
 
-#[test]
-fn image_generation_call_renders_saved_path() {
-    let saved_path = test_path_buf("/tmp/generated-image.png").abs();
-    let expected_saved_path = format!(
-        "  └ Saved to: {}",
-        Url::from_file_path(saved_path.as_path()).expect("test path should convert to file URL")
-    );
-    let cell = new_image_generation_call(
-        "call-image-generation".to_string(),
-        "completed",
-        Some("A tiny blue square".to_string()),
-        Some(saved_path),
-    );
-
-    assert_eq!(
-        render_lines(&cell.display_lines(/*width*/ 80)),
-        vec![
-            "• Generated Image:".to_string(),
-            "  └ A tiny blue square".to_string(),
-            expected_saved_path,
-        ],
-    );
-}
-
 fn session_configured_event(model: &str) -> ThreadSessionState {
     ThreadSessionState {
         daybreak_enabled: false,

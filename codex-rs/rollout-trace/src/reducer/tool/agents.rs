@@ -118,7 +118,6 @@ impl TraceReducer {
             | ToolCallKind::ApplyPatch
             | ToolCallKind::Mcp { .. }
             | ToolCallKind::Web
-            | ToolCallKind::ImageGeneration
             | ToolCallKind::SpawnAgent
             | ToolCallKind::WaitAgent
             | ToolCallKind::Other { .. } => Ok(()),
@@ -181,7 +180,6 @@ impl TraceReducer {
             | ToolCallKind::ApplyPatch
             | ToolCallKind::Mcp { .. }
             | ToolCallKind::Web
-            | ToolCallKind::ImageGeneration
             | ToolCallKind::WaitAgent
             | ToolCallKind::Other { .. } => Ok(()),
         }

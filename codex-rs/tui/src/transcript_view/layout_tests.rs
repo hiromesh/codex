@@ -150,10 +150,8 @@ fn recent_entries_are_reused_and_old_entries_are_evicted() {
 
 #[test]
 fn fullscreen_image_previews_follow_layout_without_entering_text_surfaces() {
-    use crate::history_cell::new_image_generation_call;
     use crate::history_cell::new_view_image_tool_call;
     use crate::pets::ImageProtocol;
-    use codex_utils_absolute_path::AbsolutePathBuf;
     use codex_utils_path_uri::LegacyAppPathString;
 
     let dir = tempfile::tempdir().unwrap();
@@ -165,12 +163,6 @@ fn fullscreen_image_previews_follow_layout_without_entering_text_surfaces() {
         Arc::new(new_view_image_tool_call(
             "view-call".to_string(),
             LegacyAppPathString::from_string(path.to_string_lossy().into_owned()),
-        )),
-        Arc::new(new_image_generation_call(
-            "image-call".to_string(),
-            "completed",
-            Some("A red rectangle".to_string()),
-            Some(AbsolutePathBuf::try_from(path.clone()).unwrap()),
         )),
     ];
     let area = Rect::new(

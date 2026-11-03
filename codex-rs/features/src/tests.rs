@@ -166,41 +166,6 @@ fn from_sources_ignores_removed_terminal_resize_reflow_feature_key() {
 }
 
 #[test]
-fn image_generation_extension_alias_is_supported() {
-    assert_eq!(
-        feature_for_key("imagegenext"),
-        Some(Feature::ImageGeneration)
-    );
-}
-
-#[test]
-fn image_generation_toggle_controls_extension_backed_generation() {
-    let mut entries = BTreeMap::new();
-    entries.insert("image_generation".to_string(), false);
-    let mut features = Features::with_defaults();
-    features.apply_map(&entries);
-    assert!(!features.enabled(Feature::ImageGeneration));
-
-    entries.insert("image_generation".to_string(), true);
-    features.disable(Feature::ImageGeneration);
-    features.apply_map(&entries);
-    assert!(features.enabled(Feature::ImageGeneration));
-}
-
-#[test]
-fn canonical_image_generation_toggle_wins_over_extension_alias() {
-    for (canonical, alias) in [(false, true), (true, false)] {
-        let entries = BTreeMap::from([
-            ("image_generation".to_string(), canonical),
-            ("imagegenext".to_string(), alias),
-        ]);
-        let mut features = Features::with_defaults();
-        features.apply_map(&entries);
-        assert_eq!(features.enabled(Feature::ImageGeneration), canonical);
-    }
-}
-
-#[test]
 fn use_legacy_landlock_config_records_deprecation_notice() {
     let mut entries = BTreeMap::new();
     entries.insert("use_legacy_landlock".to_string(), true);

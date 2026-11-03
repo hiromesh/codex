@@ -332,8 +332,6 @@ pub enum Feature {
     PluginSharing,
     /// Removed compatibility flag retained as a no-op.
     ExternalMigration,
-    /// Enable extension-backed image generation.
-    ImageGeneration,
     /// Omit inline image content from app-server item notifications.
     OmitAppServerNotificationMedia,
     /// Tell the model when a prompt image was resized and include its dimensions.
@@ -700,10 +698,6 @@ impl Features {
                     );
                 }
                 _ => {}
-            }
-            if k == "imagegenext" && m.contains_key(Feature::ImageGeneration.key()) {
-                self.record_legacy_usage(k, Feature::ImageGeneration);
-                continue;
             }
             match feature_for_key(k) {
                 Some(feat) => {
@@ -1695,12 +1689,6 @@ pub const FEATURES: &[FeatureSpec] = &[
         key: "external_migration",
         stage: Stage::Removed,
         default_enabled: false,
-    },
-    FeatureSpec {
-        id: Feature::ImageGeneration,
-        key: "image_generation",
-        stage: Stage::Stable,
-        default_enabled: true,
     },
     FeatureSpec {
         id: Feature::OmitAppServerNotificationMedia,

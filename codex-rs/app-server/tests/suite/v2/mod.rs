@@ -73,11 +73,9 @@ mod gateway_oauth;
 #[path = "gcp_setup_tests.rs"]
 mod gcp_setup;
 mod git_attribution;
-mod history_notes_extension;
 mod hooks_list;
 mod host_skills;
 mod https_mock;
-mod imagegen_extension;
 mod initialize;
 mod luna_reserve;
 mod marketplace_add;

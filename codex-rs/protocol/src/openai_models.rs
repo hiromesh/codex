@@ -773,8 +773,6 @@ pub struct McpResourceToolMessages {
 pub struct ModelTokenBudgetConfig {
     #[serde(default)]
     pub enabled: bool,
-    #[serde(default)]
-    pub use_history_notes_extension: bool,
     pub reminder_threshold_tokens: i64,
     pub reminder_message_template: String,
     pub guidance_message: String,

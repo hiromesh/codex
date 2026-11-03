@@ -4632,10 +4632,6 @@ async fn build_agent_spawn_config_uses_captured_step_settings_and_turn_context_v
         .features
         .set_enabled(Feature::TokenBudget, parent_enabled)
         .expect("set parent experimental context");
-    parent_config
-        .token_budget
-        .get_or_insert_default()
-        .use_history_notes_extension = parent_enabled;
     let mut expected = parent_config.clone();
     turn.configured_token_budget = expected.token_budget.clone();
     Arc::make_mut(&mut turn.config)

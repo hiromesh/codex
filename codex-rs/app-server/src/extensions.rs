@@ -82,7 +82,6 @@ pub(crate) fn thread_extensions(
     if let Some(queue_service) = queue_service {
         codex_queue_extension::install(&mut builder, queue_service);
     }
-    codex_history_notes_extension::install(&mut builder, auth_manager.clone());
     codex_core::install_agent_message_board(&mut builder, thread_manager.clone());
     if let Some(state_db) = state_db {
         codex_goal_extension::install_with_backend(
@@ -108,9 +107,6 @@ pub(crate) fn thread_extensions(
     codex_mcp_extension::install(&mut builder);
     codex_mcp_extension::install_plugins(&mut builder, environment_manager);
     codex_web_search_extension::install(&mut builder, auth_manager.clone());
-    codex_image_generation_extension::install(&mut builder, auth_manager, |config: &Config| {
-        Some(config.codex_home.clone())
-    });
     let mut skill_providers = codex_skills_extension::SkillProviders::new()
         .with_executor_provider(executor_skill_provider)
         .with_host_provider(Arc::new(codex_skills_extension::HostSkillProvider::new()));

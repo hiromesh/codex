@@ -1,7 +1,5 @@
 use super::*;
 use crate::test_support::boxed_future;
-use codex_app_server_protocol::GeneratedImageRef;
-use codex_app_server_protocol::ImageGenerationItem;
 use codex_app_server_protocol::PluginAvailability;
 use codex_utils_absolute_path::test_support::PathExt;
 use pretty_assertions::assert_eq;
@@ -819,38 +817,6 @@ pub(super) fn handle_view_image_tool_call(
                 id: call_id.into(),
                 path: path.into(),
             },
-            /*started_at_ms*/ None,
-            /*completed_at_ms*/ 0,
-        )),
-        /*replay_kind*/ None,
-    );
-}
-
-pub(super) fn handle_image_generation_end(
-    chat: &mut ChatWidget,
-    call_id: impl Into<String>,
-    status: impl Into<String>,
-    revised_prompt: Option<String>,
-    saved_path: Option<AbsolutePathBuf>,
-) {
-    chat.handle_server_notification(
-        ServerNotification::ItemCompleted(ItemCompletedNotification::new(
-            thread_id(chat),
-            "turn-1".to_string(),
-            AppServerThreadItemPayload::ImageGeneration(ImageGenerationItem {
-                id: call_id.into(),
-                status: status.into(),
-                revised_prompt,
-                image: GeneratedImageRef::Inline {
-                    result: String::new(),
-                },
-                transparent_background: None,
-                failure: None,
-                saved_path,
-                input_images: Vec::new(),
-                imagegen_request_id: None,
-                generation_id: None,
-            }),
             /*started_at_ms*/ None,
             /*completed_at_ms*/ 0,
         )),

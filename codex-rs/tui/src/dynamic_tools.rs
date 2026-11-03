@@ -13,7 +13,6 @@ use codex_app_server_protocol::DynamicToolFunctionSpec;
 use codex_app_server_protocol::DynamicToolNamespaceSpec;
 use codex_app_server_protocol::DynamicToolNamespaceTool;
 use codex_app_server_protocol::DynamicToolSpec;
-use codex_app_server_protocol::GeneratedImageRef;
 use codex_app_server_protocol::GetAccountParams;
 use codex_app_server_protocol::GetAccountResponse;
 use codex_app_server_protocol::ImageReference;
@@ -994,10 +993,6 @@ async fn execute_inner(
                                         "id": id, "turnId": turn.id, "type": "fileChange",
                                         "name": "fileChange", "status": status
                                     })),
-                                    ThreadItemPayload::ImageGeneration(item) => Some(json!({
-                                        "id": item.id, "turnId": turn.id, "type": "imageGeneration",
-                                        "name": "imageGeneration", "status": item.status
-                                    })),
                                     ThreadItemPayload::McpToolCall {
                                         id, tool, status, ..
                                     } => Some(json!({
@@ -1542,24 +1537,6 @@ fn turn_summary(turn: &Turn, include_outputs: bool, output_chars: usize) -> Valu
             ThreadItemPayload::Sleep(item) => json!({
                 "type": "sleep", "id": item.id, "durationMs": item.duration_ms
             }),
-            ThreadItemPayload::ImageGeneration(item) => {
-                let mut image = json!({
-                    "type": "imageGeneration", "id": item.id, "status": item.status,
-                    "revisedPrompt": item.revised_prompt.as_deref().map(|prompt| truncate(prompt, DEFAULT_OUTPUT_CHARS)),
-                    "savedPath": item.saved_path
-                });
-                if include_outputs {
-                    match &item.image {
-                        GeneratedImageRef::Inline { result } => {
-                            image["result"] = output_summary(result, output_chars);
-                        }
-                        GeneratedImageRef::File { file_id } => {
-                            image["fileId"] = Value::String(file_id.clone());
-                        }
-                    }
-                }
-                image
-            }
             ThreadItemPayload::EnteredReviewMode { id, review } => json!({
                 "type": "enteredReviewMode", "id": id, "review": truncate(review, DEFAULT_OUTPUT_CHARS)
             }),

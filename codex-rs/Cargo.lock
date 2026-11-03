@@ -342,9 +342,6 @@ name = "arrayvec"
 version = "0.7.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7c02d123df017efcdfbd739ef81735b36c5ba83ec3c59c80a9d7ecc718f92e50"
-dependencies = [
- "zeroize",
-]
 
 [[package]]
 name = "ascii"
@@ -1346,24 +1343,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3a822ea5bc7590f9d40f1ba12c0dc3c2760f3482c6984db1573ad11031420831"
 
 [[package]]
-name = "clatter"
-version = "2.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6fed49fa357a85c377c0f920e86100f5326111b09ad69f6de684e324e3ad8097"
-dependencies = [
- "aes-gcm",
- "arrayvec",
- "displaydoc",
- "getrandom 0.3.4",
- "ml-kem",
- "rand_core 0.6.4",
- "sha2 0.10.9",
- "thiserror-no-std",
- "x25519-dalek",
- "zeroize",
-]
-
-[[package]]
 name = "clipboard-win"
 version = "5.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1576,7 +1555,6 @@ dependencies = [
  "codex-app-server-transport",
  "codex-arg0",
  "codex-backend-client",
- "codex-cloud-config",
  "codex-config",
  "codex-connectors",
  "codex-core",
@@ -1592,11 +1570,9 @@ dependencies = [
  "codex-git-attribution",
  "codex-git-utils",
  "codex-goal-extension",
- "codex-history-notes-extension",
  "codex-home",
  "codex-hooks",
  "codex-http-client",
- "codex-image-generation-extension",
  "codex-login",
  "codex-mcp",
  "codex-mcp-extension",
@@ -2462,8 +2438,6 @@ dependencies = [
  "axum",
  "base64 0.22.1",
  "bytes",
- "clatter",
- "codex-api",
  "codex-build-info",
  "codex-config",
  "codex-core-plugin-common",
@@ -2490,7 +2464,6 @@ dependencies = [
  "codex-utils-redacted-string",
  "codex-utils-rustls-provider",
  "codex-websocket-auth",
- "codex-websocket-client",
  "ctor 0.6.3",
  "dirs",
  "futures",
@@ -2500,7 +2473,6 @@ dependencies = [
  "opentelemetry",
  "opentelemetry_sdk",
  "pretty_assertions",
- "prost",
  "rcgen",
  "rustix",
  "rustls",
@@ -2530,17 +2502,13 @@ dependencies = [
  "assert_matches",
  "chrono",
  "clap",
- "codex-api",
  "codex-app-server",
  "codex-arg0",
  "codex-build-info",
- "codex-cloud-config",
  "codex-config",
  "codex-core",
  "codex-exec-server",
  "codex-http-client",
- "codex-login",
- "codex-model-provider",
  "codex-protocol",
  "codex-sandboxing",
  "codex-utils-absolute-path",
@@ -2549,7 +2517,6 @@ dependencies = [
  "codex-utils-process",
  "codex-websocket-auth",
  "futures",
- "http 1.4.0",
  "insta",
  "jsonwebtoken",
  "pretty_assertions",
@@ -2561,7 +2528,6 @@ dependencies = [
  "toml 0.9.11+spec-1.1.0",
  "tracing",
  "tracing-subscriber",
- "url",
  "wiremock",
 ]
 
@@ -2777,13 +2743,10 @@ dependencies = [
 name = "codex-git-attribution"
 version = "0.0.0"
 dependencies = [
- "codex-backend-client",
  "codex-extension-api",
  "codex-http-client",
  "codex-login",
  "serde_json",
- "tokio",
- "wiremock",
 ]
 
 [[package]]
@@ -8682,7 +8645,6 @@ dependencies = [
  "kem",
  "rand_core 0.6.4",
  "sha3",
- "zeroize",
 ]
 
 [[package]]
@@ -12877,26 +12839,6 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 2.0.117",
-]
-
-[[package]]
-name = "thiserror-impl-no-std"
-version = "2.0.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "58e6318948b519ba6dc2b442a6d0b904ebfb8d411a3ad3e07843615a72249758"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn 1.0.109",
-]
-
-[[package]]
-name = "thiserror-no-std"
-version = "2.0.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a3ad459d94dd517257cc96add8a43190ee620011bb6e6cdc82dafd97dfafafea"
-dependencies = [
- "thiserror-impl-no-std",
 ]
 
 [[package]]

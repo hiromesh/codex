@@ -224,7 +224,6 @@ impl ConfigRequestProcessor {
         let provider = create_model_provider(config.model_provider, /*auth_manager*/ None);
         let capabilities = provider.capabilities();
         Ok(ModelProviderCapabilitiesReadResponse {
-            image_generation: capabilities.image_generation,
             web_search: capabilities.web_search,
         })
     }

@@ -658,24 +658,15 @@ async fn owned_details_keep_the_composer_cursor_and_screen() -> Result<()> {
         .await?;
     app.chat_widget
         .set_pet_image_support_for_tests(crate::pets::PetImageSupport::Supported(protocol));
-    app.transcript_cells
-        .push(Arc::new(history_cell::new_image_generation_call(
-            "image-call".to_string(),
-            "completed",
-            Some("Preview".to_string()),
-            Some(AbsolutePathBuf::try_from(path)?),
-        )));
     app.handle_tui_event(&mut tui, &mut server, TuiEvent::Draw)
         .await?;
     let images = presented(&tui);
-    assert_eq!(images.len(), 2);
+    assert_eq!(images.len(), 1);
     assert_eq!(images[0], neighbor);
-    assert_eq!(area.intersection(images[1]), images[1]);
     app.chat_widget.open_feature_enable_prompt(Feature::Collab);
     app.handle_tui_event(&mut tui, &mut server, TuiEvent::Draw)
         .await?;
     assert!(presented(&tui).is_empty());
-    app.transcript_cells.pop();
     app.handle_tui_event(&mut tui, &mut server, TuiEvent::Key(KeyCode::Esc.into()))
         .await?;
     app.handle_tui_event(&mut tui, &mut server, TuiEvent::Draw)

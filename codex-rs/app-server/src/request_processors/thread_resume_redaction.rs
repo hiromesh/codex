@@ -1,13 +1,11 @@
-#[cfg(test)]
-use codex_app_server_protocol::GeneratedImageRef;
 use codex_app_server_protocol::McpToolCallResult;
 use codex_app_server_protocol::ThreadItemPayload;
 use codex_app_server_protocol::Turn;
 use serde_json::Value as JsonValue;
 
-// Temporary bandaid for remote clients: thread/resume can include large MCP and
-// image-generation payloads. Keep this response-only so persisted rollout
-// history, model resume history, and other APIs stay unchanged.
+// Temporary bandaid for remote clients: thread/resume can include large MCP
+// payloads. Keep this response-only so persisted rollout history, model resume
+// history, and other APIs stay unchanged.
 const REDACTED_PAYLOAD: &str = "[redacted]";
 const CHATGPT_REMOTE_CLIENT_NAMES: &[&str] =
     &["codex_chatgpt_android_remote", "codex_chatgpt_ios_remote"];
@@ -34,7 +32,6 @@ pub(super) fn redact_thread_resume_payloads(turns: &mut [Turn]) {
                 }
                 true
             }
-            ThreadItemPayload::ImageGeneration(_) => false,
             _ => true,
         });
     }
@@ -54,7 +51,6 @@ fn redacted_mcp_tool_call_result() -> McpToolCallResult {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use codex_app_server_protocol::ImageGenerationItem;
     use codex_app_server_protocol::McpToolCallAppContext;
     use codex_app_server_protocol::McpToolCallError;
     use codex_app_server_protocol::McpToolCallStatus;
@@ -69,7 +65,7 @@ mod tests {
     use pretty_assertions::assert_eq;
 
     #[test]
-    fn redacts_mcp_success_result_and_removes_image_generation() {
+    fn redacts_mcp_success_result() {
         let mut thread = test_thread(vec![
             ThreadItemPayload::AgentMessage {
                 id: "agent-1".to_string(),
@@ -107,23 +103,8 @@ mod tests {
                 error: None,
                 duration_ms: Some(8),
             },
-            ThreadItemPayload::ImageGeneration(ImageGenerationItem {
-                id: "ig-1".to_string(),
-                status: "completed".to_string(),
-                revised_prompt: Some("revised".to_string()),
-                image: GeneratedImageRef::Inline {
-                    result: "base64-result".to_string(),
-                },
-                transparent_background: None,
-                failure: None,
-                saved_path: Some(test_path_buf("/tmp/ig-1.png").abs()),
-                input_images: Vec::new(),
-                imagegen_request_id: None,
-                generation_id: None,
-            }),
         ]);
         thread.turns[0].items[1].started_at_ms = Some(123);
-        thread.turns[0].items[2].started_at_ms = Some(456);
 
         redact_thread_resume_payloads(&mut thread.turns);
 

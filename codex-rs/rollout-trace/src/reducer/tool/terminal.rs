@@ -374,7 +374,6 @@ fn terminal_operation_kind(kind: &ToolCallKind) -> Option<TerminalOperationKind>
         ToolCallKind::ApplyPatch
         | ToolCallKind::Mcp { .. }
         | ToolCallKind::Web
-        | ToolCallKind::ImageGeneration
         | ToolCallKind::SpawnAgent
         | ToolCallKind::AssignAgentTask
         | ToolCallKind::SendMessage

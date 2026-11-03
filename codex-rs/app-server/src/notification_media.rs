@@ -1,5 +1,4 @@
 use codex_app_server_protocol::DynamicToolCallOutputContentItem;
-use codex_app_server_protocol::GeneratedImageRef;
 use codex_app_server_protocol::ServerNotification;
 use codex_app_server_protocol::ThreadItemPayload;
 use codex_app_server_protocol::UserInput;
@@ -36,7 +35,6 @@ pub(crate) fn without_notification_media(notification: ServerNotification) -> Se
                         });
                     }
                 }
-                ResponseItem::ImageGenerationCall { result, .. } => result.clear(),
                 ResponseItem::AdditionalTools { .. }
                 | ResponseItem::AgentMessage { .. }
                 | ResponseItem::Reasoning { .. }
@@ -175,11 +173,6 @@ fn without_thread_item_media(mut item: ThreadItemPayload) -> ThreadItemPayload {
                     _ => false,
                 }
             });
-        }
-        ThreadItemPayload::ImageGeneration(item) => {
-            item.image = GeneratedImageRef::Inline {
-                result: String::new(),
-            };
         }
         ThreadItemPayload::HookPrompt { .. }
         | ThreadItemPayload::AgentMessage { .. }

@@ -1092,55 +1092,6 @@ async fn view_image_tool_call_preserves_foreign_path() {
 }
 
 #[tokio::test]
-async fn image_generation_begin_restores_working_status_after_single_line_preamble() {
-    let (mut chat, _rx, _op_rx) = make_chatwidget_manual(/*model_override*/ None).await;
-
-    chat.on_task_started();
-    chat.on_agent_message_delta("Generating an image.".to_string());
-    chat.on_image_generation_begin();
-
-    assert!(chat.bottom_pane.is_task_running());
-    assert!(chat.bottom_pane.status_indicator_visible());
-}
-
-#[tokio::test]
-async fn image_generation_call_adds_history_cell() {
-    let (mut chat, mut rx, _op_rx) = make_chatwidget_manual(/*model_override*/ None).await;
-
-    handle_image_generation_end(
-        &mut chat,
-        "call-image-generation",
-        "completed",
-        Some("A tiny blue square".into()),
-        Some(test_path_buf("/tmp/ig-1.png").abs()),
-    );
-
-    let cells = drain_insert_history(&mut rx);
-    assert_eq!(cells.len(), 1, "expected a single history cell");
-    let platform_file_url = url::Url::from_file_path(test_path_buf("/tmp/ig-1.png"))
-        .expect("test path should convert to file URL")
-        .to_string();
-    let combined =
-        lines_to_single_string(&cells[0]).replace(&platform_file_url, "file:///tmp/ig-1.png");
-    assert_chatwidget_snapshot!("image_generation_call_history_snapshot", combined);
-
-    handle_image_generation_end(
-        &mut chat,
-        "call-image-generation-failed",
-        "failed",
-        Some("A tiny blue square".into()),
-        /*saved_path*/ None,
-    );
-
-    let cells = drain_insert_history(&mut rx);
-    assert_eq!(cells.len(), 1, "expected a single failure history cell");
-    assert_chatwidget_snapshot!(
-        "failed_image_generation_call_history_snapshot",
-        lines_to_single_string(&cells[0])
-    );
-}
-
-#[tokio::test]
 async fn exec_history_extends_previous_when_consecutive() {
     let (mut chat, _rx, _op_rx) = make_chatwidget_manual(/*model_override*/ None).await;
 

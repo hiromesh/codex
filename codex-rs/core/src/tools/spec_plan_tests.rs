@@ -19,7 +19,6 @@ use codex_protocol::dynamic_tools::DynamicToolSpec;
 use codex_protocol::error::CodexErrorDetails;
 use codex_protocol::openai_models::ApplyPatchToolType;
 use codex_protocol::openai_models::ConfigShellToolType;
-use codex_protocol::openai_models::InputModality;
 use codex_protocol::openai_models::ModelInfo;
 use codex_protocol::openai_models::ToolMode;
 use codex_protocol::openai_models::WebSearchToolType;
@@ -2180,75 +2179,7 @@ async fn hosted_web_search_fallback_follows_winning_browser_runtime() {
 }
 
 #[tokio::test]
-async fn hosted_web_search_and_standalone_image_generation_follow_runtime_gates() {
-    let image_generation_tool = Arc::new(TestNamespaceExtensionTool {
-        namespace: "image_gen",
-        tool_name: "imagegen",
-    });
-    let image_generation = probe_with(
-        |turn| {
-            use_chatgpt_auth(turn);
-            update_turn_settings_for_test(turn, |settings| {
-                Arc::make_mut(&mut settings.model_info).input_modalities =
-                    vec![InputModality::Image];
-            });
-        },
-        ToolPlanInputs {
-            extension_tool_executors: vec![image_generation_tool.clone()],
-            ..Default::default()
-        },
-    )
-    .await;
-    image_generation.assert_visible_contains(&["image_gen"]);
-
-    let extension_disabled = probe_with(
-        |turn| {
-            use_chatgpt_auth(turn);
-            set_feature(turn, Feature::ImageGeneration, /*enabled*/ false);
-            update_turn_settings_for_test(turn, |settings| {
-                Arc::make_mut(&mut settings.model_info).input_modalities =
-                    vec![InputModality::Image];
-            });
-        },
-        ToolPlanInputs {
-            extension_tool_executors: vec![image_generation_tool.clone()],
-            ..Default::default()
-        },
-    )
-    .await;
-    extension_disabled.assert_visible_lacks(&["image_gen"]);
-
-    let text_only_model = probe_with(
-        |turn| {
-            use_chatgpt_auth(turn);
-            update_turn_settings_for_test(turn, |settings| {
-                Arc::make_mut(&mut settings.model_info).input_modalities = vec![];
-            });
-        },
-        ToolPlanInputs {
-            extension_tool_executors: vec![image_generation_tool.clone()],
-            ..Default::default()
-        },
-    )
-    .await;
-    text_only_model.assert_visible_lacks(&["image_gen"]);
-
-    let unsupported_provider = probe_with(
-        |turn| {
-            use_bedrock_provider(turn);
-            update_turn_settings_for_test(turn, |settings| {
-                Arc::make_mut(&mut settings.model_info).input_modalities =
-                    vec![InputModality::Image];
-            });
-        },
-        ToolPlanInputs {
-            extension_tool_executors: vec![image_generation_tool],
-            ..Default::default()
-        },
-    )
-    .await;
-    unsupported_provider.assert_visible_lacks(&["image_gen"]);
-
+async fn hosted_web_search_and_standalone_web_search_follow_runtime_gates() {
     let live_web_search = probe(|turn| {
         set_web_search_mode(turn, WebSearchMode::Live);
         update_turn_settings_for_test(turn, |settings| {

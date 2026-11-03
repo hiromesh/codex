@@ -28,10 +28,6 @@ use crate::protocol::v2::UserInput;
 use crate::protocol::v2::WebSearchAction;
 use crate::protocol::v2::WebSearchItem;
 use crate::protocol::v2::web_search_action_from_core;
-use codex_extension_items::image_generation::GeneratedImageRef;
-#[cfg(test)]
-use codex_extension_items::image_generation::ImageGenerationInputImage;
-use codex_extension_items::image_generation::ImageGenerationItem;
 use codex_protocol::items::parse_hook_prompt_message;
 use codex_protocol::protocol::AgentMessageEvent;
 use codex_protocol::protocol::AgentReasoningEvent;
@@ -46,8 +42,6 @@ use codex_protocol::protocol::ExecCommandBeginEvent;
 use codex_protocol::protocol::ExecCommandEndEvent;
 use codex_protocol::protocol::GuardianAssessmentEvent;
 use codex_protocol::protocol::GuardianAssessmentStatus;
-use codex_protocol::protocol::ImageGenerationBeginEvent;
-use codex_protocol::protocol::ImageGenerationEndEvent;
 use codex_protocol::protocol::ItemCompletedEvent;
 use codex_protocol::protocol::ItemStartedEvent;
 use codex_protocol::protocol::McpToolCallBeginEvent;
@@ -472,8 +466,6 @@ impl ThreadHistoryBuilder {
             EventMsg::McpToolCallBegin(payload) => self.handle_mcp_tool_call_begin(payload),
             EventMsg::McpToolCallEnd(payload) => self.handle_mcp_tool_call_end(payload),
             EventMsg::ViewImageToolCall(payload) => self.handle_view_image_tool_call(payload),
-            EventMsg::ImageGenerationBegin(payload) => self.handle_image_generation_begin(payload),
-            EventMsg::ImageGenerationEnd(payload) => self.handle_image_generation_end(payload),
             EventMsg::CollabAgentSpawnBegin(payload) => {
                 self.handle_collab_agent_spawn_begin(payload)
             }
@@ -793,7 +785,6 @@ impl ThreadHistoryBuilder {
             | codex_protocol::items::TurnItem::Reasoning(_)
             | codex_protocol::items::TurnItem::WebSearch(_)
             | codex_protocol::items::TurnItem::ImageView(_)
-            | codex_protocol::items::TurnItem::ImageGeneration(_)
             | codex_protocol::items::TurnItem::FileChange(_)
             | codex_protocol::items::TurnItem::McpToolCall(_)
             | codex_protocol::items::TurnItem::ContextCompaction(_) => false,
@@ -1043,40 +1034,6 @@ impl ThreadHistoryBuilder {
             id: payload.call_id.clone(),
             path: payload.path.clone().into(),
         };
-        self.upsert_item_in_current_turn(item);
-    }
-
-    fn handle_image_generation_begin(&mut self, payload: &ImageGenerationBeginEvent) {
-        let item = ThreadItemPayload::ImageGeneration(ImageGenerationItem {
-            id: payload.call_id.clone(),
-            status: String::new(),
-            revised_prompt: None,
-            image: GeneratedImageRef::Inline {
-                result: String::new(),
-            },
-            transparent_background: None,
-            failure: None,
-            saved_path: None,
-            input_images: Vec::new(),
-            imagegen_request_id: None,
-            generation_id: None,
-        });
-        self.upsert_item_in_current_turn(item);
-    }
-
-    fn handle_image_generation_end(&mut self, payload: &ImageGenerationEndEvent) {
-        let item = ThreadItemPayload::ImageGeneration(ImageGenerationItem {
-            id: payload.call_id.clone(),
-            status: payload.status.clone(),
-            revised_prompt: payload.revised_prompt.clone(),
-            image: payload.image.clone(),
-            transparent_background: payload.transparent_background,
-            failure: payload.failure.clone(),
-            saved_path: payload.saved_path.clone(),
-            input_images: payload.input_images.clone(),
-            imagegen_request_id: None,
-            generation_id: payload.generation_id.clone(),
-        });
         self.upsert_item_in_current_turn(item);
     }
 
@@ -2565,88 +2522,6 @@ mod tests {
     }
 
     #[test]
-    fn rebuilds_extension_image_generation_item_from_persisted_completion() {
-        let turn_id = "turn-1";
-        let thread_id = ThreadId::new();
-        let saved_path = test_path_buf("/tmp/image-1.png").abs();
-        let input_images = vec![ImageGenerationInputImage {
-            path: test_path_buf("/tmp/reference.png").abs(),
-            sha256: "ab".repeat(32),
-        }];
-        let events = vec![
-            EventMsg::TurnStarted(TurnStartedEvent {
-                turn_attribution: None,
-                turn_id: turn_id.to_string(),
-                root_turn_id: None,
-                trace_id: None,
-                started_at: None,
-                model_context_window: None,
-                collaboration_mode_kind: Default::default(),
-            }),
-            EventMsg::ItemCompleted(ItemCompletedEvent {
-                thread_id,
-                turn_id: turn_id.to_string(),
-                item: CoreTurnItem::Extension(CoreExtensionItem::ImageGeneration(
-                    ImageGenerationItem {
-                        id: "image-1".to_string(),
-                        status: "completed".to_string(),
-                        revised_prompt: Some("A blue square".to_string()),
-                        image: GeneratedImageRef::Inline {
-                            result: "cG5n".to_string(),
-                        },
-                        transparent_background: Some(true),
-                        failure: None,
-                        saved_path: Some(saved_path.clone()),
-                        input_images: input_images.clone(),
-                        imagegen_request_id: None,
-                        generation_id: None,
-                    },
-                )),
-                started_at_ms: Some(0),
-                completed_at_ms: 1_000,
-            }),
-            EventMsg::TurnComplete(TurnCompleteEvent {
-                root_turn_id: None,
-                turn_id: turn_id.to_string(),
-                started_at: None,
-                last_agent_message: None,
-                error: None,
-                completed_at: None,
-                duration_ms: None,
-                time_to_first_token_ms: None,
-            }),
-        ];
-        let items = events
-            .into_iter()
-            .map(RolloutItem::EventMsg)
-            .map(|item| {
-                serde_json::from_value(serde_json::to_value(item).expect("serialize rollout"))
-                    .expect("deserialize rollout")
-            })
-            .collect::<Vec<_>>();
-
-        let turns = build_turns_from_rollout_items(&items);
-
-        assert_eq!(
-            turns[0].item_payloads().collect::<Vec<_>>(),
-            [&ThreadItemPayload::ImageGeneration(ImageGenerationItem {
-                id: "image-1".to_string(),
-                status: "completed".to_string(),
-                revised_prompt: Some("A blue square".to_string()),
-                image: GeneratedImageRef::Inline {
-                    result: "cG5n".to_string(),
-                },
-                transparent_background: Some(true),
-                failure: None,
-                saved_path: Some(saved_path),
-                input_images,
-                imagegen_request_id: None,
-                generation_id: None,
-            })]
-        );
-    }
-
-    #[test]
     fn preserves_command_plugin_id_and_redacts_secrets_across_legacy_upsert() {
         let turn_id = "turn-1";
         let thread_id = ThreadId::new();
@@ -2898,108 +2773,6 @@ mod tests {
                 memory_citation: None,
                 delivery: Some(AgentMessageDelivery::Async),
                 questions: Some(questions),
-            }
-        );
-    }
-
-    #[test]
-    fn replays_file_backed_image_generation_end_events_into_turn_history() {
-        let items = vec![
-            RolloutItem::EventMsg(EventMsg::TurnStarted(TurnStartedEvent {
-                turn_attribution: None,
-                turn_id: "turn-image".into(),
-                root_turn_id: None,
-                trace_id: None,
-                started_at: None,
-                model_context_window: None,
-                collaboration_mode_kind: Default::default(),
-            })),
-            RolloutItem::EventMsg(EventMsg::UserMessage(UserMessageEvent {
-                client_id: None,
-                message: "generate an image".into(),
-                images: None,
-                text_elements: Vec::new(),
-                local_images: Vec::new(),
-                ..Default::default()
-            })),
-            RolloutItem::EventMsg(EventMsg::ImageGenerationEnd(ImageGenerationEndEvent {
-                call_id: "ig_123".into(),
-                status: "completed".into(),
-                revised_prompt: Some("final prompt".into()),
-                image: GeneratedImageRef::File {
-                    file_id: "file_123".into(),
-                },
-                transparent_background: Some(true),
-                failure: Some(
-                    codex_extension_items::image_generation::ImageGenerationFailure::UsageLimitExceeded {
-                        limit_id: "image_gen".into(),
-                        resets_at: Some(1_786_150_800),
-                    },
-                ),
-                saved_path: Some(test_path_buf("/tmp/ig_123.png").abs()),
-                input_images: vec![ImageGenerationInputImage {
-                    path: test_path_buf("/tmp/reference.png").abs(),
-                    sha256: "ab".repeat(32),
-                }],
-                generation_id: None,
-            })),
-            RolloutItem::EventMsg(EventMsg::TurnComplete(TurnCompleteEvent {
-                root_turn_id: None,
-                turn_id: "turn-image".into(),
-                started_at: None,
-                last_agent_message: None,
-                error: None,
-                completed_at: None,
-                duration_ms: None,
-                time_to_first_token_ms: None,
-            })),
-        ];
-
-        let turns = build_turns_from_rollout_items(&items);
-        assert_eq!(turns.len(), 1);
-        assert_eq!(
-            turns[0],
-            Turn {
-                id: "turn-image".into(),
-                root_turn_id: None,
-                status: TurnStatus::Completed,
-                error: None,
-                started_at: None,
-                completed_at: None,
-                duration_ms: None,
-                items_view: TurnItemsView::Full,
-                items: vec![
-                    ThreadItem::untimed(ThreadItemPayload::UserMessage {
-                        id: "item-1".into(),
-                        client_id: None,
-                        content: vec![UserInput::Text {
-                            text: "generate an image".into(),
-                            text_elements: Vec::new(),
-                        }],
-                    }),
-                    ThreadItem::untimed(ThreadItemPayload::ImageGeneration(ImageGenerationItem {
-                        id: "ig_123".into(),
-                        status: "completed".into(),
-                        revised_prompt: Some("final prompt".into()),
-                        image: GeneratedImageRef::File {
-                            file_id: "file_123".into(),
-                        },
-                        transparent_background: Some(true),
-                        failure: Some(
-                            codex_extension_items::image_generation::ImageGenerationFailure::UsageLimitExceeded {
-                                limit_id: "image_gen".into(),
-                                resets_at: Some(1_786_150_800),
-                            },
-                        ),
-                        saved_path: Some(test_path_buf("/tmp/ig_123.png").abs()),
-                        input_images: vec![ImageGenerationInputImage {
-                    path: test_path_buf("/tmp/reference.png").abs(),
-                    sha256: "ab".repeat(32),
-                }],
-                        imagegen_request_id: None,
-                        generation_id: None,
-                    })),
-                ],
             }
         );
     }

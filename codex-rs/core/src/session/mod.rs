@@ -4607,12 +4607,7 @@ impl Session {
         {
             // Keep the legacy bridge hint when native Notes is disabled. A failed
             // native request must not fall back to the bridge.
-            if !turn_context
-                .config
-                .token_budget
-                .as_ref()
-                .is_some_and(|config| config.use_history_notes_extension)
-                && let Some((text, source_tool_namespace)) = self
+            if let Some((text, source_tool_namespace)) = self
                     .services
                     .mcp_runtime
                     .latest_call_tool(

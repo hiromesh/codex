@@ -179,7 +179,6 @@ pub enum ToolCallKind {
         tool: String,
     },
     Web,
-    ImageGeneration,
     SpawnAgent,
     AssignAgentTask,
     SendMessage,

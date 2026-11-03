@@ -48,10 +48,6 @@ pub(super) fn apply_experimental_context(
         config.token_budget = resolve_token_budget_config(&config_toml, &config.features)?;
     }
 
-    config
-        .token_budget
-        .get_or_insert_default()
-        .use_history_notes_extension = true;
     Ok(())
 }
 
@@ -66,13 +62,12 @@ pub(super) fn has_explicit_settings(config: &Config) -> bool {
         .is_some_and(|settings| {
             settings
                 .keys()
-                .any(|key| !matches!(key.as_str(), "enabled" | "use_history_notes_extension"))
+                .any(|key| !matches!(key.as_str(), "enabled"))
         })
-        || config.token_budget.as_ref().is_some_and(|token_budget| {
-            let mut settings = token_budget.clone();
-            settings.use_history_notes_extension = false;
-            settings != TokenBudgetConfig::default()
-        })
+        || config
+            .token_budget
+            .as_ref()
+            .is_some_and(|token_budget| token_budget != &TokenBudgetConfig::default())
 }
 
 /// Resolves user-configured token-budget preferences against the current model's defaults.
@@ -94,8 +89,6 @@ pub(super) fn resolve_token_budget(
     };
 
     let token_budget = TokenBudgetConfig {
-        use_history_notes_extension: configured_token_budget
-            .is_some_and(|token_budget| token_budget.use_history_notes_extension),
         reminder_threshold_tokens: Some(model_defaults.reminder_threshold_tokens),
         reminder_message_template: model_defaults.reminder_message_template.clone(),
         guidance_message: Some(model_defaults.guidance_message.clone()),
@@ -150,10 +143,7 @@ pub(super) fn apply_model_defaults(config: &mut Config, model_info: &ModelInfo) 
     }
 
     // Keep prompts unresolved so later turns and model switches use their own defaults.
-    config.token_budget = Some(TokenBudgetConfig {
-        use_history_notes_extension: model_defaults.use_history_notes_extension,
-        ..TokenBudgetConfig::default()
-    });
+    config.token_budget = Some(TokenBudgetConfig::default());
 }
 
 pub(super) async fn maybe_record(

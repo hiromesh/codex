@@ -7,8 +7,6 @@ use crate::history_cell::HistoryCell;
 use crate::test_support::PathBufExt;
 use crate::test_support::test_path_buf;
 use codex_app_server_protocol::FileUpdateChange;
-use codex_app_server_protocol::GeneratedImageRef;
-use codex_app_server_protocol::ImageGenerationItem;
 use codex_app_server_protocol::PatchApplyStatus;
 use codex_app_server_protocol::PatchChangeKind;
 use codex_app_server_protocol::SubAgentActivityKind;
@@ -121,20 +119,6 @@ fn unfinished_and_rejected_patches_keep_their_outcome() {
 #[test]
 fn tool_and_notice_projection_uses_normal_transcript_presentation() {
     let cwd = test_path_buf("/workspace").abs();
-    let image = ImageGenerationItem {
-        id: "image-1".to_string(),
-        status: "completed".to_string(),
-        revised_prompt: Some("A diagram of the history pages".to_string()),
-        image: GeneratedImageRef::Inline {
-            result: String::new(),
-        },
-        transparent_background: None,
-        failure: None,
-        saved_path: None,
-        input_images: Vec::new(),
-        imagegen_request_id: None,
-        generation_id: None,
-    };
     let items = vec![
         ThreadItemPayload::EnteredReviewMode {
             id: "review-start".to_string(),
@@ -153,11 +137,6 @@ fn tool_and_notice_projection_uses_normal_transcript_presentation() {
             id: "view-1".to_string(),
             path: LegacyAppPathString::from_string("diagram.png".to_string()),
         },
-        ThreadItemPayload::ImageGeneration(image.clone()),
-        ThreadItemPayload::ImageGeneration(ImageGenerationItem {
-            status: "in_progress".into(),
-            ..image
-        }),
         ThreadItemPayload::SubAgentActivity {
             model: None,
             reasoning_effort: None,
@@ -186,9 +165,6 @@ fn tool_and_notice_projection_uses_normal_transcript_presentation() {
     >> Code review started: current changes <<
     • Searched for 'pagination' in https://example.com
     • Viewed image diagram.png
-    • Generated Image:
-      └ A diagram of the history pages
-    • Image generation · in_progress
     • Completed `/root/reviewer`
     << Code review finished: No findings >>
     • Context compacted

@@ -531,9 +531,6 @@ impl ChatWidget {
             ThreadItemPayload::WebSearch(item) => {
                 self.on_web_search_begin(item.id);
             }
-            ThreadItemPayload::ImageGeneration(_) => {
-                self.on_image_generation_begin();
-            }
             ThreadItemPayload::CollabAgentToolCall {
                 id,
                 tool,

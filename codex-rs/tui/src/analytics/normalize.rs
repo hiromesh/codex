@@ -315,7 +315,6 @@ pub(super) fn label(key: &str) -> &str {
     match key {
         "user" => "Tasks",
         "subagent" => "Subagents",
-        "image_generation" => "Image generation",
         "automation" => "Automations",
         "guardian_review" => "Auto review",
         "guardian_classifier" => "Auto review classifier",

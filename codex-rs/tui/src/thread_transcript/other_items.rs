@@ -60,27 +60,6 @@ pub(super) fn cells(item: ThreadItemPayload, cwd: &AbsolutePathBuf) -> Transcrip
         ThreadItemPayload::ImageView { id, path } => {
             cells.push(Arc::new(history_cell::new_view_image_tool_call(id, path)))
         }
-        ThreadItemPayload::ImageGeneration(item)
-            if !matches!(item.status.as_str(), "completed" | "failed") =>
-        {
-            let status = if item.status.is_empty() {
-                "status unavailable"
-            } else {
-                &item.status
-            };
-            cells.push(Arc::new(history_cell::new_info_event(
-                format!("Image generation · {status}"),
-                /*hint*/ None,
-            )));
-        }
-        ThreadItemPayload::ImageGeneration(item) => {
-            cells.push(Arc::new(history_cell::new_image_generation_call(
-                item.id,
-                &item.status,
-                item.revised_prompt,
-                item.saved_path,
-            )));
-        }
         item @ ThreadItemPayload::CollabAgentToolCall { .. } => {
             if let Some(cell) = multi_agents::tool_call_history_cell(
                 &item,

@@ -324,15 +324,13 @@ impl AnalyticsEventsClient {
     }
 
     pub fn new(
-        auth_manager: Arc<AuthManager>,
-        base_url: impl Into<ChatgptBaseUrl>,
-        analytics_enabled: Option<bool>,
+        _auth_manager: Arc<AuthManager>,
+        _base_url: impl Into<ChatgptBaseUrl>,
+        _analytics_enabled: Option<bool>,
     ) -> Self {
-        let destination = AnalyticsEventsDestination::from_base_url(base_url.into());
-        Self {
-            queue: (analytics_enabled != Some(false))
-                .then(|| AnalyticsEventsQueue::new(Arc::clone(&auth_manager), destination)),
-        }
+        // Analytics is disabled in this build. Keep the constructor signature so callers
+        // do not need to change while the event pipeline is removed.
+        Self::disabled()
     }
 
     pub fn disabled() -> Self {

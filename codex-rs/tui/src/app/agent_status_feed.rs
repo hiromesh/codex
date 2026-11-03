@@ -193,7 +193,6 @@ fn activity_summary(item: &ThreadItemPayload) -> Option<String> {
             let path = path.render_for_ui();
             return bounded_summary(&format!("Viewed {path}"));
         }
-        ThreadItemPayload::ImageGeneration(_) => return Some("Generated an image".to_string()),
         ThreadItemPayload::EnteredReviewMode { .. } => {
             return Some("Entered review mode".to_string());
         }

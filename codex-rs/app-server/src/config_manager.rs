@@ -1,6 +1,5 @@
 use codex_app_server_protocol::ModelProviderError;
 use codex_arg0::Arg0DispatchPaths;
-use codex_cloud_config::managed_config_bundle_loader;
 use codex_config::CloudConfigBundleLoader;
 use codex_config::ConfigLayerStack;
 use codex_config::LoaderOverrides;
@@ -206,15 +205,7 @@ impl ConfigManager {
             self.revoke_mcp_ema();
             return;
         }
-        let loader = managed_config_bundle_loader(
-            auth_manager,
-            config.chatgpt_base_url.clone(),
-            self.codex_home.clone(),
-            config
-                .http_client_factory()
-                .with_network_policy(self.local_network_policy.policy()),
-            config.config_layer_stack.requirements_toml(),
-        );
+        let loader = CloudConfigBundleLoader::default();
         if let Ok(mut guard) = self.cloud_config_bundle.write() {
             guard.retire_ema_policy();
             *guard = loader;

@@ -384,14 +384,6 @@ impl ChatWidget {
             ThreadItemPayload::ImageView { id, path } => {
                 self.on_view_image_tool_call(id, path);
             }
-            ThreadItemPayload::ImageGeneration(item) => {
-                self.on_image_generation_end(
-                    item.id,
-                    item.status,
-                    item.revised_prompt,
-                    item.saved_path,
-                );
-            }
             ThreadItemPayload::EnteredReviewMode { review, .. } => {
                 if from_replay {
                     self.enter_review_mode_with_hint(review, /*from_replay*/ true);

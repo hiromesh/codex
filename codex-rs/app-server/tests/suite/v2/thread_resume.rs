@@ -28,7 +28,6 @@ use codex_app_server_protocol::CommandExecutionRequestApprovalResponse;
 use codex_app_server_protocol::DeprecationNoticeNotification;
 use codex_app_server_protocol::FileChangeApprovalDecision;
 use codex_app_server_protocol::FileChangeRequestApprovalResponse;
-use codex_app_server_protocol::GeneratedImageRef;
 use codex_app_server_protocol::ItemCompletedNotification;
 use codex_app_server_protocol::ItemStartedNotification;
 use codex_app_server_protocol::JSONRPCError;
@@ -100,7 +99,6 @@ use codex_protocol::models::ResponseItem;
 use codex_protocol::openai_models::ReasoningEffort;
 use codex_protocol::protocol::AgentMessageEvent;
 use codex_protocol::protocol::EventMsg;
-use codex_protocol::protocol::ImageGenerationEndEvent;
 use codex_protocol::protocol::McpInvocation;
 use codex_protocol::protocol::McpToolCallEndEvent;
 use codex_protocol::protocol::MultiAgentVersion;
@@ -2908,13 +2906,6 @@ async fn thread_resume_redacts_payloads_for_chatgpt_remote_clients() -> Result<(
             assert_eq!(result.structured_content, None);
             assert_eq!(result.meta, None);
             assert_eq!(error, &None);
-            assert!(
-                !remote_turn
-                    .items
-                    .iter()
-                    .any(|item| matches!(&item.payload, ThreadItemPayload::ImageGeneration(_))),
-                "remote resume should drop image generation items for {client_name}"
-            );
         }
     }
 
@@ -2964,19 +2955,6 @@ async fn thread_resume_redacts_payloads_for_chatgpt_remote_clients() -> Result<(
         Some(json!({"secret":"structured"}))
     );
     assert_eq!(result.meta, Some(json!({"secret":"meta"})));
-    assert!(
-        normal_turn.items.iter().any(|item| matches!(
-            &item.payload,
-            ThreadItemPayload::ImageGeneration(item)
-                if matches!(
-                    &item.image,
-                    GeneratedImageRef::Inline { result }
-                        if result == "base64-image-result"
-                )
-                    && item.revised_prompt.as_deref() == Some("secret revised prompt")
-        )),
-        "normal resume should keep image generation items"
-    );
 
     Ok(())
 }
@@ -3075,19 +3053,6 @@ fn append_resume_redaction_history(
                 is_error: Some(false),
                 meta: Some(json!({"secret":"meta"})),
             }),
-        }),
-        EventMsg::ImageGenerationEnd(ImageGenerationEndEvent {
-            call_id: "ig-1".to_string(),
-            status: "completed".to_string(),
-            revised_prompt: Some("secret revised prompt".to_string()),
-            image: GeneratedImageRef::Inline {
-                result: "base64-image-result".to_string(),
-            },
-            transparent_background: None,
-            failure: None,
-            saved_path: Some(test_absolute_path("/tmp/ig-1.png")),
-            input_images: Vec::new(),
-            generation_id: None,
         }),
     ]
     .into_iter()

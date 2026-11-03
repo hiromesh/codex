@@ -70,7 +70,6 @@ const AUTO_COMPACT_FALLBACK_PROMPT: &str = "Save the important state before roll
 fn model_token_budget_config() -> ModelTokenBudgetConfig {
     ModelTokenBudgetConfig {
         enabled: false,
-        use_history_notes_extension: false,
         reminder_threshold_tokens: 6_144,
         reminder_message_template: "Model reminder: {n_remaining} tokens remain.".to_string(),
         guidance_message: "Use the model-owned context-window guidance.".to_string(),
@@ -372,100 +371,6 @@ async fn experimental_context_requires_capable_model_and_codex_backend(
     Ok(())
 }
 
-#[test_case(false, true, false; "explicit_history_notes_without_experimental_capability")]
-#[test_case(false, true, true; "explicit_history_notes_with_experimental_capability")]
-#[test_case(false, false, false; "explicit_standalone_token_budget")]
-#[test_case(true, true, false; "model_default_history_notes_without_experimental_capability")]
-#[test_case(true, true, true; "model_default_history_notes_with_experimental_capability")]
-#[test_case(true, false, false; "model_default_standalone_token_budget")]
-#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn token_budget_history_notes_can_be_enabled_without_experimental_context(
-    use_model_defaults: bool,
-    use_history_notes: bool,
-    supports_context: bool,
-) -> Result<()> {
-    skip_if_no_network!(Ok(()));
-
-    let server = start_mock_server().await;
-    let backend_url = format!("{}/backend-api/codex", server.uri());
-    let mut builder = test_codex()
-        .with_auth(CodexAuth::from_external_chatgpt_tokens(
-            "header.e30.signature",
-            "account-123",
-            Some("plus"),
-        )?)
-        .with_pre_build_hook(move |home| {
-            let config = if use_model_defaults {
-                "[features.context_management]\nexperimental_mode = false\n".to_string()
-            } else {
-                format!(
-                    "[features.context_management]\nexperimental_mode = false\n[features.token_budget]\nenabled = true\nuse_history_notes_extension = {use_history_notes}\n"
-                )
-            };
-            std::fs::write(home.join("config.toml"), config)
-                .expect("write token-budget configuration");
-        })
-        .with_model_info_override("gpt-5.2", move |model_info| {
-            model_info.supports_experimental_context = supports_context;
-            let mut defaults = model_token_budget_config();
-            defaults.enabled = use_model_defaults;
-            defaults.use_history_notes_extension = use_history_notes;
-            model_info
-                .model_messages
-                .as_mut()
-                .expect("bundled model should have model messages")
-                .token_budget = Some(defaults);
-        })
-        .with_config(move |config| {
-            config.model_provider.base_url = Some(backend_url);
-            config.model_context_window = Some(CONFIGURED_CONTEXT_WINDOW);
-        });
-    let test = builder.build_with_auto_env(&server).await?;
-
-    let response = mount_sse_sequence(
-        &server,
-        vec![sse_completed("resp-1"), sse_completed("resp-2")],
-    )
-    .await;
-    test.submit_turn("inspect token-budget activation").await?;
-    // Builder overrides are consumed by the initial build. Reapply the model and
-    // provider settings so the cold resume exercises the same activation defaults.
-    let initial_config = test.config.clone();
-    let resumed = builder
-        .with_config(move |config| {
-            config.model = initial_config.model;
-            config.model_catalog = initial_config.model_catalog;
-            config.model_provider = initial_config.model_provider;
-            config.model_context_window = initial_config.model_context_window;
-        })
-        .restart(&server, &test)
-        .await?;
-    resumed
-        .submit_turn("inspect token-budget activation after restart")
-        .await?;
-
-    let requests = response.requests();
-    assert_eq!(requests.len(), 2);
-    for request in requests {
-        assert!(
-            tool_names(&request)
-                .iter()
-                .any(|name| name == "new_context")
-        );
-        assert_eq!(token_budget_contexts(&request).len(), 1);
-        let turn_metadata: Value = serde_json::from_str(
-            &request
-                .header("x-codex-turn-metadata")
-                .expect("request should include turn metadata"),
-        )?;
-        assert_eq!(
-            turn_metadata["history_ingest_requested"].as_bool(),
-            use_history_notes.then_some(true)
-        );
-    }
-    Ok(())
-}
-
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn token_budget_uses_model_message_defaults() -> Result<()> {
     skip_if_no_network!(Ok(()));
@@ -474,7 +379,6 @@ async fn token_budget_uses_model_message_defaults() -> Result<()> {
     let response = mount_sse_once(&server, sse_completed("resp-1")).await;
     let mut model_defaults = model_token_budget_config();
     model_defaults.enabled = true;
-    model_defaults.use_history_notes_extension = true;
     let expected_guidance = model_defaults.guidance_message.clone();
     let test = test_codex()
         .with_model_info_override("gpt-5.2", move |model_info| {
