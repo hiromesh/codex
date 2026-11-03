@@ -5881,7 +5881,6 @@ async fn active_profile_update_rebuilds_network_proxy_config(
     Ok(())
 }
 
-#[cfg_attr(windows, ignore)]
 #[tokio::test]
 async fn new_default_turn_uses_config_aware_skills_for_role_overrides() {
     let (session, _turn_context) = make_session_and_context().await;

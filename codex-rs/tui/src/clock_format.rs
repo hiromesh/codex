@@ -153,8 +153,7 @@ fn parse_native_pattern(pattern: &str, hour_symbols: &str) -> Option<ClockFormat
 #[cfg(not(any(
     target_os = "linux",
     target_os = "android",
-    target_os = "macos",
-    windows
+    target_os = "macos"
 )))]
 fn detect() -> Option<ClockFormat> {
     None

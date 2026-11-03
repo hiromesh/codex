@@ -1028,8 +1028,7 @@ fn file_link_preserves_path_labels_and_formats_destinations() {
 
 [other/src/lib.rs](/repo/src/lib.rs)";
     let text = render_markdown_text_for_cwd(markdown, Path::new("/repo"));
-    // UNC file-URL display currently preserves escapes on Unix but decodes them on Windows.
-    // Keep that platform-dependent destination display out of this shared snapshot.
+    // Keep the decoded UNC file-URL destination out of this shared snapshot.
     let rendered = plain_lines(&text)
         .join("\n")
         .replace("My%20File.rs", "My File.rs");

@@ -1449,7 +1449,7 @@ async fn local_daemon_registers_approval_gated_mcp_tools_for_both_start_paths_sc
         codex_home.path().join("config.toml"),
         "web_search = \"disabled\"\n[desktop]\ngit-worktree-root = 'relative'\n",
     )?;
-    // Keep the large lifecycle futures off the Windows test thread's stack.
+    // Keep the large lifecycle futures off the test thread's stack.
     let (mut app_server, mut requests, mut proxy) = Box::pin(start_recording_app_server(
         &app.config,
         /*blocked_thread_list*/ None,
@@ -2746,7 +2746,7 @@ async fn transcript_alt_beginning_loads_every_older_history_page() -> Result<()>
     app.chat_widget
         .handle_key_event(KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE));
     let mut tui = crate::tui::test_support::make_test_tui()?;
-    // Keep the large dispatcher future off the Windows test thread's stack.
+    // Keep the large dispatcher future off the test thread's stack.
     Box::pin(app.handle_event(
         &mut tui,
         &mut app_server,
@@ -3226,7 +3226,7 @@ async fn underfilled_scrollback_fetches_older_pages_without_opening_the_transcri
             None => panic!("scrollback refill request channel closed"),
         }
     };
-    // Keep the large dispatcher future off the Windows test thread's stack.
+    // Keep the large dispatcher future off the test thread's stack.
     Box::pin(app.handle_event(&mut tui, &mut app_server, request)).await?;
     let loaded = loop {
         match app_event_rx.recv().await {

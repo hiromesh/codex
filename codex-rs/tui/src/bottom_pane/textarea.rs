@@ -680,7 +680,7 @@ impl TextArea {
             return;
         }
 
-        // Windows AltGr generates ALT|CONTROL. Preserve typed characters for AltGr users
+        // AltGr generates ALT|CONTROL. Preserve typed characters for AltGr users
         // unless a specific shortcut already matched above.
         if let KeyEvent {
             code: KeyCode::Char(c),

@@ -1097,7 +1097,7 @@ full_cdp_access = "deny"
     );
     assert_eq!(
         origins
-            .get("computer_use.macos.bundle_ids.\"com.apple.TextEdit\"")
+            .get("computer_use.macos.bundle_ids.com.apple.TextEdit")
             .expect("project computer use origin")
             .name,
         ConfigLayerSource::Project {

@@ -5795,8 +5795,6 @@ fn hook_status_frame(chat: &ChatWidget, width: u16) -> String {
     terminal
         .draw(|frame| chat.render(frame.area(), frame.buffer_mut()))
         .expect("render hook activity frame");
-    // Windows path normalization drops Display's final newline; make composed
-    // frames independent of that platform difference.
     normalized_backend_snapshot(terminal.backend())
         .trim_end()
         .to_string()

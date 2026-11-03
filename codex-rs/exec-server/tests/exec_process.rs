@@ -1982,42 +1982,6 @@ async fn assert_exec_process_signal_interrupts_process(use_remote: bool) -> Resu
     Ok(())
 }
 
-async fn assert_exec_process_signal_terminates_on_windows(use_remote: bool) -> Result<()> {
-    let context = create_process_context(use_remote).await?;
-    let session = context
-        .backend
-        .start(ExecParams {
-            metadata: Default::default(),
-            process_id: ProcessId::from("proc-windows-signal"),
-            argv: vec![
-                "cmd".to_string(),
-                "/C".to_string(),
-                "echo ready && ping -n 30 127.0.0.1 >NUL".to_string(),
-            ],
-            cwd: PathUri::from_host_native_path(std::env::current_dir()?)?,
-            shell_snapshot: None,
-            env_policy: /*env_policy*/ None,
-            env: Default::default(),
-            tty: false,
-            pipe_stdin: false,
-            arg0: None,
-            sandbox: None,
-            enforce_managed_network: false,
-            managed_network: None,
-            network_proxy: None,
-        })
-        .await?;
-
-    let StartedExecProcess { process, .. } = session;
-    let wake_rx = process.subscribe_wake();
-    process.signal(ProcessSignal::Interrupt).await?;
-    let (_output, exit_code, closed) = collect_process_output_from_reads(process, wake_rx).await?;
-
-    assert_eq!(exit_code, Some(1));
-    assert!(closed);
-    Ok(())
-}
-
 async fn assert_exec_process_preserves_queued_events_before_subscribe(
     use_remote: bool,
 ) -> Result<()> {
@@ -2300,16 +2264,6 @@ async fn exec_process_rejects_write_without_pipe_stdin(use_remote: bool) -> Resu
 #[serial_test::serial(remote_exec_server)]
 async fn exec_process_signal_interrupts_process(use_remote: bool) -> Result<()> {
     assert_exec_process_signal_interrupts_process(use_remote).await
-}
-
-#[test_case(false ; "local")]
-#[test_case(true ; "remote")]
-#[cfg_attr(not(windows), ignore = "Windows-only exec-server process test")]
-#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-// Serialize tests that launch a real exec-server process through the full CLI.
-#[serial_test::serial(remote_exec_server)]
-async fn exec_process_signal_terminates_on_windows(use_remote: bool) -> Result<()> {
-    assert_exec_process_signal_terminates_on_windows(use_remote).await
 }
 
 #[test_case(false ; "local")]

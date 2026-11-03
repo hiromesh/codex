@@ -139,10 +139,6 @@ async fn interactive_worktree_start_and_fork_bind_owner_before_turn() -> anyhow:
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-#[cfg_attr(
-    windows,
-    ignore = "requires a non-elevated terminal with daemon breakaway support"
-)]
 async fn daemon_worktree_start_and_fork_bind_owner_before_turn() -> anyhow::Result<()> {
     worktree_start_and_fork("daemon").await
 }

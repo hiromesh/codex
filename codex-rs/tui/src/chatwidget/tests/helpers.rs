@@ -82,20 +82,7 @@ pub(crate) fn normalize_agent_center_snapshot(text: impl AsRef<str>) -> String {
             let content = quoted.unwrap_or(line);
             let normalized = content
                 .split('│')
-                .map(|pane| {
-                    let mut normalized = pane.to_owned();
-                    for unix_path in ["/tmp/second-project", "/tmp/project", "/project"] {
-                        // test_path_buf uses this drive for all absolute Windows fixtures.
-                        let windows_path = format!("C:{}", unix_path.replace('/', "\\"));
-                        normalized = normalized
-                            .replace(&windows_path, unix_path)
-                            .replace(&windows_path.replace('\\', "/"), unix_path);
-                    }
-                    // Only ASCII path bytes change, so this is also the removed cell width.
-                    let padding = pane.len().saturating_sub(normalized.len());
-                    normalized.push_str(&" ".repeat(padding));
-                    normalized
-                })
+                .map(|pane| pane.to_owned())
                 .collect::<Vec<_>>()
                 .join("│");
             if quoted.is_some() {

@@ -163,7 +163,7 @@ const PASTE_ENTER_SUPPRESS_WINDOW: Duration = Duration::from_millis(120);
 const PASTE_BURST_CHAR_INTERVAL: Duration = Duration::from_millis(8);
 
 // Idle timeout before flushing buffered paste content.
-// Slower paste bursts have been observed in Windows environments.
+// Slower paste bursts have been observed in some terminals.
 const PASTE_BURST_ACTIVE_IDLE_TIMEOUT: Duration = Duration::from_millis(8);
 #[derive(Clone, Default)]
 pub(crate) struct PasteBurst {
