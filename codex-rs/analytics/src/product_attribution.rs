@@ -94,7 +94,6 @@ fn event_thread_id(event: &TrackEventRequest) -> Option<&str> {
         TrackEventRequest::ControlToolCall(event) => Some(&event.event_params.base.thread_id),
         TrackEventRequest::CollabAgentToolCall(event) => Some(&event.event_params.base.thread_id),
         TrackEventRequest::WebSearch(event) => Some(&event.event_params.base.thread_id),
-        TrackEventRequest::ImageGeneration(event) => Some(&event.event_params.base.thread_id),
         TrackEventRequest::AcceptedLineFingerprints(event) => Some(&event.event_params.thread_id),
         TrackEventRequest::ReviewEvent(event) => Some(&event.event_params.thread_id),
         TrackEventRequest::PluginUsed(event) => event.event_params.thread_id.as_deref(),

@@ -2,7 +2,6 @@
 
 use codex_exec_server::ExecutorCapabilityDiscoveryV2Snapshot;
 use codex_exec_server::ExecutorSkill;
-use codex_protocol::protocol::SkillScope;
 use codex_skills::EnvironmentSkillMetadata;
 use codex_utils_path_uri::PathUri;
 
@@ -33,22 +32,6 @@ impl ExecutorSkillProvider {
                 }
             };
             catalog.warnings.extend(discovered.warnings.clone());
-            for plugin in &discovered.plugins {
-                for skill in &plugin.skills {
-                    let Some(mut entry) = self.catalog_entry_from_discovered_skill(
-                        skill,
-                        &plugin.id,
-                        &plugin.root,
-                        &snapshot.environment_id,
-                    ) else {
-                        continue;
-                    };
-                    entry.remote_plugin_id = plugin.remote_plugin_id.clone();
-                    entry.plugin_id = Some(plugin.id.clone());
-                    entry.analytics_scope = Some(SkillScope::User);
-                    catalog.push_entry(entry);
-                }
-            }
             for skill in &discovered.skills {
                 // Use the skills namespace when discovery-root metadata is absent.
                 let fallback_root;

@@ -149,7 +149,7 @@ impl SkillAnalytics {
                     turn_id: &turn_id,
                     skill_name: &skill.name,
                     scope: skill.analytics_scope,
-                    plugin_id: invocation.plugin_id.as_deref(),
+                    plugin_id: None,
                     invocation_type: match invocation_type {
                         InvocationType::Explicit => SkillInvocationType::Explicit,
                         InvocationType::Implicit => SkillInvocationType::Implicit,
@@ -160,14 +160,8 @@ impl SkillAnalytics {
             .turn_metrics
             .as_ref()
             .filter(|turn| turn.turn_id == turn_id);
-        if let Some(turn_metrics) = &turn_metrics {
-            turn_metrics.record_plugin(invocation.plugin_id.as_deref());
-        }
         if let Some(metrics) = &self.metrics {
             let skill_name_tag = sanitize_metric_tag_value(skill.name.as_str());
-            let plugin_id_tag = sanitize_metric_tag_value(
-                invocation.plugin_id.as_deref().unwrap_or("unattributed"),
-            );
             let model_slug_tag = sanitize_metric_tag_value(model.as_str());
             let reasoning_effort = turn_metrics
                 .as_ref()
@@ -184,7 +178,6 @@ impl SkillAnalytics {
                     ("status", "ok"),
                     ("skill", skill_name_tag.as_str()),
                     ("invoke_type", invoke_type),
-                    ("plugin_id", plugin_id_tag.as_str()),
                     ("model_slug", model_slug_tag.as_str()),
                     ("reasoning_effort", reasoning_effort),
                 ],

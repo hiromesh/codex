@@ -17,7 +17,6 @@ use codex_protocol::protocol::SkillScope;
 use codex_skills::system_cache_root_dir;
 use codex_utils_absolute_path::AbsolutePathBuf;
 use codex_utils_path_uri::PathUri;
-use codex_utils_plugins::PluginSkillRoot;
 use dirs::home_dir;
 use futures::StreamExt;
 use toml::Value as TomlValue;
@@ -57,7 +56,6 @@ pub(crate) async fn resolve_skill_roots(
     repository_file_system: Option<Arc<dyn ExecutorFileSystem>>,
     config_layer_stack: &ConfigLayerStack,
     cwd: &AbsolutePathBuf,
-    plugin_skill_roots: Vec<PluginSkillRoot>,
     extra_skill_roots: Vec<AbsolutePathBuf>,
     empty_remote_roots: Option<&Mutex<EmptyRemoteRootsCache>>,
 ) -> Vec<HostSkillRoot> {
@@ -68,7 +66,6 @@ pub(crate) async fn resolve_skill_roots(
         config_layer_stack,
         cwd,
         home_dir.as_ref(),
-        plugin_skill_roots,
         extra_skill_roots,
         empty_remote_roots,
     )
@@ -80,17 +77,11 @@ async fn resolve_skill_roots_with_home_dir(
     config_layer_stack: &ConfigLayerStack,
     cwd: &AbsolutePathBuf,
     home_dir: Option<&AbsolutePathBuf>,
-    plugin_skill_roots: Vec<PluginSkillRoot>,
     extra_skill_roots: Vec<AbsolutePathBuf>,
     empty_remote_roots: Option<&Mutex<EmptyRemoteRootsCache>>,
 ) -> Vec<HostSkillRoot> {
     let mut roots =
         roots_from_layer_stack(config_layer_stack, home_dir, repository_file_system.clone());
-    roots.extend(
-        plugin_skill_roots
-            .into_iter()
-            .map(|root| HostSkillRoot::plugin(root, Arc::clone(&LOCAL_FS))),
-    );
     roots.extend(
         extra_skill_roots
             .into_iter()

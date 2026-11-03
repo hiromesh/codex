@@ -40,8 +40,6 @@ use codex_app_server_protocol::CollabAgentToolCallStatus;
 use codex_app_server_protocol::CommandAction;
 use codex_app_server_protocol::CommandExecutionSource;
 use codex_app_server_protocol::CommandExecutionStatus;
-use codex_app_server_protocol::GeneratedImageRef;
-use codex_app_server_protocol::ImageGenerationItem;
 use codex_app_server_protocol::ItemCompletedNotification;
 use codex_app_server_protocol::ItemStartedNotification;
 use codex_app_server_protocol::McpToolCallAppContext;
@@ -949,82 +947,4 @@ async fn reducer_ingests_artifact_operation_fact() {
             }
         }])
     );
-}
-
-#[tokio::test]
-async fn image_generation_events_preserve_transparent_background_metadata() {
-    for (status, transparent_background) in [
-        ("completed", Some(true)),
-        ("completed", Some(false)),
-        ("completed", None),
-        ("failed", None),
-    ] {
-        let mut reducer = AnalyticsReducer::default();
-        let mut out = Vec::new();
-
-        ingest_turn_prerequisites(
-            &mut reducer,
-            &mut out,
-            /*include_initialize*/ true,
-            /*include_resolved_config*/ true,
-            /*include_started*/ true,
-            /*include_token_usage*/ false,
-        )
-        .await;
-
-        let item = ThreadItemPayload::ImageGeneration(ImageGenerationItem {
-            id: "image-1".to_string(),
-            status: status.to_string(),
-            revised_prompt: None,
-            image: GeneratedImageRef::Inline {
-                result: "ok".to_string(),
-            },
-            transparent_background,
-            failure: None,
-            saved_path: None,
-            input_images: Vec::new(),
-            imagegen_request_id: None,
-            generation_id: None,
-        });
-
-        reducer
-            .ingest(
-                AnalyticsFact::Notification(Box::new(ServerNotification::ItemStarted(
-                    ItemStartedNotification::new(
-                        "thread-2".to_string(),
-                        "turn-2".to_string(),
-                        item.clone(),
-                        /*started_at_ms*/ 998,
-                    ),
-                ))),
-                &mut out,
-            )
-            .await;
-        reducer
-            .ingest(
-                AnalyticsFact::Notification(Box::new(ServerNotification::ItemCompleted(
-                    ItemCompletedNotification::new(
-                        "thread-2".to_string(),
-                        "turn-2".to_string(),
-                        item,
-                        /*started_at_ms*/ None,
-                        /*completed_at_ms*/ 1_000,
-                    ),
-                ))),
-                &mut out,
-            )
-            .await;
-
-        let event = out
-            .iter()
-            .find(|event| matches!(event, TrackEventRequest::ImageGeneration(_)))
-            .expect("image generation event should be emitted");
-        let payload = serde_json::to_value(event).expect("serialize image generation event");
-
-        assert_eq!(
-            payload["event_params"].get("transparent_background"),
-            Some(&json!(transparent_background))
-        );
-        assert_eq!(payload["event_params"]["terminal_status"], json!(status));
-    }
 }

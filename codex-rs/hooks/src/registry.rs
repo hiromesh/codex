@@ -30,8 +30,6 @@ use crate::types::HookPayload;
 use crate::types::HookResponse;
 use async_channel::Receiver;
 use codex_config::ConfigLayerStack;
-use codex_plugin::ExecutorPluginHookSource;
-use codex_plugin::PluginHookSource;
 use codex_protocol::ThreadId;
 use codex_protocol::protocol::HookEventName;
 use codex_protocol::protocol::HookExecutionMode;
@@ -48,8 +46,6 @@ pub struct HooksConfig {
     pub feature_enabled: bool,
     pub bypass_hook_trust: bool,
     pub config_layer_stack: Option<ConfigLayerStack>,
-    pub plugin_hook_sources: Vec<PluginHookSource>,
-    pub plugin_hook_load_warnings: Vec<String>,
     pub shell_program: Option<String>,
     pub shell_args: Vec<String>,
 }
@@ -67,8 +63,6 @@ pub struct Hooks {
     environment: Arc<Vec<(OsString, OsString)>>,
     after_agent: Arc<[Hook]>,
     engine: ClaudeHooksEngine,
-    plugin_hook_sources: Arc<[PluginHookSource]>,
-    plugin_hook_load_warnings: Arc<[String]>,
 }
 
 impl Hooks {
@@ -98,15 +92,6 @@ impl Hooks {
             Arc::clone(&self.environment),
             |shell| self.engine.command_runtime.reconfigured(shell),
         )
-    }
-
-    pub fn matches_plugin_hooks<'a>(
-        &self,
-        sources: impl IntoIterator<Item = &'a PluginHookSource>,
-        warnings: impl IntoIterator<Item = &'a String>,
-    ) -> bool {
-        self.plugin_hook_sources.iter().eq(sources)
-            && self.plugin_hook_load_warnings.iter().eq(warnings)
     }
 
     /// Adds only owner-admitted requirements hooks; execution remains scoped to their environment.
@@ -157,19 +142,6 @@ impl Hooks {
         crate::engine::discovery::discover_environment_hooks(sources, display_order)
     }
 
-    pub fn with_executor_hooks(&self, executor_hooks: Vec<ExecutorPluginHookSource>) -> Self {
-        let mut hooks = self.clone();
-        hooks.engine.set_executor_hooks(executor_hooks);
-        hooks
-    }
-
-    pub fn for_memory_consolidation(&self, executor_hooks: Vec<ExecutorPluginHookSource>) -> Self {
-        let mut hooks = self.with_executor_hooks(executor_hooks);
-        Arc::make_mut(&mut hooks.engine.handlers)
-            .retain(ConfiguredHandler::runs_for_memory_consolidation);
-        hooks
-    }
-
     fn from_config(
         config: HooksConfig,
         mcp_executor: Arc<dyn HookMcpExecutor>,
@@ -190,8 +162,6 @@ impl Hooks {
             config.feature_enabled,
             config.bypass_hook_trust,
             config.config_layer_stack.as_ref(),
-            config.plugin_hook_sources.clone(),
-            config.plugin_hook_load_warnings.clone(),
             command_runtime,
             mcp_executor,
         );
@@ -199,8 +169,6 @@ impl Hooks {
             environment,
             after_agent,
             engine,
-            plugin_hook_sources: config.plugin_hook_sources.into(),
-            plugin_hook_load_warnings: config.plugin_hook_load_warnings.into(),
         }
     }
 
@@ -392,8 +360,6 @@ pub fn list_hooks(config: HooksConfig) -> HookListOutcome {
 
     let discovered = crate::engine::discovery::discover_handlers(
         config.config_layer_stack.as_ref(),
-        config.plugin_hook_sources,
-        config.plugin_hook_load_warnings,
         config.bypass_hook_trust,
         crate::engine::discovery::DiscoveryMode::Listing,
     );

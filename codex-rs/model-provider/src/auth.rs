@@ -1,4 +1,3 @@
-use std::collections::HashMap;
 use std::sync::Arc;
 
 use codex_api::AuthError;
@@ -163,28 +162,14 @@ pub fn unauthenticated_auth_provider() -> SharedAuthProvider {
     Arc::new(UnauthenticatedAuthProvider)
 }
 
-/// Returns the provider-scoped auth manager when this provider uses command-backed auth.
+/// Returns the provider-scoped auth manager when one is supplied.
 ///
-/// Providers without custom auth continue using the caller-supplied base manager, when present.
+/// Command-backed external bearer auth is no longer supported.
 pub(crate) fn auth_manager_for_provider(
     auth_manager: Option<Arc<AuthManager>>,
-    provider: &ModelProviderInfo,
+    _provider: &ModelProviderInfo,
 ) -> Option<Arc<AuthManager>> {
-    match provider.auth.clone() {
-        Some(config) => {
-            let mut env = HashMap::new();
-            if provider.is_gcp()
-                && let Some(credential_file) = &provider.credential_file
-            {
-                env.insert(
-                    "GOOGLE_APPLICATION_CREDENTIALS".to_string(),
-                    credential_file.as_os_str().to_os_string(),
-                );
-            }
-            Some(AuthManager::external_bearer_only_with_env(config, env))
-        }
-        None => auth_manager,
-    }
+    auth_manager
 }
 
 pub(crate) fn resolve_provider_auth(

@@ -15,15 +15,11 @@ workspace = true
 [dependencies]
 anyhow = { workspace = true }
 codex-core = { workspace = true }
-codex-core-plugins = { workspace = true }
 codex-config = { workspace = true }
-codex-connectors = { workspace = true }
-codex-connectors-extension = { workspace = true }
 codex-exec-server = { workspace = true }
 codex-extension-api = { workspace = true }
 codex-features = { workspace = true }
 codex-mcp = { workspace = true }
-codex-plugin = { workspace = true }
 codex-protocol = { workspace = true }
 codex-utils-absolute-path = { workspace = true }
 codex-utils-path-uri = { workspace = true }

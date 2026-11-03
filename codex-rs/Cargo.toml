@@ -59,14 +59,12 @@ members = [
     "ext/git-attribution",
     "ext/guardian-reviewer",
     "ext/history-notes",
-    "ext/image-generation",
     "ext/items",
     "ext/memories",
     "ext/mcp",
     "ext/queue",
     "ext/skills",
     "ext/web-search",
-    "external-agent-migration",
     "keyring-store",
     "file-search",
     "file-watcher",
@@ -202,8 +200,6 @@ codex-goal-extension = { path = "ext/goal" }
 codex-git-attribution = { path = "ext/git-attribution" }
 codex-guardian-reviewer = { path = "ext/guardian-reviewer" }
 codex-history-notes-extension = { path = "ext/history-notes" }
-codex-image-generation-extension = { path = "ext/image-generation" }
-codex-external-agent-migration = { path = "external-agent-migration" }
 codex-experimental-api-macros = { path = "codex-experimental-api-macros" }
 codex-features = { path = "features" }
 codex-feedback = { path = "feedback" }

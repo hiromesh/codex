@@ -1,14 +1,12 @@
-//! Retains installed-cache and standalone-skill candidates and assembles their locations.
+//! Retains standalone skill candidates and assembles their locations.
 
 use super::CapabilityLocation;
 use super::CapabilityLocations;
 use super::MAX_LOCATIONS;
-use super::discover_cached_plugins;
 use crate::LocalFileSystem;
 use crate::SkillDiscoveryRoot;
 use codex_file_system::ExecutorFileSystem;
 use codex_file_watcher::WatchPath;
-use codex_utils_path_uri::PathUri;
 use std::io;
 
 const MAX_LOCATION_WARNINGS: usize = 64;
@@ -19,42 +17,32 @@ pub(super) struct CandidateCapabilityLocations {
     watches: Vec<WatchPath>,
 }
 
-/// An installed cache or standalone skill root whose locations can be resolved.
+/// A standalone skill root whose locations can be resolved.
 #[derive(Clone, Debug, PartialEq, Eq)]
 enum CandidateCapabilityLocation {
-    Cache(PathUri),
     Standalone(SkillDiscoveryRoot),
 }
 
 impl CandidateCapabilityLocations {
-    /// Resolves existing cache and skill roots into one bounded location inventory.
+    /// Resolves existing skill roots into one bounded location inventory.
     pub(super) async fn resolve(
         fs: &LocalFileSystem,
-        cache_root: Option<PathUri>,
         skill_roots: Vec<SkillDiscoveryRoot>,
     ) -> io::Result<CapabilityLocations> {
-        let mut candidates = cache_root
-            .into_iter()
-            .map(CandidateCapabilityLocation::Cache)
-            .collect::<Vec<_>>();
         let mut standalone = skill_roots;
         let mut seen = std::collections::HashSet::new();
         standalone.retain(|root| seen.insert(root.path.clone()));
-        candidates.extend(
-            standalone
-                .into_iter()
-                .map(CandidateCapabilityLocation::Standalone),
-        );
+        let candidates = standalone
+            .into_iter()
+            .map(CandidateCapabilityLocation::Standalone)
+            .collect::<Vec<_>>();
 
         let mut watches = Vec::new();
         let mut retained_candidates = Vec::new();
         for candidate in candidates {
-            let root = match &candidate {
-                CandidateCapabilityLocation::Cache(root) => root,
-                CandidateCapabilityLocation::Standalone(root) => &root.path,
-            };
+            let CandidateCapabilityLocation::Standalone(root) = &candidate;
             let exists = match fs
-                .get_metadata(root, Default::default(), /*sandbox*/ None)
+                .get_metadata(&root.path, Default::default(), /*sandbox*/ None)
                 .await
             {
                 Ok(metadata) => metadata.is_directory,
@@ -63,7 +51,7 @@ impl CandidateCapabilityLocations {
             };
             // Missing roots use the watcher's ancestor fallback until they are created.
             watches.push(WatchPath {
-                path: root.to_abs_path()?.into_path_buf(),
+                path: root.path.to_abs_path()?.into_path_buf(),
                 recursive: true,
             });
             if exists {
@@ -83,12 +71,10 @@ impl CandidateCapabilityLocations {
 
     async fn resolve_candidates(
         &self,
-        fs: &LocalFileSystem,
+        _fs: &LocalFileSystem,
         candidate: &CandidateCapabilityLocation,
     ) -> io::Result<CapabilityLocations> {
         match candidate {
-            CandidateCapabilityLocation::Cache(root) => discover_cached_plugins(fs, root).await,
-            // Standalone roots need no manifest or version selection.
             CandidateCapabilityLocation::Standalone(root) => Ok(CapabilityLocations {
                 locations: vec![CapabilityLocation {
                     root: root.path.clone(),
@@ -100,13 +86,13 @@ impl CandidateCapabilityLocations {
         }
     }
 
-    /// Combines and bounds inventory; Core applies plugin enablement.
+    /// Combines and bounds inventory; Core applies capability enablement.
     fn assemble(&self, resolved_candidates: Vec<CapabilityLocations>) -> CapabilityLocations {
         let mut result = CapabilityLocations {
             watches: self.watches.clone(),
             ..Default::default()
         };
-        // Combine installed plugin and standalone skill locations in discovery order.
+        // Combine standalone skill locations in discovery order.
         for candidate in resolved_candidates {
             result.locations.extend(candidate.locations);
             result.warnings.extend(candidate.warnings);

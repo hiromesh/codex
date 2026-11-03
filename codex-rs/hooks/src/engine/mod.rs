@@ -4,8 +4,6 @@ pub(crate) mod dispatcher;
 mod matcher;
 pub(crate) mod mcp_runner;
 pub(crate) mod output_parser;
-mod plugin_fingerprint;
-mod plugin_trust;
 pub(crate) mod schema_loader;
 
 pub(crate) use matcher::HookMatcher;
@@ -34,9 +32,6 @@ use crate::mcp::HookMcpExecutor;
 use crate::output_spill::AdditionalContextLimit;
 use codex_config::ConfigLayerStack;
 use codex_config::HookHandlerConfig;
-use codex_plugin::ExecutorPluginHookSource;
-use codex_plugin::PluginHookSource;
-use codex_plugin::PluginId;
 use codex_protocol::protocol::HookEventName;
 use codex_protocol::protocol::HookExecutionMode;
 use codex_protocol::protocol::HookHandlerType;
@@ -65,7 +60,6 @@ pub(crate) struct CommandShell {
 pub(crate) struct ConfiguredHandler {
     /// Internally admitted cleanup hook, enabled independently of per-hook state.
     pub builtin: bool,
-    pub plugin_trust: Option<plugin_trust::PluginHookTrust>,
     pub event_name: codex_protocol::protocol::HookEventName,
     pub matcher: Option<HookMatcher>,
     pub timeout_sec: u64,
@@ -85,20 +79,6 @@ pub(crate) enum HandlerSourcePath {
         cwd: PathUri,
         source_path: PathUri,
     },
-    /// Executor-scoped handlers are currently excluded from user-visible hook reporting
-    /// (events, summary, telemetry). Their handlers are always executed async.
-    ///
-    /// TODO: With CCA, all hooks will be executor-scoped, so user visibility
-    /// (participation in lifecycle events and summaries) and execution behavior
-    /// (non-blocking) will need to be determined independently.
-    ExecutorScoped {
-        plugin_id: PluginId,
-        environment_id: String,
-        mcp_environment_id: Option<String>,
-        mcp_metadata: Option<Box<Map<String, Value>>>,
-        manifest_path: PathUri,
-        source_relative_path: String,
-    },
 }
 
 impl HandlerSourcePath {
@@ -114,7 +94,7 @@ impl HandlerSourcePath {
                 }
                 Cow::Owned(input)
             }
-            Self::Local(_) | Self::ExecutorScoped { .. } => Cow::Borrowed(input),
+            Self::Local(_) => Cow::Borrowed(input),
         }
     }
 }
@@ -291,12 +271,10 @@ impl ClaudeHooksEngine {
         enabled: bool,
         bypass_hook_trust: bool,
         config_layer_stack: Option<&ConfigLayerStack>,
-        plugin_hook_sources: Vec<PluginHookSource>,
-        plugin_hook_load_warnings: Vec<String>,
         command_runtime: CommandHookRuntime,
         mcp_executor: Arc<dyn HookMcpExecutor>,
     ) -> Self {
-        if !enabled && plugin_hook_sources.is_empty() {
+        if !enabled {
             return Self {
                 enabled,
                 handlers: Arc::default(),
@@ -311,8 +289,6 @@ impl ClaudeHooksEngine {
         let _ = schema_loader::generated_hook_schemas();
         let mut discovered = discovery::discover_handlers(
             config_layer_stack,
-            plugin_hook_sources,
-            plugin_hook_load_warnings,
             bypass_hook_trust,
             discovery::DiscoveryMode::Runtime,
         );
@@ -336,92 +312,6 @@ impl ClaudeHooksEngine {
 
     pub(crate) fn warnings(&self) -> &[String] {
         &self.warnings
-    }
-
-    pub(crate) fn set_executor_hooks(&mut self, executor_hooks: Vec<ExecutorPluginHookSource>) {
-        if executor_hooks.is_empty()
-            && !self.handlers.iter().any(|handler| {
-                matches!(
-                    handler.source_path,
-                    HandlerSourcePath::ExecutorScoped { .. }
-                )
-            })
-        {
-            return;
-        }
-
-        let handlers = Arc::make_mut(&mut self.handlers);
-        handlers.retain(|handler| {
-            !matches!(
-                handler.source_path,
-                HandlerSourcePath::ExecutorScoped { .. }
-            )
-        });
-
-        let mut display_order = handlers
-            .iter()
-            .map(|handler| handler.display_order)
-            .max()
-            .map_or(0, |display_order| display_order.saturating_add(1));
-        let mut seen_targets = HashSet::new();
-        for source in executor_hooks {
-            for (event_name, groups) in source.hooks.into_matcher_groups() {
-                let Some(handler) = groups.into_iter().flat_map(|group| group.hooks).next() else {
-                    continue;
-                };
-                let HookHandlerConfig::McpTool {
-                    server,
-                    tool,
-                    input,
-                    timeout_sec,
-                    status_message,
-                } = handler
-                else {
-                    unreachable!("allowlisted executor handler must be an MCP tool");
-                };
-
-                // Bundled plugins can share a cleanup target; run it once per event
-                // and MCP environment.
-                let target = (
-                    std::mem::discriminant(&event_name),
-                    source
-                        .mcp_environment_id
-                        .as_ref()
-                        .unwrap_or(&source.environment_id)
-                        .clone(),
-                    server.clone(),
-                    tool.clone(),
-                );
-                if !seen_targets.insert(target) {
-                    continue;
-                }
-                handlers.push(ConfiguredHandler {
-                    builtin: true,
-                    plugin_trust: None,
-                    event_name,
-                    matcher: None,
-                    timeout_sec: timeout_sec.unwrap_or(5).max(1),
-                    status_message,
-                    additional_context_limit: Default::default(),
-                    source_path: HandlerSourcePath::ExecutorScoped {
-                        plugin_id: source.plugin_id.clone(),
-                        environment_id: source.environment_id.clone(),
-                        mcp_environment_id: source.mcp_environment_id.clone(),
-                        mcp_metadata: source.mcp_metadata.clone().map(Box::new),
-                        manifest_path: source.manifest_path.clone(),
-                        source_relative_path: source.source_relative_path.clone(),
-                    },
-                    source: HookSource::Plugin,
-                    display_order,
-                    kind: ConfiguredHandlerKind::McpTool {
-                        server,
-                        tool,
-                        input,
-                    },
-                });
-                display_order = display_order.saturating_add(1);
-            }
-        }
     }
 
     pub(crate) fn required_load_errors(&self) -> &[String] {

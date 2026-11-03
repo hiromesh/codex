@@ -8,14 +8,12 @@ use serde::de::DeserializeOwned;
 
 use crate::oauth::ErrorBodyLimit;
 use crate::oauth::OAuthError;
-use crate::oauth::PkceCodes;
 use crate::oauth::TokenRejection;
 use crate::oauth::diagnostics::redact_error_url;
 
-/// ChatGPT refresh uses JSON; authorization-code and gateway grants use form encoding.
+/// ChatGPT refresh uses JSON encoding.
 #[derive(Clone, Copy, Debug)]
 pub(crate) enum TokenEncoding {
-    Form,
     Json,
 }
 
@@ -26,14 +24,6 @@ pub(crate) struct TokenEndpoint<'a> {
     pub encoding: TokenEncoding,
     pub timeout: Option<Duration>,
     pub error_body_limit: ErrorBodyLimit,
-}
-
-/// Parameters bound to an authorization attempt. Secrets deliberately have no Debug output.
-pub(crate) struct AuthorizationCodeGrant<'a> {
-    pub code: &'a str,
-    pub redirect_uri: &'a str,
-    pub pkce: &'a PkceCodes,
-    pub resource: Option<&'a str>,
 }
 
 pub(crate) struct RefreshTokenGrant<'a> {
@@ -76,24 +66,6 @@ impl<'a> OAuthClient<'a> {
         }
     }
 
-    pub(crate) async fn exchange_code<T: DeserializeOwned>(
-        &self,
-        grant: AuthorizationCodeGrant<'_>,
-    ) -> Result<T, OAuthError> {
-        let mut parameters = vec![
-            ("grant_type", "authorization_code"),
-            ("client_id", self.endpoint.client_id),
-            ("code", grant.code),
-            ("redirect_uri", grant.redirect_uri),
-            ("code_verifier", grant.pkce.code_verifier.as_str()),
-        ];
-        if let Some(resource) = grant.resource {
-            parameters.push(("resource", resource));
-        }
-        self.exchange(&parameters, &[grant.code, &grant.pkce.code_verifier])
-            .await
-    }
-
     pub(crate) async fn refresh<T: DeserializeOwned>(
         &self,
         grant: RefreshTokenGrant<'_>,
@@ -122,13 +94,6 @@ impl<'a> OAuthClient<'a> {
             request = request.timeout(timeout);
         }
         request = match self.endpoint.encoding {
-            TokenEncoding::Form => {
-                let mut form = url::form_urlencoded::Serializer::new(String::new());
-                form.extend_pairs(parameters.iter().copied());
-                request
-                    .header("Content-Type", "application/x-www-form-urlencoded")
-                    .body(form.finish())
-            }
             TokenEncoding::Json => request
                 .header("Content-Type", "application/json")
                 .json(&parameters.iter().copied().collect::<BTreeMap<_, _>>()),

@@ -28,7 +28,6 @@ use crate::user_input::ByteRange;
 use crate::user_input::TextElement;
 use crate::user_input::UserInput;
 use codex_extension_items::ExtensionItem;
-use codex_utils_absolute_path::AbsolutePathBuf;
 use codex_utils_path_uri::PathUri;
 use quick_xml::de::from_str as from_xml_str;
 use quick_xml::se::to_string as to_xml_string;
@@ -64,14 +63,9 @@ pub enum TurnItem {
     ImageView(ImageViewItem),
     /// Item whose schema and lifecycle details are owned by an extension.
     ///
-    /// Standalone image generation, sleep, and web search use this path.
-    /// App-server wraps the same typed items in their public variants.
+    /// Sleep and standalone web search use this path. App-server wraps the same
+    /// typed items in their public variants.
     Extension(ExtensionItem),
-    /// Hosted Responses API image-generation item handled directly by core.
-    ///
-    /// This remains separate from [`Self::Extension`] because core still owns
-    /// hosted image persistence and legacy-event fanout.
-    ImageGeneration(ImageGenerationItem),
     EnteredReviewMode(EnteredReviewModeItem),
     ExitedReviewMode(ExitedReviewModeItem),
     FileChange(FileChangeItem),
@@ -399,19 +393,6 @@ pub struct ImageViewItem {
     /// This core protocol type is not exposed directly in the app-server API.
     /// App-server converts the path to `LegacyAppPathString` at its boundary.
     pub path: PathUri,
-}
-
-#[derive(Debug, Clone, Deserialize, Serialize, TS, JsonSchema, PartialEq)]
-pub struct ImageGenerationItem {
-    pub id: String,
-    pub status: String,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    #[ts(optional)]
-    pub revised_prompt: Option<String>,
-    pub result: String,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    #[ts(optional)]
-    pub saved_path: Option<AbsolutePathBuf>,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, TS, JsonSchema, PartialEq)]
@@ -750,7 +731,6 @@ impl TurnItem {
             TurnItem::WebSearch(item) => item.id.clone(),
             TurnItem::ImageView(item) => item.id.clone(),
             TurnItem::Extension(item) => item.id().to_string(),
-            TurnItem::ImageGeneration(item) => item.id.clone(),
             TurnItem::EnteredReviewMode(item) => item.id.clone(),
             TurnItem::ExitedReviewMode(item) => item.id.clone(),
             TurnItem::FileChange(item) => item.id.clone(),

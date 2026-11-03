@@ -760,11 +760,6 @@ pub(crate) enum AppEvent {
         result: Result<GetAccountRateLimitsResponse, String>,
     },
 
-    /// Open the authenticated account analytics dashboard.
-    OpenAnalytics {
-        view: Option<crate::analytics::TokenActivityView>,
-    },
-
     /// Open the reset-credit flow selected from the `/usage` menu.
     OpenRateLimitResetCredits,
 

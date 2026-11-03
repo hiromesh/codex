@@ -22,21 +22,12 @@ use crate::events::CodexFileChangeEventParams;
 use crate::events::CodexFileChangeEventRequest;
 use crate::events::CodexGoalEventRequest;
 use crate::events::CodexHookRunEventRequest;
-use crate::events::CodexImageGenerationEventParams;
-use crate::events::CodexImageGenerationEventRequest;
 use crate::events::CodexMcpToolCallEventParams;
 use crate::events::CodexMcpToolCallEventRequest;
 use crate::events::CodexOnboardingExternalAgentImportCompleteEventRequest;
 use crate::events::CodexOnboardingExternalAgentImportCompleteMetadata;
 use crate::events::CodexOnboardingExternalAgentImportFailureEventRequest;
 use crate::events::CodexOnboardingExternalAgentImportFailureMetadata;
-use crate::events::CodexPluginEventRequest;
-use crate::events::CodexPluginInstallFailedEventRequest;
-use crate::events::CodexPluginInstallFailedMetadata;
-use crate::events::CodexPluginInstallRequestedEventRequest;
-use crate::events::CodexPluginMeasurementEventParams;
-use crate::events::CodexPluginMeasurementEventRequest;
-use crate::events::CodexPluginUsedEventRequest;
 use crate::events::CodexReviewEventParams;
 use crate::events::CodexReviewEventRequest;
 use crate::events::CodexRuntimeMetadata;
@@ -73,10 +64,6 @@ use crate::events::codex_artifact_operation_event_request;
 use crate::events::codex_compaction_event_params;
 use crate::events::codex_goal_event_params;
 use crate::events::codex_hook_run_metadata;
-use crate::events::codex_plugin_install_requested_metadata;
-use crate::events::codex_plugin_metadata;
-use crate::events::codex_plugin_used_metadata;
-use crate::events::plugin_state_event_type;
 use crate::events::subagent_source_name;
 use crate::events::subagent_thread_started_event_request;
 use crate::facts::AnalyticsFact;
@@ -99,13 +86,6 @@ use crate::facts::ImagePreparationFact;
 use crate::facts::ImagePreparationMetadata;
 use crate::facts::InvocationType;
 use crate::facts::McpToolCallElicitation;
-use crate::facts::PluginInstallFailedInput;
-use crate::facts::PluginInstallRequestedInput;
-use crate::facts::PluginMeasurementRow;
-use crate::facts::PluginMeasurementsInput;
-use crate::facts::PluginState;
-use crate::facts::PluginStateChangedInput;
-use crate::facts::PluginUsedInput;
 use crate::facts::SkillInvocationLocation;
 use crate::facts::SkillInvokedInput;
 use crate::facts::SubAgentThreadStartedInput;
@@ -166,7 +146,6 @@ use codex_protocol::config_types::ModeKind;
 use codex_protocol::config_types::Personality;
 use codex_protocol::config_types::ReasoningSummary;
 use codex_protocol::items::ModelInvocationContext;
-use codex_protocol::items::is_safe_plugin_relative_path;
 use codex_protocol::mcp::is_node_repl_backed_connector;
 use codex_protocol::models::PermissionProfile;
 use codex_protocol::protocol::SessionSource;
@@ -183,28 +162,6 @@ use std::collections::VecDeque;
 use std::path::Path;
 use std::path::PathBuf;
 const MAX_TOOL_RESPONSE_ENTRIES: usize = 256;
-
-pub(crate) const MAX_PLUGIN_MEASUREMENTS_PER_BATCH: usize = 100;
-const MAX_PLUGIN_MEASUREMENT_DIMENSIONS: usize = 8;
-const MAX_PLUGIN_MEASUREMENT_IDENTIFIER_BYTES: usize = 64;
-
-pub(crate) fn valid_plugin_measurement_identifier(value: &str) -> bool {
-    let mut characters = value.chars();
-    matches!(characters.next(), Some('a'..='z'))
-        && value.len() <= MAX_PLUGIN_MEASUREMENT_IDENTIFIER_BYTES
-        && characters.all(|character| {
-            character.is_ascii_lowercase() || character.is_ascii_digit() || character == '_'
-        })
-}
-
-pub(crate) fn valid_plugin_measurement_row(row: &PluginMeasurementRow) -> bool {
-    row.number_value.is_finite()
-        && valid_plugin_measurement_identifier(&row.measurement_name)
-        && row.dimensions.len() <= MAX_PLUGIN_MEASUREMENT_DIMENSIONS
-        && row.dimensions.iter().all(|(name, value)| {
-            valid_plugin_measurement_identifier(name) && valid_plugin_measurement_identifier(value)
-        })
-}
 
 // Match the fact queue capacity: analytics must not retain an unlimited number
 // of incomplete turns when lifecycle facts are dropped.
@@ -501,7 +458,6 @@ struct TurnToolCounts {
     subagent_tool_call: usize,
     subagent_tool_call_ids: HashSet<String>,
     web_search: usize,
-    image_generation: usize,
 }
 
 impl TurnToolCounts {
@@ -523,7 +479,6 @@ impl TurnToolCounts {
                 self.subagent_tool_call += 1;
             }
             ThreadItemPayload::WebSearch(_) => self.web_search += 1,
-            ThreadItemPayload::ImageGeneration(_) => self.image_generation += 1,
             ThreadItemPayload::UserMessage { .. }
             | ThreadItemPayload::HookPrompt { .. }
             | ThreadItemPayload::AgentMessage { .. }
@@ -798,21 +753,6 @@ impl AnalyticsReducer {
                 }
                 CustomAnalyticsFact::HookRun(input) => {
                     self.ingest_hook_run(input, out);
-                }
-                CustomAnalyticsFact::PluginUsed(input) => {
-                    self.ingest_plugin_used(input, out);
-                }
-                CustomAnalyticsFact::PluginInstallRequested(input) => {
-                    self.ingest_plugin_install_requested(input, out);
-                }
-                CustomAnalyticsFact::PluginStateChanged(input) => {
-                    self.ingest_plugin_state_changed(input, out);
-                }
-                CustomAnalyticsFact::PluginInstallFailed(input) => {
-                    self.ingest_plugin_install_failed(input, out);
-                }
-                CustomAnalyticsFact::PluginMeasurements(input) => {
-                    self.ingest_plugin_measurements(input, out);
                 }
                 CustomAnalyticsFact::ExternalAgentConfigImportCompleted(input) => {
                     self.ingest_external_agent_config_import_completed(input, out);
@@ -1321,12 +1261,6 @@ impl AnalyticsReducer {
         let turn_state = self.turn_state(turn_id.clone());
         turn_state.thread_id = Some(thread_id);
         turn_state.num_input_images = Some(num_input_images);
-        // Keep the first received plugin inventory, including unknown or empty,
-        // while the remaining resolved config continues updating.
-        if let Some(initial_config) = &turn_state.resolved_config {
-            input.active_plugin_ids_at_turn_start =
-                initial_config.active_plugin_ids_at_turn_start.clone();
-        }
         turn_state.resolved_config = Some(input);
         self.maybe_emit_turn_event(&turn_id, out).await;
     }
@@ -1441,8 +1375,6 @@ impl AnalyticsReducer {
                         model_slug: Some(tracking.model_slug.clone()),
                         product_client_id: Some(tracking.product_client_id.clone()),
                         skill_scope,
-                        plugin_id: invocation.plugin_id,
-                        remote_plugin_id: invocation.remote_plugin_id,
                     },
                 },
             ));
@@ -1482,70 +1414,6 @@ impl AnalyticsReducer {
             event_type: "codex_hook_run",
             event_params: codex_hook_run_metadata(&tracking, hook),
         }));
-    }
-
-    fn ingest_plugin_used(&mut self, input: PluginUsedInput, out: &mut Vec<TrackEventRequest>) {
-        let PluginUsedInput { tracking, plugin } = input;
-        out.push(TrackEventRequest::PluginUsed(CodexPluginUsedEventRequest {
-            event_type: "codex_plugin_used",
-            event_params: codex_plugin_used_metadata(&tracking, plugin),
-        }));
-    }
-
-    fn ingest_plugin_install_requested(
-        &mut self,
-        input: PluginInstallRequestedInput,
-        out: &mut Vec<TrackEventRequest>,
-    ) {
-        let PluginInstallRequestedInput { tracking, request } = input;
-        out.push(TrackEventRequest::PluginInstallRequested(
-            CodexPluginInstallRequestedEventRequest {
-                event_type: "codex_plugin_install_requested",
-                event_params: codex_plugin_install_requested_metadata(&tracking, request),
-            },
-        ));
-    }
-
-    fn ingest_plugin_state_changed(
-        &mut self,
-        input: PluginStateChangedInput,
-        out: &mut Vec<TrackEventRequest>,
-    ) {
-        let PluginStateChangedInput { plugin, state } = input;
-        let event = CodexPluginEventRequest {
-            event_type: plugin_state_event_type(state),
-            event_params: codex_plugin_metadata(plugin),
-        };
-        out.push(match state {
-            PluginState::Installed => TrackEventRequest::PluginInstalled(event),
-            PluginState::Uninstalled => TrackEventRequest::PluginUninstalled(event),
-            PluginState::Enabled => TrackEventRequest::PluginEnabled(event),
-            PluginState::Disabled => TrackEventRequest::PluginDisabled(event),
-        });
-    }
-
-    fn ingest_plugin_install_failed(
-        &mut self,
-        input: PluginInstallFailedInput,
-        out: &mut Vec<TrackEventRequest>,
-    ) {
-        let PluginInstallFailedInput {
-            plugin,
-            source,
-            error_type,
-            sub_error_type,
-        } = input;
-        out.push(TrackEventRequest::PluginInstallFailed(
-            CodexPluginInstallFailedEventRequest {
-                event_type: "codex_plugin_install_failed",
-                event_params: CodexPluginInstallFailedMetadata {
-                    plugin: codex_plugin_metadata(plugin),
-                    source,
-                    error_type,
-                    sub_error_type,
-                },
-            },
-        ));
     }
 
     fn ingest_external_agent_config_import_completed(
@@ -2771,7 +2639,6 @@ pub(crate) fn tracked_tool_item_id(item: &ThreadItemPayload) -> Option<&str> {
         | ThreadItemPayload::DynamicToolCall { id, .. }
         | ThreadItemPayload::CollabAgentToolCall { id, .. } => Some(id),
         ThreadItemPayload::WebSearch(item) => Some(&item.id),
-        ThreadItemPayload::ImageGeneration(item) => Some(&item.id),
         ThreadItemPayload::UserMessage { .. }
         | ThreadItemPayload::HookPrompt { .. }
         | ThreadItemPayload::AgentMessage { .. }
@@ -2820,7 +2687,6 @@ fn tool_event_base_mut(event: &mut TrackEventRequest) -> Option<&mut CodexToolIt
         TrackEventRequest::ControlToolCall(event) => Some(&mut event.event_params.base),
         TrackEventRequest::CollabAgentToolCall(event) => Some(&mut event.event_params.base),
         TrackEventRequest::WebSearch(event) => Some(&mut event.event_params.base),
-        TrackEventRequest::ImageGeneration(event) => Some(&mut event.event_params.base),
         _ => None,
     }
 }
@@ -3213,41 +3079,6 @@ fn tool_item_event(input: ToolItemEventInput<'_>) -> Option<TrackEventRequest> {
                 },
             }))
         }
-        ThreadItemPayload::ImageGeneration(item) => {
-            let (terminal_status, failure_kind) = image_generation_outcome(item.status.as_str());
-            let base = tool_item_base(
-                thread_id,
-                turn_id,
-                item.id.clone(),
-                "image_generation".to_string(),
-                ToolItemOutcome {
-                    terminal_status,
-                    failure_kind,
-                    execution_duration_ms: None,
-                },
-                ToolItemContext {
-                    started_at_ms,
-                    completed_at_ms,
-                    connection_state,
-                    thread_state,
-                    thread_metadata,
-                    review_summary,
-                },
-            );
-            Some(TrackEventRequest::ImageGeneration(
-                CodexImageGenerationEventRequest {
-                    event_type: "codex_image_generation_event",
-                    event_params: CodexImageGenerationEventParams {
-                        base,
-                        revised_prompt_present: item.revised_prompt.is_some(),
-                        saved_path_present: item.saved_path.is_some(),
-                        transparent_background: item.transparent_background,
-                        imagegen_request_id: item.imagegen_request_id.clone(),
-                        generation_id: item.generation_id.clone(),
-                    },
-                },
-            ))
-        }
         _ => None,
     }
 }
@@ -3633,16 +3464,6 @@ fn collab_tool_call_outcome(
     }
 }
 
-fn image_generation_outcome(status: &str) -> (ToolItemTerminalStatus, Option<ToolItemFailureKind>) {
-    match status {
-        "failed" | "error" => (
-            ToolItemTerminalStatus::Failed,
-            Some(ToolItemFailureKind::ToolError),
-        ),
-        _ => (ToolItemTerminalStatus::Completed, None),
-    }
-}
-
 fn collab_agent_tool_name(tool: &CollabAgentTool) -> &'static str {
     match tool {
         CollabAgentTool::SpawnAgent => "spawn_agent",
@@ -3870,7 +3691,6 @@ fn codex_turn_event_params(
         dynamic_tool_call_count: Some(turn_state.tool_counts.dynamic_tool_call),
         subagent_tool_call_count: Some(turn_state.tool_counts.subagent_tool_call),
         web_search_count: Some(turn_state.tool_counts.web_search),
-        image_generation_count: Some(turn_state.tool_counts.image_generation),
         input_tokens: token_usage
             .as_ref()
             .map(|token_usage| token_usage.input_tokens),

@@ -9,13 +9,9 @@ use codex_app_server_daemon::RemoteControlMode as AppServerRemoteControlMode;
 use codex_arg0::Arg0DispatchPaths;
 use codex_arg0::arg0_dispatch_or_else;
 use codex_cli::cloud_config;
-use codex_cli::read_access_token_from_stdin;
 use codex_cli::read_api_key_from_stdin;
 use codex_cli::run_login_status;
-use codex_cli::run_login_with_access_token;
 use codex_cli::run_login_with_api_key;
-use codex_cli::run_login_with_browser;
-use codex_cli::run_login_with_device_code;
 use codex_cli::run_logout;
 use codex_exec::Cli as ExecCli;
 use codex_exec::Command as ExecCommand;
@@ -61,12 +57,10 @@ mod exec_args_tests;
 #[cfg(test)]
 #[path = "exec_server_args_tests.rs"]
 mod exec_server_args_tests;
-mod marketplace_cmd;
 mod mcp_cmd;
 mod mcp_login;
 mod migrate_nfs_db;
 mod migrate_rollouts;
-mod plugin_cmd;
 mod queue_cmd;
 mod remote_control_cmd;
 mod sandbox_uninstall;
@@ -74,8 +68,6 @@ mod state_db_recovery;
 mod wsl_paths;
 
 use crate::mcp_cmd::McpCli;
-use crate::plugin_cmd::PluginCli;
-use crate::plugin_cmd::PluginSubcommand;
 use crate::queue_cmd::QueueCommand;
 use crate::remote_control_cmd::RemoteControlCommand;
 use codex_exec_server_cli::ExecServerCommand;
@@ -154,9 +146,6 @@ enum Subcommand {
 
     /// Manage external MCP servers for Codex.
     Mcp(McpCli),
-
-    /// Manage Codex plugins.
-    Plugin(PluginCli),
 
     /// [experimental] Run the app server or related tooling.
     AppServer(AppServerCommand),
@@ -476,12 +465,6 @@ struct LoginCommand {
     with_api_key: bool,
 
     #[arg(
-        long = "with-access-token",
-        help = "Read the access token from stdin (e.g. `printenv CODEX_ACCESS_TOKEN | codex login --with-access-token`)"
-    )]
-    with_access_token: bool,
-
-    #[arg(
         long = "api-key",
         num_args = 0..=1,
         default_missing_value = "",
@@ -490,18 +473,6 @@ struct LoginCommand {
         hide = true
     )]
     api_key: Option<String>,
-
-    #[arg(long = "device-auth")]
-    use_device_code: bool,
-
-    /// EXPERIMENTAL: Use custom OAuth issuer base URL (advanced)
-    /// Override the OAuth issuer base URL (advanced)
-    #[arg(long = "experimental_issuer", value_name = "URL", hide = true)]
-    issuer_base_url: Option<String>,
-
-    /// EXPERIMENTAL: Use custom OAuth client ID (advanced)
-    #[arg(long = "experimental_client-id", value_name = "CLIENT_ID", hide = true)]
-    client_id: Option<String>,
 
     #[command(subcommand)]
     action: Option<LoginSubcommand>,
@@ -1066,42 +1037,6 @@ async fn dispatch_cli(
                 loader_overrides_for_profile(interactive.config_profile_v2.as_ref())?;
             mcp_cli.run(loader_overrides).await?;
         }
-        Some(Subcommand::Plugin(plugin_cli)) => {
-            reject_remote_mode_for_subcommand(
-                root_remote.as_deref(),
-                root_remote_auth_token_env.as_deref(),
-                "plugin",
-            )?;
-            let PluginCli {
-                mut config_overrides,
-                subcommand,
-            } = plugin_cli;
-            prepend_config_flags(&mut config_overrides, root_config_overrides.clone());
-            match subcommand {
-                PluginSubcommand::Add(args) => {
-                    let overrides = config_overrides
-                        .parse_overrides()
-                        .map_err(anyhow::Error::msg)?;
-                    plugin_cmd::run_plugin_add(overrides, args).await?;
-                }
-                PluginSubcommand::List(args) => {
-                    let overrides = config_overrides
-                        .parse_overrides()
-                        .map_err(anyhow::Error::msg)?;
-                    plugin_cmd::run_plugin_list(overrides, args).await?;
-                }
-                PluginSubcommand::Marketplace(mut marketplace_cli) => {
-                    prepend_config_flags(&mut marketplace_cli.config_overrides, config_overrides);
-                    marketplace_cli.run().await?;
-                }
-                PluginSubcommand::Remove(args) => {
-                    let overrides = config_overrides
-                        .parse_overrides()
-                        .map_err(anyhow::Error::msg)?;
-                    plugin_cmd::run_plugin_remove(overrides, args).await?;
-                }
-            }
-        }
         Some(Subcommand::AppServer(app_server_cli)) => {
             let AppServerCommand {
                 startup_config,
@@ -1212,11 +1147,7 @@ async fn dispatch_cli(
                             .map(|(name, value)| (name.as_str(), value))
                             .collect::<std::collections::BTreeMap<_, _>>();
                         let mut feature_overrides = std::collections::BTreeMap::new();
-                        // Match Features::apply_map's alias precedence.
                         for (&name, &value) in &features {
-                            if name == "imagegenext" && features.contains_key("image_generation") {
-                                continue;
-                            }
                             let value = if let Some(table) = value.as_table() {
                                 let Some(enabled) = table.get("enabled") else {
                                     continue;
@@ -1510,19 +1441,7 @@ async fn dispatch_cli(
                     run_login_status(login_cli.config_overrides).await;
                 }
                 None => {
-                    if login_cli.with_api_key && login_cli.with_access_token {
-                        eprintln!(
-                            "Choose one login credential source: --with-api-key or --with-access-token."
-                        );
-                        std::process::exit(1);
-                    } else if login_cli.use_device_code {
-                        run_login_with_device_code(
-                            login_cli.config_overrides,
-                            login_cli.issuer_base_url,
-                            login_cli.client_id,
-                        )
-                        .await;
-                    } else if login_cli.api_key.is_some() {
+                    if login_cli.api_key.is_some() {
                         eprintln!(
                             "The --api-key flag is no longer supported. Pipe the key instead, e.g. `printenv OPENAI_API_KEY | codex login --with-api-key`."
                         );
@@ -1530,11 +1449,11 @@ async fn dispatch_cli(
                     } else if login_cli.with_api_key {
                         let api_key = read_api_key_from_stdin();
                         run_login_with_api_key(login_cli.config_overrides, api_key).await;
-                    } else if login_cli.with_access_token {
-                        let access_token = read_access_token_from_stdin();
-                        run_login_with_access_token(login_cli.config_overrides, access_token).await;
                     } else {
-                        run_login_with_browser(login_cli.config_overrides).await;
+                        eprintln!(
+                            "API key login is required. Pipe the key instead, e.g. `printenv OPENAI_API_KEY | codex login --with-api-key`."
+                        );
+                        std::process::exit(1);
                     }
                 }
             }
@@ -2140,7 +2059,6 @@ fn unsupported_subcommand_name_for_strict_config(
         }
         Some(Subcommand::RemoteControl(remote_control)) => Some(remote_control.subcommand_name()),
         Some(Subcommand::Mcp(_)) => Some("mcp"),
-        Some(Subcommand::Plugin(_)) => Some("plugin"),
         Some(Subcommand::MigrateRollouts(_)) => Some("migrate-rollouts"),
         Some(Subcommand::MigrateNfsDb(_)) => Some("migrate-nfs-db"),
         #[cfg(target_os = "macos")]
@@ -3215,82 +3133,6 @@ enabled = true
     }
 
     #[test]
-    fn plugin_marketplace_help_uses_plugin_namespace() {
-        let help = help_from_args(&["codex", "plugin", "marketplace", "--help"]);
-        assert!(
-            help.contains("Usage: codex plugin marketplace [OPTIONS] <COMMAND>"),
-            "{help}"
-        );
-
-        for (subcommand, usage) in [
-            ("add", "Usage: codex plugin marketplace add"),
-            ("list", "Usage: codex plugin marketplace list"),
-            ("upgrade", "Usage: codex plugin marketplace upgrade"),
-            ("remove", "Usage: codex plugin marketplace remove"),
-        ] {
-            let help = help_from_args(&["codex", "plugin", "marketplace", subcommand, "--help"]);
-            assert!(help.contains(usage), "{help}");
-        }
-    }
-
-    #[test]
-    fn plugin_marketplace_add_parses_under_plugin() {
-        let cli =
-            MultitoolCli::try_parse_from(["codex", "plugin", "marketplace", "add", "owner/repo"])
-                .expect("parse");
-
-        assert!(matches!(cli.subcommand, Some(Subcommand::Plugin(_))));
-    }
-
-    #[test]
-    fn plugin_marketplace_upgrade_parses_under_plugin() {
-        let cli =
-            MultitoolCli::try_parse_from(["codex", "plugin", "marketplace", "upgrade", "debug"])
-                .expect("parse");
-
-        assert!(matches!(cli.subcommand, Some(Subcommand::Plugin(_))));
-    }
-
-    #[test]
-    fn plugin_add_parses_under_plugin() {
-        let cli = MultitoolCli::try_parse_from([
-            "codex",
-            "plugin",
-            "add",
-            "sample",
-            "--marketplace",
-            "debug",
-        ])
-        .expect("parse");
-
-        assert!(matches!(cli.subcommand, Some(Subcommand::Plugin(_))));
-    }
-
-    #[test]
-    fn plugin_list_parses_under_plugin() {
-        let cli =
-            MultitoolCli::try_parse_from(["codex", "plugin", "list", "--marketplace", "debug"])
-                .expect("parse");
-
-        assert!(matches!(cli.subcommand, Some(Subcommand::Plugin(_))));
-    }
-
-    #[test]
-    fn plugin_remove_parses_under_plugin() {
-        let cli = MultitoolCli::try_parse_from([
-            "codex",
-            "plugin",
-            "remove",
-            "sample",
-            "--marketplace",
-            "debug",
-        ])
-        .expect("parse");
-
-        assert!(matches!(cli.subcommand, Some(Subcommand::Plugin(_))));
-    }
-
-    #[test]
     fn update_parses_as_update_subcommand() {
         let cli = MultitoolCli::try_parse_from(["codex", "update"]).expect("parse");
         assert!(matches!(cli.subcommand, Some(Subcommand::Update)));
@@ -3462,15 +3304,6 @@ enabled = true
             .expect_err("parse should fail");
 
         assert_eq!(err.kind(), clap::error::ErrorKind::MissingRequiredArgument);
-    }
-
-    #[test]
-    fn plugin_marketplace_remove_parses_under_plugin() {
-        let cli =
-            MultitoolCli::try_parse_from(["codex", "plugin", "marketplace", "remove", "debug"])
-                .expect("parse");
-
-        assert!(matches!(cli.subcommand, Some(Subcommand::Plugin(_))));
     }
 
     #[test]

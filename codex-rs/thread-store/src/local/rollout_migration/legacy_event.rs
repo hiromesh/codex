@@ -8,8 +8,6 @@
 //! It intentionally stays separate from live thread-history reduction because migration needs a
 //! frozen adapter for historical rollout payloads.
 
-use codex_extension_items::ExtensionItem;
-use codex_extension_items::image_generation::ImageGenerationItem;
 use codex_protocol::items::AgentMessageContent;
 use codex_protocol::items::AgentMessageItem;
 use codex_protocol::items::CommandExecutionItem;
@@ -197,21 +195,6 @@ pub(super) fn completed_item(
                 action: event.action.clone(),
                 results: event.results.clone(),
             }),
-            None,
-        )),
-        EventMsg::ImageGenerationEnd(event) => Some((
-            TurnItem::Extension(ExtensionItem::ImageGeneration(ImageGenerationItem {
-                id: event.call_id.clone(),
-                status: event.status.clone(),
-                revised_prompt: event.revised_prompt.clone(),
-                image: event.image.clone(),
-                transparent_background: event.transparent_background,
-                failure: event.failure.clone(),
-                saved_path: event.saved_path.clone(),
-                input_images: event.input_images.clone(),
-                imagegen_request_id: None,
-                generation_id: event.generation_id.clone(),
-            })),
             None,
         )),
         EventMsg::ContextCompacted(_) => Some((

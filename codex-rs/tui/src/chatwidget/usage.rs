@@ -47,15 +47,6 @@ impl ChatWidget {
             footer_hint: Some(usage_hint_line(&self.bottom_pane.list_keymap(), "open")),
             items: vec![
                 SelectionItem {
-                    name: "View analytics".to_string(),
-                    description: Some("Usage history".to_string()),
-                    actions: vec![Box::new(|tx| {
-                        tx.send(AppEvent::OpenAnalytics { view: None });
-                    })],
-                    dismiss_on_select: true,
-                    ..Default::default()
-                },
-                SelectionItem {
                     name: "Redeem reset".to_string(),
                     description: Some(reset_description),
                     is_disabled: !reset_action_enabled,

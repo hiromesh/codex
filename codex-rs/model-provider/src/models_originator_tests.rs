@@ -45,7 +45,6 @@ async fn originator_managers_share_api_key_discovery_policy() {
     let endpoint = Arc::new(OpenAiModelsEndpoint::new(
         provider,
         Some(Arc::clone(&auth)),
-        /*gateway_auth_manager*/ None,
     ));
     let manager = OpenAiModelsManager::new(home.path().to_path_buf(), endpoint, Some(auth));
     let work = manager.for_originator("codex_work_cca").unwrap();
@@ -139,7 +138,6 @@ async fn originator_catalogs_are_isolated_and_reused_from_disk() {
         let endpoint = Arc::new(OpenAiModelsEndpoint::new(
             provider.clone(),
             Some(Arc::clone(&auth)),
-            /*gateway_auth_manager*/ None,
         ));
         let manager = OpenAiModelsManager::new(home.path().to_path_buf(), endpoint, Some(auth));
         let work = manager.for_originator("codex_work_cca").unwrap();

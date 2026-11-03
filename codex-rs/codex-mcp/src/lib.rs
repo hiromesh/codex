@@ -42,11 +42,6 @@ pub use tool_request_meta::McpToolRequestMetaProvider;
 pub use tools::ToolInfo;
 pub use trusted_access::TrustedAccessContext;
 
-/// Backward-compatible name for the shared Codex Apps tools runtime.
-pub type CodexAppsToolsCache = codex_connectors::ConnectorRuntimeManager<ToolInfo>;
-/// Backward-compatible name for the Codex Apps runtime context key.
-pub type CodexAppsToolsCacheKey = codex_connectors::ConnectorRuntimeContextKey;
-
 pub use catalog::McpCatalogBuilder;
 pub use catalog::McpEnvironmentAuthority;
 pub use catalog::McpPluginAttribution;
@@ -73,23 +68,10 @@ pub use auth_elicitation::build_auth_elicitation;
 pub use auth_elicitation::build_auth_elicitation_plan;
 pub use auth_elicitation::connector_auth_failure_from_tool_result;
 pub use auth_elicitation::is_connector_auth_failure_from_tool_result;
-/// Backward-compatible name for the Codex Apps runtime context key builder.
-pub use codex_connectors::connector_runtime_context_key as codex_apps_tools_cache_key;
-pub use mcp::codex_apps_mcp_server_config;
 pub use mcp::configured_mcp_servers;
 pub use mcp::effective_mcp_servers;
 pub use mcp::effective_mcp_servers_from_configured;
-pub use mcp::host_owned_codex_apps_enabled;
-pub use mcp::hosted_plugin_runtime_mcp_server_config;
 pub use mcp::tool_plugin_context;
-pub use plugin_config::PluginMcpConfigParseOutcome;
-pub use plugin_config::PluginMcpServerParseError;
-pub use plugin_config::normalize_executor_plugin_mcp_declarations;
-pub use plugin_config::parse_agent_plugin_mcp_config;
-pub use plugin_config::parse_executor_plugin_mcp_config;
-pub use plugin_config::parse_plugin_mcp_config;
-pub use plugin_config::parse_plugin_mcp_declarations;
-
 pub use mcp::McpServerStatusSnapshot;
 pub use mcp::McpSnapshotDetail;
 pub use mcp::collect_mcp_server_status_snapshot_with_detail;
@@ -107,7 +89,6 @@ pub use mcp::resolve_oauth_callback;
 pub use mcp::resolve_oauth_scopes;
 pub use mcp::should_retry_without_scopes;
 
-pub use codex_apps::declared_openai_file_input_param_names;
 pub use mcp::McpPermissionPromptAutoApproveContext;
 pub use mcp::mcp_permission_prompt_is_auto_approved;
 pub use mcp::qualified_mcp_tool_name_prefix;
@@ -119,7 +100,6 @@ pub(crate) mod binding_clients;
 mod catalog;
 mod client_capabilities;
 mod client_tool_catalog;
-pub(crate) mod codex_apps;
 pub(crate) mod connection_manager;
 mod connection_pool;
 pub(crate) mod elicitation;
@@ -132,7 +112,6 @@ mod executor_environment_http_client;
 pub(crate) mod mcp;
 mod openai_docs_source_attribution;
 mod pagination;
-mod plugin_config;
 mod resource_client;
 mod resource_origin;
 pub(crate) mod rmcp_client;

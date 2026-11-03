@@ -3,7 +3,6 @@
 use clap::Parser;
 use codex_app_server::AppServerRuntimeOptions;
 use codex_app_server::AppServerTransport;
-use codex_app_server::PluginStartupTasks;
 use codex_app_server::run_main_with_transport_options;
 use codex_arg0::Arg0DispatchPaths;
 use codex_arg0::arg0_dispatch_or_else;
@@ -86,7 +85,7 @@ fn main() -> anyhow::Result<()> {
             auth,
             strict_config,
             #[cfg(debug_assertions)]
-            disable_plugin_startup_tasks_for_tests,
+            disable_plugin_startup_tasks_for_tests: _,
             remote_control,
             managed_daemon,
         } = AppServerArgs::parse();
@@ -104,10 +103,6 @@ fn main() -> anyhow::Result<()> {
             managed_daemon,
             ..Default::default()
         };
-        #[cfg(debug_assertions)]
-        if disable_plugin_startup_tasks_for_tests {
-            runtime_options.plugin_startup_tasks = PluginStartupTasks::Skip;
-        }
         runtime_options.remote_control_startup_mode =
             match (remote_control, remote_control_disabled) {
                 (true, _) => codex_app_server::RemoteControlStartupMode::EnabledEphemeral,

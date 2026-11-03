@@ -773,18 +773,6 @@ impl ChatWidget {
             SlashCommand::Pwd => {
                 self.add_error_message("Usage: /pwd".to_string());
             }
-            SlashCommand::Usage => {
-                if self.ensure_usage_command_available() {
-                    match crate::analytics::TokenActivityView::parse(trimmed) {
-                        Some(view) => self
-                            .app_event_tx
-                            .send(AppEvent::OpenAnalytics { view: Some(view) }),
-                        None => self.add_error_message(
-                            "Usage: /usage [daily|weekly|cumulative]".to_string(),
-                        ),
-                    }
-                }
-            }
             SlashCommand::Ide => {
                 self.handle_ide_command_args(trimmed);
             }

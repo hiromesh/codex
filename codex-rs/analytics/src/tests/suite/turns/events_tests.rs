@@ -25,8 +25,6 @@ use codex_app_server_protocol::CollabAgentTool;
 use codex_app_server_protocol::CollabAgentToolCallStatus;
 use codex_app_server_protocol::CommandExecutionStatus;
 use codex_app_server_protocol::DynamicToolCallStatus;
-use codex_app_server_protocol::GeneratedImageRef;
-use codex_app_server_protocol::ImageGenerationItem;
 use codex_app_server_protocol::ItemCompletedNotification;
 use codex_app_server_protocol::ItemStartedNotification;
 use codex_app_server_protocol::McpToolCallAppContext;
@@ -158,7 +156,6 @@ fn turn_event_serializes_expected_shape() {
             dynamic_tool_call_count: None,
             subagent_tool_call_count: None,
             web_search_count: None,
-            image_generation_count: None,
             input_tokens: None,
             cached_input_tokens: None,
             cache_write_input_tokens: None,
@@ -258,7 +255,6 @@ fn turn_event_serializes_expected_shape() {
                 "dynamic_tool_call_count": null,
                 "subagent_tool_call_count": null,
                 "web_search_count": null,
-                "image_generation_count": null,
                 "input_tokens": null,
                 "cached_input_tokens": null,
                 "cache_write_input_tokens": null,
@@ -422,7 +418,6 @@ async fn turn_lifecycle_emits_turn_event() {
         json!(0)
     );
     assert_eq!(payload["event_params"]["web_search_count"], json!(0));
-    assert_eq!(payload["event_params"]["image_generation_count"], json!(0));
     assert_eq!(payload["event_params"]["started_at"], json!(455));
     assert_eq!(payload["event_params"]["completed_at"], json!(456));
     assert_eq!(payload["event_params"]["duration_ms"], json!(1234));
@@ -539,20 +534,6 @@ async fn turn_event_counts_completed_tool_items() {
             action: None,
             results: None,
         }),
-        ThreadItemPayload::ImageGeneration(ImageGenerationItem {
-            id: "image-1".to_string(),
-            status: "completed".to_string(),
-            revised_prompt: None,
-            image: GeneratedImageRef::Inline {
-                result: "ok".to_string(),
-            },
-            transparent_background: None,
-            failure: None,
-            saved_path: None,
-            input_images: Vec::new(),
-            imagegen_request_id: Some("req-imagegen-123".to_string()),
-            generation_id: Some("gen-image-123".to_string()),
-        }),
     ];
 
     for item in &completed_tool_items {
@@ -635,7 +616,6 @@ async fn turn_event_counts_completed_tool_items() {
             ("codex_mcp_tool_call_event", None),
             ("codex_dynamic_tool_call_event", None),
             ("codex_web_search_event", None),
-            ("codex_image_generation_event", None),
             ("codex_collab_agent_tool_call_event", None),
             ("codex_control_tool_call_event", None),
         ]
@@ -649,21 +629,6 @@ async fn turn_event_counts_completed_tool_items() {
             )
         })
         .to_vec()
-    );
-
-    let image_generation_event = out
-        .iter()
-        .find(|event| matches!(event, TrackEventRequest::ImageGeneration(_)))
-        .expect("image generation event should be emitted");
-    let payload =
-        serde_json::to_value(image_generation_event).expect("serialize image generation event");
-    assert_eq!(
-        payload["event_params"]["imagegen_request_id"],
-        json!("req-imagegen-123")
-    );
-    assert_eq!(
-        payload["event_params"]["generation_id"],
-        json!("gen-image-123")
     );
 
     let mcp_tool_call_event = out
@@ -695,7 +660,7 @@ async fn turn_event_counts_completed_tool_items() {
         .expect("turn event should be emitted");
     let payload = serde_json::to_value(turn_event).expect("serialize turn event");
     assert_eq!(payload["event_params"]["root_turn_id"], "root-ancestor");
-    assert_eq!(payload["event_params"]["total_tool_call_count"], json!(9));
+    assert_eq!(payload["event_params"]["total_tool_call_count"], json!(8));
     assert_eq!(payload["event_params"]["shell_command_count"], json!(1));
     assert_eq!(payload["event_params"]["file_change_count"], json!(1));
     assert_eq!(payload["event_params"]["mcp_tool_call_count"], json!(1));
@@ -705,7 +670,6 @@ async fn turn_event_counts_completed_tool_items() {
         json!(2)
     );
     assert_eq!(payload["event_params"]["web_search_count"], json!(1));
-    assert_eq!(payload["event_params"]["image_generation_count"], json!(1));
 }
 
 #[tokio::test]

@@ -16,17 +16,12 @@ use crate::error_code::method_not_found;
 use crate::extensions::ThreadExtensionDependencies;
 use crate::extensions::app_server_extension_event_sink;
 use crate::extensions::thread_extensions;
-use crate::external_agent_migration::ExternalAgentConfigRequestProcessor;
-use crate::external_agent_migration::ExternalAgentConfigRequestProcessorArgs;
 use crate::fs_watch::FsWatchManager;
 use crate::outgoing_message::ConnectionId;
 use crate::outgoing_message::ConnectionRequestId;
 use crate::outgoing_message::OutgoingMessageSender;
 use crate::outgoing_message::RequestContext;
-use crate::plugin_config_reload;
-use crate::plugin_config_reload::PluginStartupConfig;
 use crate::request_processors::AccountRequestProcessor;
-use crate::request_processors::AppsRequestProcessor;
 use crate::request_processors::CatalogRequestProcessor;
 use crate::request_processors::CommandExecRequestProcessor;
 use crate::request_processors::ConfigRequestProcessor;
@@ -35,11 +30,9 @@ use crate::request_processors::FeedbackRequestProcessor;
 use crate::request_processors::FsRequestProcessor;
 use crate::request_processors::GitRequestProcessor;
 use crate::request_processors::InitializeRequestProcessor;
-use crate::request_processors::MarketplaceRequestProcessor;
 use crate::request_processors::McpEventStreamReady;
 use crate::request_processors::McpEventStreams;
 use crate::request_processors::McpRequestProcessor;
-use crate::request_processors::PluginRequestProcessor;
 use crate::request_processors::ProcessExecRequestProcessor;
 use crate::request_processors::ProjectRequestProcessor;
 use crate::request_processors::RemoteControlRequestProcessor;
@@ -60,7 +53,6 @@ use crate::thread_state::ConnectionCapabilities;
 use crate::thread_state::ThreadStateManager;
 use crate::transport::AppServerTransport;
 use crate::transport::RemoteControlHandle;
-use crate::turn_cost_worker::TurnCostWorker;
 use codex_analytics::AnalyticsEventsClient;
 use codex_analytics::AppServerRpcTransport;
 use codex_app_server_protocol::ClientNotification;
@@ -148,23 +140,18 @@ pub(crate) struct MessageProcessor {
     outgoing: Arc<OutgoingMessageSender>,
     startup_warnings: StartupWarnings,
     models_refresh_worker: ModelsRefreshWorker,
-    turn_cost_worker: Option<TurnCostWorker>,
     skills_watcher: Arc<SkillsWatcher>,
     account_processor: Arc<AccountRequestProcessor>,
-    apps_processor: AppsRequestProcessor,
     catalog_processor: CatalogRequestProcessor,
     command_exec_processor: CommandExecRequestProcessor,
     process_exec_processor: ProcessExecRequestProcessor,
     config_processor: ConfigRequestProcessor,
     environment_processor: EnvironmentRequestProcessor,
-    external_agent_config_processor: ExternalAgentConfigRequestProcessor,
     feedback_processor: FeedbackRequestProcessor,
     fs_processor: FsRequestProcessor,
     git_processor: GitRequestProcessor,
     initialize_processor: InitializeRequestProcessor,
-    marketplace_processor: MarketplaceRequestProcessor,
     mcp_processor: McpRequestProcessor,
-    plugin_processor: PluginRequestProcessor,
     project_processor: ProjectRequestProcessor,
     pub(super) remote_control_processor: RemoteControlRequestProcessor,
     search_processor: SearchRequestProcessor,
@@ -271,8 +258,6 @@ pub(crate) struct MessageProcessorArgs {
     pub(crate) installation_id: String,
     pub(crate) rpc_transport: AppServerRpcTransport,
     pub(crate) remote_control_handle: Option<RemoteControlHandle>,
-    /// `None` skips startup tasks; otherwise preserve the initial config-loading path.
-    pub(crate) plugin_startup_tasks: Option<PluginStartupConfig>,
 }
 
 impl MessageProcessor {
@@ -298,7 +283,6 @@ impl MessageProcessor {
             installation_id,
             rpc_transport,
             remote_control_handle,
-            plugin_startup_tasks,
         } = args;
         // Startup credential reads must not open a browser before initialize selects the policy.
         let gateway_login_control =
@@ -395,11 +379,6 @@ impl MessageProcessor {
             Arc::clone(&auth_manager),
         ));
         let models_refresh_worker = crate::models_refresh_worker::spawn(&model_catalog);
-        let turn_cost_worker =
-            TurnCostWorker::spawn(Arc::clone(&config), Arc::clone(&auth_manager));
-        thread_manager
-            .plugins_manager()
-            .set_analytics_events_client(analytics_events_client.clone());
         let skills_watcher = SkillsWatcher::new(
             thread_manager.skills_service(),
             &config.codex_home,
@@ -410,23 +389,13 @@ impl MessageProcessor {
         let thread_watch_manager =
             crate::thread_status::ThreadWatchManager::new_with_outgoing(outgoing.clone());
         let thread_list_state_permit = Arc::new(Semaphore::new(/*permits*/ 1));
-        let app_list_shutdown_token = CancellationToken::new();
         let request_serialization_queues = RequestSerializationQueues::default();
         let config_processor = ConfigRequestProcessor::new(
             outgoing.clone(),
             config_manager.clone(),
             thread_manager.clone(),
             Arc::clone(&model_catalog),
-            analytics_events_client.clone(),
         );
-        let on_effective_plugins_changed =
-            crate::effective_plugin_change::effective_plugins_changed_callback(
-                auth_manager.clone(),
-                Arc::clone(&thread_manager),
-                config_manager.clone(),
-                config_processor.clone(),
-                request_serialization_queues.clone(),
-            );
         let account_processor = AccountRequestProcessor::new(
             auth_manager.clone(),
             Arc::clone(&thread_manager),
@@ -434,13 +403,6 @@ impl MessageProcessor {
             Arc::clone(&config),
             config_manager.clone(),
             Arc::clone(&model_catalog),
-        );
-        let apps_processor = AppsRequestProcessor::new(
-            auth_manager.clone(),
-            Arc::clone(&thread_manager),
-            outgoing.clone(),
-            config_manager.clone(),
-            app_list_shutdown_token,
         );
         let catalog_processor = CatalogRequestProcessor::new(
             outgoing.clone(),
@@ -470,8 +432,6 @@ impl MessageProcessor {
             state_db.clone(),
         );
         let git_processor = GitRequestProcessor::new();
-        let marketplace_processor =
-            MarketplaceRequestProcessor::new(config_manager.clone(), Arc::clone(&thread_manager));
         let mcp_processor = McpRequestProcessor::new(
             auth_manager.clone(),
             Arc::clone(&thread_manager),
@@ -479,14 +439,6 @@ impl MessageProcessor {
             outgoing.clone(),
             config_manager.clone(),
             account_processor.clone(),
-        );
-        let plugin_processor = PluginRequestProcessor::new(
-            auth_manager.clone(),
-            Arc::clone(&thread_manager),
-            outgoing.clone(),
-            analytics_events_client.clone(),
-            config_manager.clone(),
-            on_effective_plugins_changed,
         );
         let remote_control_processor = RemoteControlRequestProcessor::new(remote_control_handle);
         let search_processor = SearchRequestProcessor::new(outgoing.clone());
@@ -527,7 +479,6 @@ impl MessageProcessor {
             state_db.clone(),
             log_db,
             Arc::clone(&skills_watcher),
-            turn_cost_worker.as_ref().map(TurnCostWorker::handle),
             config_warnings.clone(),
             sample_responses,
         );
@@ -542,30 +493,7 @@ impl MessageProcessor {
             thread_state_manager,
             thread_watch_manager,
             Arc::clone(&skills_watcher),
-            turn_cost_worker.as_ref().map(TurnCostWorker::handle),
         );
-        if let Some(startup_config) = plugin_startup_tasks {
-            // Keep plugin startup warmups aligned at app-server startup.
-            let reload_config = match startup_config {
-                PluginStartupConfig::Current => {
-                    plugin_config_reload::for_cwd(config_manager.clone(), config.cwd.clone())
-                }
-                PluginStartupConfig::Defaults => {
-                    plugin_config_reload::defaults(config_manager.clone())
-                }
-            };
-            let on_effective_plugins_changed =
-                plugin_processor.effective_plugins_changed_callback();
-            thread_manager
-                .plugins_manager()
-                .maybe_start_plugin_startup_tasks_for_config(
-                    &config.plugins_config_input(),
-                    config.features.enabled(Feature::PluginDiscoveryPrefetch),
-                    reload_config,
-                    Some(on_effective_plugins_changed),
-                    startup_warnings_tx,
-                );
-        }
         let initialize_processor = InitializeRequestProcessor::new(
             gateway_login_control,
             outgoing.clone(),
@@ -573,18 +501,6 @@ impl MessageProcessor {
             Arc::clone(&config),
             rpc_transport,
         );
-        let external_agent_config_processor =
-            ExternalAgentConfigRequestProcessor::new(ExternalAgentConfigRequestProcessorArgs {
-                outgoing: outgoing.clone(),
-                thread_manager: Arc::clone(&thread_manager),
-                thread_store: Arc::clone(&thread_store),
-                config_manager: config_manager.clone(),
-                config_processor: config_processor.clone(),
-                state_db,
-                analytics_events_client,
-                arg0_paths,
-                codex_home: config.codex_home.to_path_buf(),
-            });
         let environment_processor =
             EnvironmentRequestProcessor::new(thread_manager.environment_manager());
         let fs_processor = FsRequestProcessor::new(
@@ -598,23 +514,18 @@ impl MessageProcessor {
                 config: config_warnings,
             },
             models_refresh_worker,
-            turn_cost_worker,
             skills_watcher,
             account_processor,
-            apps_processor,
             catalog_processor,
             command_exec_processor,
             process_exec_processor,
             config_processor,
             environment_processor,
-            external_agent_config_processor,
             feedback_processor,
             fs_processor,
             git_processor,
             initialize_processor,
-            marketplace_processor,
             mcp_processor,
-            plugin_processor,
             project_processor,
             remote_control_processor,
             search_processor,
@@ -628,7 +539,6 @@ impl MessageProcessor {
 
     pub(crate) fn clear_runtime_references(&self) {
         self.account_processor.clear_external_auth();
-        self.apps_processor.shutdown();
         self.models_refresh_worker.shutdown();
         self.skills_watcher.shutdown();
     }
@@ -862,9 +772,6 @@ impl MessageProcessor {
 
     pub(crate) async fn drain_background_tasks(&self) {
         self.models_refresh_worker.shutdown();
-        if let Some(worker) = &self.turn_cost_worker {
-            worker.shutdown();
-        }
         self.thread_processor.drain_background_tasks().await;
     }
 
@@ -1127,26 +1034,6 @@ impl MessageProcessor {
             ClientRequest::ConfigRead { params, .. } => self
                 .config_processor
                 .read(params)
-                .await
-                .map(|response| Some(response.into())),
-            ClientRequest::ExternalAgentConfigDetect { params, .. } => self
-                .external_agent_config_processor
-                .detect(params)
-                .await
-                .map(|response| Some(response.into())),
-            ClientRequest::ExternalAgentConfigImport { params, .. } => self
-                .external_agent_config_processor
-                .import(request_id.clone(), params)
-                .await
-                .map(|()| None),
-            ClientRequest::ExternalAgentConfigImportHistoryRecord { params, .. } => self
-                .external_agent_config_processor
-                .record_import_history(params)
-                .await
-                .map(|response| Some(response.into())),
-            ClientRequest::ExternalAgentConfigImportHistoriesRead { .. } => self
-                .external_agent_config_processor
-                .read_import_histories()
                 .await
                 .map(|response| Some(response.into())),
             ClientRequest::ConfigValueWrite { params, .. } => {
@@ -1560,74 +1447,8 @@ impl MessageProcessor {
             ClientRequest::HooksList { params, .. } => {
                 self.catalog_processor.hooks_list(params).await
             }
-            ClientRequest::MarketplaceAdd { params, .. } => {
-                self.marketplace_processor.marketplace_add(params).await
-            }
-            ClientRequest::MarketplaceRemove { params, .. } => {
-                self.marketplace_processor.marketplace_remove(params).await
-            }
-            ClientRequest::MarketplaceUpgrade { params, .. } => {
-                self.marketplace_processor.marketplace_upgrade(params).await
-            }
-            ClientRequest::PluginList { params, .. } => {
-                self.plugin_processor.plugin_list(params).await
-            }
-            ClientRequest::PluginSearch { params, .. } => {
-                self.plugin_processor.plugin_search(params).await
-            }
-            ClientRequest::PluginInstalled { params, .. } => {
-                self.plugin_processor.plugin_installed(params).await
-            }
-            ClientRequest::PluginReconcile { params, .. } => {
-                self.plugin_processor
-                    .plugin_reconcile(
-                        params,
-                        self.config_processor.clone(),
-                        &self.request_serialization_queues,
-                    )
-                    .await
-            }
-            ClientRequest::PluginRead { params, .. } => {
-                self.plugin_processor.plugin_read(params).await
-            }
-            ClientRequest::PluginSkillRead { params, .. } => {
-                self.plugin_processor.plugin_skill_read(params).await
-            }
-            ClientRequest::PluginShareSave { params, .. } => {
-                self.plugin_processor.plugin_share_save(params).await
-            }
-            ClientRequest::PluginShareUpdateTargets { params, .. } => {
-                self.plugin_processor
-                    .plugin_share_update_targets(params)
-                    .await
-            }
-            ClientRequest::PluginShareList { params, .. } => {
-                self.plugin_processor.plugin_share_list(params).await
-            }
-            ClientRequest::PluginShareCheckout { params, .. } => {
-                self.plugin_processor.plugin_share_checkout(params).await
-            }
-            ClientRequest::PluginShareDelete { params, .. } => {
-                self.plugin_processor.plugin_share_delete(params).await
-            }
-            ClientRequest::AppsRead { params, .. } => self.apps_processor.apps_read(params).await,
-            ClientRequest::AppsList { params, .. } => {
-                self.apps_processor.apps_list(&request_id, params).await
-            }
-            ClientRequest::AppsInstalled { params, .. } => self
-                .apps_processor
-                .apps_installed(params)
-                .await
-                .map(|response| Some(response.into())),
             ClientRequest::SkillsConfigWrite { params, .. } => {
                 self.catalog_processor.skills_config_write(params).await
-            }
-            ClientRequest::PluginInstall { params, .. } => {
-                // Keep installation and auth setup state off the shared request dispatcher stack.
-                Box::pin(self.plugin_processor.plugin_install(params)).await
-            }
-            ClientRequest::PluginUninstall { params, .. } => {
-                self.plugin_processor.plugin_uninstall(params).await
             }
             ClientRequest::ModelList { params, .. } => {
                 self.catalog_processor.model_list(params).await
@@ -1807,25 +1628,6 @@ impl MessageProcessor {
             }
             ClientRequest::GetAuthStatus { params, .. } => {
                 self.account_processor.get_auth_status(params).await
-            }
-            ClientRequest::GetAccountRateLimits { params, .. } => {
-                self.account_processor.get_account_rate_limits(params).await
-            }
-            ClientRequest::ConsumeAccountRateLimitResetCredit { params, .. } => {
-                self.account_processor
-                    .consume_account_rate_limit_reset_credit(params)
-                    .await
-            }
-            ClientRequest::GetAccountTokenUsage { params, .. } => {
-                self.account_processor.get_account_token_usage(params).await
-            }
-            ClientRequest::GetWorkspaceMessages { .. } => {
-                self.account_processor.get_workspace_messages().await
-            }
-            ClientRequest::SendAddCreditsNudgeEmail { params, .. } => {
-                self.account_processor
-                    .send_add_credits_nudge_email(params)
-                    .await
             }
             ClientRequest::GitDiffToRemote { params, .. } => {
                 self.git_processor.git_diff_to_remote(params).await

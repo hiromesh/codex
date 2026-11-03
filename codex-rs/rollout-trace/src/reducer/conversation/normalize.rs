@@ -125,7 +125,7 @@ fn normalize_model_item(
                 .and_then(Value::as_str)
                 .map(ToString::to_string),
         }),
-        "tool_search_call" | "web_search_call" | "image_generation_call" | "local_shell_call" => {
+        "tool_search_call" | "web_search_call" | "local_shell_call" => {
             Ok(NormalizedConversationItem {
                 responses_item_id: None,
                 role: ConversationRole::Assistant,

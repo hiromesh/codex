@@ -66,7 +66,6 @@ fn keep_forked_rollout_item(item: &RolloutItem, preserve_context_baselines: bool
             | ResponseItem::CustomToolCallOutput { .. }
             | ResponseItem::ToolSearchOutput { .. }
             | ResponseItem::WebSearchCall { .. }
-            | ResponseItem::ImageGenerationCall { .. }
             | ResponseItem::Compaction { .. }
             | ResponseItem::CompactionTrigger { .. }
             | ResponseItem::ContextCompaction { .. }

@@ -92,7 +92,6 @@ pub fn should_persist_response_item(item: &ResponseItem) -> bool {
         | ResponseItem::CustomToolCall { .. }
         | ResponseItem::CustomToolCallOutput { .. }
         | ResponseItem::WebSearchCall { .. }
-        | ResponseItem::ImageGenerationCall { .. }
         | ResponseItem::ConfigurationUpdate { .. }
         | ResponseItem::Compaction { .. }
         | ResponseItem::ContextCompaction { .. } => true,
@@ -117,7 +116,6 @@ pub fn should_persist_response_item_for_memories(item: &ResponseItem) -> bool {
         ResponseItem::AdditionalTools { .. }
         | ResponseItem::Reasoning { .. }
         | ResponseItem::ConfigurationUpdate { .. }
-        | ResponseItem::ImageGenerationCall { .. }
         | ResponseItem::Compaction { .. }
         | ResponseItem::CompactionTrigger { .. }
         | ResponseItem::ContextCompaction { .. }
@@ -150,8 +148,7 @@ fn persisted_event_msg(
         | EventMsg::PatchApplyEnd(_)
         | EventMsg::ContextCompacted(_)
         | EventMsg::McpToolCallEnd(_)
-        | EventMsg::WebSearchEnd(_)
-        | EventMsg::ImageGenerationEnd(_) => {
+        | EventMsg::WebSearchEnd(_) => {
             matches!(history_mode, ThreadHistoryMode::Legacy).then_some(Cow::Borrowed(ev))
         }
         EventMsg::SubAgentActivity(event) => (matches!(history_mode, ThreadHistoryMode::Legacy)
@@ -214,7 +211,6 @@ fn persisted_event_msg(
         | EventMsg::PlanDelta(_)
         | EventMsg::ReasoningContentDelta(_)
         | EventMsg::ReasoningRawContentDelta(_)
-        | EventMsg::ImageGenerationBegin(_)
         | EventMsg::CollabAgentSpawnBegin(_)
         | EventMsg::CollabAgentInteractionBegin(_)
         | EventMsg::CollabWaitingBegin(_)
@@ -280,7 +276,3 @@ fn persisted_item_completed_event<'a>(
         },
     }
 }
-
-#[cfg(test)]
-#[path = "policy_tests.rs"]
-mod tests;

@@ -1161,7 +1161,6 @@ fn push_startup_warning_counts(details: &mut Vec<String>, warnings: &[String]) {
     for (label, needle) in [
         ("startup warning skills", "skill"),
         ("startup warning hooks", "hook"),
-        ("startup warning plugins", "plugin"),
         ("startup warning MCP", "mcp"),
         ("startup warning deprecated", "deprecated"),
     ] {
@@ -3323,7 +3322,6 @@ mod tests {
         let warnings = vec![
             "Skipped loading 2 skill(s) due to invalid SKILL.md files.".to_string(),
             "[features].codex_hooks is deprecated. Use [features].hooks instead.".to_string(),
-            "plugin example failed to load".to_string(),
             "MCP server example failed to start".to_string(),
         ];
         let mut details = Vec::new();
@@ -3333,10 +3331,9 @@ mod tests {
         assert_eq!(
             details,
             vec![
-                "startup warnings: 4",
+                "startup warnings: 3",
                 "startup warning skills: 1",
                 "startup warning hooks: 1",
-                "startup warning plugins: 1",
                 "startup warning MCP: 1",
                 "startup warning deprecated: 1",
             ]

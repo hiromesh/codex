@@ -10,7 +10,6 @@ use codex_api::SharedAuthProvider;
 use codex_api::TransportError;
 use codex_login::AuthManager;
 use codex_login::CodexAuth;
-use codex_login::GatewayAuthManager;
 use codex_login::WorkspaceRoutingRequest;
 use codex_login::default_client::ClientRedirectPolicy;
 use codex_model_provider_info::ModelProviderInfo;
@@ -33,7 +32,6 @@ use crate::auth::auth_manager_for_provider;
 use crate::auth::resolve_provider_auth;
 use crate::auth::resolve_provider_auth_for_scope;
 use crate::auth::uses_fedramp_api_key;
-use crate::combined_auth::compose_auth;
 use crate::gcp::GcpModelProvider;
 use crate::models_endpoint::OpenAiModelsEndpoint;
 use crate::workspace_routing::WorkspaceRoutingContext;
@@ -171,12 +169,6 @@ pub trait ModelProvider: fmt::Debug + Send + Sync {
     /// manager throughout the codebase; that is a larger refactor than this change.
     fn auth_manager(&self) -> Option<Arc<AuthManager>>;
 
-    /// Returns the gateway credential manager shared with inference and model discovery.
-    /// Hosts use this handle for explicit login; configured setup failures remain errors.
-    fn gateway_auth_manager(&self) -> std::io::Result<Option<Arc<GatewayAuthManager>>> {
-        Ok(None)
-    }
-
     /// Returns whether this transport failure can be recovered by provider-scoped authentication.
     ///
     /// The default preserves existing unauthorized-response handling. Providers with other
@@ -313,14 +305,6 @@ pub trait ModelProvider: fmt::Debug + Send + Sync {
         })
     }
 
-    /// Adds provider-owned credentials, such as gateway OAuth, to already selected primary auth.
-    fn compose_auth(
-        &self,
-        resolved: ResolvedProviderAuth,
-    ) -> ModelProviderFuture<'_, codex_protocol::error::Result<ResolvedProviderAuth>> {
-        Box::pin(async move { Ok(resolved) })
-    }
-
     /// Returns request credentials, optionally scoped to a Codex session task.
     fn api_auth_for_scope(
         &self,
@@ -429,13 +413,11 @@ pub fn create_model_provider(
     Arc::new(ConfiguredModelProvider::new(provider_info, auth_manager))
 }
 
-/// Runtime model provider that orchestrates primary and gateway credentials.
+/// Runtime model provider.
 #[derive(Clone, Debug)]
 struct ConfiguredModelProvider {
     info: ModelProviderInfo,
     auth_manager: Option<Arc<AuthManager>>,
-    // Construct eagerly; report setup failures when auth is requested because the factory is infallible.
-    gateway_auth_manager: Option<Result<Arc<GatewayAuthManager>, String>>,
 }
 
 enum ModelsCacheConfig {
@@ -449,20 +431,10 @@ impl ConfiguredModelProvider {
         info: ModelProviderInfo,
         auth_manager: Option<Arc<AuthManager>>,
     ) -> Self {
-        let gateway_auth_manager = info.gateway_oauth.as_ref().map(|config| {
-            info.validate()?;
-            let manager = auth_manager
-                .as_ref()
-                .ok_or_else(|| "gateway_oauth requires auth runtime configuration".to_string())?;
-            crate::shared_state::process_shared_state()
-                .gateway_auth(config, &manager.runtime_config())
-                .map_err(|_| "failed to create provider OAuth HTTP client".to_string())
-        });
         let auth_manager = auth_manager_for_provider(auth_manager, &info);
         Self {
             info,
             auth_manager,
-            gateway_auth_manager,
         }
     }
 
@@ -471,7 +443,7 @@ impl ConfiguredModelProvider {
         scope: Option<ProviderAuthScope>,
     ) -> codex_protocol::error::Result<ResolvedProviderAuth> {
         let auth = self.auth().await;
-        let resolved = match scope {
+        match scope {
             Some(scope) if provider_uses_first_party_auth_path(&self.info) => {
                 resolve_provider_auth_for_scope(
                     self.auth_manager.clone(),
@@ -479,11 +451,10 @@ impl ConfiguredModelProvider {
                     &self.info,
                     scope,
                 )
-                .await?
+                .await
             }
-            _ => ResolvedProviderAuth::new(resolve_provider_auth(auth.as_ref(), &self.info)?),
-        };
-        self.compose_auth(resolved).await
+            _ => resolve_provider_auth(auth.as_ref(), &self.info).map(ResolvedProviderAuth::new),
+        }
     }
 
     fn create_models_manager(
@@ -501,7 +472,6 @@ impl ConfiguredModelProvider {
         let endpoint = Arc::new(OpenAiModelsEndpoint::new(
             self.info.clone(),
             self.auth_manager.clone(),
-            self.gateway_auth_manager.clone(),
         ));
         let auth_manager = self.auth_manager.clone();
         let manager = match cache {
@@ -548,13 +518,6 @@ impl ModelProvider for ConfiguredModelProvider {
         self.auth_manager.clone()
     }
 
-    fn gateway_auth_manager(&self) -> std::io::Result<Option<Arc<GatewayAuthManager>>> {
-        self.gateway_auth_manager
-            .clone()
-            .transpose()
-            .map_err(std::io::Error::other)
-    }
-
     fn supports_attestation(&self) -> bool {
         self.auth_manager
             .as_ref()
@@ -593,24 +556,9 @@ impl ModelProvider for ConfiguredModelProvider {
         Box::pin(async move {
             let auth = self.auth().await;
             let provider = self.api_provider_for_auth(auth.as_ref())?;
-            let primary = resolve_provider_auth(auth.as_ref(), &self.info)?;
-            let auth = self
-                .compose_auth(ResolvedProviderAuth::new(primary))
-                .await?
-                .auth;
+            let auth = resolve_provider_auth(auth.as_ref(), &self.info)?;
             Ok((provider, auth))
         })
-    }
-
-    fn compose_auth(
-        &self,
-        resolved: ResolvedProviderAuth,
-    ) -> ModelProviderFuture<'_, codex_protocol::error::Result<ResolvedProviderAuth>> {
-        Box::pin(compose_auth(
-            &self.info,
-            self.gateway_auth_manager.as_ref(),
-            resolved,
-        ))
     }
 
     fn api_auth_for_scope(

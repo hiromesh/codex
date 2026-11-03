@@ -8,7 +8,6 @@ mod config;
 mod dynamic_skill_selector;
 mod extension;
 mod fragments;
-mod host_aliases;
 mod host_outcome;
 mod host_prompt;
 mod host_roots;
@@ -54,7 +53,6 @@ pub use required::validate_required_skills;
 pub use sources::SkillProviderSource;
 pub use sources::SkillProviders;
 pub use state::SkillsThreadState;
-pub use telemetry::record_plugin_turn_usage;
 
 /// Recognizes persisted explicit skill prompts without exposing their fragment implementation.
 pub fn is_skill_prompt_fragment(text: &str) -> bool {

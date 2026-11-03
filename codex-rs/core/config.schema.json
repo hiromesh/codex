@@ -946,13 +946,7 @@
             "image_detail_original": {
               "type": "boolean"
             },
-            "image_generation": {
-              "type": "boolean"
-            },
             "image_resize_notice": {
-              "type": "boolean"
-            },
-            "imagegenext": {
               "type": "boolean"
             },
             "in_app_browser": {
@@ -4373,10 +4367,6 @@
           "format": "int64",
           "minimum": 1.0,
           "type": "integer"
-        },
-        "use_history_notes_extension": {
-          "description": "Whether to expose the built-in history and notes extension.",
-          "type": "boolean"
         }
       },
       "type": "object"
@@ -7110,13 +7100,7 @@
         "image_detail_original": {
           "type": "boolean"
         },
-        "image_generation": {
-          "type": "boolean"
-        },
         "image_resize_notice": {
-          "type": "boolean"
-        },
-        "imagegenext": {
           "type": "boolean"
         },
         "in_app_browser": {

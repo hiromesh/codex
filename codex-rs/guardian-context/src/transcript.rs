@@ -440,7 +440,6 @@ fn collect_transcript_for_review(
                 ..
             }
             | ResponseItem::AdditionalTools { .. }
-            | ResponseItem::ImageGenerationCall { .. }
             | ResponseItem::ToolSearchCall { .. }
             | ResponseItem::ToolSearchOutput { .. }
             | ResponseItem::Compaction { .. }

@@ -1562,7 +1562,6 @@ dependencies = [
  "codex-diagnostics",
  "codex-exec-server",
  "codex-extension-api",
- "codex-external-agent-migration",
  "codex-features",
  "codex-feedback",
  "codex-file-search",
@@ -1916,10 +1915,8 @@ dependencies = [
  "codex-app-server-protocol",
  "codex-arg0",
  "codex-build-info",
- "codex-cloud-config",
  "codex-config",
  "codex-core",
- "codex-core-plugins",
  "codex-exec",
  "codex-exec-server",
  "codex-exec-server-cli",
@@ -1938,7 +1935,6 @@ dependencies = [
  "codex-model-provider",
  "codex-models-manager",
  "codex-multi-env-copy-file",
- "codex-plugin",
  "codex-protocol",
  "codex-rmcp-client",
  "codex-rollout",
@@ -2189,7 +2185,6 @@ dependencies = [
  "codex-home",
  "codex-hooks",
  "codex-http-client",
- "codex-image-generation-extension",
  "codex-install-context",
  "codex-login",
  "codex-mcp",
@@ -2387,7 +2382,6 @@ dependencies = [
  "codex-app-server-protocol",
  "codex-apply-patch",
  "codex-arg0",
- "codex-cloud-config",
  "codex-config",
  "codex-core",
  "codex-features",
@@ -2440,7 +2434,6 @@ dependencies = [
  "bytes",
  "codex-build-info",
  "codex-config",
- "codex-core-plugin-common",
  "codex-exec-server-protocol",
  "codex-exec-server-test-support",
  "codex-file-system",
@@ -2597,7 +2590,6 @@ dependencies = [
  "codex-api",
  "codex-config",
  "codex-context-fragments",
- "codex-core-plugin-common",
  "codex-exec-server-protocol",
  "codex-file-system",
  "codex-guardian-context",
@@ -2617,43 +2609,11 @@ dependencies = [
 name = "codex-extension-items"
 version = "0.0.0"
 dependencies = [
- "codex-utils-absolute-path",
  "pretty_assertions",
  "schemars 0.8.22",
  "serde",
  "serde_json",
  "ts-rs",
-]
-
-[[package]]
-name = "codex-external-agent-migration"
-version = "0.0.0"
-dependencies = [
- "chrono",
- "codex-analytics",
- "codex-app-server-protocol",
- "codex-config",
- "codex-core",
- "codex-core-plugins",
- "codex-hooks",
- "codex-login",
- "codex-memories-write",
- "codex-otel",
- "codex-plugin",
- "codex-protocol",
- "codex-rollout",
- "codex-thread-store",
- "codex-utils-output-truncation",
- "linkify",
- "pretty_assertions",
- "serde",
- "serde_json",
- "serde_yaml",
- "sha2 0.10.9",
- "tempfile",
- "tokio",
- "toml 0.9.11+spec-1.1.0",
- "tracing",
 ]
 
 [[package]]
@@ -2910,7 +2870,6 @@ dependencies = [
  "async-channel",
  "chrono",
  "codex-config",
- "codex-plugin",
  "codex-protocol",
  "codex-utils-absolute-path",
  "codex-utils-output-truncation",
@@ -2969,38 +2928,6 @@ dependencies = [
  "url",
  "windows-sys 0.61.2",
  "zstd",
-]
-
-[[package]]
-name = "codex-image-generation-extension"
-version = "0.0.0"
-dependencies = [
- "base64 0.22.1",
- "codex-api",
- "codex-attachment-store",
- "codex-core",
- "codex-exec-server",
- "codex-extension-api",
- "codex-extension-items",
- "codex-http-client",
- "codex-login",
- "codex-model-provider",
- "codex-model-provider-info",
- "codex-protocol",
- "codex-tools",
- "codex-utils-absolute-path",
- "codex-utils-image",
- "codex-utils-path-uri",
- "http 1.4.0",
- "image",
- "pretty_assertions",
- "schemars 0.8.22",
- "serde",
- "serde_json",
- "sha2 0.10.9",
- "tempfile",
- "tokio",
- "tracing",
 ]
 
 [[package]]
@@ -3168,17 +3095,13 @@ dependencies = [
  "anyhow",
  "axum",
  "codex-config",
- "codex-connectors",
- "codex-connectors-extension",
  "codex-core",
- "codex-core-plugins",
  "codex-exec-server",
  "codex-exec-server-test-support",
  "codex-extension-api",
  "codex-features",
  "codex-login",
  "codex-mcp",
- "codex-plugin",
  "codex-protocol",
  "codex-utils-absolute-path",
  "codex-utils-path-uri",
@@ -3232,7 +3155,6 @@ version = "0.0.0"
 dependencies = [
  "anyhow",
  "chrono",
- "codex-backend-client",
  "codex-config",
  "codex-core",
  "codex-features",
@@ -8352,15 +8274,6 @@ name = "link-section"
 version = "0.17.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4d1e908a416d6e9f725743b84a36feea40c4c131e805fbc26d61f9f451f36080"
-
-[[package]]
-name = "linkify"
-version = "0.11.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "92f9ae2f3d31697697311f016320fe984127e636b45cf5eb5c175b7eb103dadb"
-dependencies = [
- "memchr",
-]
 
 [[package]]
 name = "linktime-proc-macro"

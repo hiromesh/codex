@@ -45,16 +45,42 @@ pub(super) fn parse_legacy_rollout_value(mut value: Value) -> Result<Option<Roll
 }
 
 fn should_skip_retired_record(value: &Value) -> bool {
-    matches!(
+    if matches!(
         event_type(value),
-        Some("guardian_assessment" | "thread_name_updated" | "undo_completed")
-    ) || (rollout_type(value) == Some("response_item")
-        && value
+        Some(
+            "guardian_assessment"
+                | "thread_name_updated"
+                | "undo_completed"
+                | "image_generation_begin"
+                | "image_generation_end"
+        )
+    ) {
+        return true;
+    }
+    if rollout_type(value) == Some("response_item") {
+        return value
             .get("payload")
             .and_then(Value::as_object)
             .and_then(|payload| payload.get("type"))
             .and_then(Value::as_str)
-            == Some("ghost_snapshot"))
+            .is_some_and(|kind| matches!(kind, "ghost_snapshot" | "image_generation_call"));
+    }
+    if matches!(event_type(value), Some("item_started" | "item_completed")) {
+        let item = value
+            .get("payload")
+            .and_then(Value::as_object)
+            .and_then(|payload| payload.get("item"))
+            .and_then(Value::as_object);
+        let item_type = item
+            .and_then(|item| item.get("type"))
+            .and_then(Value::as_str);
+        let item_kind = item
+            .and_then(|item| item.get("kind"))
+            .and_then(Value::as_str);
+        return item_type == Some("ImageGeneration")
+            || (item_type == Some("Extension") && item_kind == Some("image_gen.generation"));
+    }
+    false
 }
 
 fn normalize_legacy_turn_context(value: &mut Value) {

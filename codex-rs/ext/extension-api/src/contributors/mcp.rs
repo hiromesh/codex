@@ -1,5 +1,4 @@
 use codex_config::McpServerConfig;
-use codex_core_plugin_common::PluginIdentity;
 use codex_exec_server_protocol::ExecutorCapabilityDiscoverySnapshot;
 use codex_exec_server_protocol::ExecutorCapabilityDiscoveryV2Snapshot;
 use codex_protocol::capabilities::SelectedCapabilityRoot;
@@ -165,44 +164,6 @@ impl<'a, C> McpServerContributionContext<'a, C> {
     }
 }
 
-/// Selected plugin identities and executor roots whose skills must be hidden.
-#[derive(Clone, Debug, Default)]
-pub struct SelectedPluginSnapshot {
-    pub plugins: Vec<SelectedPluginIdentity>,
-    /// Selected plugin roots suppressed by the effective plugin feature policy.
-    pub disabled_plugin_roots: Vec<String>,
-    pub disabled_plugin_ids: Vec<String>,
-}
-
-/// The configured identity of a selected plugin and, when present, the root owning its skills.
-#[derive(Clone, Debug)]
-pub struct SelectedPluginIdentity {
-    /// Hosted plugins have no executor root and cannot own skills from an executor folder.
-    pub selected_root_id: Option<String>,
-    pub plugin_id: PluginIdentity,
-}
-
-/// An executor plugin and its deferred MCP data. Callers that only need the identity can drop
-/// `mcp` without loading server or connector configuration. A plugin still owns its skills when
-/// it has no MCP data.
-pub struct SelectedPlugin<'a> {
-    pub selected_root_id: String,
-    pub plugin_id: String,
-    pub identity: PluginIdentity,
-    pub enabled: bool,
-    pub mcp: ExtensionFuture<'a, SelectedPluginContribution>,
-}
-
-/// MCP data attributed by the host to the plugin that declared it.
-#[derive(Clone)]
-pub struct SelectedPluginContribution {
-    pub plugin_display_name: String,
-    /// Environment that supplied the plugin, independent of where its MCP servers run.
-    pub source_environment_id: String,
-    pub connector_ids: Vec<String>,
-    pub servers: Vec<(String, McpServerConfig)>,
-}
-
 /// One extension-owned overlay for the runtime MCP server configuration.
 #[derive(Clone, Debug)]
 pub enum McpServerContribution {
@@ -224,13 +185,6 @@ pub enum McpServerContribution {
         config: Box<McpServerConfig>,
         /// Overrides the HTTP protocol mode, or uses the hosted Apps default when absent.
         protocol_mode: Option<crate::McpProtocolMode>,
-    },
-    /// Attributes Apps connectors to an account-hosted plugin. Plugins from executor folders must
-    /// use `McpServerContributor::selected_plugins`, even if they only provide Apps connectors.
-    HostedPluginConnectors {
-        plugin_id: String,
-        plugin_display_name: String,
-        connector_ids: Vec<String>,
     },
     /// Removes a named MCP server.
     Remove { name: String },

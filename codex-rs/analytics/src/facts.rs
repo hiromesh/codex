@@ -10,7 +10,6 @@ use codex_app_server_protocol::RequestId;
 use codex_app_server_protocol::ServerNotification;
 use codex_app_server_protocol::ServerRequest;
 use codex_app_server_protocol::ServerResponse;
-use codex_plugin::PluginTelemetryMetadata;
 use codex_protocol::config_types::ApprovalsReviewer;
 use codex_protocol::config_types::ModeKind;
 use codex_protocol::config_types::Personality;
@@ -35,7 +34,6 @@ use codex_protocol::protocol::TokenUsage;
 use codex_protocol::request_permissions::RequestPermissionsResponse;
 use codex_utils_path_uri::PathUri;
 use serde::Serialize;
-use std::collections::BTreeMap;
 use std::path::PathBuf;
 use std::sync::Arc;
 
@@ -59,7 +57,6 @@ pub struct ArtifactOperation {
     pub item_id: String,
     pub lifecycle: ArtifactOperationLifecycle,
     pub occurred_at_ms: u64,
-    pub plugin_id: String,
     pub script_path: String,
     pub skill: String,
     pub artifact_type: String,
@@ -192,8 +189,6 @@ pub struct TurnResolvedConfigFact {
     pub turn_id: String,
     pub thread_id: String,
     pub turn_metadata: Arc<dyn TurnAnalyticsMetadata>,
-    /// Observed active plugin inventory. None is unknown; Some([]) is observed empty.
-    pub active_plugin_ids_at_turn_start: Option<Vec<String>>,
     pub num_input_images: usize,
     pub submission_type: Option<TurnSubmissionType>,
     pub ephemeral: bool,
@@ -381,8 +376,6 @@ impl From<InputError> for TurnSteerRejectionReason {
 pub struct SkillInvocation {
     pub skill_name: String,
     pub location: SkillInvocationLocation,
-    pub plugin_id: Option<String>,
-    pub remote_plugin_id: Option<String>,
     pub invocation_type: InvocationType,
 }
 
@@ -617,11 +610,6 @@ pub(crate) enum CustomAnalyticsFact {
     AppUsed(AppUsedInput),
     McpToolCallElicitation(McpToolCallElicitation),
     HookRun(HookRunInput),
-    PluginUsed(PluginUsedInput),
-    PluginInstallRequested(PluginInstallRequestedInput),
-    PluginStateChanged(PluginStateChangedInput),
-    PluginInstallFailed(PluginInstallFailedInput),
-    PluginMeasurements(PluginMeasurementsInput),
     ExternalAgentConfigImportCompleted(ExternalAgentConfigImportCompletedInput),
     ExternalAgentConfigImportFailure(ExternalAgentConfigImportFailureInput),
 }
@@ -631,27 +619,7 @@ pub(crate) struct ArtifactOperationInput {
     pub operation: ArtifactOperation,
 }
 
-#[derive(Clone, Debug, PartialEq)]
-pub struct PluginMeasurementRow {
-    pub measurement_name: String,
-    pub number_value: f64,
-    pub dimensions: BTreeMap<String, String>,
-}
-
-#[derive(Clone, Debug, PartialEq)]
-pub struct PluginMeasurementsInput {
-    pub thread_id: String,
-    pub turn_id: String,
-    pub item_id: String,
-    pub originator: String,
-    pub model_slug: Option<String>,
-    pub reasoning_effort: Option<String>,
-    pub plugin_id: String,
-    pub execution_id: String,
-    pub operation: String,
-    pub rows: Vec<PluginMeasurementRow>,
-}
-
+#[derive(Clone)]
 pub(crate) struct SkillInvokedInput {
     pub tracking: TrackEventsContext,
     pub invocations: Vec<SkillInvocation>,
@@ -681,57 +649,6 @@ pub struct HookRunFact {
     pub status: HookRunStatus,
 }
 
-pub(crate) struct PluginUsedInput {
-    pub tracking: TrackEventsContext,
-    pub plugin: PluginTelemetryMetadata,
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
-#[serde(rename_all = "snake_case")]
-pub enum PluginInstallRequestSource {
-    EndpointRecommendation,
-    LegacyDiscovery,
-}
-
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct PluginInstallRequested {
-    pub suggestion_id: String,
-    pub plugins: Vec<PluginInstallRequestedPlugin>,
-    pub source: PluginInstallRequestSource,
-}
-
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct PluginInstallRequestedPlugin {
-    pub plugin_id: String,
-    pub remote_plugin_id: Option<String>,
-    pub plugin_name: String,
-    pub connector_ids: Vec<String>,
-}
-
-pub(crate) struct PluginInstallRequestedInput {
-    pub tracking: TrackEventsContext,
-    pub request: PluginInstallRequested,
-}
-
-pub(crate) struct PluginStateChangedInput {
-    pub plugin: PluginTelemetryMetadata,
-    pub state: PluginState,
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
-#[serde(rename_all = "snake_case")]
-pub enum PluginInstallSource {
-    Manual,
-    ExternalAgentMigration,
-}
-
-pub(crate) struct PluginInstallFailedInput {
-    pub plugin: PluginTelemetryMetadata,
-    pub source: PluginInstallSource,
-    pub error_type: String,
-    pub sub_error_type: Option<String>,
-}
-
 pub struct ExternalAgentConfigImportCompletedInput {
     pub import_id: String,
     pub source: String,
@@ -749,12 +666,4 @@ pub struct ExternalAgentConfigImportFailureInput {
     pub failure_stage: String,
     pub error_type: String,
     pub sub_error_type: Option<String>,
-}
-
-#[derive(Clone, Copy)]
-pub(crate) enum PluginState {
-    Installed,
-    Uninstalled,
-    Enabled,
-    Disabled,
 }

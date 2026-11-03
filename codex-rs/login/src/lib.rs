@@ -7,30 +7,11 @@ pub use auth::WorkspaceRoutingRequest;
 pub use auth::WorkspaceRoutingResolver;
 pub use auth::WorkspaceRoutingSession;
 
-mod callback_params;
-mod device_code_auth;
 mod oauth;
-mod oauth_session;
 mod outbound_proxy;
-mod pkce;
-mod server;
-mod success_page;
 
-pub use callback_params::LoginCallbackResult;
-pub use callback_params::LoginOnboardingEntrypoint;
 pub use codex_config::types::AuthCredentialsStoreMode;
 pub use codex_http_client::BuildCustomCaTransportError as BuildLoginHttpClientError;
-pub use device_code_auth::DeviceCode;
-pub use device_code_auth::complete_device_code_login;
-pub use device_code_auth::request_device_code;
-pub use device_code_auth::run_device_code_login;
-pub use server::LoginServer;
-pub use server::ServerOptions;
-pub use server::ShutdownHandle;
-pub use server::run_login_server;
-pub use success_page::CODEX_OPEN_APP_URL;
-pub use success_page::LoginSuccessPage;
-pub use success_page::LoginSuccessPageBrand;
 
 pub use auth::AccountOAuthGrant;
 pub use auth::AccountOAuthGrantLease;
@@ -62,12 +43,8 @@ pub use auth::UnauthorizedRecovery;
 pub use auth::default_client;
 pub use auth::enforce_login_restrictions;
 pub use auth::load_auth_dot_json;
-pub use auth::login_with_access_token;
 pub use auth::login_with_api_key;
-pub use auth::login_with_bedrock_access_keys;
-pub use auth::login_with_bedrock_api_key;
 pub use auth::logout;
-pub use auth::logout_with_revoke;
 pub use auth::oauth_client_id;
 pub use auth::read_codex_access_token_from_env;
 pub use auth::read_openai_api_key_from_env;
@@ -76,22 +53,3 @@ pub use auth_env_telemetry::AuthEnvTelemetry;
 pub use auth_env_telemetry::collect_auth_env_telemetry;
 pub use outbound_proxy::AuthRouteConfig;
 pub use token_data::TokenData;
-
-// Existing inference-gateway names continue to refer to the same grant manager.
-pub use oauth_session::OAuthLoginControl as GatewayLoginControl;
-pub use oauth_session::OAuthSessionConfig as GatewayAuthConfig;
-pub use oauth_session::OAuthSessionError as GatewayAuthError;
-pub use oauth_session::OAuthSessionManager as GatewayAuthManager;
-pub use oauth_session::OAuthSessionStatus as GatewayAuthStatus;
-pub use oauth_session::OAuthSessionStatusChange as GatewayAuthStatusChange;
-pub use oauth_session::subscribe_oauth_session_status as subscribe_gateway_auth_status;
-
-pub use oauth_session::OAuthLoginControl;
-pub use oauth_session::OAuthRequestCredentials;
-pub use oauth_session::OAuthSessionConfig;
-pub use oauth_session::OAuthSessionError;
-pub use oauth_session::OAuthSessionManager;
-pub use oauth_session::OAuthSessionRequest;
-pub use oauth_session::OAuthSessionStatus;
-pub use oauth_session::OAuthSessionStatusChange;
-pub use oauth_session::subscribe_oauth_session_status;

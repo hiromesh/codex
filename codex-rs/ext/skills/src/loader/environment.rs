@@ -1,4 +1,3 @@
-use std::collections::HashMap;
 use std::io;
 
 use codex_exec_server::CapabilityRootDiscovery;
@@ -13,7 +12,6 @@ use codex_skills::SkillDependencies;
 use codex_skills::SkillPolicy;
 use codex_skills::parse_skill_frontmatter_metadata;
 use codex_utils_path_uri::PathUri;
-use codex_utils_plugins::SkillDiscoveryMode;
 use futures::StreamExt;
 
 use super::MAX_QUALIFIED_NAME_LEN;
@@ -26,7 +24,6 @@ use super::discovery::SkillMetadataDiscovery;
 use super::discovery::discover_skills;
 use super::metadata::sanitize_single_line;
 use super::metadata::validate_len;
-use super::namespace::SkillNamespaceResolver;
 use codex_skills::parse_skill_metadata;
 
 struct ParsedEnvironmentSkill {
@@ -122,7 +119,6 @@ pub async fn load_environment_skills_from_root(
         SkillDiscoveryOptions {
             directory_symlinks: DirectorySymlinkPolicy::Follow,
             hidden_directories: HiddenDirectoryPolicy::Include,
-            mode: SkillDiscoveryMode::Recursive,
         },
     )
     .await;
@@ -131,19 +127,6 @@ pub async fn load_environment_skills_from_root(
     if discovery.skills.is_empty() {
         return outcome;
     }
-
-    let skill_paths = discovery
-        .skills
-        .iter()
-        .map(|skill| skill.path.clone())
-        .collect::<Vec<_>>();
-    let namespace_resolver = SkillNamespaceResolver::discover(
-        file_system,
-        root,
-        &skill_paths,
-        discovery.plugin_roots,
-        discovery.namespace_roots,
-    );
 
     // Remote executors can multiplex these independent per-skill reads, so polling a bounded
     // number together allows the I/O for each skill and its metadata to happen concurrently.
@@ -159,19 +142,15 @@ pub async fn load_environment_skills_from_root(
         })
         .buffered(MAX_CONCURRENT_SKILL_LOADS)
         .collect::<Vec<_>>();
-    let (namespace_resolver, skill_results) = tokio::join!(namespace_resolver, skill_results);
 
     for (path, result) in skill_results {
         let result = result.and_then(|skill| {
-            let name = namespace_resolver
-                .for_skill(root, &skill.path_to_skills_md)
-                .qualify(&skill.base_name);
-            validate_len(&name, MAX_QUALIFIED_NAME_LEN, "qualified name")
+            validate_len(&skill.base_name, MAX_QUALIFIED_NAME_LEN, "qualified name")
                 .map_err(|err| err.to_string())?;
 
             Ok(EnvironmentSkillMetadata {
                 path_to_skills_md: skill.path_to_skills_md,
-                name,
+                name: skill.base_name,
                 description: skill.description,
                 short_description: skill.short_description,
                 dependencies: skill.dependencies,
@@ -212,31 +191,7 @@ pub fn load_environment_skills_from_discovery(
         return outcome;
     }
 
-    let mut plugin_namespaces = HashMap::new();
-    for (plugin_root, name) in discovery.namespace_manifests.iter().filter_map(|manifest| {
-        #[derive(serde::Deserialize)]
-        struct ManifestName {
-            #[serde(default)]
-            name: String,
-        }
-
-        let plugin_root = manifest.path.parent()?.parent()?;
-        let parsed = serde_json::from_str::<ManifestName>(&manifest.contents).ok()?;
-        let name = if parsed.name.trim().is_empty() {
-            plugin_root.basename()?
-        } else {
-            parsed.name
-        };
-        Some((plugin_root, name))
-    }) {
-        // Exec-server orders manifests by the same precedence as local discovery. Preserve the
-        // first manifest if an older or alternate server returns duplicates for one plugin root.
-        plugin_namespaces.entry(plugin_root).or_insert(name);
-    }
-
     for skill in &discovery.skills {
-        let plugin_namespace =
-            nearest_plugin_namespace(&skill.instructions.path, &plugin_namespaces);
         let ParsedSkillFrontmatter {
             name: base_name,
             description,
@@ -253,9 +208,7 @@ pub fn load_environment_skills_from_discovery(
                 continue;
             }
         };
-        let name = plugin_namespace
-            .map(|namespace| format!("{namespace}:{base_name}"))
-            .unwrap_or(base_name);
+        let name = base_name;
         if let Err(error) = validate_len(&name, MAX_QUALIFIED_NAME_LEN, "qualified name") {
             outcome.warnings.push(format!(
                 "Failed to load environment skill at {}: {error}",
@@ -304,19 +257,6 @@ pub fn load_environment_skills_from_discovery(
     outcome
 }
 
-fn nearest_plugin_namespace<'a>(
-    skill_path: &PathUri,
-    plugin_namespaces: &'a HashMap<PathUri, String>,
-) -> Option<&'a str> {
-    let mut ancestor = skill_path.parent();
-    while let Some(path) = ancestor {
-        if let Some(namespace) = plugin_namespaces.get(&path) {
-            return Some(namespace);
-        }
-        ancestor = path.parent();
-    }
-    None
-}
 async fn read_skill_contents(
     file_system: &dyn EnvironmentAccess,
     skill_path: &PathUri,

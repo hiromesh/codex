@@ -90,7 +90,6 @@ async fn listener_shutdown_releases_runtime_and_preserves_other_subscribers(
         /*state_db*/ None,
         /*log_db*/ None,
         skills_watcher.clone(),
-        /*turn_cost_worker*/ None,
         Vec::new(),
         Arc::new(SampleResponseRegistry::default()),
     );

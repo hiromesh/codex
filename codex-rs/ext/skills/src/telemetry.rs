@@ -1,4 +1,3 @@
-use std::collections::HashSet;
 use std::sync::Arc;
 use std::sync::Mutex;
 use std::sync::Weak;
@@ -16,13 +15,6 @@ use codex_protocol::openai_models::ModelInfo;
 
 use crate::state::SkillsSessionState;
 
-/// Attributes a successful host skill invocation to its turn's plugin latency metrics.
-pub fn record_plugin_turn_usage(turn_store: &ExtensionData, plugin_id: Option<&str>) {
-    if let Some(turn) = turn_store.get::<SkillTurnMetrics>() {
-        turn.record_plugin(plugin_id);
-    }
-}
-
 pub(crate) struct SkillTurnMetrics {
     pub(crate) turn_id: String,
     pub(crate) turn_metadata: Option<Arc<dyn codex_analytics::TurnAnalyticsMetadata>>,
@@ -34,21 +26,18 @@ pub(crate) struct SkillTurnMetrics {
 
 #[derive(Default)]
 struct TurnUsage {
-    plugins: HashSet<String>,
     failed: bool,
 }
 
 impl SkillTurnMetrics {
-    pub(crate) fn record_plugin(&self, plugin_id: Option<&str>) {
+    pub(crate) fn mark_failed(&self) {
         if let Some(usage) = self
             .usage
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner)
             .as_mut()
         {
-            usage
-                .plugins
-                .insert(plugin_id.unwrap_or("unattributed").to_string());
+            usage.failed = true;
         }
     }
 
@@ -75,19 +64,15 @@ impl SkillTurnMetrics {
         // Seconds keep multi-minute turns within the standard histogram buckets.
         // Round up so integer-second bucket boundaries classify fractional durations correctly.
         let duration_seconds = self.started_at.elapsed().as_secs_f64().ceil() as i64;
-        for plugin_id in usage.plugins {
-            let plugin_id = sanitize_metric_tag_value(&plugin_id);
-            metrics.histogram(
-                "codex.skill.turn.duration_seconds",
-                duration_seconds,
-                &[
-                    ("plugin_id", plugin_id.as_str()),
-                    ("model_slug", self.model_slug.as_str()),
-                    ("reasoning_effort", self.reasoning_effort.as_str()),
-                    ("status", status),
-                ],
-            );
-        }
+        metrics.histogram(
+            "codex.skill.turn.duration_seconds",
+            duration_seconds,
+            &[
+                ("model_slug", self.model_slug.as_str()),
+                ("reasoning_effort", self.reasoning_effort.as_str()),
+                ("status", status),
+            ],
+        );
     }
 }
 
@@ -150,14 +135,8 @@ impl TurnLifecycleContributor for SkillTelemetry {
 
     fn on_turn_error<'a>(&'a self, input: TurnErrorInput<'a>) -> ExtensionFuture<'a, ()> {
         Box::pin(async move {
-            if let Some(turn) = input.turn_store.get::<SkillTurnMetrics>()
-                && let Some(usage) = turn
-                    .usage
-                    .lock()
-                    .unwrap_or_else(std::sync::PoisonError::into_inner)
-                    .as_mut()
-            {
-                usage.failed = true;
+            if let Some(turn) = input.turn_store.get::<SkillTurnMetrics>() {
+                turn.mark_failed();
             }
         })
     }

@@ -27,7 +27,6 @@ pub(super) async fn load_host_skill_metadata(
     file_system: &dyn ExecutorFileSystem,
     skill_path: &AbsolutePathBuf,
     metadata: &SkillMetadataDiscovery,
-    plugin_root: Option<&AbsolutePathBuf>,
 ) -> LoadedSkillMetadata {
     // Fail open: optional metadata should not block loading SKILL.md.
     let Some(skill_dir) = skill_path.parent() else {
@@ -92,10 +91,7 @@ pub(super) async fn load_host_skill_metadata(
         dependencies,
         policy,
     } = parsed;
-    let asset_policy = match plugin_root {
-        Some(plugin_root) => SkillInterfaceAssetPolicy::PluginShared { plugin_root },
-        None => SkillInterfaceAssetPolicy::LocalOnly,
-    };
+    let asset_policy = SkillInterfaceAssetPolicy::LocalOnly;
     LoadedSkillMetadata {
         interface: resolve_skill_interface(interface, &skill_dir, asset_policy),
         dependencies,

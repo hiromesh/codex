@@ -1262,31 +1262,6 @@ pub enum ResponseItem {
         #[ts(optional)]
         internal_chat_message_metadata_passthrough: Option<InternalChatMessageMetadataPassthrough>,
     },
-    // Emitted by the Responses API when the agent triggers image generation.
-    // Example payload:
-    // {
-    //   "id":"ig_123",
-    //   "type":"image_generation_call",
-    //   "status":"completed",
-    //   "revised_prompt":"A gray tabby cat hugging an otter...",
-    //   "result":"..."
-    // }
-    ImageGenerationCall {
-        #[serde(default, skip_serializing_if = "Option::is_none")]
-        #[ts(optional)]
-        encrypted_content: Option<String>,
-        #[serde(default, skip_serializing_if = "Option::is_none")]
-        #[ts(optional)]
-        id: Option<ResponseItemId>,
-        status: String,
-        #[serde(default, skip_serializing_if = "Option::is_none")]
-        #[ts(optional)]
-        revised_prompt: Option<String>,
-        result: String,
-        #[serde(default, skip_serializing_if = "Option::is_none")]
-        #[ts(optional)]
-        internal_chat_message_metadata_passthrough: Option<InternalChatMessageMetadataPassthrough>,
-    },
     #[serde(alias = "compaction_summary")]
     Compaction {
         #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -1343,9 +1318,6 @@ impl ResponseItem {
             | Self::WebSearchCall {
                 encrypted_content, ..
             }
-            | Self::ImageGenerationCall {
-                encrypted_content, ..
-            }
             | Self::ContextCompaction {
                 encrypted_content, ..
             } => *encrypted_content = None,
@@ -1378,7 +1350,6 @@ impl ResponseItem {
             Self::CustomToolCallOutput { .. } => "custom_tool_call_output",
             Self::ToolSearchOutput { .. } => "tool_search_output",
             Self::WebSearchCall { .. } => "web_search_call",
-            Self::ImageGenerationCall { .. } => "image_generation_call",
             Self::Compaction { .. } => "compaction",
             Self::ConfigurationUpdate { .. } => "configuration_update",
             Self::CompactionTrigger { .. } => "compaction_trigger",
@@ -1407,7 +1378,6 @@ impl ResponseItem {
             | Self::ToolSearchOutput { id, .. }
             | Self::WebSearchCall { id, .. }
             | Self::Reasoning { id, .. }
-            | Self::ImageGenerationCall { id, .. }
             | Self::Compaction { id, .. }
             | Self::ContextCompaction { id, .. } => id.as_ref(),
             Self::ConfigurationUpdate { .. } | Self::CompactionTrigger { .. } | Self::Other => None,
@@ -1429,7 +1399,6 @@ impl ResponseItem {
             | Self::ToolSearchOutput { id, .. }
             | Self::WebSearchCall { id, .. }
             | Self::Reasoning { id, .. }
-            | Self::ImageGenerationCall { id, .. }
             | Self::Compaction { id, .. }
             | Self::ContextCompaction { id, .. } => *id = new_id,
             Self::ConfigurationUpdate { .. } | Self::CompactionTrigger { .. } | Self::Other => {}
@@ -1451,7 +1420,6 @@ impl ResponseItem {
             Self::CustomToolCallOutput { .. } => Some("ctco"),
             Self::ToolSearchOutput { .. } => Some("tso"),
             Self::WebSearchCall { .. } => Some("ws"),
-            Self::ImageGenerationCall { .. } => Some("ig"),
             Self::Compaction { .. } | Self::ContextCompaction { .. } => Some("cmp"),
             Self::ConfigurationUpdate { .. } | Self::CompactionTrigger { .. } | Self::Other => None,
         }
@@ -1589,10 +1557,6 @@ impl ResponseItem {
                 internal_chat_message_metadata_passthrough: metadata,
                 ..
             }
-            | Self::ImageGenerationCall {
-                internal_chat_message_metadata_passthrough: metadata,
-                ..
-            }
             | Self::Compaction {
                 internal_chat_message_metadata_passthrough: metadata,
                 ..
@@ -1653,10 +1617,6 @@ impl ResponseItem {
                 ..
             }
             | Self::WebSearchCall {
-                internal_chat_message_metadata_passthrough: metadata,
-                ..
-            }
-            | Self::ImageGenerationCall {
                 internal_chat_message_metadata_passthrough: metadata,
                 ..
             }
@@ -2802,53 +2762,6 @@ mod tests {
                 },
                 detail: Some(DEFAULT_IMAGE_DETAIL),
             }]
-        );
-    }
-
-    #[test]
-    fn response_item_parses_image_generation_call() {
-        let item = serde_json::from_value::<ResponseItem>(serde_json::json!({
-            "id": "ig_123",
-            "type": "image_generation_call",
-            "status": "completed",
-            "revised_prompt": "A small blue square",
-            "result": "Zm9v",
-        }))
-        .expect("image generation item should deserialize");
-
-        assert_eq!(
-            item,
-            ResponseItem::ImageGenerationCall {
-                encrypted_content: None,
-                id: Some(ResponseItemId::with_suffix("ig", "123")),
-                status: "completed".to_string(),
-                revised_prompt: Some("A small blue square".to_string()),
-                result: "Zm9v".to_string(),
-                internal_chat_message_metadata_passthrough: None,
-            }
-        );
-    }
-
-    #[test]
-    fn response_item_parses_image_generation_call_without_revised_prompt() {
-        let item = serde_json::from_value::<ResponseItem>(serde_json::json!({
-            "id": "ig_123",
-            "type": "image_generation_call",
-            "status": "completed",
-            "result": "Zm9v",
-        }))
-        .expect("image generation item should deserialize");
-
-        assert_eq!(
-            item,
-            ResponseItem::ImageGenerationCall {
-                encrypted_content: None,
-                id: Some(ResponseItemId::with_suffix("ig", "123")),
-                status: "completed".to_string(),
-                revised_prompt: None,
-                result: "Zm9v".to_string(),
-                internal_chat_message_metadata_passthrough: None,
-            }
         );
     }
 

@@ -203,7 +203,6 @@ impl GoalAccountingState {
             | TurnItem::WebSearch(_)
             | TurnItem::ImageView(_)
             | TurnItem::Extension(_)
-            | TurnItem::ImageGeneration(_)
             | TurnItem::EnteredReviewMode(_)
             | TurnItem::ExitedReviewMode(_)
             | TurnItem::FileChange(_)

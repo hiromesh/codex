@@ -104,7 +104,6 @@ pub(crate) use worktree_startup::ManagedTuiWorktree;
 
 mod activation_key_guard;
 mod additional_dirs;
-mod analytics;
 mod app;
 mod app_backtrack;
 mod app_command;
@@ -176,7 +175,6 @@ pub(crate) mod live_wrap;
 mod local_settings;
 mod rendered_selection;
 pub use live_wrap::RowBuilder;
-mod local_chatgpt_auth;
 mod managed_new_thread_defaults;
 mod markdown;
 mod markdown_render;

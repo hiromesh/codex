@@ -95,7 +95,6 @@ fn permission_request_timeout_only_counts_synchronous_handlers() {
     let command = "echo synchronous permission hook";
     let synchronous_handler = ConfiguredHandler {
         builtin: false,
-        plugin_trust: None,
         event_name: HookEventName::PermissionRequest,
         matcher: None,
         timeout_sec: 5,
@@ -2282,7 +2281,6 @@ fn executor_stop_hook_fixture() -> (
         engine.handlers.as_slice(),
         &[ConfiguredHandler {
             builtin: true,
-            plugin_trust: None,
             event_name: HookEventName::Stop,
             matcher: None,
             timeout_sec: 5,
@@ -2444,7 +2442,6 @@ async fn executor_stop_hooks_run_unless_regular_hooks_block_without_stopping() {
 
     Arc::make_mut(&mut engine.handlers).push(ConfiguredHandler {
         builtin: false,
-        plugin_trust: None,
         event_name: HookEventName::Stop,
         matcher: None,
         timeout_sec: 30,
@@ -2480,7 +2477,6 @@ async fn executor_stop_hooks_run_unless_regular_hooks_block_without_stopping() {
 
     Arc::make_mut(&mut engine.handlers).push(ConfiguredHandler {
         builtin: false,
-        plugin_trust: None,
         event_name: HookEventName::Stop,
         matcher: None,
         timeout_sec: 30,

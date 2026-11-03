@@ -97,7 +97,6 @@ fn normalize_image_details(items: &mut [ResponseItem], model_info: &ModelInfo) {
             | ResponseItem::CustomToolCall { .. }
             | ResponseItem::ToolSearchOutput { .. }
             | ResponseItem::WebSearchCall { .. }
-            | ResponseItem::ImageGenerationCall { .. }
             | ResponseItem::Compaction { .. }
             | ResponseItem::ConfigurationUpdate { .. }
             | ResponseItem::CompactionTrigger { .. }

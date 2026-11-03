@@ -935,92 +935,6 @@ client_request_definitions! {
         serialization: global_shared_read("config"),
         response: v2::HooksListResponse,
     },
-    MarketplaceAdd => "marketplace/add" {
-        params: v2::MarketplaceAddParams,
-        serialization: global("config"),
-        response: v2::MarketplaceAddResponse,
-    },
-    MarketplaceRemove => "marketplace/remove" {
-        params: v2::MarketplaceRemoveParams,
-        serialization: global("config"),
-        response: v2::MarketplaceRemoveResponse,
-    },
-    MarketplaceUpgrade => "marketplace/upgrade" {
-        params: v2::MarketplaceUpgradeParams,
-        serialization: global("config"),
-        response: v2::MarketplaceUpgradeResponse,
-    },
-    PluginList => "plugin/list" {
-        params: v2::PluginListParams,
-        serialization: None,
-        response: v2::PluginListResponse,
-    },
-    #[experimental("plugin/search")]
-    PluginSearch => "plugin/search" {
-        params: v2::PluginSearchParams,
-        serialization: None,
-        response: v2::PluginSearchResponse,
-    },
-    PluginInstalled => "plugin/installed" {
-        params: v2::PluginInstalledParams,
-        serialization: None,
-        response: v2::PluginInstalledResponse,
-    },
-    PluginReconcile => "plugin/reconcile" {
-        params: v2::PluginReconcileParams,
-        serialization: None,
-        response: v2::PluginReconcileResponse,
-    },
-    PluginRead => "plugin/read" {
-        params: v2::PluginReadParams,
-        serialization: None,
-        response: v2::PluginReadResponse,
-    },
-    PluginSkillRead => "plugin/skill/read" {
-        params: v2::PluginSkillReadParams,
-        serialization: global("config"),
-        response: v2::PluginSkillReadResponse,
-    },
-    PluginShareSave => "plugin/share/save" {
-        params: v2::PluginShareSaveParams,
-        serialization: global("config"),
-        response: v2::PluginShareSaveResponse,
-    },
-    PluginShareUpdateTargets => "plugin/share/updateTargets" {
-        params: v2::PluginShareUpdateTargetsParams,
-        serialization: global("config"),
-        response: v2::PluginShareUpdateTargetsResponse,
-    },
-    PluginShareList => "plugin/share/list" {
-        params: v2::PluginShareListParams,
-        serialization: global("config"),
-        response: v2::PluginShareListResponse,
-    },
-    PluginShareCheckout => "plugin/share/checkout" {
-        params: v2::PluginShareCheckoutParams,
-        serialization: global("config"),
-        response: v2::PluginShareCheckoutResponse,
-    },
-    PluginShareDelete => "plugin/share/delete" {
-        params: v2::PluginShareDeleteParams,
-        serialization: global("config"),
-        response: v2::PluginShareDeleteResponse,
-    },
-    AppsRead => "app/read" {
-        params: v2::AppsReadParams,
-        serialization: None,
-        response: v2::AppsReadResponse,
-    },
-    AppsList => "app/list" {
-        params: v2::AppsListParams,
-        serialization: None,
-        response: v2::AppsListResponse,
-    },
-    AppsInstalled => "app/installed" {
-        params: v2::AppsInstalledParams,
-        serialization: None,
-        response: v2::AppsInstalledResponse,
-    },
     // File system requests are intentionally concurrent. Desktop already treats local
     // file system operations as concurrent, and app-server remote fs mirrors that model.
     FsReadFile => "fs/readFile" {
@@ -1072,16 +986,6 @@ client_request_definitions! {
         params: v2::SkillsConfigWriteParams,
         serialization: global("config"),
         response: v2::SkillsConfigWriteResponse,
-    },
-    PluginInstall => "plugin/install" {
-        params: v2::PluginInstallParams,
-        serialization: global("config"),
-        response: v2::PluginInstallResponse,
-    },
-    PluginUninstall => "plugin/uninstall" {
-        params: v2::PluginUninstallParams,
-        serialization: global("config"),
-        response: v2::PluginUninstallResponse,
     },
     TurnStart => "turn/start" {
         params: v2::TurnStartParams,
@@ -1448,26 +1352,6 @@ client_request_definitions! {
         params: v2::ConfigReadParams,
         serialization: global_shared_read("config"),
         response: v2::ConfigReadResponse,
-    },
-    ExternalAgentConfigDetect => "externalAgentConfig/detect" {
-        params: v2::ExternalAgentConfigDetectParams,
-        serialization: global("external-agent-detect"),
-        response: v2::ExternalAgentConfigDetectResponse,
-    },
-    ExternalAgentConfigImport => "externalAgentConfig/import" {
-        params: v2::ExternalAgentConfigImportParams,
-        serialization: global("config"),
-        response: v2::ExternalAgentConfigImportResponse,
-    },
-    ExternalAgentConfigImportHistoryRecord => "externalAgentConfig/import/recordHistory" {
-        params: v2::ExternalAgentConfigImportHistoryRecordParams,
-        serialization: global("config"),
-        response: v2::ExternalAgentConfigImportHistoryRecordResponse,
-    },
-    ExternalAgentConfigImportHistoriesRead => "externalAgentConfig/import/readHistories" {
-        params: #[ts(type = "undefined")] #[serde(skip_serializing_if = "Option::is_none")] Option<()>,
-        serialization: global_shared_read("config"),
-        response: v2::ExternalAgentConfigImportHistoriesReadResponse,
     },
     ConfigValueWrite => "config/value/write" {
         params: v2::ConfigValueWriteParams,
@@ -2035,10 +1919,7 @@ server_notification_definitions! {
     AccountUpdated => "account/updated" (v2::AccountUpdatedNotification),
     GatewayOAuthChanged => "account/gatewayOAuth/changed" (v2::GatewayOAuthChangedNotification),
     AccountRateLimitsUpdated => "account/rateLimits/updated" (v2::AccountRateLimitsUpdatedNotification),
-    AppListUpdated => "app/list/updated" (v2::AppListUpdatedNotification),
     RemoteControlStatusChanged => "remoteControl/status/changed" (v2::RemoteControlStatusChangedNotification),
-    ExternalAgentConfigImportProgress => "externalAgentConfig/import/progress" (v2::ExternalAgentConfigImportProgressNotification),
-    ExternalAgentConfigImportCompleted => "externalAgentConfig/import/completed" (v2::ExternalAgentConfigImportCompletedNotification),
     FsChanged => "fs/changed" (v2::FsChangedNotification),
     ReasoningSummaryTextDelta => "item/reasoning/summaryTextDelta" (v2::ReasoningSummaryTextDeltaNotification),
     ReasoningSummaryPartAdded => "item/reasoning/summaryPartAdded" (v2::ReasoningSummaryPartAddedNotification),
@@ -2380,20 +2261,6 @@ mod tests {
             })
         );
 
-        let plugin_install = ClientRequest::PluginInstall {
-            request_id: request_id(),
-            params: v2::PluginInstallParams {
-                marketplace_path: Some(absolute_path("/tmp/marketplace")),
-                remote_marketplace_name: None,
-                install_attempt_id: None,
-                plugin_name: "plugin-a".to_string(),
-            },
-        };
-        assert_eq!(
-            plugin_install.serialization_scope(),
-            Some(ClientRequestSerializationScope::Global("config"))
-        );
-
         let skills_list = ClientRequest::SkillsList {
             request_id: request_id(),
             params: v2::SkillsListParams {
@@ -2423,46 +2290,6 @@ mod tests {
         };
         assert_eq!(
             skills_extra_roots_set.serialization_scope(),
-            Some(ClientRequestSerializationScope::Global("config"))
-        );
-
-        let plugin_list = ClientRequest::PluginList {
-            request_id: request_id(),
-            params: v2::PluginListParams {
-                cwds: None,
-                marketplace_kinds: None,
-                force_refetch: false,
-            },
-        };
-        assert_eq!(plugin_list.serialization_scope(), None);
-
-        let plugin_read = ClientRequest::PluginRead {
-            request_id: request_id(),
-            params: v2::PluginReadParams {
-                marketplace_path: Some(absolute_path("/tmp/marketplace")),
-                remote_marketplace_name: None,
-                plugin_name: "plugin-a".to_string(),
-            },
-        };
-        assert_eq!(plugin_read.serialization_scope(), None);
-
-        let plugin_installed = ClientRequest::PluginInstalled {
-            request_id: request_id(),
-            params: v2::PluginInstalledParams {
-                cwds: None,
-                install_suggestion_plugin_names: None,
-            },
-        };
-        assert_eq!(plugin_installed.serialization_scope(), None);
-
-        let plugin_uninstall = ClientRequest::PluginUninstall {
-            request_id: request_id(),
-            params: v2::PluginUninstallParams {
-                plugin_id: "plugin-a".to_string(),
-            },
-        };
-        assert_eq!(
-            plugin_uninstall.serialization_scope(),
             Some(ClientRequestSerializationScope::Global("config"))
         );
 
@@ -2562,17 +2389,6 @@ mod tests {
             Some(ClientRequestSerializationScope::Thread {
                 thread_id: "guardian-thread".to_string()
             })
-        );
-
-        let marketplace_remove = ClientRequest::MarketplaceRemove {
-            request_id: request_id(),
-            params: v2::MarketplaceRemoveParams {
-                marketplace_name: "marketplace".to_string(),
-            },
-        };
-        assert_eq!(
-            marketplace_remove.serialization_scope(),
-            Some(ClientRequestSerializationScope::Global("config"))
         );
 
         let add_credits_nudge = ClientRequest::SendAddCreditsNudgeEmail {
@@ -3731,115 +3547,6 @@ mod tests {
                 "method": "collaborationMode/list",
                 "id": 7,
                 "params": {}
-            }),
-            serde_json::to_value(&request)?,
-        );
-        Ok(())
-    }
-
-    #[test]
-    fn serialize_list_apps() -> Result<()> {
-        let request = ClientRequest::AppsList {
-            request_id: RequestId::Integer(8),
-            params: v2::AppsListParams::default(),
-        };
-        assert_eq!(
-            json!({
-                "method": "app/list",
-                "id": 8,
-                "params": {
-                    "cursor": null,
-                    "limit": null,
-                    "threadId": null
-                }
-            }),
-            serde_json::to_value(&request)?,
-        );
-        Ok(())
-    }
-
-    #[test]
-    fn serialize_installed_apps() -> Result<()> {
-        let request = ClientRequest::AppsInstalled {
-            request_id: RequestId::Integer(9),
-            params: v2::AppsInstalledParams::default(),
-        };
-        assert_eq!(
-            json!({
-                "method": "app/installed",
-                "id": 9,
-                "params": {
-                    "threadId": null
-                }
-            }),
-            serde_json::to_value(&request)?,
-        );
-
-        let force_refresh_request = ClientRequest::AppsInstalled {
-            request_id: RequestId::Integer(10),
-            params: v2::AppsInstalledParams {
-                thread_id: Some("thread-1".to_string()),
-                force_refresh: true,
-            },
-        };
-        assert_eq!(
-            json!({
-                "method": "app/installed",
-                "id": 10,
-                "params": {
-                    "threadId": "thread-1",
-                    "forceRefresh": true
-                }
-            }),
-            serde_json::to_value(&force_refresh_request)?,
-        );
-        Ok(())
-    }
-
-    #[test]
-    fn serialize_installed_apps_response() -> Result<()> {
-        let response = v2::AppsInstalledResponse {
-            apps: vec![v2::InstalledApp {
-                id: "demo-app".to_string(),
-                runtime_name: Some("Demo App".to_string()),
-                enabled: false,
-                callable: false,
-            }],
-        };
-
-        assert_eq!(
-            json!({
-                "apps": [{
-                    "id": "demo-app",
-                    "runtimeName": "Demo App",
-                    "enabled": false,
-                    "callable": false
-                }]
-            }),
-            serde_json::to_value(response)?,
-        );
-        Ok(())
-    }
-
-    #[test]
-    fn serialize_read_apps() -> Result<()> {
-        let request = ClientRequest::AppsRead {
-            request_id: RequestId::Integer(9),
-            params: v2::AppsReadParams {
-                app_ids: vec!["app-a".to_string(), "app-b".to_string()],
-                thread_id: None,
-                include_tools: true,
-            },
-        };
-        assert_eq!(
-            json!({
-                "method": "app/read",
-                "id": 9,
-                "params": {
-                    "appIds": ["app-a", "app-b"],
-                    "threadId": null,
-                    "includeTools": true
-                }
             }),
             serde_json::to_value(&request)?,
         );

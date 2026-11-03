@@ -1126,7 +1126,6 @@ fn is_api_message(message: &ResponseItem, metadata: Option<&CodexHarnessMetadata
         | ResponseItem::LocalShellCall { .. }
         | ResponseItem::Reasoning { .. }
         | ResponseItem::WebSearchCall { .. }
-        | ResponseItem::ImageGenerationCall { .. }
         | ResponseItem::Compaction { .. }
         | ResponseItem::ContextCompaction { .. } => true,
         ResponseItem::CompactionTrigger { .. } => false,
@@ -1267,17 +1266,6 @@ fn estimate_response_item_model_visible_bytes(item: &ResponseItem) -> i64 {
         ResponseItem::WebSearchCall { action, .. } => {
             action.as_ref().map(json_content_bytes).unwrap_or_default()
         }
-        ResponseItem::ImageGenerationCall {
-            revised_prompt,
-            result,
-            ..
-        } => text_bytes(revised_prompt.as_deref().unwrap_or_default()).saturating_add(
-            if result.is_empty() {
-                0
-            } else {
-                RESIZED_IMAGE_BYTES_ESTIMATE
-            },
-        ),
         ResponseItem::ContextCompaction {
             encrypted_content: None,
             ..
@@ -1422,7 +1410,6 @@ fn is_model_generated_item(item: &ResponseItem) -> bool {
         | ResponseItem::FunctionCall { .. }
         | ResponseItem::ToolSearchCall { .. }
         | ResponseItem::WebSearchCall { .. }
-        | ResponseItem::ImageGenerationCall { .. }
         | ResponseItem::CustomToolCall { .. }
         | ResponseItem::LocalShellCall { .. }
         | ResponseItem::Compaction { .. }

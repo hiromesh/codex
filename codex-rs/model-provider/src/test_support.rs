@@ -20,4 +20,3 @@ pub fn models_cache_entry(
     }
 }
 
-pub use crate::shared_state::test_support::seed_gateway_auth;

@@ -63,7 +63,6 @@ use crate::outgoing_message::OutgoingEnvelope;
 use crate::outgoing_message::OutgoingMessage;
 use crate::outgoing_message::OutgoingMessageSender;
 use crate::outgoing_message::QueuedOutgoingMessage;
-use crate::plugin_config_reload::PluginStartupConfig;
 use crate::transport::CHANNEL_CAPACITY;
 use crate::transport::OutboundConnectionState;
 use crate::transport::route_outgoing_envelope;
@@ -120,7 +119,6 @@ fn server_notification_requires_delivery(notification: &ServerNotification) -> b
             | ServerNotification::ThreadQueueChanged(_)
             | ServerNotification::ThreadSettingsUpdated(_)
             | ServerNotification::ThreadAttachmentUpdated(_)
-            | ServerNotification::ExternalAgentConfigImportCompleted(_)
             | ServerNotification::ItemCompleted(ItemCompletedNotification {
                 item: codex_app_server_protocol::ThreadItem {
                     payload: ThreadItemPayload::AgentMessage {
@@ -527,7 +525,6 @@ async fn start_uninitialized(mut args: InProcessStartArgs) -> IoResult<InProcess
                 installation_id,
                 rpc_transport: AppServerRpcTransport::InProcess,
                 remote_control_handle: None,
-                plugin_startup_tasks: Some(PluginStartupConfig::Current),
             }));
             let mut thread_created_rx = processor.thread_created_receiver();
             let session = Arc::new(ConnectionSessionState::new(
@@ -857,7 +854,6 @@ mod tests {
     use super::*;
     use codex_app_server_protocol::ClientInfo;
     use codex_app_server_protocol::ConfigRequirementsReadResponse;
-    use codex_app_server_protocol::ExternalAgentConfigImportCompletedNotification;
     use codex_app_server_protocol::SessionSource as ApiSessionSource;
     use codex_app_server_protocol::ThreadAttachmentAddParams;
     use codex_app_server_protocol::ThreadAttachmentOperation;
@@ -1139,14 +1135,6 @@ mod tests {
             &ServerNotification::ThreadQueueChanged(ThreadQueueChangedNotification {
                 thread_id: "thread-1".to_string(),
             })
-        ));
-        assert!(server_notification_requires_delivery(
-            &ServerNotification::ExternalAgentConfigImportCompleted(
-                ExternalAgentConfigImportCompletedNotification {
-                    import_id: "import".to_string(),
-                    item_type_results: Vec::new(),
-                },
-            )
         ));
         assert!(server_notification_requires_delivery(
             &ServerNotification::ThreadAttachmentUpdated(ThreadAttachmentUpdatedNotification {

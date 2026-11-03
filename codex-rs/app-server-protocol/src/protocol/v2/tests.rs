@@ -116,22 +116,6 @@ fn mcp_oauth_login_response_accepts_older_servers_without_login_id() {
 }
 
 #[test]
-fn external_agent_config_detect_response_defaults_connectors_for_older_servers() {
-    let response = serde_json::from_value::<ExternalAgentConfigDetectResponse>(json!({
-        "items": [],
-    }))
-    .expect("older detect response should deserialize");
-
-    assert_eq!(
-        response,
-        ExternalAgentConfigDetectResponse {
-            items: Vec::new(),
-            connectors: Vec::new(),
-        }
-    );
-}
-
-#[test]
 fn thread_background_terminals_list_response_round_trips_foreign_paths() {
     for (uri, expected_cwd) in [
         ("file:///home/alice/repo", "/home/alice/repo"),
@@ -677,81 +661,6 @@ fn collab_agent_state_maps_interrupted_status() {
         CollabAgentState {
             status: CollabAgentStatus::Interrupted,
             message: None,
-        }
-    );
-}
-
-#[test]
-fn external_agent_config_plugins_details_round_trip() {
-    let item: ExternalAgentConfigMigrationItem = serde_json::from_value(json!({
-        "itemType": "PLUGINS",
-        "description": "Install supported plugins from Claude settings",
-        "cwd": absolute_path_string("repo"),
-        "details": {
-            "plugins": [
-                {
-                    "marketplaceName": "team-marketplace",
-                    "pluginNames": ["asana"]
-                }
-            ]
-        }
-    }))
-    .expect("plugins migration item should deserialize");
-
-    assert_eq!(
-        item,
-        ExternalAgentConfigMigrationItem {
-            item_type: ExternalAgentConfigMigrationItemType::Plugins,
-            description: "Install supported plugins from Claude settings".to_string(),
-            cwd: Some(PathBuf::from(absolute_path_string("repo"))),
-            details: Some(MigrationDetails {
-                plugins: vec![PluginsMigration {
-                    marketplace_name: "team-marketplace".to_string(),
-                    plugin_names: vec!["asana".to_string()],
-                }],
-                ..Default::default()
-            }),
-        }
-    );
-}
-
-#[test]
-fn external_agent_config_import_params_accept_legacy_plugin_details() {
-    let params: ExternalAgentConfigImportParams = serde_json::from_value(json!({
-        "migrationItems": [{
-            "itemType": "PLUGINS",
-            "description": "Install supported plugins from Claude settings",
-            "cwd": absolute_path_string("repo"),
-            "details": {
-                "plugins": [
-                    {
-                        "marketplaceName": "team-marketplace",
-                        "pluginNames": ["asana"]
-                    }
-                ]
-            }
-        }]
-    }))
-    .expect("legacy plugin import params should deserialize");
-
-    assert_eq!(
-        params,
-        ExternalAgentConfigImportParams {
-            migration_items: vec![ExternalAgentConfigMigrationItem {
-                item_type: ExternalAgentConfigMigrationItemType::Plugins,
-                description: "Install supported plugins from Claude settings".to_string(),
-                cwd: Some(PathBuf::from(absolute_path_string("repo"))),
-                details: Some(MigrationDetails {
-                    plugins: vec![PluginsMigration {
-                        marketplace_name: "team-marketplace".to_string(),
-                        plugin_names: vec!["asana".to_string()],
-                    }],
-                    ..Default::default()
-                }),
-            }],
-            source: None,
-            provider_id: None,
-            migration_source: None,
         }
     );
 }

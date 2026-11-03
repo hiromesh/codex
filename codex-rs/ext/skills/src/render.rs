@@ -18,7 +18,6 @@ use crate::catalog_prompt::SkillPrompt;
 use crate::catalog_prompt::SkillPromptKind;
 use crate::catalog_prompt::render_available_skills_body;
 use crate::fragments::AvailableSkillsInstructions;
-use crate::host_aliases::shared_host_alias_roots;
 
 const DEFAULT_SKILL_METADATA_CHAR_BUDGET: usize = 8_000;
 const MAX_CONFIGURED_SKILL_METADATA_TOKEN_BUDGET: usize = 10_000;
@@ -1077,7 +1076,11 @@ pub(crate) fn build_alias_plan(entries: &[&SkillCatalogEntry]) -> Option<AliasPl
     let mut alias_ordered_entries = entries.to_vec();
     alias_ordered_entries.sort_by_key(|entry| entry.alias_root_order().unwrap_or(usize::MAX));
     let roots = match source {
-        SkillSourceKind::Host => shared_host_alias_roots(&alias_ordered_entries),
+        SkillSourceKind::Host => alias_ordered_entries
+            .iter()
+            .filter_map(|entry| entry.alias_root())
+            .map(str::to_string)
+            .collect(),
         SkillSourceKind::Executor | SkillSourceKind::Cloud => alias_ordered_entries
             .iter()
             .filter_map(|entry| entry.alias_root())

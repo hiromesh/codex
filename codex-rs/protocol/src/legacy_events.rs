@@ -13,7 +13,6 @@ use crate::items::DynamicToolCallStatus;
 use crate::items::EnteredReviewModeItem;
 use crate::items::ExitedReviewModeItem;
 use crate::items::FileChangeItem;
-use crate::items::ImageGenerationItem;
 use crate::items::McpToolCallItem;
 use crate::items::ReasoningItem;
 use crate::items::SubAgentActivityItem;
@@ -46,8 +45,6 @@ use crate::protocol::ExecCommandBeginEvent;
 use crate::protocol::ExecCommandEndEvent;
 use crate::protocol::ExecCommandStatus;
 use crate::protocol::ExitedReviewModeEvent;
-use crate::protocol::ImageGenerationBeginEvent;
-use crate::protocol::ImageGenerationEndEvent;
 use crate::protocol::ItemCompletedEvent;
 use crate::protocol::ItemStartedEvent;
 use crate::protocol::McpInvocation;
@@ -65,7 +62,6 @@ use crate::protocol::ViewImageToolCallEvent;
 use crate::protocol::WebSearchBeginEvent;
 use crate::protocol::WebSearchEndEvent;
 use crate::user_input::UserInput;
-use codex_extension_items::image_generation::GeneratedImageRef;
 
 /// Converts canonical item lifecycle events back into the legacy raw event stream used by
 /// compatibility consumers that have not migrated to `TurnItem`.
@@ -456,24 +452,6 @@ impl WebSearchItem {
     }
 }
 
-impl ImageGenerationItem {
-    pub fn as_legacy_event(&self) -> EventMsg {
-        EventMsg::ImageGenerationEnd(ImageGenerationEndEvent {
-            call_id: self.id.clone(),
-            status: self.status.clone(),
-            revised_prompt: self.revised_prompt.clone(),
-            image: GeneratedImageRef::Inline {
-                result: self.result.clone(),
-            },
-            transparent_background: None,
-            failure: None,
-            saved_path: self.saved_path.clone(),
-            input_images: Vec::new(),
-            generation_id: None,
-        })
-    }
-}
-
 impl FileChangeItem {
     pub fn as_legacy_begin_event(&self, turn_id: String) -> EventMsg {
         EventMsg::PatchApplyBegin(PatchApplyBeginEvent {
@@ -567,7 +545,6 @@ impl TurnItem {
                 })]
             }
             TurnItem::Extension(_) => Vec::new(),
-            TurnItem::ImageGeneration(item) => vec![item.as_legacy_event()],
             TurnItem::EnteredReviewMode(_) | TurnItem::ExitedReviewMode(_) => Vec::new(),
             TurnItem::FileChange(item) => item
                 .as_legacy_end_event(String::new())
@@ -590,11 +567,6 @@ impl HasLegacyEvent for ItemStartedEvent {
                 call_id: item.id.clone(),
             })],
             TurnItem::ImageView(_) => Vec::new(),
-            TurnItem::ImageGeneration(item) => {
-                vec![EventMsg::ImageGenerationBegin(ImageGenerationBeginEvent {
-                    call_id: item.id.clone(),
-                })]
-            }
             TurnItem::FileChange(item) => vec![item.as_legacy_begin_event(self.turn_id.clone())],
             TurnItem::McpToolCall(item) => vec![item.as_legacy_begin_event(self.turn_id.clone())],
             TurnItem::CommandExecution(item) => {

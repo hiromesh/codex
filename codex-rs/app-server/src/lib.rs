@@ -30,7 +30,6 @@ use crate::outgoing_message::ConnectionId;
 use crate::outgoing_message::OutgoingEnvelope;
 use crate::outgoing_message::OutgoingMessageSender;
 use crate::outgoing_message::QueuedOutgoingMessage;
-use crate::plugin_config_reload::PluginStartupConfig;
 use crate::transport::CHANNEL_CAPACITY;
 use crate::transport::ConnectionOrigin;
 use crate::transport::ConnectionState;
@@ -113,10 +112,8 @@ mod connection_rpc_gate;
 mod current_time;
 mod daemon_thread_recovery;
 mod dynamic_tools;
-mod effective_plugin_change;
 mod error_code;
 mod extensions;
-mod external_agent_migration;
 mod external_auth;
 mod filters;
 mod fs_watch;
@@ -136,7 +133,6 @@ mod notification_media;
 mod otel_config;
 mod otel_reloader;
 mod outgoing_message;
-mod plugin_config_reload;
 mod request_processors;
 mod request_serialization;
 mod server_request_error;
@@ -147,7 +143,6 @@ mod thread_state;
 mod thread_status;
 mod transport;
 mod turn_admission;
-mod turn_cost_worker;
 mod user_verification_response;
 
 pub use crate::error_code::INPUT_TOO_LARGE_ERROR_CODE;
@@ -458,17 +453,10 @@ pub enum AppServerExit {
     Forced,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum PluginStartupTasks {
-    Start,
-    Skip,
-}
-
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AppServerRuntimeOptions {
     /// Optional host-owned frozen cloud skill catalog and resources, loaded once at startup.
     pub cloud_skills_snapshot: Option<std::path::PathBuf>,
-    pub plugin_startup_tasks: PluginStartupTasks,
     pub remote_control_startup_mode: RemoteControlStartupMode,
     pub install_shutdown_signal_handler: bool,
     pub managed_daemon: bool,
@@ -478,7 +466,6 @@ impl Default for AppServerRuntimeOptions {
     fn default() -> Self {
         Self {
             cloud_skills_snapshot: None,
-            plugin_startup_tasks: PluginStartupTasks::Start,
             remote_control_startup_mode: RemoteControlStartupMode::ResolvePersisted,
             install_shutdown_signal_handler: true,
             managed_daemon: false,
@@ -552,7 +539,6 @@ pub async fn run_main_with_transport_options(
         .load_managed_startup_config(startup_cwd.clone())
         .await?;
     let mut config_warnings = Vec::new();
-    let mut plugin_startup_config = PluginStartupConfig::Current;
     let config = match startup.config {
         Ok(config) => config,
         Err(err) if is_unsupported_untrusted_approval_policy_error(&err) => {
@@ -565,7 +551,6 @@ pub async fn run_main_with_transport_options(
 
             let message = config_warning_from_error("Invalid configuration; using defaults.", &err);
             config_warnings.push(message);
-            plugin_startup_config = PluginStartupConfig::Defaults;
             config_manager.load_default_config().await.map_err(|e| {
                 std::io::Error::new(
                     ErrorKind::InvalidData,
@@ -978,11 +963,6 @@ pub async fn run_main_with_transport_options(
             installation_id,
             rpc_transport: analytics_rpc_transport(&transport),
             remote_control_handle: Some(remote_control_handle.clone()),
-            plugin_startup_tasks: matches!(
-                runtime_options.plugin_startup_tasks,
-                PluginStartupTasks::Start
-            )
-            .then_some(plugin_startup_config),
         });
         processor.remote_control_processor.daemon_settings_file = daemon_settings_file;
         let processor = Arc::new(processor);

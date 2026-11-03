@@ -179,7 +179,6 @@ impl<'call> ToolExecutor<ToolCall<'call>> for ReadTool {
                     SkillToolAuthoritySelector::Executor => "executor",
                 },
                 skill_name = %skill_entry.name,
-                skill_plugin_id = selected_source.plugin_id.as_deref(),
                 skill_resource_kind = if requested_resource == main_prompt {
                     "main_prompt"
                 } else {

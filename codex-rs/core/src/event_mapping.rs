@@ -231,21 +231,6 @@ pub fn parse_turn_item(item: &ResponseItem) -> Option<TurnItem> {
                 results: None,
             }))
         }
-        ResponseItem::ImageGenerationCall {
-            id,
-            status,
-            revised_prompt,
-            result,
-            ..
-        } => Some(TurnItem::ImageGeneration(
-            codex_protocol::items::ImageGenerationItem {
-                id: id.as_deref()?.to_string(),
-                status: status.clone(),
-                revised_prompt: revised_prompt.clone(),
-                result: result.clone(),
-                saved_path: None,
-            },
-        )),
         _ => None,
     }
 }

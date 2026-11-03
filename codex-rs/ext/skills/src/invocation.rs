@@ -17,10 +17,10 @@ use crate::catalog::SkillSourceKind;
 use crate::catalog::SkillSourceLocation;
 
 impl SkillCatalogEntry {
-    /// Uses merged identity and scope, with plugin attribution from the route actually used.
+    /// Uses merged identity and scope from the route actually used.
     pub(crate) fn invocation(
         &self,
-        source: &SkillSourceLocation,
+        _source: &SkillSourceLocation,
         invocation_type: InvocationType,
     ) -> SkillInvocation {
         SkillInvocation {
@@ -30,8 +30,6 @@ impl SkillCatalogEntry {
                 skill_id: self.canonical_skill_id.clone(),
                 scope: self.analytics_scope,
             },
-            plugin_id: source.plugin_id.clone(),
-            remote_plugin_id: self.remote_plugin_id.clone(),
             invocation_type,
         }
     }
@@ -61,8 +59,6 @@ pub fn detect_implicit_skill_invocation(
                 path: skill.path_to_skills_md,
                 scope: skill.scope,
             },
-            plugin_id: skill.plugin_id,
-            remote_plugin_id: skill.remote_plugin_id,
             invocation_type: InvocationType::Implicit,
         });
     }

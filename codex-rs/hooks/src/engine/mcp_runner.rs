@@ -37,34 +37,13 @@ pub(crate) async fn run_mcp_tool(
 ) -> HandlerRunResult {
     let started_at = chrono::Utc::now().timestamp();
     let started = Instant::now();
-    let timeout_started = tokio::time::Instant::now();
-    let duration = Duration::from_secs(handler.timeout_sec);
     let result = async {
-        if let Some(trust) = &handler.plugin_trust {
-            tokio::time::timeout(duration, trust.verify())
-                .await
-                .context("hook trust verification timed out")??;
-        }
         let input = expand_mcp_argument_template(argument_template, hook_event)?;
         let (environment_id, mut call_metadata) = match &handler.source_path {
             HandlerSourcePath::Local(_) => (None, None),
             HandlerSourcePath::Environment { environment_id, .. } => {
                 (Some(environment_id.clone()), None)
             }
-            HandlerSourcePath::ExecutorScoped {
-                environment_id,
-                mcp_environment_id,
-                mcp_metadata,
-                ..
-            } => (
-                Some(
-                    mcp_environment_id
-                        .as_ref()
-                        .unwrap_or(environment_id)
-                        .clone(),
-                ),
-                mcp_metadata.as_deref().cloned(),
-            ),
         };
         if let Some(metadata) = metadata {
             call_metadata
@@ -78,11 +57,7 @@ pub(crate) async fn run_mcp_tool(
                 environment_id,
                 metadata: call_metadata,
                 input,
-                timeout: if handler.plugin_trust.is_some() {
-                    duration.saturating_sub(timeout_started.elapsed())
-                } else {
-                    Duration::from_secs(handler.timeout_sec)
-                },
+                timeout: Duration::from_secs(handler.timeout_sec),
             })
             .await
     }

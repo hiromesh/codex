@@ -2681,8 +2681,7 @@ async fn try_run_sampling_request(
                         | ResponseItem::CustomToolCall { call_id, .. } => Some(call_id.as_str()),
                         ResponseItem::ToolSearchCall { call_id, .. }
                         | ResponseItem::LocalShellCall { call_id, .. } => call_id.as_deref(),
-                        ResponseItem::WebSearchCall { id, .. }
-                        | ResponseItem::ImageGenerationCall { id, .. } => {
+                        ResponseItem::WebSearchCall { id, .. } => {
                             id.as_ref().map(codex_protocol::ResponseItemId::as_str)
                         }
                         _ => None,
@@ -2765,7 +2764,6 @@ async fn try_run_sampling_request(
                     | ResponseItem::CustomToolCallOutput { .. }
                     | ResponseItem::ToolSearchOutput { .. }
                     | ResponseItem::WebSearchCall { .. }
-                    | ResponseItem::ImageGenerationCall { .. }
                     | ResponseItem::Compaction { .. }
                     | ResponseItem::ConfigurationUpdate { .. }
                     | ResponseItem::CompactionTrigger { .. }

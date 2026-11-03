@@ -23,7 +23,6 @@ async fn catalog_deadline_returns_request_timeout() {
     let endpoint = OpenAiModelsEndpoint::new(
         ModelProviderInfo::create_openai_provider(Some(server.uri())),
         /*auth_manager*/ None,
-        /*gateway_auth_manager*/ None,
     );
 
     tokio::time::pause();

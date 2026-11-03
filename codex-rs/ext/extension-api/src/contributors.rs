@@ -2,7 +2,6 @@ use std::future::Future;
 use std::pin::Pin;
 use std::sync::Arc;
 
-use codex_config::types::PluginsConfigToml;
 use codex_context_fragments::ContextualUserFragment;
 use codex_exec_server_protocol::ExecutorCapabilityDiscoverySnapshot;
 use codex_exec_server_protocol::ExecutorCapabilityDiscoveryV2Snapshot;
@@ -32,10 +31,6 @@ pub use approval_review::SynchronousApprovalReviewer;
 pub use context::TurnContextContributionInput;
 pub use mcp::McpServerContribution;
 pub use mcp::McpServerContributionContext;
-pub use mcp::SelectedPlugin;
-pub use mcp::SelectedPluginContribution;
-pub use mcp::SelectedPluginIdentity;
-pub use mcp::SelectedPluginSnapshot;
 pub use prompt::PromptFragment;
 pub use prompt::PromptSlot;
 pub use skill_invocation::SkillInvocationInput;
@@ -93,24 +88,6 @@ pub trait McpServerContributor<C: Sync>: Send + Sync {
         &'a self,
         context: McpServerContributionContext<'a, C>,
     ) -> ExtensionFuture<'a, Vec<McpServerContribution>>;
-
-    /// Reads canonical hosted-plugin IDs from published state without discovery or MCP I/O.
-    fn hosted_plugin_ids(&self, _context: McpServerContributionContext<'_, C>) -> Vec<String> {
-        Vec::new()
-    }
-
-    /// Declares executor plugins, including those without MCP servers or connectors. Each
-    /// declaration identifies the plugin once; its deferred MCP data cannot change that identity.
-    /// Return plugins in precedence order: across contributors in registration order, the first
-    /// plugin wins if several provide the same server. Use the supplied plugin policy for both
-    /// admission and deferred projection; a step's policy may be newer than its other config.
-    fn selected_plugins<'a>(
-        &'a self,
-        _context: McpServerContributionContext<'a, C>,
-        _plugins_config: &'a PluginsConfigToml,
-    ) -> ExtensionFuture<'a, Vec<SelectedPlugin<'a>>> {
-        Box::pin(async { Vec::new() })
-    }
 }
 
 /// Extension contribution that adds prompt fragments during prompt assembly.
@@ -368,8 +345,6 @@ pub struct StepPreparationInput<'a> {
     pub ready_selected_capability_roots: &'a [SelectedCapabilityRoot],
     pub executor_capability_discovery: Option<&'a ExecutorCapabilityDiscoverySnapshot>,
     pub executor_capability_discovery_v2: Option<&'a [ExecutorCapabilityDiscoveryV2Snapshot]>,
-    /// Captured plugin policy; an empty snapshot represents no selected plugins.
-    pub selected_plugins: &'a SelectedPluginSnapshot,
     pub session_store: &'a ExtensionData,
     pub thread_store: &'a ExtensionData,
     pub turn_store: &'a ExtensionData,

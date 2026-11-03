@@ -53,7 +53,6 @@ pub(crate) async fn make_test_app() -> Box<App> {
         last_thread_usage_status_cell: None,
         pending_thread_usage_history_refresh: false,
         overlay: None,
-        retained_analytics: None,
         deferred_history_lines: Vec::new(),
         has_emitted_history_lines: false,
         transcript_reflow: TranscriptReflowState::default(),

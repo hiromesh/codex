@@ -594,7 +594,6 @@ def generate_v2_all(schema_dir: Path, *, format_output: bool = True) -> None:
             cwd=sdk_root() if format_output else Path(td),
         )
     _preserve_inline_media_class_names(out_path)
-    _add_legacy_image_generation_thread_item_alias(out_path)
     _preserve_open_enum(out_path, "CodexErrorInfoValue", allow_empty=True)
     _preserve_reasoning_effort_enum(out_path)
     _preserve_thread_source_enum(out_path)
@@ -618,22 +617,6 @@ def _preserve_inline_media_class_names(out_path: Path) -> None:
         source = re.sub(rf"\b{re.escape(generated_name)}\b", stable_name, source)
 
     out_path.write_text(source)
-
-
-def _add_legacy_image_generation_thread_item_alias(out_path: Path) -> None:
-    """Keep the inline image-generation class import available after splitting the wire type."""
-    source = out_path.read_text()
-    class_start = source.find("class ResultThreadItem(BaseModel):")
-    if class_start == -1:
-        raise RuntimeError("Generated SDK is missing ResultThreadItem")
-    if re.search(r"\bImageGenerationThreadItem\b", source):
-        raise RuntimeError("Generated SDK already defines ImageGenerationThreadItem")
-    class_end = source.find("\n\nclass ", class_start)
-    if class_end == -1:
-        class_end = len(source)
-
-    alias = "\n\nImageGenerationThreadItem = ResultThreadItem\n"
-    out_path.write_text(source[:class_end] + alias + source[class_end:])
 
 
 def _preserve_reasoning_effort_enum(out_path: Path) -> None:

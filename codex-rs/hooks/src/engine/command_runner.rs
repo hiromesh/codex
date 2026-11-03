@@ -216,28 +216,6 @@ pub(crate) async fn run_command(
 ) -> HandlerRunResult {
     let started_at = chrono::Utc::now().timestamp();
     let started = Instant::now();
-    let timeout_started = tokio::time::Instant::now();
-    let duration = Duration::from_secs(handler.timeout_sec);
-    if let Some(trust) = &handler.plugin_trust {
-        let error = match timeout(duration, trust.verify()).await {
-            Ok(Ok(())) => None,
-            Ok(Err(err)) => Some(err.to_string()),
-            Err(_) => Some(format!("hook timed out after {}s", handler.timeout_sec)),
-        };
-        if let Some(error) = error {
-            return finish_command_run(
-                started_at,
-                started,
-                CommandRunCompletion {
-                    exit_code: None,
-                    stdout: String::new(),
-                    stderr: String::new(),
-                    error: Some(error),
-                    outcome: "trust_error",
-                },
-            );
-        }
-    }
 
     if let super::HandlerSourcePath::Environment { environment_id, .. } = &handler.source_path {
         let result = match &runtime.environment_executor {

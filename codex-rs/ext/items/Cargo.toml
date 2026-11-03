@@ -13,7 +13,6 @@ doctest = false
 workspace = true
 
 [dependencies]
-codex-utils-absolute-path = { workspace = true }
 schemars = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }

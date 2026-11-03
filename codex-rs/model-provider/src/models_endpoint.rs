@@ -18,7 +18,6 @@ use codex_http_client::HttpClientFactory;
 use codex_login::AuthEnvTelemetry;
 use codex_login::AuthManager;
 use codex_login::CodexAuth;
-use codex_login::GatewayAuthManager;
 use codex_login::collect_auth_env_telemetry;
 use codex_login::default_client::ClientRedirectPolicy;
 use codex_login::default_client::create_client_for_route_async;
@@ -39,7 +38,6 @@ use tokio::time::timeout;
 use crate::auth::ResolvedProviderAuth;
 use crate::auth::resolve_provider_auth;
 use crate::auth::uses_fedramp_api_key;
-use crate::combined_auth::compose_auth;
 use crate::provider::resolve_api_provider;
 
 const MODELS_REFRESH_TIMEOUT: Duration = Duration::from_secs(5);
@@ -51,7 +49,6 @@ const FEDRAMP_CODEX_BASE_URL: &str = "https://gov.chatgpt.com/backend-api/codex"
 pub(crate) struct OpenAiModelsEndpoint {
     provider_info: ModelProviderInfo,
     auth_manager: Option<Arc<AuthManager>>,
-    gateway_auth_manager: Option<Result<Arc<GatewayAuthManager>, String>>,
     transport_builder: Arc<dyn ModelsTransportBuilder>,
 }
 
@@ -59,7 +56,6 @@ impl OpenAiModelsEndpoint {
     pub(crate) fn new(
         provider_info: ModelProviderInfo,
         auth_manager: Option<Arc<AuthManager>>,
-        gateway_auth_manager: Option<Result<Arc<GatewayAuthManager>, String>>,
     ) -> Self {
         let redirect_policy = if provider_info.model_catalog_url.is_some() {
             ClientRedirectPolicy::Reject
@@ -69,7 +65,6 @@ impl OpenAiModelsEndpoint {
         Self {
             provider_info,
             auth_manager,
-            gateway_auth_manager,
             transport_builder: Arc::new(RouteAwareModelsTransportBuilder { redirect_policy }),
         }
     }
@@ -145,14 +140,7 @@ impl OpenAiModelsEndpoint {
             }
             .to_string();
         }
-        let primary = resolve_provider_auth(auth.as_ref(), &self.provider_info)?;
-        let resolved = compose_auth(
-            &self.provider_info,
-            self.gateway_auth_manager.as_ref(),
-            ResolvedProviderAuth::new(primary),
-        )
-        .await?;
-        let api_auth = resolved.auth;
+        let api_auth = resolve_provider_auth(auth.as_ref(), &self.provider_info)?;
         let request_url = match self.provider_info.model_catalog_url.as_deref() {
             Some(catalog_url) => ModelsClient::<ReqwestTransport>::catalog_request_url(
                 &api_provider,
@@ -244,7 +232,6 @@ impl ModelsEndpointClient for OpenAiModelsEndpoint {
         Some(Arc::new(Self {
             provider_info,
             auth_manager: self.auth_manager.clone(),
-            gateway_auth_manager: self.gateway_auth_manager.clone(),
             transport_builder: Arc::clone(&self.transport_builder),
         }))
     }
@@ -558,7 +545,6 @@ mod tests {
                     ..ModelProviderInfo::create_openai_provider(base_url.map(str::to_string))
                 },
                 auth_manager: Some(auth.clone()),
-                gateway_auth_manager: None,
                 transport_builder: capture.clone(),
             });
             let provider = crate::provider::create_model_provider(
@@ -632,7 +618,6 @@ mod tests {
                     ..ModelProviderInfo::create_openai_provider(/*base_url*/ None)
                 },
                 auth_manager: auth_manager.clone(),
-                gateway_auth_manager: None,
                 transport_builder: capture.clone(),
             });
             let provider = crate::provider::create_model_provider(
@@ -683,7 +668,6 @@ mod tests {
         let endpoint = OpenAiModelsEndpoint::new(
             provider_info_with_command_auth(),
             /*auth_manager*/ None,
-            /*gateway_auth_manager*/ None,
         );
 
         assert!(endpoint.has_command_auth());
@@ -701,7 +685,6 @@ mod tests {
         let endpoint = OpenAiModelsEndpoint::new(
             ModelProviderInfo::create_openai_provider(/*base_url*/ None),
             /*auth_manager*/ None,
-            /*gateway_auth_manager*/ None,
         );
 
         assert!(!endpoint.has_command_auth());
@@ -724,7 +707,6 @@ mod tests {
         let endpoint = OpenAiModelsEndpoint {
             provider_info: ModelProviderInfo::create_openai_provider(Some(server.uri())),
             auth_manager: None,
-            gateway_auth_manager: None,
             transport_builder: Arc::new(RecordingTransportBuilder {
                 observed_request: Arc::clone(&observed_request),
             }),
@@ -770,7 +752,6 @@ mod tests {
         let endpoint = OpenAiModelsEndpoint {
             provider_info,
             auth_manager: None,
-            gateway_auth_manager: None,
             transport_builder: Arc::new(RecordingTransportBuilder {
                 observed_request: Arc::new(Mutex::new(None)),
             }),
@@ -848,8 +829,7 @@ mod tests {
             Arc::new(OpenAiModelsEndpoint::new(
                 provider,
                 Some(auth.clone()),
-                /*gateway_auth_manager*/ None,
-            )),
+                )),
             Some(auth.clone()),
         );
         let catalog = manager
@@ -964,8 +944,7 @@ mod tests {
             let endpoint = Arc::new(OpenAiModelsEndpoint::new(
                 provider,
                 Some(auth_manager.clone()),
-                /*gateway_auth_manager*/ None,
-            ));
+                ));
             let manager = OpenAiModelsManager::new(
                 home.path().to_path_buf(),
                 endpoint,
@@ -1009,8 +988,7 @@ mod tests {
                     ..ModelProviderInfo::default()
                 },
                 /*auth_manager*/ None,
-                /*gateway_auth_manager*/ None,
-            );
+                );
             let error = endpoint
                 .list_models(
                     "1.2.3",
@@ -1049,7 +1027,6 @@ mod tests {
                 ..ModelProviderInfo::default()
             },
             /*auth_manager*/ None,
-            /*gateway_auth_manager*/ None,
         );
         let error = endpoint
             .list_models(

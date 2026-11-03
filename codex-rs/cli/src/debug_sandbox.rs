@@ -1,5 +1,3 @@
-mod cloud_config;
-#[cfg(target_os = "macos")]
 mod pid_tracker;
 #[cfg(target_os = "macos")]
 mod seatbelt;
@@ -14,7 +12,6 @@ use codex_core::config::Config;
 use codex_core::config::ConfigBuilder;
 use codex_core::config::ConfigOverrides;
 use codex_core::config::NetworkProxyAuditMetadata;
-use codex_core::config::find_codex_home;
 use codex_core::exec_env::create_env;
 #[cfg(target_os = "macos")]
 use codex_core::spawn::CODEX_SANDBOX_ENV_VAR;
@@ -455,20 +452,12 @@ async fn load_debug_sandbox_config(
     options: DebugSandboxConfigOptions,
     strict_config: bool,
 ) -> anyhow::Result<Config> {
-    let cloud_config_bundle = cloud_config::bootstrap_cloud_config_bundle(
-        &cli_overrides,
-        &options,
-        find_codex_home,
-        strict_config,
-    )
-    .await?;
-
     load_debug_sandbox_config_with_codex_home(
         cli_overrides,
         codex_linux_sandbox_exe,
         options,
         /*codex_home*/ None,
-        cloud_config_bundle,
+        CloudConfigBundleLoader::default(),
         strict_config,
     )
     .await

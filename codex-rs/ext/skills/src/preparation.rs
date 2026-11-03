@@ -4,9 +4,7 @@
 use crate::HostSkillsSnapshot;
 use crate::SkillsExtensionConfig;
 use crate::catalog::SkillCatalog;
-use crate::catalog::apply_plugin_denials;
 use crate::provider::SkillListQuery;
-use crate::provider::attribute_executor_plugins;
 use crate::sources::SkillProviders;
 use crate::state::SkillsSessionState;
 use crate::state::SkillsThreadState;
@@ -26,18 +24,10 @@ pub(crate) async fn prepare_catalogs(
     let mut cloud = cloud_enabled
         .then(|| thread_state.available_cloud_catalog())
         .flatten();
-    let (mut executor, host_catalog) = futures::join!(
+    let (executor, host_catalog) = futures::join!(
         discover_executor_catalog(thread_state, providers, input, &config, cloud_enabled),
         discover_host_catalog(providers, input, &config),
     );
-    if discovery_v2 {
-        apply_plugin_denials(&mut executor, input.selected_plugins);
-        if let Some(cloud) = &mut cloud {
-            apply_plugin_denials(cloud, input.selected_plugins);
-        }
-    } else {
-        attribute_executor_plugins(&mut executor, input.selected_plugins);
-    }
     let cloud_status = if !providers.has_cloud_provider() {
         CatalogStatus::Unavailable
     } else if cloud_enabled {

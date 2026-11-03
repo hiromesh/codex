@@ -1,6 +1,5 @@
 mod config_rules;
 mod context;
-mod declarations;
 mod engine;
 mod environment;
 pub(crate) mod events;
@@ -17,8 +16,6 @@ mod types;
 use codex_protocol::protocol::HookEventName;
 
 pub use config_rules::hook_states_from_stack;
-pub use declarations::PluginHookDeclaration;
-pub use declarations::plugin_hook_declarations;
 pub use engine::HookListEntry;
 pub use engine::HookListEntryHandler;
 pub use engine::discovery::validate_environment_hooks;

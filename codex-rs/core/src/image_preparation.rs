@@ -202,7 +202,6 @@ pub(crate) async fn prepare_response_items(
             | ResponseItem::CustomToolCall { .. }
             | ResponseItem::ToolSearchOutput { .. }
             | ResponseItem::WebSearchCall { .. }
-            | ResponseItem::ImageGenerationCall { .. }
             | ResponseItem::Compaction { .. }
             | ResponseItem::ConfigurationUpdate { .. }
             | ResponseItem::CompactionTrigger { .. }

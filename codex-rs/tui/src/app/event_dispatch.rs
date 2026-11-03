@@ -1945,24 +1945,6 @@ impl App {
                     self.chat_widget.finish_rate_limit_recovery();
                 }
             },
-            AppEvent::OpenAnalytics { view: summary_view } => {
-                tui.enter_alt_screen()?;
-                let mut view = self.retained_analytics.take().unwrap_or_else(|| {
-                    Box::new(crate::analytics::AnalyticsView::new(self.keymap.list.clone()))
-                });
-                view.keymap = self.keymap.list.clone();
-                if summary_view.is_some() {
-                    view.select_summary(summary_view);
-                }
-                view.open(
-                    app_server.request_handle(),
-                    tui.frame_requester(),
-                    self.model_catalog.try_list_models()?,
-                    std::sync::Arc::new(self.config.clone()),
-                );
-                self.overlay = Some(Overlay::Analytics(view));
-                tui.frame_requester().schedule_frame();
-            }
             AppEvent::OpenRateLimitResetCredits => {
                 let request_id = self.chat_widget.show_rate_limit_reset_loading_popup();
                 self.refresh_rate_limits(

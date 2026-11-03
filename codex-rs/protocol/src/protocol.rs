@@ -63,9 +63,6 @@ use crate::turn_input::TurnInputMode;
 use crate::turn_input::TurnInputRequest;
 use crate::turn_input::TurnInputSubmission;
 use crate::turn_input::TurnStartOptions;
-use codex_extension_items::image_generation::GeneratedImageRef;
-use codex_extension_items::image_generation::ImageGenerationFailure;
-use codex_extension_items::image_generation::ImageGenerationInputImage;
 use codex_utils_absolute_path::AbsolutePathBuf;
 use codex_utils_path_uri::LegacyAppPathString;
 use codex_utils_path_uri::PathUri;
@@ -1210,10 +1207,6 @@ pub enum EventMsg {
     WebSearchBegin(WebSearchBeginEvent),
 
     WebSearchEnd(WebSearchEndEvent),
-
-    ImageGenerationBegin(ImageGenerationBeginEvent),
-
-    ImageGenerationEnd(ImageGenerationEndEvent),
 
     /// Notification that the server is about to execute a command.
     ExecCommandBegin(ExecCommandBeginEvent),
@@ -2556,37 +2549,6 @@ pub struct WebSearchEndEvent {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[ts(optional)]
     pub results: Option<Vec<Value>>,
-}
-
-#[derive(Debug, Clone, Deserialize, Serialize, JsonSchema, TS)]
-pub struct ImageGenerationBeginEvent {
-    pub call_id: String,
-}
-
-#[derive(Debug, Clone, Deserialize, Serialize, JsonSchema, TS)]
-pub struct ImageGenerationEndEvent {
-    pub call_id: String,
-    pub status: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    #[ts(optional)]
-    pub revised_prompt: Option<String>,
-    #[serde(flatten)]
-    pub image: GeneratedImageRef,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    #[ts(optional)]
-    pub transparent_background: Option<bool>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    #[ts(optional)]
-    pub failure: Option<ImageGenerationFailure>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    #[ts(optional)]
-    pub saved_path: Option<AbsolutePathBuf>,
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    #[ts(as = "Option<_>", optional)]
-    pub input_images: Vec<ImageGenerationInputImage>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    #[ts(optional)]
-    pub generation_id: Option<String>,
 }
 
 // Conversation kept for backward compatibility.
@@ -4278,7 +4240,6 @@ mod tests {
     use crate::items::EnteredReviewModeItem;
     use crate::items::ExitedReviewModeItem;
     use crate::items::FileChangeItem;
-    use crate::items::ImageGenerationItem;
     use crate::items::McpToolCallItem;
     use crate::items::McpToolCallStatus;
     use crate::items::UserMessageItem;
@@ -5104,29 +5065,6 @@ mod tests {
     }
 
     #[test]
-    fn item_started_event_from_image_generation_emits_begin_event() {
-        let event = ItemStartedEvent {
-            thread_id: ThreadId::new(),
-            turn_id: "turn-1".into(),
-            item: TurnItem::ImageGeneration(ImageGenerationItem {
-                id: "ig-1".into(),
-                status: "in_progress".into(),
-                revised_prompt: None,
-                result: String::new(),
-                saved_path: None,
-            }),
-            started_at_ms: 0,
-        };
-
-        let legacy_events = event.as_legacy_events(/*show_raw_agent_reasoning*/ false);
-        assert_eq!(legacy_events.len(), 1);
-        match &legacy_events[0] {
-            EventMsg::ImageGenerationBegin(event) => assert_eq!(event.call_id, "ig-1"),
-            _ => panic!("expected ImageGenerationBegin event"),
-        }
-    }
-
-    #[test]
     fn item_started_event_from_file_change_emits_patch_begin_event() {
         let event = ItemStartedEvent {
             thread_id: ThreadId::new(),
@@ -5208,44 +5146,6 @@ mod tests {
                 assert_eq!(event.read_only_hint, Some(false));
             }
             _ => panic!("expected McpToolCallBegin event"),
-        }
-    }
-
-    #[test]
-    fn item_completed_event_from_image_generation_emits_end_event() {
-        let event = ItemCompletedEvent {
-            thread_id: ThreadId::new(),
-            turn_id: "turn-1".into(),
-            item: TurnItem::ImageGeneration(ImageGenerationItem {
-                id: "ig-1".into(),
-                status: "completed".into(),
-                revised_prompt: Some("A tiny blue square".into()),
-                result: "Zm9v".into(),
-                saved_path: Some(test_path_buf("/tmp/ig-1.png").abs()),
-            }),
-            started_at_ms: Some(0),
-            completed_at_ms: 0,
-        };
-
-        let legacy_events = event.as_legacy_events(/*show_raw_agent_reasoning*/ false);
-        assert_eq!(legacy_events.len(), 1);
-        match &legacy_events[0] {
-            EventMsg::ImageGenerationEnd(event) => {
-                assert_eq!(event.call_id, "ig-1");
-                assert_eq!(event.status, "completed");
-                assert_eq!(event.revised_prompt.as_deref(), Some("A tiny blue square"));
-                assert_eq!(
-                    event.image,
-                    GeneratedImageRef::Inline {
-                        result: "Zm9v".to_string(),
-                    }
-                );
-                assert_eq!(
-                    event.saved_path.as_ref().map(AbsolutePathBuf::as_path),
-                    Some(test_path_buf("/tmp/ig-1.png").as_path())
-                );
-            }
-            _ => panic!("expected ImageGenerationEnd event"),
         }
     }
 

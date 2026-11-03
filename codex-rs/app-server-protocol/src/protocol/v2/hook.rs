@@ -11,9 +11,11 @@ use codex_protocol::protocol::HookRunSummary as CoreHookRunSummary;
 use codex_protocol::protocol::HookScope as CoreHookScope;
 use codex_protocol::protocol::HookSource as CoreHookSource;
 use codex_protocol::protocol::HookTrustStatus as CoreHookTrustStatus;
+use codex_utils_absolute_path::AbsolutePathBuf;
 use codex_utils_path_uri::LegacyAppPathString;
 use serde::Deserialize;
 use serde::Serialize;
+use std::path::PathBuf;
 
 v2_enum_from_core!(
     pub enum HookEventName from CoreHookEventName {
@@ -66,6 +68,86 @@ v2_enum_from_core!(
 
 fn default_hook_source() -> HookSource {
     HookSource::Unknown
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, Default, PartialEq, JsonSchema, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export_to = "v2/")]
+pub struct HooksListParams {
+    /// Working directories to inspect when no thread is specified. An empty list uses the session cwd.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub cwds: Vec<PathBuf>,
+    /// List a loaded thread's hooks, including its selected environments. Omit `cwds` in this mode.
+    #[ts(optional = nullable)]
+    pub thread_id: Option<String>,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, JsonSchema, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export_to = "v2/")]
+pub struct HooksListResponse {
+    pub data: Vec<HooksListEntry>,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, JsonSchema, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export_to = "v2/")]
+pub struct HooksListEntry {
+    pub cwd: PathBuf,
+    pub hooks: Vec<HookMetadata>,
+    pub warnings: Vec<String>,
+    pub errors: Vec<HookErrorInfo>,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, JsonSchema, TS)]
+#[serde(tag = "handlerType", rename_all = "camelCase")]
+#[ts(tag = "handlerType", export_to = "v2/")]
+pub enum HookHandlerMetadata {
+    Command {
+        command: String,
+        #[serde(default)]
+        r#async: bool,
+    },
+    McpTool {
+        server: String,
+        tool: String,
+    },
+    Prompt {},
+    Agent {},
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, JsonSchema, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export_to = "v2/")]
+pub struct HookMetadata {
+    pub key: String,
+    pub event_name: HookEventName,
+    #[serde(flatten)]
+    pub handler: HookHandlerMetadata,
+    pub matcher: Option<String>,
+    pub timeout_sec: u64,
+    pub status_message: Option<String>,
+    /// Configured `additionalContext` spill threshold.
+    /// `null` uses 2,500 tokens; `0` disables spilling.
+    pub additional_context_limit: Option<usize>,
+    pub source_path: AbsolutePathBuf,
+    pub source: HookSource,
+    pub plugin_id: Option<String>,
+    /// The owning execution environment, if this hook came from its requirements.
+    pub environment_id: Option<String>,
+    pub display_order: i64,
+    pub enabled: bool,
+    pub is_managed: bool,
+    pub current_hash: String,
+    pub trust_status: HookTrustStatus,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, JsonSchema, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export_to = "v2/")]
+pub struct HookErrorInfo {
+    pub path: PathBuf,
+    pub message: String,
 }
 
 v2_enum_from_core!(

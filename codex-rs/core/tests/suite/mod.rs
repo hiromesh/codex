@@ -74,7 +74,6 @@ mod direct_tool_metadata;
 mod dynamic_tool_cancellation;
 mod exec;
 mod exec_policy;
-mod extension_sandbox;
 mod external_auth;
 mod fork_thread;
 mod gcp;

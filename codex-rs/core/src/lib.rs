@@ -6,7 +6,6 @@
 #![deny(clippy::print_stdout, clippy::print_stderr)]
 
 mod apply_patch;
-mod apps;
 mod client;
 mod client_common;
 mod model_request;
@@ -82,7 +81,6 @@ mod attestation;
 mod codex_delegate;
 mod command_canonicalization;
 pub mod config;
-pub mod connectors;
 pub mod context;
 mod context_manager;
 mod current_time;
@@ -117,18 +115,10 @@ pub(crate) mod utils;
 pub use mention_syntax::PLUGIN_TEXT_MENTION_SIGIL;
 pub use mention_syntax::TOOL_MENTION_SIGIL;
 pub use utils::path_utils;
-pub(crate) mod plugins;
-pub use plugins::plugins_manager_for_config;
 #[doc(hidden)]
 pub(crate) mod prompt_debug;
 #[doc(hidden)]
 pub use prompt_debug::build_prompt_input;
-pub(crate) mod mentions {
-    pub(crate) use crate::plugins::build_connector_slug_counts;
-    pub(crate) use crate::plugins::collect_explicit_app_ids;
-    pub(crate) use crate::plugins::collect_explicit_plugin_mentions;
-    pub(crate) use crate::plugins::collect_tool_mentions_from_messages;
-}
 mod sandbox_tags;
 pub mod sandboxing;
 mod session_prefix;

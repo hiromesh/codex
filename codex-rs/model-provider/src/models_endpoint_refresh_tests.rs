@@ -105,7 +105,6 @@ async fn catalog_timeout_preserves_refreshed_tokens() {
         let endpoint = OpenAiModelsEndpoint::new(
             info,
             Some(Arc::clone(&credentials)),
-            /*gateway_auth_manager*/ None,
         );
         let error = endpoint
             .list_models("test", factory.clone())
