@@ -4354,7 +4354,6 @@ allow_local_binding = true
     Ok(())
 }
 
-#[cfg(not(target_os = "windows"))]
 #[tokio::test(flavor = "current_thread")]
 async fn network_approval_retry_keeps_deny_read_sandbox_for_escalated_command() -> Result<()> {
     skip_if_no_network!(Ok(()));

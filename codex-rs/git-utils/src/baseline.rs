@@ -10,8 +10,6 @@ use std::collections::BTreeSet;
 use std::ffi::OsStr;
 use std::fs;
 use std::io::Read;
-#[cfg(windows)]
-use std::os::windows::fs::FileTypeExt;
 use std::path::Path;
 use std::path::PathBuf;
 use tokio::task;
@@ -155,8 +153,6 @@ fn baseline_control(root: &Path) -> PathBuf {
 
 fn discard_baseline_path(path: &Path) -> anyhow::Result<()> {
     match path.symlink_metadata() {
-        #[cfg(windows)]
-        Ok(meta) if meta.file_type().is_symlink_dir() => fs::remove_dir(path)?,
         Ok(meta) if meta.is_dir() => {
             // Invalidate before deletion: interruption must not leave trusted partial metadata.
             match fs::remove_file(path.join(BASELINE_VERSION_FILE)) {
@@ -211,8 +207,8 @@ fn reset_git_repository_sync(root: &Path, contents: BaselineContents) -> anyhow:
 }
 
 fn write_index_from_head(root: &Path) -> anyhow::Result<()> {
-    // Pin the index write to this worktree. Relative paths also work with Git for Windows
-    // when Rust has canonicalized the working directory to a verbatim path.
+    // Pin the index write to this worktree. Relative paths also work when Rust has
+    // canonicalized the working directory to a verbatim path.
     run_git_for_status(
         root,
         ["read-tree", "--reset", "HEAD"],

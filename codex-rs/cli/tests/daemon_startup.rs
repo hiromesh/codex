@@ -90,78 +90,12 @@ async fn daemon_auto_start_preserves_bedrock_onboarding() -> Result<()> {
 }
 
 #[tokio::test]
-#[cfg(windows)]
-async fn elevated_local_tui_uses_embedded_without_starting_daemon() -> Result<()> {
-    if !codex_app_server_daemon::is_elevated()? {
-        eprintln!("requires an elevated Windows runner");
-        return Ok(());
-    }
-    for command in ["elevated", "elevated-resume", "elevated-fork"] {
-        daemon_startup(command).await?;
-    }
-    let codex = codex_utils_cargo_bin::cargo_bin("codex")?;
-    let home = tempfile::tempdir()?;
-    for operation in ["start", "restart"] {
-        let output = Command::new(&codex)
-            .env("CODEX_HOME", home.path())
-            .args(["app-server", "daemon", operation])
-            .output()?;
-        ensure!(
-            !output.status.success(),
-            "{operation} must reject elevation"
-        );
-        ensure!(
-            String::from_utf8_lossy(&output.stderr).contains("non-elevated terminal"),
-            "{}",
-            String::from_utf8_lossy(&output.stderr)
-        );
-    }
-    ensure!(!home.path().join("app-server-daemon").exists());
-    Ok(())
-}
-
-#[tokio::test]
-#[cfg(windows)]
-async fn restrictive_launcher_uses_embedded_if_daemon_cannot_start() -> Result<()> {
-    const CHILD: &str = "CODEX_TEST_RESTRICTIVE_DAEMON_START";
-    if std::env::var_os(CHILD).is_some() {
-        // The PTY creates its own breakaway-permitted job. Add Cargo's
-        // restriction *inside* the PTY so it is the CLI's innermost job.
-        let job = codex_utils_pty::JobObject::create_without_breakaway()?;
-        let codex = codex_utils_cargo_bin::cargo_bin("codex")?;
-        let mut command = tokio::process::Command::new(codex);
-        command
-            .arg("--no-alt-screen")
-            .stdin(std::process::Stdio::inherit())
-            .stdout(std::process::Stdio::inherit())
-            .stderr(std::process::Stdio::inherit())
-            // This interactive CLI must inherit the PTY console rather than use
-            // the background helper's CREATE_NO_WINDOW launch policy.
-            .creation_flags(windows_sys::Win32::System::Threading::CREATE_SUSPENDED)
-            .kill_on_drop(true);
-        let mut child = command.spawn()?;
-        ensure!(
-            job.assign_and_resume_process(child.id().context("missing CLI pid")?)?
-                .is_some(),
-            "CLI job assignment failed"
-        );
-        let status = child.wait().await?;
-        ensure!(status.success(), "CLI exited: {status}");
-        return Ok(());
-    }
-    daemon_startup("restrictive-job").await
-}
-
-#[tokio::test]
 #[cfg(unix)]
 async fn bedrock_onboarding_leaves_a_running_daemon_untouched() -> Result<()> {
     daemon_startup("bedrock-running").await
 }
 
 async fn daemon_startup(command: &str) -> Result<()> {
-    #[cfg(windows)]
-    let elevated = codex_app_server_daemon::is_elevated()?;
-    #[cfg(not(windows))]
     let elevated = false;
     let elevated_launch = command.starts_with("elevated");
     let codex = codex_utils_cargo_bin::cargo_bin("codex")?.canonicalize()?;
@@ -256,7 +190,7 @@ async fn daemon_startup(command: &str) -> Result<()> {
         let managed = home
             .path()
             .join("packages/app-server-daemon/current/bin")
-            .join(if cfg!(windows) { "codex.exe" } else { "codex" });
+            .join(if false { "codex.exe" } else { "codex" });
         fs::create_dir_all(home.path().join("packages/app-server-daemon/current/bin"))?;
         // Hard links change the executable's ctime and invalidate Rosetta's translation cache.
         #[cfg(unix)]
@@ -401,7 +335,7 @@ async fn daemon_startup(command: &str) -> Result<()> {
                 "Runningwithoutthesharedbackgroundserver:--strict-config"
             }
         };
-        let program = if cfg!(windows) && command == "restrictive-job" {
+        let program = if false && command == "restrictive-job" {
             env.insert("CODEX_TEST_RESTRICTIVE_DAEMON_START".into(), "1".into());
             args = vec![
                 "--exact".into(),

@@ -2637,7 +2637,7 @@ async fn stdio_mcp_tool_call_includes_sandbox_state_meta(
             .into_iter()
             .find(|selection| selection.environment_id == remote_aware_environment_id())
             .context("thread should select the MCP server's executor environment")?;
-        let workspace_roots = vec![PathUri::parse(if cfg!(windows) {
+        let workspace_roots = vec![PathUri::parse(if false {
             "file:///foreign/workspace"
         } else {
             "file:///C:/workspace"
@@ -4225,7 +4225,7 @@ async fn streamable_http_tool_call_round_trip(mode: HeadersHelperMode) -> anyhow
                     .display(),
                 helper_invocations.display(),
             )
-        } else if cfg!(windows) {
+        } else if false {
             r#"echo {"Proxy-Authorization":"Bearer gateway-token"}"#.to_string()
         } else {
             r#"printf '{"Proxy-Authorization":"Bearer gateway-token"}'"#.to_string()

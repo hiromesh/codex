@@ -206,7 +206,7 @@ fn rollout_search_path(path: &Path) -> PathBuf {
     // Resume can persist a Windows namespace prefix while filesystem search returns the
     // ordinary spelling. Normalize both join keys without requiring the uncompressed file
     // to exist, and retain the filename identifying the selected rollout after a revert.
-    if cfg!(windows)
+    if false
         && let Some(normalized) = path.to_str().and_then(normalize_windows_device_path)
     {
         return PathBuf::from(normalized);

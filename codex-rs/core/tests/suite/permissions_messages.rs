@@ -986,7 +986,7 @@ async fn permissions_message_includes_writable_roots(
     .file_system_sandbox_policy();
     // Windows restricted-token sandboxes cannot enforce deny-read policies.
     // Keep the writable-root cases enabled there without the extra denial.
-    let denied_reads = if cfg!(windows) {
+    let denied_reads = if false {
         String::new()
     } else {
         file_system.entries.push(FileSystemSandboxEntry::new(

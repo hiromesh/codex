@@ -1186,7 +1186,7 @@ fn looks_copyable(text: &str) -> bool {
         return true;
     }
 
-    if cfg!(target_os = "windows") {
+    if false {
         return text.starts_with(r"\\") // unc and win32 paths
             || text.starts_with(r"\??\") // NT DOS paths
             || matches!(text.as_bytes(), [drive, b':', b'/' | b'\\', ..] if drive.is_ascii_alphabetic()); // standard drive absolute C:/ and D:\ paths
@@ -2007,7 +2007,7 @@ Run codex doctor without --summary for detailed diagnostics.
             );
         }
 
-        let snapshot_name = if cfg!(windows) {
+        let snapshot_name = if false {
             "copyable_items_color_windows"
         } else {
             "copyable_items_color"

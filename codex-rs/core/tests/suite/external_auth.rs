@@ -258,26 +258,6 @@ fn bedrock_credential_export_config(
         )
     };
 
-    #[cfg(windows)]
-    let (command, args) = {
-        let script_path = credentials_path.with_extension("cmd");
-        std::fs::write(
-            &script_path,
-            "@echo off\r\n>> \"%~1\" echo invoked\r\ntype \"%~2\"\r\n",
-        )?;
-        (
-            "cmd.exe".to_string(),
-            vec![
-                "/D".to_string(),
-                "/Q".to_string(),
-                "/C".to_string(),
-                script_path.to_string_lossy().into_owned(),
-                invocations_path.to_string_lossy().into_owned(),
-                credentials_path.to_string_lossy().into_owned(),
-            ],
-        )
-    };
-
     Ok(AwsCredentialExportConfig {
         command,
         args: args.into_iter().map(RedactedString::from).collect(),

@@ -147,50 +147,6 @@ fn process_snapshot() -> ProcessSnapshot {
     }
 }
 
-#[cfg(target_os = "windows")]
-fn process_snapshot() -> ProcessSnapshot {
-    #[repr(C)]
-    struct ProcessMemoryCounters {
-        size: u32,
-        page_fault_count: u32,
-        peak_working_set_size: usize,
-        working_set_size: usize,
-        quota_peak_paged_pool_usage: usize,
-        quota_paged_pool_usage: usize,
-        quota_peak_non_paged_pool_usage: usize,
-        quota_non_paged_pool_usage: usize,
-        pagefile_usage: usize,
-        peak_pagefile_usage: usize,
-    }
-
-    #[link(name = "kernel32")]
-    unsafe extern "system" {
-        fn GetCurrentProcess() -> *mut std::ffi::c_void;
-        fn K32GetProcessMemoryInfo(
-            process: *mut std::ffi::c_void,
-            counters: *mut ProcessMemoryCounters,
-            size: u32,
-        ) -> i32;
-    }
-
-    let counters = unsafe {
-        let mut counters = std::mem::MaybeUninit::<ProcessMemoryCounters>::zeroed();
-        let size = u32::try_from(std::mem::size_of::<ProcessMemoryCounters>()).unwrap_or(u32::MAX);
-        // SAFETY: the pseudo-handle is valid and the kernel initializes this
-        // correctly sized writable buffer on success.
-        if K32GetProcessMemoryInfo(GetCurrentProcess(), counters.as_mut_ptr(), size) == 0 {
-            return empty_process_snapshot();
-        }
-        counters.assume_init()
-    };
-
-    ProcessSnapshot {
-        id: std::process::id(),
-        resident_memory_bytes: u64::try_from(counters.working_set_size).ok(),
-        physical_footprint_bytes: None,
-    }
-}
-
 #[cfg(not(any(target_os = "macos", target_os = "linux", target_os = "windows")))]
 fn process_snapshot() -> ProcessSnapshot {
     empty_process_snapshot()

@@ -21,9 +21,6 @@ use tempfile::TempDir;
 use tokio::time::Duration;
 use tokio::time::timeout;
 
-#[cfg(windows)]
-const DEFAULT_READ_TIMEOUT: Duration = Duration::from_secs(25);
-#[cfg(not(windows))]
 const DEFAULT_READ_TIMEOUT: Duration = Duration::from_secs(10);
 const CURRENT_TIME_AT: i64 = 1_781_717_655;
 const CURRENT_TIME_REMINDER: &str =

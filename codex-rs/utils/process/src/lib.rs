@@ -9,15 +9,6 @@ use std::process::Command;
 /// Convert with `tokio::process::Command::from` for asynchronous execution.
 /// Subsequent Windows `creation_flags` calls must retain `CREATE_NO_WINDOW`.
 pub fn background_command(program: impl AsRef<OsStr>) -> Command {
-    #[cfg(windows)]
-    {
-        use std::os::windows::process::CommandExt;
-
-        let mut command = Command::new(program);
-        command.creation_flags(/*flags*/ 0x0800_0000); // CREATE_NO_WINDOW
-        command
-    }
-    #[cfg(not(windows))]
     Command::new(program)
 }
 

@@ -3,8 +3,6 @@ use std::ffi::OsStr;
 use std::ffi::OsString;
 use std::future::Future;
 use std::io::ErrorKind;
-#[cfg(windows)]
-use std::os::windows::process::CommandExt;
 use std::path::Path;
 #[cfg(not(unix))]
 use std::process::Stdio;
@@ -18,8 +16,6 @@ use async_channel::Sender;
 use codex_protocol::shell_environment::is_non_inheritable_env_var;
 #[cfg(unix)]
 use codex_utils_pty::Command;
-#[cfg(windows)]
-use codex_utils_pty::JobObject;
 use futures::future::try_join;
 use serde_json::Value;
 use tokio::io::AsyncWriteExt;
@@ -29,9 +25,6 @@ use tokio::sync::Semaphore;
 use tokio::task::JoinSet;
 use tokio::time::timeout;
 use tracing::Span;
-
-#[cfg(windows)]
-const CREATE_NO_WINDOW: u32 = 0x08000000;
 
 use super::ClaudeHooksEngine;
 use super::CommandShell;
@@ -280,12 +273,6 @@ pub(crate) async fn run_command(
     let mut command = build_command(&runtime.shell, command_line, &runtime.environment, env);
     command.current_dir(cwd);
 
-    #[cfg(windows)]
-    let (child, process_tree_job) = match JobObject::spawn_background(&mut command) {
-        Ok((child, job)) => (Ok(child), job),
-        Err(error) => (Err(error), None),
-    };
-    #[cfg(not(windows))]
     let child = command.spawn();
 
     let mut child = match child {
@@ -307,10 +294,6 @@ pub(crate) async fn run_command(
 
     let mut process_tree_guard = ProcessTreeGuard {
         process_id: child.id(),
-        #[cfg(windows)]
-        job: process_tree_job,
-    };
-
     let stdin = child.stdin.take();
     let write_stdin = async {
         if let Some(mut stdin) = stdin
@@ -337,11 +320,6 @@ pub(crate) async fn run_command(
     .await
     {
         Ok(Ok(((), output))) => {
-            // Successfully completed hooks may intentionally leave detached helpers running.
-            #[cfg(windows)]
-            if let Some(job) = process_tree_guard.job.as_ref() {
-                let _ = job.preserve_descendants();
-            }
             process_tree_guard.process_id = None;
             finish_command_run(
                 started_at,
@@ -383,144 +361,3 @@ pub(crate) async fn run_command(
 // Needed only until command hooks move to the exec server, which owns process-tree cleanup.
 struct ProcessTreeGuard {
     process_id: Option<u32>,
-    #[cfg(windows)]
-    job: Option<JobObject>,
-}
-
-impl Drop for ProcessTreeGuard {
-    fn drop(&mut self) {
-        let Some(process_id) = self.process_id else {
-            return;
-        };
-
-        #[cfg(unix)]
-        {
-            let _ = codex_utils_pty::process_group::kill_process_group(process_id);
-        }
-
-        #[cfg(windows)]
-        {
-            if let Some(job) = self.job.as_ref() {
-                let _ = job.terminate();
-            } else {
-                let _ = std::process::Command::new("taskkill")
-                    .args(["/PID", &process_id.to_string(), "/T", "/F"])
-                    .stdin(Stdio::null())
-                    .stdout(Stdio::null())
-                    .stderr(Stdio::null())
-                    .creation_flags(CREATE_NO_WINDOW)
-                    .spawn();
-            }
-        }
-    }
-}
-
-struct CommandRunCompletion {
-    exit_code: Option<i32>,
-    stdout: String,
-    stderr: String,
-    error: Option<String>,
-    outcome: &'static str,
-}
-
-fn finish_command_run(
-    started_at: i64,
-    started: Instant,
-    completion: CommandRunCompletion,
-) -> HandlerRunResult {
-    Span::current().record("hook.command_outcome", completion.outcome);
-    HandlerRunResult {
-        context_metadata: codex_protocol::models::ContentItemMetadata::command_hook(),
-        started_at,
-        completed_at: chrono::Utc::now().timestamp(),
-        duration_ms: started.elapsed().as_millis().try_into().unwrap_or(i64::MAX),
-        exit_code: completion.exit_code,
-        stdout: completion.stdout,
-        stderr: completion.stderr,
-        error: completion.error,
-    }
-}
-
-fn build_command(
-    shell: &CommandShell,
-    command_line: &str,
-    environment: &[(OsString, OsString)],
-    env: &HashMap<String, String>,
-) -> Command {
-    let mut command = if shell.program.is_empty() {
-        Command::new(default_shell_program(environment))
-    } else {
-        Command::new(&shell.program)
-    };
-    if shell.program.is_empty() {
-        #[cfg(windows)]
-        command.arg("/C");
-        #[cfg(not(windows))]
-        command.arg("-lc");
-    } else {
-        command.args(&shell.args);
-    }
-    #[cfg(windows)]
-    if shell.program.is_empty() || shell.args.iter().any(|arg| arg.eq_ignore_ascii_case("/c")) {
-        command.raw_arg(format!(r#""{command_line}""#));
-    } else {
-        command.arg(command_line);
-    }
-    #[cfg(not(windows))]
-    command.arg(command_line);
-
-    #[cfg(unix)]
-    command.process_mode(codex_utils_pty::ProcessMode::NewSession);
-    #[cfg(windows)]
-    command.creation_flags(CREATE_NO_WINDOW);
-    #[cfg(not(unix))]
-    command
-        .env_clear()
-        .stdin(Stdio::piped())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .kill_on_drop(true);
-
-    // Both launchers start with an empty environment. Replay the session snapshot
-    // before hook overrides, filtering restricted names from both sources.
-    command.envs(
-        environment
-            .iter()
-            .map(|(key, value)| (key.as_os_str(), value.as_os_str()))
-            .chain(
-                env.iter()
-                    .map(|(key, value)| (OsStr::new(key), OsStr::new(value))),
-            )
-            .filter(|(key, _)| !key.to_str().is_some_and(is_non_inheritable_env_var)),
-    );
-    command
-}
-
-fn default_shell_program(environment: &[(OsString, OsString)]) -> OsString {
-    #[cfg(windows)]
-    let (environment_variable, fallback_program) = ("COMSPEC", "cmd.exe");
-
-    #[cfg(not(windows))]
-    let (environment_variable, fallback_program) = ("SHELL", "/bin/sh");
-
-    environment
-        .iter()
-        .find(|(key, _)| {
-            #[cfg(windows)]
-            {
-                key.to_str()
-                    .is_some_and(|key| key.eq_ignore_ascii_case(environment_variable))
-            }
-
-            #[cfg(not(windows))]
-            {
-                key == OsStr::new(environment_variable)
-            }
-        })
-        .map(|(_, value)| value.clone())
-        .unwrap_or_else(|| OsString::from(fallback_program))
-}
-
-#[cfg(test)]
-#[path = "command_runner_tests.rs"]
-mod tests;

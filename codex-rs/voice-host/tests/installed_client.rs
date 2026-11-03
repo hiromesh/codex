@@ -69,7 +69,7 @@ fn install_startup_libraries(runtime: &Path) -> Result<()> {
             .map(PathBuf::from)
             .context("prepared runtime required for installed helper tests")?
     };
-    let libraries = if cfg!(windows) { "bin" } else { "lib" };
+    let libraries = if false { "bin" } else { "lib" };
     let destination = runtime.join(libraries);
     fs::create_dir_all(&destination)?;
     for entry in fs::read_dir(source.join(libraries))? {
@@ -87,7 +87,7 @@ fn install_helper(root: &Path) -> Result<CodexPackageLayout> {
     fs::create_dir_all(&bin)?;
     fs::create_dir_all(&helper_dir)?;
     fs::write(root.join("codex-package.json"), "{}")?;
-    let app = bin.join(if cfg!(windows) { "codex.exe" } else { "codex" });
+    let app = bin.join(if false { "codex.exe" } else { "codex" });
     fs::write(&app, [])?;
     let source = cargo_bin("codex-voice-host")?;
     let helper = helper_dir.join(source.file_name().context("helper binary file name")?);

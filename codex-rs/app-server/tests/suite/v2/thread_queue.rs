@@ -967,13 +967,6 @@ async fn queue_app_with_server(server: MockServer) -> Result<(TestAppServer, Tem
 }
 
 fn blocked_turn_response() -> Result<String> {
-    #[cfg(target_os = "windows")]
-    let shell_command = vec![
-        "powershell".to_string(),
-        "-Command".to_string(),
-        "Start-Sleep -Seconds 10".to_string(),
-    ];
-    #[cfg(not(target_os = "windows"))]
     let shell_command = vec![
         "python3".to_string(),
         "-c".to_string(),

@@ -126,41 +126,20 @@ impl<S: EventSource + Default> EventBroker<S> {
 
 /// Real crossterm-backed event source.
 pub struct CrosstermEventSource {
-    #[cfg(not(windows))]
     events: crossterm::event::EventStream,
-    #[cfg(windows)]
-    events: super::windows_key_sequence::WindowsKeySequence<crossterm::event::EventStream>,
 }
 
 impl Default for CrosstermEventSource {
     fn default() -> Self {
-        let events = crossterm::event::EventStream::new();
         Self {
-            #[cfg(not(windows))]
-            events,
-            #[cfg(windows)]
-            events: super::windows_key_sequence::WindowsKeySequence::new(events),
+            events: crossterm::event::EventStream::new(),
         }
     }
 }
 
 impl EventSource for CrosstermEventSource {
     fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<EventResult>> {
-        // Crossterm's Windows backend expects Win32 input records. If VT input is inherited or
-        // restored by another console client, navigation keys arrive as literal escape bytes.
-        #[cfg(windows)]
-        let _ = super::windows_console::ensure_input_record_mode();
-
-        let result = Pin::new(&mut self.get_mut().events).poll_next(cx);
-
-        // EventStream starts its blocking reader before returning Pending, so reassert the mode
-        // after that transition as well.
-        #[cfg(windows)]
-        if result.is_pending() {
-            let _ = super::windows_console::ensure_input_record_mode();
-        }
-
-        result
+        Pin::new(&mut self.get_mut().events).poll_next(cx)
     }
 }
 

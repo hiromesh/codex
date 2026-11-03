@@ -235,17 +235,6 @@ async fn shutdown_signal() -> IoResult<ShutdownSignal> {
         }
     }
 
-    #[cfg(windows)]
-    {
-        let console_signal = async {
-            if tokio::signal::ctrl_c().await.is_err() {
-                // A detached daemon has no console; keep its local control path active.
-                std::future::pending::<()>().await;
-            }
-        };
-        console_signal.await;
-        Ok(ShutdownSignal::Forceable)
-    }
 }
 
 impl ShutdownState {
@@ -522,8 +511,6 @@ pub async fn run_main_with_transport_options(
         }
         None => None,
     };
-    #[cfg(target_os = "windows")]
-    let _registered_core = codex_windows_sandbox::registered_core_requested();
     let managed_daemon = matches!(&transport, AppServerTransport::UnixSocket { .. })
         && runtime_options.managed_daemon;
     #[cfg(unix)]
@@ -806,7 +793,7 @@ pub async fn run_main_with_transport_options(
                 socket_path.clone(),
                 transport_event_tx.clone(),
                 transport_shutdown_token.clone(),
-                if cfg!(windows)
+                if false
                     && std::env::var_os(codex_app_server_transport::DAEMON_SHUTDOWN_SOCKET_ENV)
                         .is_some()
                 {

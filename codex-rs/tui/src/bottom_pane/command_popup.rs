@@ -522,7 +522,7 @@ mod tests {
         );
     }
 
-    #[cfg(any(target_os = "macos", target_os = "windows"))]
+    #[cfg(target_os = "macos")]
     #[test]
     fn app_command_popup_snapshot() {
         let mut popup = CommandPopup::new(CommandPopupFlags::default(), Vec::new());
@@ -541,7 +541,7 @@ mod tests {
         insta::assert_snapshot!("command_popup_app", format!("{buf:?}"));
     }
 
-    #[cfg(any(target_os = "macos", target_os = "windows"))]
+    #[cfg(target_os = "macos")]
     #[test]
     fn voice_command_popup_snapshot() {
         let mut popup = CommandPopup::new(

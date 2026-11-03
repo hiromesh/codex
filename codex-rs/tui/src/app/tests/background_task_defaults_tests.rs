@@ -236,7 +236,7 @@ async fn command_center_new_reads_server_defaults_for_actual_destination() -> Re
                     "client-model"
                 },
                 if mode == "local-default-provider" {
-                    "model_provider = \"ollama\"\n"
+                    "model_provider = \"lmstudio\"\n"
                 } else {
                     ""
                 }
@@ -252,7 +252,7 @@ async fn command_center_new_reads_server_defaults_for_actual_destination() -> Re
                     "model = \"server-model\"\n"
                 },
                 if mode == "local" || mode == "local-cli-provider" || mode == "local-cli-model" {
-                    "model_provider = \"ollama\"\n"
+                    "model_provider = \"lmstudio\"\n"
                 } else {
                     ""
                 }

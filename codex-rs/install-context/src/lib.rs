@@ -18,7 +18,6 @@ static INSTALL_CONTEXT: OnceLock<InstallContext> = OnceLock::new();
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum StandalonePlatform {
     Unix,
-    Windows,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -196,21 +195,6 @@ impl CodexPackageLayout {
     fn from_exe(exe_path: &Path) -> Option<Self> {
         let canonical_exe = canonical_absolute_path(exe_path)?;
         let exe_dir = canonical_exe.parent()?;
-        // WinGet preserves a target-qualified executable at the package root.
-        // Only recognize that layout when metadata names this exact executable.
-        #[cfg(windows)]
-        if let Ok(contents) = std::fs::read(exe_dir.join(PACKAGE_METADATA_FILENAME))
-            && let Ok(metadata) = serde_json::from_slice::<serde_json::Value>(&contents)
-            && metadata["layoutVersion"] == 1
-            && metadata["entrypoint"].as_str().map(OsStr::new) == canonical_exe.file_name()
-        {
-            return Some(Self {
-                resources_dir: existing_dir(exe_dir.join(RESOURCES_DIRNAME)),
-                path_dir: existing_dir(exe_dir.join(PATH_DIRNAME)),
-                package_dir: exe_dir.clone(),
-                bin_dir: exe_dir,
-            });
-        }
         match exe_dir.file_name() {
             Some(name) if name == OsStr::new(BIN_DIRNAME) => Self::from_package_bin_dir(exe_dir),
             Some(name) if name == OsStr::new(RESOURCES_DIRNAME) => {
@@ -302,11 +286,7 @@ fn canonical_absolute_path(path: &Path) -> Option<AbsolutePathBuf> {
 }
 
 fn standalone_platform() -> StandalonePlatform {
-    if cfg!(windows) {
-        StandalonePlatform::Windows
-    } else {
-        StandalonePlatform::Unix
-    }
+    StandalonePlatform::Unix
 }
 
 fn existing_dir(path: AbsolutePathBuf) -> Option<AbsolutePathBuf> {
@@ -314,11 +294,7 @@ fn existing_dir(path: AbsolutePathBuf) -> Option<AbsolutePathBuf> {
 }
 
 fn default_rg_command() -> PathBuf {
-    if cfg!(windows) {
-        PathBuf::from("rg.exe")
-    } else {
-        PathBuf::from("rg")
-    }
+    PathBuf::from("rg")
 }
 
 #[cfg(test)]

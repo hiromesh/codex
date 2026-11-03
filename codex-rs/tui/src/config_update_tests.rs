@@ -223,8 +223,6 @@ async fn remote_project_trust_guards_thread_start_and_preserves_repository_decis
     );
 
     let key = project_trust_key(&project_root);
-    #[cfg(windows)]
-    let (legacy_key, lookup_cwd) = (key.to_ascii_uppercase(), canonical_project_cwd.clone());
     #[cfg(unix)]
     let (legacy_key, lookup_cwd) = {
         let alias = temp_dir.path().join("project-alias");

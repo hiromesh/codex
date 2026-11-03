@@ -148,8 +148,6 @@ use codex_history::InitialHistory;
 use codex_history::ResponseItemEnvelope;
 use codex_history::ResumedHistory;
 use codex_history::RolloutItem;
-#[cfg(windows)]
-use codex_network_proxy::ManagedProxyRouting;
 use codex_network_proxy::NetworkProxyConfig;
 use codex_otel::MetricsClient;
 use codex_otel::MetricsConfig;
@@ -1425,9 +1423,6 @@ async fn new_turn_refreshes_managed_network_proxy_for_sandbox_change() -> anyhow
             .session_configuration
             .set_permission_profile_for_tests(initial_permission_profile)
             .expect("test setup should allow permission profile");
-        #[cfg(windows)]
-        {
-        }
     }
     session
         .services
@@ -1454,21 +1449,6 @@ async fn new_turn_refreshes_managed_network_proxy_for_sandbox_change() -> anyhow
         started_proxy.proxy().current_cfg().await?.allowed_domains(),
         Some(vec!["*.example.com".to_string()])
     );
-    #[cfg(windows)]
-    {
-        assert_eq!(
-            started_proxy.proxy().managed_proxy_routing(),
-            ManagedProxyRouting::DedicatedListeners
-        );
-        let rebuilt_policy_decider = started_proxy
-            .network_policy_decider()
-            .expect("rebuilt managed network proxy should retain its policy decider");
-        assert!(Arc::ptr_eq(
-            &network_policy_decider,
-            &rebuilt_policy_decider
-        ));
-    }
-
     Ok(())
 }
 
@@ -1746,9 +1726,6 @@ async fn user_shell_commands_do_not_inherit_managed_network_proxy() -> anyhow::R
     let turn_context = session.new_default_turn().await;
     assert!(turn_context.network.is_some());
 
-    #[cfg(windows)]
-    let command = r#"$val = $env:HTTP_PROXY; if ([string]::IsNullOrEmpty($val)) { $val = 'not-set' } ; [System.Console]::Write($val)"#.to_string();
-    #[cfg(not(windows))]
     let command = r#"sh -c "printf '%s' \"${HTTP_PROXY:-not-set}\"""#.to_string();
 
     execute_user_shell_command(

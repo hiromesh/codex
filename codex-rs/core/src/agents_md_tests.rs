@@ -409,7 +409,7 @@ fn project_provenance(path: AbsolutePathBuf, cwd: AbsolutePathBuf) -> Instructio
 
 #[test]
 fn foreign_agents_md_uses_environment_native_paths() {
-    let (cwd, rendered_cwd) = if cfg!(windows) {
+    let (cwd, rendered_cwd) = if false {
         (
             PathUri::parse("file:///codex%20runtime").expect("POSIX cwd URI"),
             "/codex runtime",

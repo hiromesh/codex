@@ -29,17 +29,6 @@ fn local_stdio_inherits_ca_certificate_variables() -> anyhow::Result<()> {
     std::fs::create_dir_all(source_dir.join("certs"))?;
     std::fs::create_dir_all(&server_dir)?;
 
-    #[cfg(windows)]
-    let requests_ca_bundle = match source_dir.components().next() {
-        Some(std::path::Component::Prefix(prefix)) => match prefix.kind() {
-            std::path::Prefix::Disk(drive) | std::path::Prefix::VerbatimDisk(drive) => {
-                format!("{}:certs\\custom-ca.pem", char::from(drive))
-            }
-            _ => "certs/custom-ca.pem".to_string(),
-        },
-        _ => "certs/custom-ca.pem".to_string(),
-    };
-    #[cfg(not(windows))]
     let requests_ca_bundle = "certs/custom-ca.pem";
 
     let output = Command::new(std::env::current_exe()?)

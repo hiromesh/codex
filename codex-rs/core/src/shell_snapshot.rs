@@ -711,9 +711,9 @@ async fn capture_snapshot(
         .iter()
         .filter(|(key, _)| {
             allowed_metadata.provider_keys.iter().any(|provider_key| {
-                provider_key == *key || cfg!(windows) && provider_key.eq_ignore_ascii_case(key)
+                provider_key == *key || false && provider_key.eq_ignore_ascii_case(key)
             }) && !provider_context_keys.iter().any(|context| {
-                context == *key || cfg!(windows) && context.eq_ignore_ascii_case(key)
+                context == *key || false && context.eq_ignore_ascii_case(key)
             }) && !allowed_brokered_keys.contains(key)
         })
         .map(|(key, value)| (key.clone(), value.clone()))
@@ -742,7 +742,7 @@ async fn capture_snapshot(
         .iter()
         .filter(|(key, _)| {
             !allowed_metadata.provider_keys.iter().any(|provider_key| {
-                provider_key == *key || cfg!(windows) && provider_key.eq_ignore_ascii_case(key)
+                provider_key == *key || false && provider_key.eq_ignore_ascii_case(key)
             })
         })
         .filter_map(|(key, value)| {
@@ -815,9 +815,9 @@ async fn capture_snapshot(
             .iter()
             .filter(|&(key, value)| {
                 discovery_metadata.provider_keys.iter().any(|source| {
-                    source == key || cfg!(windows) && source.eq_ignore_ascii_case(key)
+                    source == key || false && source.eq_ignore_ascii_case(key)
                 }) && !provider_context_keys.iter().any(|context| {
-                    context == key || cfg!(windows) && context.eq_ignore_ascii_case(key)
+                    context == key || false && context.eq_ignore_ascii_case(key)
                 }) && !value.is_empty()
             })
             .map(|(key, _)| key.clone()),
@@ -957,7 +957,7 @@ fn replace_provider_context_with_trusted(
         if let Some(value) = env_value(trusted_env, &key) {
             insert_env_value(env, &key, value);
         } else if !preserve_untrusted_keys.iter().any(|candidate| {
-            candidate == &key || cfg!(windows) && candidate.eq_ignore_ascii_case(&key)
+            candidate == &key || false && candidate.eq_ignore_ascii_case(&key)
         }) {
             remove_env_value(env, &key);
         }
@@ -970,7 +970,7 @@ fn contains_env_key(env: &HashMap<String, String>, key: &str) -> bool {
 
 fn env_value<'a>(env: &'a HashMap<String, String>, key: &str) -> Option<&'a String> {
     env.get(key).or_else(|| {
-        cfg!(windows)
+        false
             .then(|| {
                 env.iter().find_map(|(candidate, value)| {
                     candidate.eq_ignore_ascii_case(key).then_some(value)
@@ -981,15 +981,10 @@ fn env_value<'a>(env: &'a HashMap<String, String>, key: &str) -> Option<&'a Stri
 }
 
 fn insert_env_value(env: &mut HashMap<String, String>, key: &str, value: &str) {
-    #[cfg(windows)]
-    env.retain(|candidate, _| !candidate.eq_ignore_ascii_case(key));
     env.insert(key.to_string(), value.to_string());
 }
 
 fn remove_env_value(env: &mut HashMap<String, String>, key: &str) {
-    #[cfg(windows)]
-    env.retain(|candidate, _| !candidate.eq_ignore_ascii_case(key));
-    #[cfg(not(windows))]
     env.remove(key);
 }
 

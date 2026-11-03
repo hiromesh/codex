@@ -132,11 +132,6 @@ async fn v2_rpc_refreshes_metadata_and_enforces_sandbox() -> anyhow::Result<()> 
             PermissionProfile::from_runtime_permissions(&policy, NetworkSandboxPolicy::Restricted),
             cwd.clone(),
         );
-        #[cfg(windows)]
-        let sandbox = FileSystemSandboxContext {
-            windows_sandbox_selection: codex_exec_server::WindowsSandboxSelection::RestrictedToken,
-            ..sandbox
-        };
         let restricted = DiscoverV2CapabilitiesRequest {
             cwd: cwd.clone(),
             sandbox: Some(sandbox),
@@ -156,45 +151,6 @@ async fn v2_rpc_refreshes_metadata_and_enforces_sandbox() -> anyhow::Result<()> 
                 expected_root,
             );
             assert!(!serde_json::to_string(&response)?.contains("mail@market"));
-        }
-        // Windows restricted tokens reject split read access; a supported read-only policy succeeds.
-        #[cfg(windows)]
-        {
-            let Err(error) = discover(&mut server, &restricted).await else {
-                anyhow::bail!("unsupported read restrictions must not reuse cached metadata");
-            };
-            assert!(
-                error.chain().any(|cause| cause
-                    .to_string()
-                    .contains("cannot enforce split filesystem read restrictions")),
-                "{error:#}"
-            );
-            let mut sandbox = FileSystemSandboxContext::from_legacy_sandbox_policy(
-                codex_protocol::protocol::SandboxPolicy::new_read_only_policy(),
-                cwd.clone(),
-            )?;
-            sandbox.windows_sandbox_selection =
-                codex_exec_server::WindowsSandboxSelection::RestrictedToken;
-            let permitted = DiscoverV2CapabilitiesRequest {
-                cwd: cwd.clone(),
-                sandbox: Some(sandbox),
-            };
-            let response = discover(&mut server, &permitted).await?;
-            assert!(
-                response
-                    .plugins
-                    .iter()
-                    .any(|plugin| plugin.id == "mail@market")
-            );
-            assert_eq!(
-                response
-                    .skills
-                    .iter()
-                    .find(|skill| skill.name == "demo")
-                    .context("sandboxed demo skill")?
-                    .discovery_root,
-                expected_root,
-            );
         }
     }
 

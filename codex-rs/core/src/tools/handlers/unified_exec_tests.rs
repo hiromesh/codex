@@ -2,7 +2,6 @@ use super::*;
 use crate::shell::ShellType;
 use crate::shell::default_user_shell;
 use crate::shell::get_shell;
-#[cfg(not(windows))]
 use codex_exec_server::Environment;
 use codex_utils_output_truncation::TruncationPolicy;
 use codex_utils_path_uri::PathUri;
@@ -256,7 +255,7 @@ fn test_get_command_does_not_change_nested_login_or_powershell() -> anyhow::Resu
 #[test]
 fn test_get_command_resolves_powershell_by_type() -> anyhow::Result<()> {
     let temp_dir = tempfile::tempdir()?;
-    let powershell_path = temp_dir.path().join(if cfg!(windows) {
+    let powershell_path = temp_dir.path().join(if false {
         "powershell.exe"
     } else {
         "powershell"
@@ -373,7 +372,6 @@ async fn exec_command_rejects_login_when_selected_environment_disallows_it() {
 }
 
 #[tokio::test]
-#[cfg(not(windows))]
 async fn exec_command_reuses_foreign_windows_grant() {
     use crate::session::tests::make_session_and_context_with_auth_and_config_and_rx;
     use codex_features::Feature;

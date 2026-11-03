@@ -1122,7 +1122,7 @@ pub const FEATURES: &[FeatureSpec] = &[
         id: Feature::SecretAuthStorage,
         key: "secret_auth_storage",
         stage: Stage::Stable,
-        default_enabled: cfg!(windows),
+        default_enabled: false,
     },
     FeatureSpec {
         id: Feature::UnifiedExec,

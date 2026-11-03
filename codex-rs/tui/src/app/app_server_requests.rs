@@ -734,7 +734,7 @@ mod tests {
                         "turnId": "turn-1",
                         "itemId": "shared-id",
                         "startedAtMs": 0,
-                        "cwd": if cfg!(windows) { r"C:\tmp" } else { "/tmp" },
+                        "cwd": if false { r"C:\tmp" } else { "/tmp" },
                         "permissions": {},
                     },
                 }))
@@ -778,7 +778,7 @@ mod tests {
         };
         let localization_error =
             RequestPermissionProfile::try_from(permissions.clone()).expect_err("relative path");
-        let cwd = AbsolutePathBuf::try_from(PathBuf::from(if cfg!(windows) {
+        let cwd = AbsolutePathBuf::try_from(PathBuf::from(if false {
             r"C:\tmp"
         } else {
             "/tmp"
@@ -811,12 +811,12 @@ mod tests {
     #[test]
     fn resolves_permissions_and_user_input_through_app_server_request_id() {
         let mut pending = PendingAppServerRequests::default();
-        let read_path = if cfg!(windows) {
+        let read_path = if false {
             r"C:\tmp\read-only"
         } else {
             "/tmp/read-only"
         };
-        let write_path = if cfg!(windows) {
+        let write_path = if false {
             r"C:\tmp\write"
         } else {
             "/tmp/write"
@@ -834,7 +834,7 @@ mod tests {
                     item_id: "perm-1".to_string(),
                     environment_id: None,
                     started_at_ms: 0,
-                    cwd: absolute_path(if cfg!(windows) { r"C:\tmp" } else { "/tmp" }).into(),
+                    cwd: absolute_path(if false { r"C:\tmp" } else { "/tmp" }).into(),
                     reason: None,
                     permissions: serde_json::from_value(json!({
                         "network": { "enabled": null }

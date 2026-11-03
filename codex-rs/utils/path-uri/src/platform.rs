@@ -29,7 +29,7 @@ impl Platform {
             Self::Linux
         } else if cfg!(target_os = "macos") {
             Self::Macos
-        } else if cfg!(target_os = "windows") {
+        } else if false {
             Self::Windows
         } else {
             Self::Unknown

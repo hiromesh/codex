@@ -108,16 +108,11 @@ async fn exec_server_accepts_initialize(version: Option<&str>) -> anyhow::Result
 async fn discovery_prewarms_before_initialize_and_recovers_without_client_opt_in()
 -> anyhow::Result<()> {
     let codex_home = TempDir::new()?;
-    #[cfg(not(windows))]
     let discovery_home = {
         // Fail the scan before startup, without racing the background task.
         std::fs::write(codex_home.path().join("plugins"), "not a directory")?;
         codex_home.path().to_path_buf()
     };
-    // Windows treats the file-parent fixture as NotFound, which discovery skips.
-    // A missing explicit home instead makes home resolution fail deterministically.
-    #[cfg(windows)]
-    let discovery_home = codex_home.path().join("missing");
     let user_home = codex_home.path().join("home");
     std::fs::create_dir_all(user_home.join(".agents/skills"))?;
     let stderr_path = codex_home.path().join("executor.log");
@@ -184,7 +179,6 @@ async fn discovery_prewarms_before_initialize_and_recovers_without_client_opt_in
     assert_eq!(id, environment_info_id);
     let info: EnvironmentInfo = serde_json::from_value(result)?;
     // Repair the failed startup fixture; discovery must retry and find the new skill.
-    #[cfg(not(windows))]
     std::fs::remove_file(discovery_home.join("plugins"))?;
     let skill_root = discovery_home.join("skills/recovered");
     std::fs::create_dir_all(&skill_root)?;

@@ -75,52 +75,6 @@ pub(crate) fn load_platform_native_certs() -> CertificateResult {
     result
 }
 
-#[cfg(windows)]
-pub(crate) fn load_platform_native_certs() -> CertificateResult {
-    use schannel::cert_store::CertStore;
-
-    let mut result = CertificateResult::default();
-    let current_user_store = match CertStore::open_current_user("ROOT") {
-        Ok(store) => store,
-        Err(err) => {
-            result.errors.push(Error {
-                context: "failed to open current user certificate store",
-                kind: ErrorKind::Os(err.into()),
-            });
-            return result;
-        }
-    };
-
-    for cert in current_user_store.certs() {
-        let valid_uses = match cert.valid_uses() {
-            Ok(valid_uses) => valid_uses,
-            Err(err) => {
-                result.errors.push(Error {
-                    context: "failed to inspect certificate valid uses",
-                    kind: ErrorKind::Os(err.into()),
-                });
-                continue;
-            }
-        };
-        let is_time_valid = match cert.is_time_valid() {
-            Ok(is_time_valid) => is_time_valid,
-            Err(err) => {
-                result.errors.push(Error {
-                    context: "failed to inspect certificate time validity",
-                    kind: ErrorKind::Os(err.into()),
-                });
-                continue;
-            }
-        };
-        if usable_for_rustls(valid_uses) && is_time_valid {
-            result
-                .certs
-                .push(CertificateDer::from(cert.to_der().to_vec()));
-        }
-    }
-    result
-}
-
 #[cfg(not(any(all(unix, not(target_os = "macos")), target_os = "macos", windows)))]
 pub(crate) fn load_platform_native_certs() -> CertificateResult {
     rustls_native_certs::load_native_certs()
@@ -248,13 +202,3 @@ const PLATFORM_CERTIFICATE_FILE_NAMES: &[&str] = &["/boot/system/data/ssl/CARoot
 ))]
 const PLATFORM_CERTIFICATE_FILE_NAMES: &[&str] = &["/etc/ssl/certs/ca-certificates.crt"];
 
-#[cfg(windows)]
-fn usable_for_rustls(uses: schannel::cert_context::ValidUses) -> bool {
-    match uses {
-        schannel::cert_context::ValidUses::All => true,
-        schannel::cert_context::ValidUses::Oids(strs) => strs.iter().any(|x| x == PKIX_SERVER_AUTH),
-    }
-}
-
-#[cfg(windows)]
-const PKIX_SERVER_AUTH: &str = "1.3.6.1.5.5.7.3.1";

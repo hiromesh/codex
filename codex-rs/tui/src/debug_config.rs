@@ -777,12 +777,12 @@ interrupt_message = false
 
     #[test]
     fn debug_config_output_lists_all_layers_including_disabled() {
-        let system_file = if cfg!(windows) {
+        let system_file = if false {
             absolute_path("C:\\etc\\codex\\config.toml")
         } else {
             absolute_path("/etc/codex/config.toml")
         };
-        let project_folder = if cfg!(windows) {
+        let project_folder = if false {
             absolute_path("C:\\repo\\.codex")
         } else {
             absolute_path("/repo/.codex")
@@ -818,27 +818,27 @@ interrupt_message = false
 
     #[test]
     fn debug_config_output_lists_requirement_sources() {
-        let requirements_file = if cfg!(windows) {
+        let requirements_file = if false {
             absolute_path("C:\\ProgramData\\OpenAI\\Codex\\requirements.toml")
         } else {
             absolute_path("/etc/codex/requirements.toml")
         };
-        let denied_path = if cfg!(windows) {
+        let denied_path = if false {
             absolute_path("C:\\Users\\alice\\.gitconfig")
         } else {
             absolute_path("/home/alice/.gitconfig")
         };
-        let sqlite_home = if cfg!(windows) {
+        let sqlite_home = if false {
             absolute_path("C:\\Users\\alice\\.codex\\state")
         } else {
             absolute_path("/home/alice/.codex/state")
         };
-        let log_dir = if cfg!(windows) {
+        let log_dir = if false {
             absolute_path("C:\\Users\\alice\\.codex\\logs")
         } else {
             absolute_path("/home/alice/.codex/logs")
         };
-        let model_catalog_json = if cfg!(windows) {
+        let model_catalog_json = if false {
             absolute_path("C:\\Users\\alice\\.codex\\models.json")
         } else {
             absolute_path("/home/alice/.codex/models.json")
@@ -1016,7 +1016,7 @@ interrupt_message = false
             models: None,
         };
 
-        let user_file = if cfg!(windows) {
+        let user_file = if false {
             absolute_path("C:\\users\\alice\\.codex\\config.toml")
         } else {
             absolute_path("/home/alice/.codex/config.toml")
@@ -1035,7 +1035,6 @@ interrupt_message = false
         .expect("config layer stack");
 
         let rendered = render_stack_to_text(&stack);
-        #[cfg(not(windows))]
         insta::assert_snapshot!("debug_config_requirement_sources", rendered.as_str());
 
         let requirements_source = (RequirementSource::LegacyManagedConfigTomlFromMdm).to_string();
@@ -1094,12 +1093,12 @@ interrupt_message = false
 
     #[test]
     fn debug_config_output_filters_sandbox_modes_blocked_by_deny_read_requirements() {
-        let requirements_file = if cfg!(windows) {
+        let requirements_file = if false {
             absolute_path("C:\\ProgramData\\OpenAI\\Codex\\requirements.toml")
         } else {
             absolute_path("/etc/codex/requirements.toml")
         };
-        let denied_path = if cfg!(windows) {
+        let denied_path = if false {
             absolute_path("C:\\Users\\alice\\.gitconfig")
         } else {
             absolute_path("/home/alice/.gitconfig")
@@ -1161,7 +1160,6 @@ interrupt_message = false
         let rendered = render_stack_to_text_with_sandbox_mode_filter(&stack, |mode| {
             sandbox_mode_is_allowed_by_permissions(&permissions, mode)
         });
-        #[cfg(not(windows))]
         insta::assert_snapshot!(
             "debug_config_effective_sandbox_modes_with_deny_read",
             rendered.as_str()
@@ -1296,7 +1294,7 @@ model = "managed_model"
 approval_policy = "never"
 "#;
         let mdm_value = toml::from_str::<TomlValue>(raw_mdm_toml).expect("MDM value");
-        let mdm_base_dir = if cfg!(windows) {
+        let mdm_base_dir = if false {
             absolute_path("C:\\codex")
         } else {
             absolute_path("/var/lib/codex")
@@ -1330,7 +1328,7 @@ model = "enterprise_model"
 approval_policy = "never"
 "#;
         let cloud_value = toml::from_str::<TomlValue>(raw_cloud_toml).expect("cloud value");
-        let cloud_base_dir = if cfg!(windows) {
+        let cloud_base_dir = if false {
             absolute_path("C:\\codex")
         } else {
             absolute_path("/var/lib/codex")
@@ -1413,7 +1411,7 @@ approval_policy = "never"
         let requirements = ConfigRequirements {
             managed_hooks: Some(ConstrainedWithSource::new(
                 Constrained::allow_any(ManagedHooksRequirementsToml {
-                    managed_dir: Some(if cfg!(windows) {
+                    managed_dir: Some(if false {
                         std::path::PathBuf::from(r"C:\enterprise\hooks")
                     } else {
                         std::path::PathBuf::from("/enterprise/hooks")

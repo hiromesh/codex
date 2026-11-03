@@ -23,17 +23,6 @@ pub(super) async fn run_main_inner(
             "--add-dir is not supported with --remote. Configure additional workspace roots on the server.",
         ));
     }
-    #[cfg(windows)]
-    let elevated_warning = if explicit_remote_endpoint.is_none()
-        && !cli.no_daemon
-        && codex_app_server_daemon::is_elevated().map_err(std::io::Error::other)?
-    {
-        cli.no_daemon = true;
-        Some(daemon_startup::ELEVATED_LAUNCH_WARNING)
-    } else {
-        None
-    };
-    #[cfg(not(windows))]
     let elevated_warning: Option<&str> = None;
     let strict_config = cli.strict_config;
     if cli.shared.worktree {
@@ -616,17 +605,6 @@ pub(super) async fn run_main_inner(
                 daemon_telemetry::record_start(&config, &result).await;
                 match result {
                     Ok(output) => Ok(Some(output)),
-                    #[cfg(windows)]
-                    Err(err) if err.is::<codex_app_server_daemon::DetachedLaunchRestricted>() => {
-                        Ok(None)
-                    }
-                    Err(err) => Err(std::io::Error::other(format!(
-                        "{err:#}\n{}",
-                        daemon_startup::FAILURE_HINT
-                    ))),
-                }
-            })
-            .await??;
         if let Some(output) = output {
             managed_daemon = output.backend.is_some();
             app_server_target = AppServerTarget::LocalDaemon {

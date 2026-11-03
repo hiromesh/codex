@@ -885,7 +885,7 @@ impl ProviderAuthCommandFixture {
     pub(super) fn fixed_token(token: &str) -> std::io::Result<Self> {
         let tempdir = tempfile::tempdir()?;
         std::fs::write(tempdir.path().join("token.txt"), token)?;
-        let (command, args): (&str, &[&str]) = if cfg!(windows) {
+        let (command, args): (&str, &[&str]) = if false {
             ("cmd.exe", &["/D", "/C", "type", "token.txt"])
         } else {
             ("cat", &["token.txt"])
@@ -926,38 +926,6 @@ mv tokens.next tokens.txt
             ("./print-token.sh".to_string(), Vec::new())
         };
 
-        #[cfg(windows)]
-        let (command, args) = {
-            let script_path = tempdir.path().join("print-token.cmd");
-            std::fs::write(
-                &script_path,
-                r#"@echo off
-setlocal EnableExtensions DisableDelayedExpansion
-setlocal EnableDelayedExpansion
-echo(!GOOGLE_APPLICATION_CREDENTIALS!>> credential-env.txt
-endlocal
-if exist fail-until-401 exit /b 1
-
-set "first_line="
-<tokens.txt set /p first_line=
-if not defined first_line exit /b 1
-
-echo(%first_line%
-more +1 tokens.txt > tokens.next
-move /y tokens.next tokens.txt >nul
-"#,
-            )?;
-            (
-                "cmd.exe".to_string(),
-                vec![
-                    "/D".to_string(),
-                    "/Q".to_string(),
-                    "/C".to_string(),
-                    ".\\print-token.cmd".to_string(),
-                ],
-            )
-        };
-
         Ok(Self {
             tempdir,
             command,
@@ -976,41 +944,6 @@ move /y tokens.next tokens.txt >nul
                 .expect("tempdir should be absolute"),
         }
     }
-}
-
-#[cfg(windows)]
-#[test]
-fn provider_auth_command_logs_credential_paths_with_cmd_metacharacters() -> anyhow::Result<()> {
-    let auth_fixture = ProviderAuthCommandFixture::new(&["first-token", "second-token"])?;
-    let credential_file = auth_fixture
-        .tempdir
-        .path()
-        .join("ADC (team)&^!credentials!%PATH%.json");
-
-    for (credential_path, token) in [
-        (Some(credential_file.as_os_str()), "first-token"),
-        (None, "second-token"),
-    ] {
-        let mut command = codex_utils_process::background_command(&auth_fixture.command);
-        command
-            .args(&auth_fixture.args)
-            .current_dir(auth_fixture.tempdir.path());
-        if let Some(credential_path) = credential_path {
-            command.env("GOOGLE_APPLICATION_CREDENTIALS", credential_path);
-        } else {
-            command.env_remove("GOOGLE_APPLICATION_CREDENTIALS");
-        }
-        let output = command.output()?;
-        assert!(output.status.success(), "{output:?}");
-        assert_eq!(String::from_utf8(output.stdout)?, format!("{token}\r\n"));
-        assert_eq!(output.stderr, Vec::<u8>::new());
-    }
-
-    assert_eq!(
-        std::fs::read_to_string(auth_fixture.tempdir.path().join("credential-env.txt"))?,
-        format!("{}\r\n\r\n", credential_file.display()),
-    );
-    Ok(())
 }
 
 fn non_zero_u64(value: u64) -> NonZeroU64 {
@@ -2483,49 +2416,6 @@ async fn omits_environment_context_when_configured_off() {
         "did not expect environment context when include_environment_context = false, got {:?}",
         request.body_json()["input"]
     );
-}
-
-#[cfg(windows)]
-#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn powershell_shell_version_is_model_visible_only_when_enabled() -> anyhow::Result<()> {
-    core_test_support::skip_if_remote!(Ok(()), "requires local Windows PowerShell execution");
-
-    let shell_path = codex_shell_command::powershell::try_find_powershell_executable_blocking()
-        .ok_or_else(|| anyhow::anyhow!("Windows PowerShell is unavailable"))?
-        .to_path_buf();
-    for enabled in [false, true] {
-        let server = MockServer::start().await;
-        let response = mount_sse_once(&server, sse(vec![ev_completed("done")])).await;
-        let user_shell = codex_shell_command::shell_detect::DetectedShell {
-            shell_type: codex_shell_command::shell_detect::ShellType::PowerShell,
-            shell_path: shell_path.clone(),
-        }
-        .into();
-        let mut builder = test_codex()
-            .with_user_shell(user_shell)
-            .with_config(move |config| {
-                config
-                    .features
-                    .set_enabled(Feature::PowerShellShellVersion, enabled)
-                    .expect("test config should allow PowerShell version feature updates");
-            });
-        let test = builder.build_with_auto_env(&server).await?;
-        test.submit_turn("report the selected shell").await?;
-
-        let request = response.single_request();
-        assert!(message_input_text_contains(
-            &request,
-            "user",
-            "<shell>powershell</shell>"
-        ));
-        assert_eq!(
-            message_input_text_contains(&request, "user", "<shell_version>5.1</shell_version>"),
-            enabled,
-            "PowerShell shell version must follow its feature flag"
-        );
-    }
-
-    Ok(())
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]

@@ -96,10 +96,10 @@ async fn refreshes_immediately_periodically_and_stops_when_dropped() {
     let codex_home = tempdir().expect("temp dir");
     let endpoint = TestModelsEndpoint::new();
     let requirements_path = codex_home.path().join("requirements.toml");
-    std::fs::write(&requirements_path, "model_provider = 'ollama'").unwrap();
+    std::fs::write(&requirements_path, "model_provider = 'lmstudio'").unwrap();
     let config_manager = crate::config_manager::ConfigManager::new_for_tests(
         codex_home.path().to_path_buf(),
-        vec![("model_provider".to_string(), "ollama".into())],
+        vec![("model_provider".to_string(), "lmstudio".into())],
         LoaderOverrides::with_managed_config_path_for_tests(
             codex_home.path().join("managed_config.toml"),
         ),
@@ -111,7 +111,7 @@ async fn refreshes_immediately_periodically_and_stops_when_dropped() {
             .codex_home(codex_home.path().to_path_buf())
             .loader_overrides(LoaderOverrides::without_managed_config_for_tests())
             .harness_overrides(ConfigOverrides {
-                model_provider: Some("ollama".to_string()),
+                model_provider: Some("lmstudio".to_string()),
                 ..Default::default()
             })
             .build()
@@ -149,7 +149,7 @@ async fn refreshes_immediately_periodically_and_stops_when_dropped() {
     catalog.invalidate().await;
     assert_eq!(
         catalog.current().await.unwrap().0.model_provider_id,
-        "ollama"
+        "lmstudio"
     );
 
     assert!(Arc::ptr_eq(
@@ -169,7 +169,7 @@ async fn refreshes_immediately_periodically_and_stops_when_dropped() {
     catalog.invalidate().await;
     assert_eq!(
         catalog.current().await.unwrap().0.model_provider_id,
-        "ollama"
+        "lmstudio"
     );
     assert_eq!(endpoint.fetch_count.load(Ordering::SeqCst), 2);
 }
@@ -282,7 +282,7 @@ async fn catalog_reload_recovers_after_cloud_failure() -> anyhow::Result<()> {
                 ))
             } else {
                 Ok(Some(
-                    CloudConfigBundleFixture::enterprise_requirement("model_provider = 'ollama'")
+                    CloudConfigBundleFixture::enterprise_requirement("model_provider = 'lmstudio'")
                         .into_bundle(),
                 ))
             }
@@ -311,7 +311,7 @@ async fn catalog_reload_recovers_after_cloud_failure() -> anyhow::Result<()> {
     failed.store(false, Ordering::SeqCst);
     // Exercise the same online request used by the periodic background worker.
     catalog.list_models(RefreshStrategy::Online).await?;
-    assert_eq!(catalog.current().await?.0.model_provider_id, "ollama");
+    assert_eq!(catalog.current().await?.0.model_provider_id, "lmstudio");
     assert!(
         !catalog
             .list_models(RefreshStrategy::Offline)

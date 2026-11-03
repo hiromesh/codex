@@ -2,12 +2,6 @@
 
 mod backend;
 mod background_command;
-#[cfg(windows)]
-pub use backend::windows::DetachedLaunchRestricted;
-#[cfg(windows)]
-pub use backend::windows::is_elevated;
-#[cfg(windows)]
-use backend::windows::try_lock_file;
 mod client;
 mod diagnostics;
 mod install_lock;
@@ -237,71 +231,6 @@ enum RestartDecision {
 
 pub async fn run(command: LifecycleCommand) -> Result<LifecycleOutput> {
     ensure_supported_platform()?;
-    #[cfg(windows)]
-    if matches!(
-        command,
-        LifecycleCommand::Start | LifecycleCommand::Restart { .. }
-    ) {
-        backend::windows::ensure_not_elevated()?;
-    }
-    // Keep daemon package preparation off callers' async stack frames.
-    Box::pin(Daemon::from_environment()?.run(command)).await
-}
-
-pub async fn bootstrap(options: BootstrapOptions) -> Result<BootstrapOutput> {
-    ensure_supported_platform()?;
-    #[cfg(windows)]
-    backend::windows::ensure_not_elevated()?;
-    Box::pin(Daemon::from_environment()?.bootstrap(options)).await
-}
-
-pub async fn ensure_remote_control_ready() -> Result<RemoteControlReadyOutput> {
-    ensure_supported_platform()?;
-    #[cfg(windows)]
-    backend::windows::ensure_not_elevated()?;
-    Box::pin(Daemon::from_environment()?.ensure_remote_control_ready()).await
-}
-
-pub async fn enable_remote_control_on_socket(
-    socket_path: &Path,
-    connect_timeout: Duration,
-    connect_retry_delay: Duration,
-) -> Result<RemoteControlReadyStatus> {
-    ensure_supported_platform()?;
-    remote_control_client::enable_remote_control_with_connect_retry(
-        socket_path,
-        connect_timeout,
-        connect_retry_delay,
-    )
-    .await
-}
-
-/// Starts a manual pairing session through an already-running daemon app-server.
-pub async fn start_remote_control_pairing() -> Result<RemoteControlPairingStartResponse> {
-    ensure_supported_platform()?;
-    let daemon = Daemon::from_environment()?;
-    remote_control_client::start_pairing(&daemon.socket_path).await
-}
-
-pub async fn set_remote_control(mode: RemoteControlMode) -> Result<RemoteControlOutput> {
-    ensure_supported_platform()?;
-    #[cfg(windows)]
-    backend::windows::ensure_not_elevated()?;
-    Box::pin(Daemon::from_environment()?.set_remote_control(mode)).await
-}
-
-pub async fn run_pid_update_loop(
-    http_client_factory: codex_http_client::HttpClientFactory,
-    restore_release: Option<String>,
-) -> Result<()> {
-    ensure_supported_platform()?;
-    #[cfg(windows)]
-    backend::windows::ensure_not_elevated()?;
-    update_loop::run(http_client_factory, restore_release).await
-}
-
-pub use backend::stderr_log::stderr_writer;
-
 /// Routes managed app-server logs through a bounded queue to a dedicated file worker.
 /// Full queues and oversized records are dropped; shutdown never waits for disk I/O.
 /// Native and other-process stderr writes remain best effort during pruning.
@@ -318,8 +247,6 @@ pub async fn update(
     http_client_factory: codex_http_client::HttpClientFactory,
 ) -> Result<UpdateOutput> {
     ensure_supported_platform()?;
-    #[cfg(windows)]
-    backend::windows::ensure_not_elevated()?;
     update_loop::request_manual_update(&Daemon::from_environment()?, http_client_factory).await
 }
 
@@ -588,8 +515,6 @@ impl Daemon {
                 }
                 RestartDecision::AlreadyCurrent => RestartIfRunningOutcome::AlreadyCurrent,
                 RestartDecision::Restart => {
-                    #[cfg(windows)]
-                    backend::windows::ensure_detached_launch(managed_codex_bin)?;
                     if let Err(err) = thread_recovery::discard_pending(self) {
                         let _ = stderr_writer().write_all(format!(
                             "warning: failed to clear stale daemon recovery before update: {err}\n"
@@ -1074,8 +999,6 @@ impl Daemon {
 
     fn ensure_managed_codex_bin(&self) -> Result<()> {
         if self.managed_codex_bin.is_file() {
-            #[cfg(windows)]
-            backend::windows::ensure_detached_launch(&self.managed_codex_bin)?;
             return Ok(());
         }
 

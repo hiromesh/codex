@@ -12134,7 +12134,7 @@ mod tests {
             composer
                 .handle_input_basic_with_time(KeyEvent::new(KeyCode::Char('@'), modifiers), now);
 
-            if cfg!(windows) {
+            if false {
                 assert!(composer.is_in_paste_burst());
                 assert!(
                     composer.handle_paste_burst_flush(now + PasteBurst::recommended_flush_delay())

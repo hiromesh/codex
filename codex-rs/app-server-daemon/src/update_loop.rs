@@ -73,9 +73,6 @@ const INSTALLER_STDERR_TAIL_BYTES: usize = 2 * 1024;
 const INSTALLER_STDERR_DRAIN_TIMEOUT: Duration = Duration::from_secs(1);
 #[cfg(unix)]
 const INSTALL_URL: &str = "https://chatgpt.com/codex/install.sh";
-#[cfg(windows)]
-const INSTALL_URL: &str = "https://chatgpt.com/codex/install.ps1";
-
 pub(crate) async fn run(
     http_client_factory: HttpClientFactory,
     restore_release: Option<String>,
@@ -115,17 +112,6 @@ async fn run_with_http(
             let _ = backend.promote_legacy_identity().await;
         }
     }
-    #[cfg(windows)]
-    let updater = {
-        // Updater ownership needs only paths, not settings that may be mid-edit.
-        crate::backend::pid_update_loop_backend(daemon.backend_paths(&DaemonSettings::default()))
-    };
-    #[cfg(windows)]
-    updater.wait_for_ownership().await?;
-    #[cfg(windows)]
-    let mut terminate = Signal;
-    #[cfg(windows)]
-    let _installer_job = crate::backend::windows::updater_job()?;
     let socket_path = daemon.manual_update_socket_path();
     codex_uds::prepare_private_socket_directory(
         socket_path
@@ -136,16 +122,7 @@ async fn run_with_http(
     #[cfg(unix)]
     let (listener, _socket_guard) =
         codex_app_server_transport::bind_private_daemon_socket(&socket_path).await?;
-    #[cfg(windows)]
-    let listener = {
-        if socket_path.exists() {
-            tokio::fs::remove_file(&socket_path).await?;
-        }
-        codex_uds::UnixListener::bind(&socket_path).await?
-    };
     let mut listener = Some(listener);
-    #[cfg(windows)]
-    updater.mark_ready().await?;
     let needs_managed_handoff =
         match resolved_managed_codex_bin(&daemon.current_managed_codex_bin()?).await {
             Ok(managed_bin) => executable_identity(&managed_bin)
@@ -206,10 +183,6 @@ async fn run_with_http(
                     }
                     Ok(_) => {}
                 }
-                // Failed successor cleanup leaves its PID published. The predecessor
-                // must stop instead of installing again without ownership.
-                #[cfg(windows)]
-                updater.wait_for_ownership().await?;
                 if manual_handoff_pending {
                     if !daemon.is_stable_standalone_release()? {
                         if !daemon.has_latest_selection_marker() {
@@ -290,25 +263,6 @@ async fn adopt_managed_updater(
                 .context("updater pid path has no parent")?,
         )
         .map(|_| UpdateLoopControl::Stop)
-    }
-    #[cfg(windows)]
-    {
-        let replacement = crate::backend::pid_update_loop_backend(
-            daemon.backend_paths_with_bin(&daemon.load_settings().await?, &managed_bin),
-        );
-        listener.take();
-        if let Err(err) = replacement.replace_current_updater().await {
-            // A failed replacement may still own the PID if its cleanup could
-            // not terminate the successor. Never reopen our request socket then.
-            replacement.wait_for_ownership().await?;
-            let socket_path = daemon.manual_update_socket_path();
-            if socket_path.exists() {
-                tokio::fs::remove_file(&socket_path).await?;
-            }
-            *listener = Some(codex_uds::UnixListener::bind(&socket_path).await?);
-            return Err(err);
-        }
-        Ok(UpdateLoopControl::Stop)
     }
 }
 
@@ -416,15 +370,6 @@ async fn update_once(
     ) {
         return Ok((UpdateLoopControl::Stop, None));
     }
-    #[cfg(windows)]
-    tokio::select! {
-        result = run_installer_script(&script, installer_mode, &package_root) => { crate::diagnostics::result("installer_run", started, result)?; },
-        _ = terminate.recv() => return Ok((UpdateLoopControl::Stop, None)),
-    }
-    anyhow::ensure!(
-        trigger == UpdateTrigger::Scheduled || daemon.is_stable_standalone_release()?,
-        "installer did not select a stable latest release; retry the update"
-    );
     if release_selection_unstable(daemon, trigger)? {
         return Ok((UpdateLoopControl::Continue, None));
     }
@@ -586,14 +531,6 @@ async fn run_installer_script(
         command.process_group(0);
         command
     };
-    #[cfg(windows)]
-    let mut command = {
-        let mut command = Command::new("powershell.exe");
-        command.creation_flags(windows_sys::Win32::System::Threading::CREATE_NO_WINDOW);
-        command.args(["-NoLogo", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-Command", "[Console]::OutputEncoding = [System.Text.UTF8Encoding]::new($false); try { Invoke-Expression ([Console]::In.ReadToEnd()) } catch { Write-Error $_; exit 1 }"])
-            .kill_on_drop(true);
-        command
-    };
     let (latest_guard, current_guard, previous_release, defer_selection) = match mode {
         InstallerMode::Update(release) => ("1", "0", release, "0"),
         InstallerMode::RestoreProduction(release) => ("0", "1", release, "0"),
@@ -662,8 +599,6 @@ async fn run_installer_script(
             }
         }
     });
-    #[cfg(windows)]
-    let _installer_job = crate::backend::windows::installer_job(&child)?;
     let mut stdin = child
         .stdin
         .take()
@@ -675,8 +610,6 @@ async fn run_installer_script(
         result = stdin.write_all(script) => Some(result),
         _ = &mut terminate => None,
     };
-    #[cfg(windows)]
-    let write_result = Some(stdin.write_all(script).await);
     drop(stdin);
     #[cfg(unix)]
     if write_result.is_none() {
@@ -696,8 +629,6 @@ async fn run_installer_script(
             return Ok(UpdateLoopControl::Stop);
         }
     };
-    #[cfg(windows)]
-    let status = child.wait().await;
     let status = match status {
         Ok(status) => status,
         Err(err) => {
@@ -796,14 +727,3 @@ impl InstallerHttp for RouteAwareClientPool {
 #[path = "update_loop_tests.rs"]
 mod tests;
 
-#[cfg(windows)]
-struct Signal;
-
-#[cfg(windows)]
-impl Signal {
-    async fn recv(&mut self) -> Option<()> {
-        // An unreadable control path must stop the updater rather than disable shutdown.
-        let _ = codex_app_server_transport::daemon_shutdown_signal().await;
-        Some(())
-    }
-}

@@ -214,7 +214,7 @@ enum ReviewerResponse {
 }
 
 fn large_output_command(lines: usize) -> String {
-    if cfg!(windows) {
+    if false {
         format!("1..{lines} | ForEach-Object {{ 'inspection-output' }}")
     } else {
         format!("yes inspection-output | head -n {lines}")

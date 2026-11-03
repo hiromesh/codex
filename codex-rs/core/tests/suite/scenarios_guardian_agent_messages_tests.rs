@@ -130,7 +130,6 @@ async fn encrypted_parent_reply_survives_incremental_guardian_reviews(
                 trust_discovered_hooks(config);
             }
         });
-    #[cfg(not(target_os = "windows"))]
     let test = if native_call_namespace.is_none() {
         test.with_pre_build_hook(|home| {
             super::super::hooks::write_updating_pre_tool_use_hook(

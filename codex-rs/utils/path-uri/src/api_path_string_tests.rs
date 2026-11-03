@@ -549,9 +549,6 @@ fn ambiguous_absolute_api_paths_preserve_their_inferred_convention() {
 
 #[test]
 fn converts_native_api_path_to_inferred_absolute_path() {
-    #[cfg(windows)]
-    let raw_path = r"C:\workspace\file.rs";
-    #[cfg(not(windows))]
     let raw_path = "/workspace/file.rs";
     let path = serde_json::from_value::<LegacyAppPathString>(serde_json::json!(raw_path))
         .expect("absolute API path should deserialize");
@@ -580,11 +577,7 @@ fn foreign_absolute_syntax_deserializes_without_host_interpretation() {
 
 #[test]
 fn from_path_preserves_foreign_absolute_path_for_uri_conversion() {
-    #[cfg(not(windows))]
     let (foreign_path, expected_uri) = (r"C:\Users\openai\share", "file:///C:/Users/openai/share");
-    #[cfg(windows)]
-    let (foreign_path, expected_uri) = ("/home/openai/share", "file:///home/openai/share");
-
     let path: PathUri = LegacyAppPathString::from_path(std::path::Path::new(foreign_path))
         .try_into()
         .expect("foreign absolute path should convert");
@@ -599,47 +592,12 @@ fn from_path_preserves_foreign_absolute_path_for_uri_conversion() {
 fn renders_an_absolute_path_using_the_host_convention() {
     #[cfg(unix)]
     let native_path = "/workspace/a file.rs";
-    #[cfg(windows)]
-    let native_path = r"C:\workspace\a file.rs";
     let path = AbsolutePathBuf::from_absolute_path_checked(native_path)
         .expect("native path should be absolute");
 
     assert_eq!(
         LegacyAppPathString::from(path),
         LegacyAppPathString(native_path.to_string())
-    );
-}
-
-#[cfg(windows)]
-#[test]
-fn renders_native_non_unicode_windows_fallback_lossily() {
-    use std::os::windows::ffi::OsStringExt;
-
-    let native_path = std::path::PathBuf::from(std::ffi::OsString::from_wide(
-        &r"C:\bad\"
-            .encode_utf16()
-            .chain([0xd800])
-            .collect::<Vec<_>>(),
-    ));
-    let native_path =
-        AbsolutePathBuf::from_absolute_path_checked(native_path).expect("absolute native path");
-
-    assert_eq!(
-        LegacyAppPathString::from_abs_path(&native_path),
-        LegacyAppPathString(r"C:\bad\�".to_string())
-    );
-
-    let path = PathUri::from_abs_path(&native_path);
-
-    assert_eq!(
-        LegacyAppPathString::from_path_uri(&path, PathConvention::Windows),
-        Ok(LegacyAppPathString(r"C:\bad\�".to_string()))
-    );
-    assert_eq!(
-        LegacyAppPathString::from_path_uri(&path, PathConvention::Posix),
-        Err(LegacyAppPathStringError::OpaqueFallback {
-            path: path.to_string(),
-        })
     );
 }
 

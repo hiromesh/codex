@@ -35,7 +35,6 @@ fn tool_call_id_replaces_platform_equivalent_names() {
         set_tool_call_id_env_var(&mut env, call_id);
 
         let mut expected = HashMap::from([("OTHER".to_string(), "unchanged".to_string())]);
-        #[cfg(not(windows))]
         expected.extend([
             (
                 "Codex_Tool_Call_Id".to_string(),
@@ -156,14 +155,6 @@ fn command_scrubber_removes_names_from_real_child_environment() {
     assert_eq!(restricted_names, Vec::<&str>::new());
 }
 
-#[cfg(windows)]
-fn environment_command() -> Command {
-    let mut command = Command::new("cmd.exe");
-    command.args(["/D", "/C", "set"]);
-    command
-}
-
-#[cfg(not(windows))]
 fn environment_command() -> Command {
     Command::new("env")
 }

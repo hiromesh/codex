@@ -4,11 +4,7 @@ use std::path::Path;
 use std::path::PathBuf;
 use std::process::Stdio;
 
-#[cfg(windows)]
-use codex_protocol::permissions::FileSystemPath;
 use codex_protocol::permissions::FileSystemSandboxPolicy;
-#[cfg(windows)]
-use codex_protocol::permissions::FileSystemSpecialPath;
 use color_eyre::eyre::Report;
 use color_eyre::eyre::Result;
 use tempfile::Builder;
@@ -19,20 +15,10 @@ use tokio::process::Command;
 pub(crate) enum EditorError {
     #[error("neither VISUAL nor EDITOR is set")]
     MissingEditor,
-    #[cfg(not(windows))]
     #[error("failed to parse editor command")]
     ParseFailed,
     #[error("editor command is empty")]
     EmptyCommand,
-}
-
-/// Tries to resolve the full path to a Windows program, respecting PATH + PATHEXT.
-/// Falls back to the original program name if resolution fails.
-#[cfg(windows)]
-fn resolve_windows_program(program: &str) -> std::path::PathBuf {
-    // On Windows, `Command::new("code")` will not resolve `code.cmd` shims on PATH.
-    // Use `which` so we respect PATH + PATHEXT (e.g., `code` -> `code.cmd`).
-    which::which(program).unwrap_or_else(|_| std::path::PathBuf::from(program))
 }
 
 /// Resolve the editor command from environment variables.
@@ -42,11 +28,6 @@ pub(crate) fn resolve_editor_command() -> std::result::Result<Vec<String>, Edito
         .or_else(|_| env::var("EDITOR"))
         .map_err(|_| EditorError::MissingEditor)?;
     let parts = {
-        #[cfg(windows)]
-        {
-            winsplit::split(&raw)
-        }
-        #[cfg(not(windows))]
         {
             shlex::split(&raw).ok_or(EditorError::ParseFailed)?
         }
@@ -63,29 +44,6 @@ pub(super) fn editor_directory(
     cwd: &Path,
 ) -> Result<PathBuf> {
     let writable_roots = file_system_policy.get_writable_roots_with_cwd(cwd);
-    #[cfg(windows)]
-    let windows_temporary_roots = if !file_system_policy.has_full_disk_write_access()
-        && file_system_policy.entries.iter().any(|entry| {
-            matches!(
-                &entry.path,
-                FileSystemPath::Special {
-                    value: FileSystemSpecialPath::Tmpdir
-                }
-            ) && entry.access.can_write()
-        }) {
-        ["TEMP", "TMP"]
-            .into_iter()
-            .filter_map(env::var_os)
-            .map(PathBuf::from)
-            .filter(|path| path.is_absolute())
-            .flat_map(|path| {
-                let canonical_path = dunce::canonicalize(&path).ok();
-                std::iter::once(path).chain(canonical_path)
-            })
-            .collect::<Vec<_>>()
-    } else {
-        Vec::new()
-    };
     let mut error = Report::msg("editor directory must not be writable");
     let mut rejected_writable = false;
 
@@ -132,13 +90,6 @@ pub(super) fn editor_directory(
                         || writable_roots.iter().any(|root| {
                             root.is_path_writable(directory)
                                 || root.root.as_path().starts_with(directory)
-                        });
-                    #[cfg(windows)]
-                    let is_writable = is_writable
-                        || windows_temporary_roots.iter().any(|root| {
-                            directory.starts_with(root)
-                                || parent.starts_with(root)
-                                || root.starts_with(directory)
                         });
                     is_writable
                 })
@@ -200,12 +151,6 @@ pub(crate) async fn run_editor(
     fs::write(&temp_path, seed)?;
 
     let mut cmd = {
-        #[cfg(windows)]
-        {
-            // handles .cmd/.bat shims
-            Command::new(resolve_windows_program(&editor_cmd[0]))
-        }
-        #[cfg(not(windows))]
         {
             Command::new(&editor_cmd[0])
         }

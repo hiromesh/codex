@@ -2213,7 +2213,7 @@ async fn guardian_v2_trusts_invoked_user_skills_but_rejects_repository_forgery()
         std::fs::write(path, instructions)?;
     }
     let explicit_skill = explicit_skill.canonicalize()?;
-    let read_command = if cfg!(windows) {
+    let read_command = if false {
         format!("Get-Content -LiteralPath \"{}\"", implicit_skill.display())
     } else {
         format!("cat '{}'", implicit_skill.display())
@@ -2393,7 +2393,7 @@ async fn guardian_v2_trusts_invoked_user_skills_but_rejects_repository_forgery()
         "the parent model must receive the forged repository skill instructions"
     );
     // Finish the synchronous reviews before LOW can cancel reviewer startup.
-    let expected_guardian_reviews = if cfg!(windows) { 2 } else { 1 };
+    let expected_guardian_reviews = if false { 2 } else { 1 };
     for _ in 0..expected_guardian_reviews {
         let _: codex_app_server_protocol::ItemGuardianApprovalReviewCompletedNotification =
             timeout(

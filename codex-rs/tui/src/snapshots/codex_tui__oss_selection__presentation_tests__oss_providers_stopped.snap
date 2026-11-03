@@ -7,7 +7,6 @@ expression: terminal.backend()
   Choose a local AI server for this session.
 
 › 1. LM Studio · ○ Not running                                                  
-  2. Ollama · ○ Not running
 
   Local LM Studio server (default port 1234)
 

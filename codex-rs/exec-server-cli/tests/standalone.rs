@@ -110,18 +110,12 @@ async fn standalone_initializes_reports_version_and_runs_helpers() -> anyhow::Re
             serde_json::from_str(&stdout.next_line().await?.context("read response")?)?;
         assert_eq!(response, json!({"id": 3, "result": {"dataBase64": "b2s="}}));
 
-        #[cfg(windows)]
-        let argv = vec!["cmd.exe", "/C", "exit 0"];
-        #[cfg(not(windows))]
         let argv = vec![
             "/bin/sh",
             "-c",
             "if touch forbidden 2>/dev/null; then exit 7; fi",
         ];
-        #[cfg(not(windows))]
         let expected_exit = if sandbox.is_some() { 0 } else { 7 };
-        #[cfg(windows)]
-        let expected_exit = 0;
         let start = json!({"id": 4, "method": "process/start", "params": {
             "processId": "standalone-process", "cwd": cwd, "sandbox": sandbox,
             "argv": argv, "env": {"PATH": std::env::var("PATH")?}, "tty": false, "pipeStdin": false, "arg0": null,

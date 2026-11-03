@@ -5,7 +5,6 @@ use codex_config::test_support::CloudConfigBundleFixture;
 use codex_core::EnvironmentConfig;
 use codex_core::config::Config;
 use codex_core::config::ConfigBuilder;
-use codex_core::windows_sandbox::WindowsSandboxLevelExt;
 use codex_core_plugins::ExecutorPluginProvider;
 use codex_core_plugins::PluginCatalog;
 use codex_core_plugins::PluginCatalogEntry;
@@ -33,7 +32,6 @@ use codex_mcp_extension::PluginsThreadState;
 use codex_mcp_extension::install_plugin_providers;
 use codex_protocol::capabilities::CapabilityRootLocation;
 use codex_protocol::capabilities::SelectedCapabilityRoot;
-use codex_protocol::config_types::WindowsSandboxLevel;
 use codex_protocol::models::PermissionProfileSnapshot;
 use codex_utils_path_uri::PathUri;
 use core_test_support::apps_test_server::AppsTestServer;
@@ -831,8 +829,6 @@ async fn run_cloud_plugin_projection_scenarios() -> anyhow::Result<()> {
                             test.config.permissions.permission_profile().clone(),
                         ),
                         shell_environment_policy: Default::default(),
-                        windows_sandbox_level: WindowsSandboxLevel::from_config(&test.config),
-                        windows_sandbox_type: test.config.permissions.windows_sandbox_type,
                         use_legacy_landlock: test.config.features.use_legacy_landlock(),
                         exec_policy: None,
                         mcp_policy: None,

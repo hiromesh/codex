@@ -395,7 +395,7 @@ async fn serving_assessment_replaces_async_scoring(
     skip_if_target_windows!(Ok(()), "exec_command requires a POSIX executor");
     core_test_support::skip_if_test_condition!(
         Ok(()),
-        cfg!(target_os = "windows")
+        false
             && matches!(scenario, ProbeCase::Rewrite | ProbeCase::Interrupted),
         "a Windows host",
         "hook fixtures require a POSIX host",
@@ -478,7 +478,6 @@ async fn serving_assessment_replaces_async_scoring(
     let mut builder = test_codex()
         .with_model("guardian-probe-parent")
         .with_pre_build_hook(move |home| {
-            #[cfg(not(target_os = "windows"))]
             match scenario {
                 ProbeCase::Rewrite => super::hooks::write_updating_pre_tool_use_hook(
                     home, "^Bash$", &json!({"command": "echo probe-policy-second-rewritten"}),

@@ -20,7 +20,7 @@ const CLEARED_AUTH_ENV: &[(&str, Option<&str>)] = &[
 async fn list_without_provider_definitions_only_returns_openai() -> Result<()> {
     for (config, default_id, base_url) in [
         ("", "openai", None),
-        ("model_provider = 'ollama'", "ollama", None),
+        ("model_provider = 'lmstudio'", "lmstudio", None),
         (
             "openai_base_url = 'https://proxy.example.test/v1'",
             "openai",

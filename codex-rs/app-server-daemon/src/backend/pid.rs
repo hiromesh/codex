@@ -188,37 +188,6 @@ impl PidBackend {
             let deadline = started_at + force_after + STOP_FORCE_TIMEOUT;
             #[cfg(unix)]
             self.terminate_process(pid)?;
-            #[cfg(windows)]
-            let process = {
-                let Some(process) = super::windows::Process::open(pid)? else {
-                    continue;
-                };
-                if process.start_time()? != record.process_start_time {
-                    continue;
-                }
-                match self.command_kind {
-                    PidCommandKind::AppServer { .. } => {
-                        let codex_home = self
-                            .pid_file
-                            .parent()
-                            .and_then(Path::parent)
-                            .context("daemon pid path has no Codex home")?;
-                        let socket_path =
-                            codex_app_server_transport::app_server_control_socket_path(codex_home)?;
-                        if let Err(err) =
-                            crate::client::request_shutdown(socket_path.as_path(), pid).await
-                        {
-                            tracing::warn!(%pid, %err, "managed app-server shutdown request failed; waiting for force deadline");
-                        }
-                    }
-                    PidCommandKind::UpdateLoop { .. } => {
-                        fs::write(self.pid_file.with_extension("shutdown"), pid.to_string())
-                            .await
-                            .context("failed to request updater shutdown")?;
-                    }
-                }
-                process
-            };
             let mut forced = false;
             loop {
                 #[cfg(unix)]
@@ -241,8 +210,6 @@ impl PidBackend {
                     crate::diagnostics::event("shutdown_forced", serde_json::json!({ "pid": pid }));
                     #[cfg(unix)]
                     self.force_terminate_process(pid)?;
-                    #[cfg(windows)]
-                    process.terminate()?;
                     forced = true;
                 }
                 sleep(STOP_POLL_INTERVAL).await;
@@ -448,7 +415,6 @@ impl PidBackend {
         }
     }
 
-    #[cfg(not(windows))]
     fn force_terminate_process(&self, pid: u32) -> Result<()> {
         match self.command_kind {
             PidCommandKind::AppServer { .. } => force_terminate_process(pid),
@@ -842,38 +808,7 @@ async fn read_process_details(pid: u32) -> Result<(String, String)> {
 #[path = "pid_tests.rs"]
 mod tests;
 
-#[cfg(windows)]
-use super::windows::try_lock_file;
 
-#[cfg(windows)]
-async fn read_process_start_time(pid: u32) -> Result<String> {
-    super::windows::Process::open(pid)?
-        .context("daemon process exited during startup")?
-        .start_time()
-}
-
-#[cfg(windows)]
-async fn process_matches_record(record: &PidRecord) -> Result<bool> {
-    let Some(process) = super::windows::Process::open(record.pid)? else {
-        return Ok(false);
-    };
-    Ok(process.is_running()? && process.start_time()? == record.process_start_time)
-}
-
-#[cfg(windows)]
-fn force_terminate_process(pid: u32) -> Result<()> {
-    if let Some(process) = super::windows::Process::open(pid)? {
-        process.terminate()?;
-    }
-    Ok(())
-}
-
-#[cfg(windows)]
-use force_terminate_process as terminate_process;
-
-#[cfg(windows)]
-#[path = "pid_windows.rs"]
-mod windows;
 
 #[cfg(any(unix, windows))]
 #[path = "pid_start.rs"]

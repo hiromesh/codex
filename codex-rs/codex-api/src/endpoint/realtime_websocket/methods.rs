@@ -1091,17 +1091,6 @@ impl RealtimeWebsocketClient {
         // outbound HTTPS and websocket traffic.
         let tls_config = maybe_build_rustls_client_config_with_custom_ca()
             .map_err(|err| ApiError::Stream(format!("failed to configure websocket TLS: {err}")))?;
-        // A fresh Windows install may not have downloaded the server's trusted root yet.
-        // Use platform validation only for system trust, preserving custom CA semantics.
-        #[cfg(windows)]
-        let tls_config = match tls_config {
-            Some(tls_config) => Some(tls_config),
-            None => Some(
-                codex_http_client::build_windows_platform_tls_config().map_err(|err| {
-                    ApiError::Stream(format!("failed to configure websocket TLS: {err}"))
-                })?,
-            ),
-        };
         let tls_mode = match tls_config {
             Some(tls_config) => WebSocketTlsMode::Rustls(tls_config),
             None => WebSocketTlsMode::TungsteniteDefault,

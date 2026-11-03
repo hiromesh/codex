@@ -11,8 +11,6 @@ mod tests;
 #[cfg(test)]
 #[path = "projectless_directory_tests.rs"]
 mod projectless_directory_tests;
-#[cfg(windows)]
-mod windows;
 
 pub use application::LocalApplicationRequirements;
 pub use application::load_local_application_requirements;
@@ -63,8 +61,6 @@ use dunce::canonicalize as normalize_path;
 use serde::Deserialize;
 use std::io;
 use std::path::Path;
-#[cfg(windows)]
-use std::path::PathBuf;
 use toml::Value as TomlValue;
 
 pub use local::LocalConfigLayers;
@@ -72,16 +68,9 @@ pub use local::LocalTomlLayer;
 pub use local::LocalTomlLayerStack;
 pub use local::load_local_config_layers;
 pub use managed_requirements::load_managed_requirements_state;
-#[cfg(windows)]
-pub use windows::WindowsSystemConfigNamespaceProbe;
-#[cfg(windows)]
-pub use windows::probe_windows_system_config_namespace;
 
 #[cfg(unix)]
 const SYSTEM_CONFIG_TOML_FILE_UNIX: &str = "/etc/codex/config.toml";
-
-#[cfg(windows)]
-const DEFAULT_PROGRAM_DATA_DIR_WINDOWS: &str = r"C:\ProgramData";
 
 // Project-local config comes from repository contents, so it should not get to
 // choose where a user's credentials are sent or which local commands are run.
@@ -736,11 +725,6 @@ fn system_requirements_toml_file() -> io::Result<AbsolutePathBuf> {
     AbsolutePathBuf::from_absolute_path(Path::new("/etc/codex/requirements.toml"))
 }
 
-#[cfg(windows)]
-fn system_requirements_toml_file() -> io::Result<AbsolutePathBuf> {
-    windows_system_requirements_toml_file()
-}
-
 fn system_requirements_toml_file_with_overrides(
     overrides: &LoaderOverrides,
 ) -> io::Result<AbsolutePathBuf> {
@@ -766,10 +750,6 @@ fn has_local_managed_configuration_with_system_requirements_path(
     codex_home: &Path,
     system_requirements_path: &Path,
 ) -> io::Result<bool> {
-    #[cfg(windows)]
-    let _ = codex_home;
-
-    #[cfg(not(windows))]
     if layer_io::managed_config_default_path(codex_home).try_exists()? {
         return Ok(true);
     }
@@ -791,11 +771,6 @@ pub fn system_config_toml_file() -> io::Result<AbsolutePathBuf> {
     AbsolutePathBuf::from_absolute_path(Path::new(SYSTEM_CONFIG_TOML_FILE_UNIX))
 }
 
-#[cfg(windows)]
-pub fn system_config_toml_file() -> io::Result<AbsolutePathBuf> {
-    windows_system_config_toml_file()
-}
-
 fn system_config_toml_file_with_overrides(
     overrides: &LoaderOverrides,
 ) -> io::Result<AbsolutePathBuf> {
@@ -803,94 +778,6 @@ fn system_config_toml_file_with_overrides(
         Some(path) => AbsolutePathBuf::from_absolute_path(path),
         None => system_config_toml_file(),
     }
-}
-
-#[cfg(windows)]
-fn windows_codex_system_dir() -> PathBuf {
-    let program_data = windows_program_data_dir_from_known_folder().unwrap_or_else(|err| {
-        tracing::warn!(
-            error = %err,
-            "Failed to resolve ProgramData known folder; using default path"
-        );
-        PathBuf::from(DEFAULT_PROGRAM_DATA_DIR_WINDOWS)
-    });
-    program_data.join("OpenAI").join("Codex")
-}
-
-#[cfg(windows)]
-fn windows_system_requirements_toml_file() -> io::Result<AbsolutePathBuf> {
-    if let Ok(path) = winreg::RegKey::predef(winreg::enums::HKEY_LOCAL_MACHINE)
-        .open_subkey_with_flags(
-            r"SOFTWARE\Policies\OpenAI\Codex",
-            winreg::enums::KEY_READ | winreg::enums::KEY_WOW64_64KEY,
-        )
-        .and_then(|key| key.get_value::<std::ffi::OsString, _>("RequirementsPath"))
-    {
-        return AbsolutePathBuf::from_absolute_path_checked(path);
-    }
-
-    let requirements_toml_file = windows_codex_system_dir().join("requirements.toml");
-    AbsolutePathBuf::try_from(requirements_toml_file)
-}
-
-#[cfg(windows)]
-fn windows_system_config_toml_file() -> io::Result<AbsolutePathBuf> {
-    let config_toml_file = windows_codex_system_dir().join("config.toml");
-    AbsolutePathBuf::try_from(config_toml_file)
-}
-
-#[cfg(windows)]
-fn windows_program_data_dir_from_known_folder() -> io::Result<PathBuf> {
-    use std::ffi::OsString;
-    use std::os::windows::ffi::OsStringExt;
-    use windows_sys::Win32::System::Com::CoTaskMemFree;
-    use windows_sys::Win32::UI::Shell::FOLDERID_ProgramData;
-    use windows_sys::Win32::UI::Shell::KF_FLAG_DEFAULT;
-    use windows_sys::Win32::UI::Shell::SHGetKnownFolderPath;
-
-    let mut path_ptr = std::ptr::null_mut::<u16>();
-    let known_folder_flags = u32::try_from(KF_FLAG_DEFAULT).map_err(|_| {
-        io::Error::other(format!(
-            "KF_FLAG_DEFAULT did not fit in u32: {KF_FLAG_DEFAULT}"
-        ))
-    })?;
-    // Known folder IDs reference:
-    // https://learn.microsoft.com/en-us/windows/win32/shell/knownfolderid
-    // SAFETY: SHGetKnownFolderPath initializes path_ptr with a CoTaskMem-allocated,
-    // null-terminated UTF-16 string on success.
-    let hr = unsafe {
-        SHGetKnownFolderPath(
-            &FOLDERID_ProgramData,
-            known_folder_flags,
-            std::ptr::null_mut(),
-            &mut path_ptr,
-        )
-    };
-    if hr != 0 {
-        return Err(io::Error::other(format!(
-            "SHGetKnownFolderPath(FOLDERID_ProgramData) failed with HRESULT {hr:#010x}"
-        )));
-    }
-    if path_ptr.is_null() {
-        return Err(io::Error::other(
-            "SHGetKnownFolderPath(FOLDERID_ProgramData) returned a null pointer",
-        ));
-    }
-
-    // SAFETY: path_ptr is a valid null-terminated UTF-16 string allocated by
-    // SHGetKnownFolderPath and must be freed with CoTaskMemFree.
-    let path = unsafe {
-        let mut len = 0usize;
-        while *path_ptr.add(len) != 0 {
-            len += 1;
-        }
-        let wide = std::slice::from_raw_parts(path_ptr, len);
-        let path = PathBuf::from(OsString::from_wide(wide));
-        CoTaskMemFree(path_ptr.cast());
-        path
-    };
-
-    Ok(path)
 }
 
 fn requirements_layers_from_legacy_scheme(
@@ -1394,7 +1281,7 @@ fn sanitize_project_config(
             ignored_keys.push("shell_environment_policy.experimental_use_profile".to_string());
         }
         let environment_keys_match = |left: &str, right: &str| {
-            left == right || cfg!(windows) && left.eq_ignore_ascii_case(right)
+            left == right || false && left.eq_ignore_ascii_case(right)
         };
         if let Some(overrides) = policy.get_mut("set").and_then(TomlValue::as_table_mut) {
             overrides.retain(|key, _| {
@@ -1592,7 +1479,7 @@ pub fn normalized_project_trust_keys(path: &Path) -> Vec<String> {
 }
 
 fn normalize_project_trust_lookup_key(key: String) -> String {
-    if cfg!(windows) {
+    if false {
         key.to_ascii_lowercase()
     } else {
         key
@@ -1606,14 +1493,6 @@ fn project_trust_for_lookup_key(
         return Some((lookup_key.to_string(), trust_level));
     }
 
-    // Only Windows folds project keys. On other platforms the exact lookup is exhaustive.
-    #[cfg(windows)]
-    return projects_trust
-        .iter()
-        .filter(|(key, _)| key.eq_ignore_ascii_case(lookup_key))
-        .min_by_key(|(key, _)| *key)
-        .map(|(key, trust_level)| (key.clone(), *trust_level));
-    #[cfg(not(windows))]
     None
 }
 /// Takes a `toml::Value` parsed from a config.toml file and walks through it,
@@ -2061,8 +1940,6 @@ struct LegacyManagedConfigToml {
 #[cfg(test)]
 mod unit_tests {
     use super::*;
-    #[cfg(windows)]
-    use std::path::Path;
     use tempfile::tempdir;
 
     #[test]
@@ -2162,36 +2039,4 @@ foo = "xyzzy"
         Ok(())
     }
 
-    #[cfg(windows)]
-    #[test]
-    fn windows_codex_system_dir_uses_expected_suffix() {
-        let expected = windows_program_data_dir_from_known_folder()
-            .unwrap_or_else(|_| PathBuf::from(DEFAULT_PROGRAM_DATA_DIR_WINDOWS))
-            .join("OpenAI")
-            .join("Codex");
-        assert_eq!(windows_codex_system_dir(), expected);
-        assert!(windows_codex_system_dir().ends_with(Path::new("OpenAI").join("Codex")));
-    }
-
-    #[cfg(windows)]
-    #[test]
-    fn windows_system_config_toml_file_uses_expected_suffix() {
-        let expected = windows_program_data_dir_from_known_folder()
-            .unwrap_or_else(|_| PathBuf::from(DEFAULT_PROGRAM_DATA_DIR_WINDOWS))
-            .join("OpenAI")
-            .join("Codex")
-            .join("config.toml");
-        assert_eq!(
-            windows_system_config_toml_file()
-                .expect("config.toml path")
-                .as_path(),
-            expected.as_path()
-        );
-        assert!(
-            windows_system_config_toml_file()
-                .expect("config.toml path")
-                .as_path()
-                .ends_with(Path::new("OpenAI").join("Codex").join("config.toml"))
-        );
-    }
 }

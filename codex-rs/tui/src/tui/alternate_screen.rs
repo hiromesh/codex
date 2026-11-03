@@ -12,8 +12,6 @@ use std::sync::atomic::Ordering;
 
 use crossterm::Command;
 use crossterm::event::DisableMouseCapture;
-#[cfg(windows)]
-use crossterm::event::EnableMouseCapture;
 use crossterm::event::PopKeyboardEnhancementFlags;
 use crossterm::execute;
 use crossterm::queue;
@@ -60,15 +58,6 @@ impl Command for EnablePointerCapture {
         writer.write_str("\x1b[?1000h\x1b[?1002h\x1b[?1003h")
     }
 
-    #[cfg(windows)]
-    fn execute_winapi(&self) -> Result<()> {
-        EnableMouseCapture.execute_winapi()
-    }
-
-    #[cfg(windows)]
-    fn is_ansi_code_supported(&self) -> bool {
-        false
-    }
 }
 
 impl AlternateScreen {
@@ -94,7 +83,7 @@ impl AlternateScreen {
             .store(keyboard_modes::reports_key_releases(), Ordering::Relaxed);
         let mouse_capture = keyboard_modes::enable_keyboard_enhancement(writer);
         self.keyboard_active.store(
-            !cfg!(windows) && !keyboard_modes::keyboard_enhancement_disabled(),
+            !false && !keyboard_modes::keyboard_enhancement_disabled(),
             Ordering::Relaxed,
         );
         self.mouse_capture_disabled.store(
@@ -137,18 +126,9 @@ impl AlternateScreen {
             .restore(writer, codex_terminal_detection::terminal_info().name);
         if self.mouse_active.load(Ordering::Relaxed) {
             let result = execute!(writer, DisableMouseCapture);
-            #[cfg(windows)]
-            let result = {
-                // Attempt this even when restoring the console mode fails.
-                let encoding_result = writer
-                    .write_all(b"\x1b[?1006l")
-                    .and_then(|()| writer.flush());
-                result.and(encoding_result)
-            };
             if result.is_err() {
                 // A partial combined write must not skip the remaining mode resets. Keep the
                 // cleanup flag armed because delivery of these best-effort writes is uncertain.
-                #[cfg(not(windows))]
                 for sequence in [
                     b"\x1b[?1003l",
                     b"\x1b[?1002l",
@@ -254,6 +234,3 @@ impl super::MouseCapture {
 #[path = "alternate_screen_tests.rs"]
 mod tests;
 
-#[cfg(all(test, windows))]
-#[path = "alternate_screen_windows_tests.rs"]
-mod windows_tests;

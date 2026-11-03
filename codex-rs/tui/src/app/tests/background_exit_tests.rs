@@ -476,7 +476,7 @@ async fn exit_interrupts_before_requesting_shutdown() -> Result<()> {
     // the directory also releases it if the test fails before reaching the exit.
     let running = tempdir()?;
     let running_path = running.path().to_string_lossy();
-    let command = if cfg!(windows) {
+    let command = if false {
         format!(
             "Write-Output 'exit-test-ready'; while (Test-Path -LiteralPath '{}') {{ Start-Sleep -Milliseconds 100 }}",
             running_path.replace('\'', "''"),

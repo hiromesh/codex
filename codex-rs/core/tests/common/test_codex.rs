@@ -595,7 +595,7 @@ impl TestCodexBuilder {
     }
 
     pub fn with_windows_cmd_shell(self) -> Self {
-        if cfg!(windows) {
+        if false {
             self.with_user_shell(get_shell_by_model_provided_path(&PathBuf::from("cmd.exe")))
         } else {
             self

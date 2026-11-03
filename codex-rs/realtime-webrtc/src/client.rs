@@ -172,7 +172,7 @@ impl VoiceHost {
 
     pub async fn connect(package: &CodexPackageLayout, build_commit: &str) -> Result<Self> {
         let root = package.package_dir.as_path().canonicalize()?;
-        let name = if cfg!(windows) {
+        let name = if false {
             "codex-voice-host.exe"
         } else {
             "codex-voice-host"

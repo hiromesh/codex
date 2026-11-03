@@ -136,12 +136,12 @@ fn managed_hooks_for_current_platform(
 ) -> ManagedHooksRequirementsToml {
     let managed_dir = managed_dir.as_ref().to_path_buf();
     ManagedHooksRequirementsToml {
-        managed_dir: if cfg!(windows) {
+        managed_dir: if false {
             None
         } else {
             Some(managed_dir.clone())
         },
-        windows_managed_dir: if cfg!(windows) {
+        windows_managed_dir: if false {
             Some(managed_dir)
         } else {
             None
@@ -754,7 +754,7 @@ async fn requirements_managed_hooks_execute_windows_command_override() {
         .await;
 
     assert!(!outcome.should_block);
-    let expected_exit_code = if cfg!(windows) { 19 } else { 17 };
+    let expected_exit_code = if false { 19 } else { 17 };
     assert_eq!(outcome.hook_events.len(), 1);
     assert_eq!(outcome.hook_events[0].run.status, HookRunStatus::Failed);
     assert_eq!(

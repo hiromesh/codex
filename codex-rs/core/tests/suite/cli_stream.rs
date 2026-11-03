@@ -97,16 +97,6 @@ impl Drop for ChildProcessCleanupGuard {
             let _ = codex_utils_pty::process_group::kill_process_group(self.0);
         }
 
-        #[cfg(windows)]
-        {
-            let _ = Command::new("taskkill")
-                .args(["/PID", &self.0.to_string(), "/T", "/F"])
-                .stdin(Stdio::null())
-                .stdout(Stdio::null())
-                .stderr(Stdio::null())
-                .status();
-        }
-
         #[cfg(not(any(unix, windows)))]
         {
             let _ = self.0;

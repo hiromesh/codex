@@ -812,7 +812,7 @@ fn should_include_windows_shell_guidance(environments: &TurnEnvironmentSnapshot)
     // executors without platform OS information preserve the host-derived guidance.
     match executor_platform_os {
         Some(platform_os) => platform_os == "windows",
-        None => cfg!(windows),
+        None => false,
     }
 }
 

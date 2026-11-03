@@ -205,10 +205,6 @@ fn read_windows_vscode_detection_with_timeout(
     }
 }
 
-#[cfg(all(test, unix))]
-#[path = "windows_term_program_tests.rs"]
-mod windows_term_program_tests;
-
 /// Restore keyboard reporting and return the mouse policy from the same fresh tmux probe.
 pub(super) fn enable_keyboard_enhancement(writer: &mut impl Write) -> super::tmux::MouseCapture {
     let tmux_options = super::tmux::options();
@@ -322,18 +318,6 @@ impl Command for ResetKeyboardEnhancementFlags {
         f.write_str("\x1b[<u")
     }
 
-    #[cfg(windows)]
-    fn execute_winapi(&self) -> std::io::Result<()> {
-        Err(std::io::Error::new(
-            std::io::ErrorKind::Unsupported,
-            "keyboard enhancement reset is not implemented for the legacy Windows API",
-        ))
-    }
-
-    #[cfg(windows)]
-    fn is_ansi_code_supported(&self) -> bool {
-        false
-    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -344,18 +328,6 @@ impl Command for EnableModifyOtherKeys {
         f.write_str("\x1b[>4;2m")
     }
 
-    #[cfg(windows)]
-    fn execute_winapi(&self) -> std::io::Result<()> {
-        Err(std::io::Error::new(
-            std::io::ErrorKind::Unsupported,
-            "modifyOtherKeys enable is not implemented for the legacy Windows API",
-        ))
-    }
-
-    #[cfg(windows)]
-    fn is_ansi_code_supported(&self) -> bool {
-        false
-    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -366,18 +338,6 @@ impl Command for DisableModifyOtherKeys {
         f.write_str("\x1b[>4;0m")
     }
 
-    #[cfg(windows)]
-    fn execute_winapi(&self) -> std::io::Result<()> {
-        Err(std::io::Error::new(
-            std::io::ErrorKind::Unsupported,
-            "modifyOtherKeys reset is not implemented for the legacy Windows API",
-        ))
-    }
-
-    #[cfg(windows)]
-    fn is_ansi_code_supported(&self) -> bool {
-        false
-    }
 }
 
 #[cfg(test)]

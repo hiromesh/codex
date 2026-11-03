@@ -758,24 +758,6 @@ async fn resolve_root_git_project_for_trust_ignores_metadata_errors() {
     );
 }
 
-#[cfg(windows)]
-#[tokio::test]
-async fn resolve_root_git_project_for_trust_supports_windows_namespace_paths() {
-    let tmp = TempDir::new().expect("tempdir");
-    let repo = tmp.path().join("repo");
-    std::fs::create_dir_all(repo.join(".git")).unwrap();
-    std::fs::write(repo.join(".git/HEAD"), "ref: refs/heads/main\n").unwrap();
-    std::fs::create_dir_all(repo.join("nested")).unwrap();
-
-    let namespace_repo = PathBuf::from(format!(r"\\?\{}", repo.display()));
-    let namespace_nested = namespace_repo.join("nested");
-
-    assert_eq!(
-        resolve_root_git_project_for_trust(LOCAL_FS.as_ref(), &namespace_nested.abs()).await,
-        Some(namespace_repo.abs())
-    );
-}
-
 #[tokio::test]
 async fn resolve_root_git_project_for_trust_regular_repo_returns_repo_root() {
     let temp_dir = TempDir::new().expect("Failed to create temp dir");

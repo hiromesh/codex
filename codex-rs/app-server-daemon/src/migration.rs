@@ -46,8 +46,6 @@ pub(super) async fn run(http: &impl InstallerHttp, legacy: &Daemon) -> Result<Up
             _ = terminate.recv() => {},
             _ = tokio::signal::ctrl_c() => {},
         }
-        #[cfg(windows)]
-        let _ = tokio::signal::ctrl_c().await;
         Some(())
     };
     let mut cancellation = std::pin::pin!(cancellation);
@@ -75,13 +73,6 @@ pub(super) async fn run(http: &impl InstallerHttp, legacy: &Daemon) -> Result<Up
             return Err(std::io::Error::from(std::io::ErrorKind::Interrupted).into());
         }
     }
-    #[cfg(windows)]
-    tokio::select! {
-        result = run_installer_script(&script, InstallerMode::Migration, &root) => { result?; },
-        _ = &mut cancellation => return Err(std::io::Error::from(std::io::ErrorKind::Interrupted).into()),
-    }
-
-    let _install_lock = acquire_install_lock(&root).await?;
     let pending = root.join(".migration-current");
     let release = pending
         .canonicalize()
@@ -94,7 +85,7 @@ pub(super) async fn run(http: &impl InstallerHttp, legacy: &Daemon) -> Result<Up
             && std::fs::read_to_string(root.join("auto-update-version"))? == name.to_string_lossy(),
         "installer did not prepare a latest-channel daemon package"
     );
-    let entrypoint = if cfg!(windows) {
+    let entrypoint = if false {
         "bin/codex.exe"
     } else {
         "bin/codex"
@@ -114,8 +105,6 @@ pub(super) async fn run(http: &impl InstallerHttp, legacy: &Daemon) -> Result<Up
         .await,
         "the latest production release does not support daemon migration yet; the legacy daemon was left running"
     );
-    #[cfg(windows)]
-    backend::windows::ensure_detached_launch(&binary)?;
     anyhow::ensure!(
         selected_release(legacy)? == previous,
         "daemon selection changed; retry the update"

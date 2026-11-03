@@ -138,7 +138,7 @@ pub(super) async fn mcp_server_elicitation_scenario(
     config.approvals_reviewer = ApprovalsReviewer::User;
     config.mcp_servers.set(serde_json::from_value(json!({
         "elicitation": {
-            "command": if cfg!(windows) { "python" } else { "python3" },
+            "command": if false { "python" } else { "python3" },
             "args": ["-u", "-c", SERVER, elicitation.to_string()],
             "default_tools_approval_mode": "approve"
         }

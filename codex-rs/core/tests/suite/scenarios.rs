@@ -60,7 +60,6 @@ use codex_protocol::protocol::AdditionalContextEntry;
 use codex_protocol::protocol::AdditionalContextKind;
 use codex_protocol::protocol::EnvironmentConfigState;
 use codex_protocol::protocol::EventMsg;
-#[cfg(not(target_os = "windows"))]
 use codex_protocol::protocol::MultiAgentVersion;
 use codex_protocol::protocol::Op;
 use codex_protocol::protocol::TurnEnvironmentSelection;
@@ -171,7 +170,6 @@ mod mcp_sharing;
 #[path = "scenarios_guardian_agent_messages_tests.rs"]
 mod guardian_agent_messages;
 
-#[cfg(not(target_os = "windows"))]
 #[path = "scenarios_guardian_handoff.rs"]
 mod guardian_handoff;
 
@@ -2381,7 +2379,6 @@ async fn guardian_checkpoint_migration_request_history() -> Result<()> {
     Ok(())
 }
 
-#[cfg(not(target_os = "windows"))]
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn model_catalog_refresh_preserves_tools_and_history() -> Result<()> {
     let requests = super::spawn_agent_description::model_catalog_refresh_requests(

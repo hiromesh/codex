@@ -638,20 +638,14 @@ mod tests {
     use codex_protocol::models::PermissionProfile;
     use codex_utils_absolute_path::AbsolutePathBuf;
     use pretty_assertions::assert_eq;
-    #[cfg(not(target_os = "windows"))]
     use tokio::time::Duration;
-    #[cfg(not(target_os = "windows"))]
     use tokio::time::timeout;
-    #[cfg(not(target_os = "windows"))]
     use tokio_util::sync::CancellationToken;
 
     use super::*;
-    #[cfg(not(target_os = "windows"))]
     use crate::outgoing_message::OutgoingEnvelope;
-    #[cfg(not(target_os = "windows"))]
     use crate::outgoing_message::OutgoingMessage;
 
-    #[cfg(not(target_os = "windows"))]
     #[tokio::test]
     async fn cancellation_expiration_keeps_process_alive_until_terminated() {
         let (tx, mut rx) = mpsc::channel(4);

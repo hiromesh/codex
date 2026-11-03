@@ -236,7 +236,7 @@ async fn memories_startup_phase2_scopes_stop_hooks() -> anyhow::Result<()> {
         .await?;
         seed_required_memory_artifacts(&root).await?;
 
-        let python = if cfg!(windows) { "python" } else { "python3" };
+        let python = if false { "python" } else { "python3" };
         let hook_script = home.path().join("memory_hook.py");
         let hook_log = home.path().join("stop");
         let notify_log = home.path().join("notify");

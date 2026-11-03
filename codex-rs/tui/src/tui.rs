@@ -20,7 +20,6 @@ use crossterm::cursor::SetCursorStyle;
 use crossterm::event::DisableBracketedPaste;
 use crossterm::event::DisableFocusChange;
 use crossterm::event::EnableBracketedPaste;
-#[cfg(not(windows))]
 use crossterm::event::EnableFocusChange;
 use crossterm::event::KeyEvent;
 use crossterm::event::MouseEvent;
@@ -89,11 +88,6 @@ mod terminal_stderr;
 #[cfg(test)]
 pub(crate) mod test_support;
 mod tmux;
-#[cfg(any(windows, test))]
-mod windows_console;
-#[cfg(any(windows, test))]
-mod windows_key_sequence;
-
 pub(crate) use selection_clipboard::SelectionCopy;
 
 /// Target frame interval for UI redraw scheduling.
@@ -162,26 +156,6 @@ mod tests {
             NotificationCondition::Always,
             /*terminal_focused*/ true
         ));
-    }
-
-    #[test]
-    fn windows_console_input_modes_preserve_original_vt_input_state() {
-        let input_record_mode = super::windows_console::input_record_mode(/*mode*/ 0x398);
-        assert_eq!(input_record_mode, 0x198);
-        assert_eq!(
-            super::windows_console::restored_input_mode(
-                input_record_mode,
-                super::windows_console::VirtualTerminalInput::Enabled,
-            ),
-            0x398
-        );
-        assert_eq!(
-            super::windows_console::restored_input_mode(
-                /*mode*/ 0x198,
-                super::windows_console::VirtualTerminalInput::Disabled,
-            ),
-            0x198
-        );
     }
 
     #[test]
@@ -254,8 +228,6 @@ pub fn set_modes() -> Result<()> {
     execute!(stdout(), EnableBracketedPaste)?;
 
     enable_raw_mode()?;
-    #[cfg(windows)]
-    windows_console::set_input_record_mode()?;
     // Enable keyboard enhancement flags so modifiers for keys like Enter are disambiguated.
     // chat_composer.rs is using a keyboard event listener to enter for any modified keys
     // to create a new line that require this.
@@ -264,10 +236,7 @@ pub fn set_modes() -> Result<()> {
     // gracefully if unsupported.
     keyboard_modes::enable_keyboard_enhancement(&mut stdout());
 
-    #[cfg(not(windows))]
     let _ = execute!(stdout(), EnableFocusChange);
-    #[cfg(windows)]
-    let _ = execute!(stdout(), DisableFocusChange);
     Ok(())
 }
 
@@ -278,18 +247,6 @@ impl Command for EnableAlternateScroll {
     fn write_ansi(&self, f: &mut impl fmt::Write) -> fmt::Result {
         write!(f, "\x1b[?1007h")
     }
-
-    #[cfg(windows)]
-    fn execute_winapi(&self) -> Result<()> {
-        Err(std::io::Error::other(
-            "tried to execute EnableAlternateScroll using WinAPI; use ANSI instead",
-        ))
-    }
-
-    #[cfg(windows)]
-    fn is_ansi_code_supported(&self) -> bool {
-        true
-    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -298,18 +255,6 @@ struct DisableAlternateScroll;
 impl Command for DisableAlternateScroll {
     fn write_ansi(&self, f: &mut impl fmt::Write) -> fmt::Result {
         write!(f, "\x1b[?1007l")
-    }
-
-    #[cfg(windows)]
-    fn execute_winapi(&self) -> Result<()> {
-        Err(std::io::Error::other(
-            "tried to execute DisableAlternateScroll using WinAPI; use ANSI instead",
-        ))
-    }
-
-    #[cfg(windows)]
-    fn is_ansi_code_supported(&self) -> bool {
-        true
     }
 }
 
@@ -367,10 +312,6 @@ fn restore_common(
     if raw_mode_restore != RawModeRestore::Keep
         && let Err(err) = disable_raw_mode()
     {
-        first_error.get_or_insert(err);
-    }
-    #[cfg(windows)]
-    if let Err(err) = windows_console::restore_input_mode() {
         first_error.get_or_insert(err);
     }
     if let Err(err) = execute!(
@@ -467,31 +408,7 @@ fn flush_terminal_input_buffer() {
     }
 }
 
-/// Flush the underlying stdin buffer to clear any input that may be buffered at the terminal level.
-/// For example, clears any user input that occurred while the crossterm EventStream was dropped.
-#[cfg(windows)]
-fn flush_terminal_input_buffer() {
-    use windows_sys::Win32::Foundation::GetLastError;
-    use windows_sys::Win32::Foundation::INVALID_HANDLE_VALUE;
-    use windows_sys::Win32::System::Console::FlushConsoleInputBuffer;
-    use windows_sys::Win32::System::Console::GetStdHandle;
-    use windows_sys::Win32::System::Console::STD_INPUT_HANDLE;
-
-    let handle = unsafe { GetStdHandle(STD_INPUT_HANDLE) };
-    if handle == INVALID_HANDLE_VALUE || handle.is_null() {
-        let err = unsafe { GetLastError() };
-        tracing::warn!("failed to get stdin handle for flush: error {err}");
-        return;
-    }
-
-    let result = unsafe { FlushConsoleInputBuffer(handle) };
-    if result == 0 {
-        let err = unsafe { GetLastError() };
-        tracing::warn!("failed to flush stdin buffer: error {err}");
-    }
-}
-
-#[cfg(not(any(unix, windows)))]
+#[cfg(not(unix))]
 pub(crate) fn flush_terminal_input_buffer() {}
 
 /// Initialize the terminal (inline viewport; history stays in normal scrollback)
@@ -574,11 +491,6 @@ pub(crate) fn init() -> Result<InitializedTerminal> {
     let enhanced_keys_supported =
         !keyboard_modes::keyboard_enhancement_disabled() && detect_keyboard_enhancement_supported();
 
-    #[cfg(windows)]
-    // OSC replies can arrive after their deadline. Do not issue terminal queries before directory
-    // trust and other protected startup screens have finished accepting their security decisions.
-    crate::terminal_palette::set_default_colors_from_startup_probe(/*colors*/ None);
-
     let tui = CustomTerminal::with_options_and_cursor_position(backend, cursor_pos)?;
     let stderr_guard = terminal_stderr::TerminalStderrGuard::install()?;
     let initialized_terminal = InitializedTerminal {
@@ -609,28 +521,6 @@ fn detect_keyboard_enhancement_supported() -> bool {
     // Non-Unix startup keeps the existing crossterm keyboard probe path because it already knows
     // how to interpret platform-specific event sources.
     supports_keyboard_enhancement().unwrap_or(/*default*/ false)
-}
-
-#[cfg(windows)]
-fn probe_windows_default_colors() {
-    let started_at = std::time::Instant::now();
-    match crate::terminal_probe::default_colors(crate::terminal_probe::DEFAULT_TIMEOUT) {
-        Ok(colors) => {
-            tracing::info!(
-                duration_ms = %started_at.elapsed().as_millis(),
-                default_colors = colors.is_some(),
-                "terminal default color probe completed"
-            );
-            crate::terminal_palette::set_default_colors_from_startup_probe(colors);
-        }
-        Err(err) => {
-            tracing::warn!(
-                duration_ms = %started_at.elapsed().as_millis(),
-                "terminal default color probe failed: {err}"
-            );
-            crate::terminal_palette::set_default_colors_from_startup_probe(/*colors*/ None);
-        }
-    }
 }
 
 fn set_panic_hook() {
@@ -911,15 +801,6 @@ impl Tui {
     // Inverse of `pause_events`.
     pub fn resume_events(&mut self) {
         self.event_broker.resume_events();
-    }
-
-    /// Discover the visible Windows theme only after protected startup decisions have completed.
-    #[cfg(windows)]
-    pub(crate) fn probe_default_colors_after_protected_startup(&mut self) {
-        self.pause_events();
-        probe_windows_default_colors();
-        self.resume_events();
-        self.frame_requester.schedule_frame();
     }
 
     /// Reclaim terminal modes and stderr after a panic hook ran inside a recovery boundary.
@@ -1570,50 +1451,6 @@ impl Tui {
     }
 }
 
-#[cfg(windows)]
-fn ensure_virtual_terminal_processing() -> Result<()> {
-    use windows_sys::Win32::Foundation::HANDLE;
-    use windows_sys::Win32::Foundation::INVALID_HANDLE_VALUE;
-    use windows_sys::Win32::System::Console::ENABLE_PROCESSED_OUTPUT;
-    use windows_sys::Win32::System::Console::ENABLE_VIRTUAL_TERMINAL_PROCESSING;
-    use windows_sys::Win32::System::Console::GetConsoleMode;
-    use windows_sys::Win32::System::Console::GetStdHandle;
-    use windows_sys::Win32::System::Console::STD_ERROR_HANDLE;
-    use windows_sys::Win32::System::Console::STD_OUTPUT_HANDLE;
-    use windows_sys::Win32::System::Console::SetConsoleMode;
-
-    fn enable_for_handle(handle: HANDLE) -> Result<()> {
-        if handle == INVALID_HANDLE_VALUE || handle.is_null() {
-            return Ok(());
-        }
-
-        let mut mode = 0;
-        if unsafe { GetConsoleMode(handle, &mut mode) } == 0 {
-            return Ok(());
-        }
-
-        let requested = ENABLE_PROCESSED_OUTPUT | ENABLE_VIRTUAL_TERMINAL_PROCESSING;
-        if mode & requested == requested {
-            return Ok(());
-        }
-
-        if unsafe { SetConsoleMode(handle, mode | requested) } == 0 {
-            return Err(std::io::Error::last_os_error());
-        }
-
-        Ok(())
-    }
-
-    let stdout_handle = unsafe { GetStdHandle(STD_OUTPUT_HANDLE) };
-    enable_for_handle(stdout_handle)?;
-
-    let stderr_handle = unsafe { GetStdHandle(STD_ERROR_HANDLE) };
-    enable_for_handle(stderr_handle)?;
-
-    Ok(())
-}
-
-#[cfg(not(windows))]
 fn ensure_virtual_terminal_processing() -> Result<()> {
     Ok(())
 }

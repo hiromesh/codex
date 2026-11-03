@@ -111,14 +111,6 @@ pub async fn bind_private_daemon_socket(
             lock,
         )
     };
-    #[cfg(windows)]
-    let (socket_path, directory_guard) = {
-        if let Some(parent) = socket_path.as_path().parent() {
-            codex_uds::prepare_private_socket_directory(parent).await?;
-        }
-        let (path, guard) = codex_uds::validate_private_socket_path(socket_path.as_path())?;
-        (AbsolutePathBuf::from_absolute_path_checked(path)?, guard)
-    };
     prepare_control_socket_path(socket_path.as_path()).await?;
     let listener = UnixListener::bind(socket_path.as_path()).await?;
     #[cfg(unix)]
@@ -131,9 +123,6 @@ pub async fn bind_private_daemon_socket(
         rendezvous_path,
         #[cfg(unix)]
         _startup_lock: startup_lock,
-        #[cfg(windows)]
-        _directory_guard: directory_guard,
-    };
     set_control_socket_permissions(socket_guard.socket_path.as_path()).await?;
     #[cfg(unix)]
     std::os::unix::fs::symlink(
@@ -268,13 +257,6 @@ async fn run_daemon_shutdown(
 
 // Unix callers hold the physical socket's startup lock through bind and publication.
 async fn prepare_control_socket_path(socket_path: &Path) -> IoResult<()> {
-    #[cfg(windows)]
-    let (socket_path, _directory_guard) = codex_uds::validate_private_socket_path(socket_path)?;
-    #[cfg(windows)]
-    let socket_path = AbsolutePathBuf::from_absolute_path_checked(socket_path)?;
-    #[cfg(windows)]
-    let socket_path = socket_path.as_path();
-
     match UnixStream::connect(socket_path).await {
         Ok(_stream) => {
             return Err(std::io::Error::new(
@@ -340,13 +322,6 @@ pub fn verified_local_daemon_socket(socket_path: &Path) -> IoResult<Option<Absol
             return AbsolutePathBuf::from_absolute_path(protected).map(Some);
         }
         Ok(None)
-    }
-    #[cfg(windows)]
-    {
-        // The TUI revalidates this directory and verifies the peer at connection time,
-        // using the same connect_local_daemon path as implicit startup.
-        let (path, _directory) = codex_uds::validate_private_socket_path(socket_path)?;
-        AbsolutePathBuf::from_absolute_path_checked(path).map(Some)
     }
 }
 
@@ -516,9 +491,6 @@ pub struct DaemonSocketFileGuard {
     rendezvous_path: AbsolutePathBuf,
     #[cfg(unix)]
     _startup_lock: AppServerStartupLock,
-    // Keep the directory pinned until after the socket file is removed in Drop.
-    #[cfg(windows)]
-    _directory_guard: std::os::windows::io::OwnedHandle,
 }
 
 impl Drop for DaemonSocketFileGuard {

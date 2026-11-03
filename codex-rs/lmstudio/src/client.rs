@@ -147,18 +147,11 @@ impl LMStudioClient {
                 {
                     std::env::var("HOME").unwrap_or_default()
                 }
-                #[cfg(windows)]
-                {
-                    std::env::var("USERPROFILE").unwrap_or_default()
-                }
             }
         };
 
         #[cfg(unix)]
         let fallback_path = format!("{home}/.lmstudio/bin/lms");
-
-        #[cfg(windows)]
-        let fallback_path = format!("{home}/.lmstudio/bin/lms.exe");
 
         if Path::new(&fallback_path).exists() {
             Ok(fallback_path)
@@ -413,12 +406,5 @@ mod tests {
             }
         }
 
-        #[cfg(windows)]
-        {
-            let result = LMStudioClient::find_lms_with_home_dir(Some("C:\\test\\home"));
-            if let Err(e) = result {
-                assert!(e.to_string().contains("LM Studio not found"));
-            }
-        }
     }
 }

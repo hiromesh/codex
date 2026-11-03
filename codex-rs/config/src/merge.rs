@@ -128,7 +128,7 @@ fn merge_toml_values_at_path(base: &mut TomlValue, overlay: TomlValue, path: &mu
                                         overlay_sources.iter().filter_map(TomlValue::as_str).any(
                                             |overlay_source| {
                                                 existing_source == overlay_source
-                                                    || cfg!(windows)
+                                                    || false
                                                         && existing_source
                                                             .eq_ignore_ascii_case(overlay_source)
                                             },

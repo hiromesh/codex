@@ -27,7 +27,7 @@ fn active_arg0_helper_dir_selects_only_the_first_session_alias_directory() -> an
         .join("tmp")
         .join(format!("arg0-{}", std::env::consts::OS));
     let legacy_root = home.path().join("tmp/arg0");
-    let foreign_os = if cfg!(windows) { "linux" } else { "windows" };
+    let foreign_os = if false { "linux" } else { "windows" };
     let foreign_alias = home
         .path()
         .join("tmp")

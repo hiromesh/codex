@@ -48,8 +48,6 @@ pub async fn update_from_cli(
     confirm: impl FnOnce(&InstallRequest) -> Result<bool>,
 ) -> Result<Option<crate::UpdateOutput>> {
     crate::ensure_supported_platform()?;
-    #[cfg(windows)]
-    crate::backend::windows::ensure_not_elevated()?;
     let daemon = Daemon::from_environment()?;
     let settings = daemon.load_settings().await?;
     let source = InstallContext::current().package_layout.as_ref();
@@ -157,13 +155,13 @@ async fn prepare_from_package(
     let version = manifest.version.to_string();
     let target = platform_target()?;
     let mut metadata: serde_json::Value = serde_json::from_slice(&manifest_bytes)?;
-    let entrypoint = if cfg!(windows) {
+    let entrypoint = if false {
         "bin/codex.exe"
     } else {
         "bin/codex"
     };
     let source_entrypoint = metadata["entrypoint"].as_str().unwrap_or_default();
-    let winget = cfg!(windows)
+    let winget = false
         && metadata["layoutVersion"] == 1
         && source_entrypoint == format!("codex-{target}.exe");
     anyhow::ensure!(
@@ -250,13 +248,6 @@ async fn prepare_from_package(
     // source. Hash the final tree for reuse, since it now differs from the source.
     let digest = if winget {
         std::fs::create_dir_all(stage.path().join("bin"))?;
-        #[cfg(windows)]
-        for (from, to) in [(staged_exe, Path::new(entrypoint))] {
-            windows::publish_release(&stage.path().join(from), &stage.path().join(to)).await?;
-            if let Some(digest) = staged_digests.remove(from) {
-                staged_digests.insert(to.to_path_buf(), digest);
-            }
-        }
         let voice_path = stage.path().join("codex-resources/voice/manifest.json");
         if voice_path.try_exists()? {
             let mut voice: serde_json::Value =
@@ -307,9 +298,6 @@ async fn prepare_from_package(
         if !stage.path().join("codex").exists() {
             std::os::unix::fs::symlink("bin/codex", stage.path().join("codex"))?;
         }
-        #[cfg(windows)]
-        windows::publish_release(stage.path(), &release).await?;
-        #[cfg(not(windows))]
         std::fs::rename(stage.path(), &release)?;
     }
     let release = release.canonicalize()?;
@@ -328,12 +316,6 @@ async fn prepare_from_package(
             && (backend.is_some() || crate::client::probe(&daemon.socket_path).await.is_err()),
         "daemon package location or socket ownership changed while preparing its package; retry the command"
     );
-    #[cfg(windows)]
-    if backend.is_some() {
-        crate::backend::windows::ensure_detached_launch(&release.join(entrypoint))?;
-    }
-    #[cfg(windows)]
-    windows::validate_selection(&root)?;
     if mode == InstallMode::Replace {
         let stopped = async {
             crate::backend::pid_update_loop_backend(daemon.backend_paths(settings))
@@ -389,8 +371,6 @@ async fn prepare_from_package(
             std::os::unix::fs::symlink(&release, &link)?;
             std::fs::rename(link, root.join("current"))?;
         }
-        #[cfg(windows)]
-        windows::select_release(&root, &release)?;
         if let Err(error) =
             crate::release_pruning::record_selection(&root, previous_release.as_deref())
         {
@@ -502,13 +482,13 @@ fn validate_package(root: &Path, entrypoint: &str) -> Result<()> {
     let mut names = vec![
         "codex-package.json",
         entrypoint,
-        if cfg!(windows) {
+        if false {
             "codex-path/rg.exe"
         } else {
             "codex-path/rg"
         },
     ];
-    if cfg!(windows) {
+    if false {
         names.extend([
             "codex-resources/codex-command-runner.exe",
             "codex-resources/codex-windows-sandbox-setup.exe",
@@ -548,10 +528,6 @@ fn platform_target() -> Result<&'static str> {
         (os, arch) => Err(anyhow!("unsupported packaged daemon platform {os}/{arch}")),
     }
 }
-
-#[cfg(windows)]
-#[path = "prepare_install_windows.rs"]
-mod windows;
 
 #[cfg(test)]
 #[path = "prepare_install_tests.rs"]

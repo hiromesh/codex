@@ -236,8 +236,6 @@ impl WorktreeManager {
                 continue;
             };
             let backlink = backlink.strip_suffix(b"\n").unwrap_or(&backlink);
-            #[cfg(windows)]
-            let backlink = backlink.strip_suffix(b"\r").unwrap_or(backlink);
             let Ok(backlink) = git_path_from_bytes(backlink) else {
                 continue;
             };

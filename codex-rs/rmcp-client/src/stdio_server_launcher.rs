@@ -16,8 +16,6 @@ use std::collections::HashMap;
 use std::ffi::OsString;
 use std::future::Future;
 use std::io;
-#[cfg(windows)]
-use std::os::windows::io::OwnedHandle;
 use std::path::Path;
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -410,15 +408,6 @@ fn kill_process_group_and_warn(pid: u32) -> io::Result<()> {
         .inspect_err(|error| warn!("Failed to kill MCP process group {pid}: {error}"))
 }
 
-#[cfg(windows)]
-enum LocalProcessTerminator {
-    Job {
-        job: codex_utils_pty::JobObject,
-        discovery_root: Option<OwnedHandle>,
-    },
-    Process(OwnedHandle),
-}
-
 #[cfg(not(any(unix, windows)))]
 struct LocalProcessTerminator;
 
@@ -479,22 +468,7 @@ impl LocalStdioServerLauncher {
             command.descriptor_policy(DescriptorPolicy::Explicit);
             command
         };
-        #[cfg(windows)]
-        let mut command = build_command();
-        #[cfg(not(windows))]
         let command = build_command();
-        #[cfg(windows)]
-        let job = match codex_utils_pty::JobObject::create_without_breakaway() {
-            Ok(job) => {
-                command.prepare_suspended_spawn(&job);
-                Some(job)
-            }
-            Err(error) => {
-                warn!("Windows MCP process job containment unavailable: {error}");
-                None
-            }
-        };
-
         // The async caller can be cancelled while this blocking worker is inside spawn.
         let slot = replacement_slot.as_ref().map(|slot| slot.blocking_lock());
         if slot.as_ref().is_some_and(|slot| slot.closed) {
@@ -504,34 +478,6 @@ impl LocalStdioServerLauncher {
             ));
         }
         let child = command.spawn()?;
-        #[cfg(windows)]
-        let (child, job) = match job {
-            Some(job) => match child
-                .id()
-                .ok_or_else(|| io::Error::other("missing suspended MCP server process id"))
-                .and_then(|process_id| job.assign_and_resume_process(process_id))
-            {
-                Ok(Some(root)) => (child, Some((job, root))),
-                Ok(None) => (child, None),
-                Err(error) => {
-                    warn!(
-                        "Windows MCP process job containment failed; retrying without it: {error}"
-                    );
-                    drop(child);
-                    drop(job);
-                    (build_command().spawn()?, None)
-                }
-            },
-            None => (child, None),
-        };
-        #[cfg(windows)]
-        let protocol_mode = if job.is_none() && protocol_mode == McpProtocolMode::DiscoverLocalStdio
-        {
-            // A probe can require a restart. Without a job we cannot stop its descendants.
-            McpProtocolMode::Legacy
-        } else {
-            protocol_mode
-        };
         let process_id = child.id();
         // A legacy replacement still belongs to the discovery startup that launched it.
         let discovery_owned = (protocol_mode == McpProtocolMode::DiscoverLocalStdio
@@ -539,22 +485,6 @@ impl LocalStdioServerLauncher {
             && process_id.is_some();
         let (transport, stderr) =
             LocalStdioTransport::new(child, program_name.clone(), protocol_mode)?;
-        #[cfg(windows)]
-        let terminator = match job {
-            Some((job, root)) => Some(LocalProcessTerminator::Job {
-                job,
-                discovery_root: discovery_owned.then_some(root),
-            }),
-            None => process_id.and_then(|process_id| {
-                match codex_utils_pty::JobObject::open_process_handle(process_id) {
-                    Ok(handle) => Some(LocalProcessTerminator::Process(handle)),
-                    Err(error) => {
-                        warn!("Windows MCP process handle unavailable: {error}");
-                        None
-                    }
-                }
-            }),
-        };
         #[cfg(unix)]
         let (transport, terminator) = {
             let mut transport = transport;
@@ -709,32 +639,6 @@ impl LocalProcessTerminator {
                     let _ = kill_process_group_and_warn(process_group_id);
                 }
             });
-        }
-    }
-
-    #[cfg(windows)]
-    fn terminate_discovery(&self, _reason: StdioTermination) -> io::Result<()> {
-        match self {
-            Self::Job {
-                job,
-                discovery_root: Some(root),
-            } => job.terminate_and_wait(root, Duration::from_secs(1)),
-            _ => Err(io::Error::other(
-                "cannot restart an uncontained Windows MCP server",
-            )),
-        }
-    }
-
-    #[cfg(windows)]
-    fn terminate(&self) {
-        let result = match self {
-            Self::Job { job, .. } => job.terminate(),
-            Self::Process(process_handle) => {
-                codex_utils_pty::JobObject::terminate_process_handle(process_handle)
-            }
-        };
-        if let Err(error) = result {
-            warn!("Failed to terminate Windows MCP process: {error}");
         }
     }
 
@@ -1155,7 +1059,7 @@ mod tests {
         // Older executors apply the final overlay with a case-sensitive merge.
         child_env.extend(overrides.clone());
         let mut expected = env;
-        if cfg!(windows) {
+        if false {
             expected.remove("SystemDrive");
             expected.remove("LocalAppData");
         }

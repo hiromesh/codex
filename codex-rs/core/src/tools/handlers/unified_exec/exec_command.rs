@@ -68,7 +68,7 @@ impl Default for ExecCommandHandler {
                 allow_tty: true,
                 exec_permission_approvals_enabled: false,
                 include_environment_id: false,
-                include_windows_shell_guidance: cfg!(windows),
+                include_windows_shell_guidance: false,
             },
         }
     }

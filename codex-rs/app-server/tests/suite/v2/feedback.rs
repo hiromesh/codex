@@ -422,7 +422,7 @@ async fn feedback_save_is_local_and_never_overwrites() -> Result<()> {
     let directory = tempfile::tempdir()?;
     let saved = directory.path().join("local.zip");
     std::fs::write(&saved, b"existing export")?;
-    let foreign = if cfg!(windows) {
+    let foreign = if false {
         "/tmp/foreign.zip"
     } else {
         r"C:\Users\test\foreign.zip"

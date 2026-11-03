@@ -31,16 +31,6 @@ pub(super) fn classify(error: &CredentialStoreError) -> ErrorKind {
                 _ => {}
             }
         }
-        #[cfg(target_os = "windows")]
-        if let Some(error) = error.downcast_ref::<keyring::windows::Error>() {
-            return match error.0 {
-                1312 => ErrorKind::NotConnected,  // ERROR_NO_SUCH_LOGON_SESSION
-                5 => ErrorKind::PermissionDenied, // ERROR_ACCESS_DENIED
-                50 => ErrorKind::Unsupported,     // ERROR_NOT_SUPPORTED
-                1460 => ErrorKind::TimedOut,      // ERROR_TIMEOUT
-                _ => ErrorKind::Other,
-            };
-        }
         cause = error.source();
     }
     ErrorKind::Other

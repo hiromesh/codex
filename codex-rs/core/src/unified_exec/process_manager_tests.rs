@@ -294,31 +294,6 @@ fn exec_server_params_use_path_uri_and_env_policy_overlay_contract() {
     assert_ne!(first.process_id, second.process_id);
 }
 
-#[cfg(windows)]
-#[test]
-fn initial_exec_yield_time_uses_windows_floor() {
-    let above_max_yield_time_ms = crate::unified_exec::MAX_YIELD_TIME_MS + 1;
-
-    assert_eq!(
-        clamp_yield_time(/*yield_time_ms*/ 1_000),
-        crate::unified_exec::WINDOWS_INITIAL_EXEC_YIELD_TIME_FLOOR_MS
-    );
-    assert_eq!(
-        clamp_yield_time(/*yield_time_ms*/ 2_000),
-        crate::unified_exec::WINDOWS_INITIAL_EXEC_YIELD_TIME_FLOOR_MS
-    );
-    assert_eq!(
-        clamp_yield_time(/*yield_time_ms*/ 5_000),
-        crate::unified_exec::WINDOWS_INITIAL_EXEC_YIELD_TIME_FLOOR_MS
-    );
-    assert_eq!(clamp_yield_time(/*yield_time_ms*/ 10_000), 10_000);
-    assert_eq!(
-        clamp_yield_time(/*yield_time_ms*/ above_max_yield_time_ms),
-        crate::unified_exec::MAX_YIELD_TIME_MS
-    );
-}
-
-#[cfg(not(windows))]
 #[test]
 fn initial_exec_yield_time_has_no_platform_floor() {
     assert_eq!(clamp_yield_time(/*yield_time_ms*/ 1_000), 1_000);

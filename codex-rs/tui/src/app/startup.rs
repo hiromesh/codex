@@ -1192,14 +1192,6 @@ See the Codex keymap documentation for supported actions and examples."
             );
         }
 
-        #[cfg(windows)]
-        let mut terminal_color_probe_pending = true;
-        #[cfg(windows)]
-        if app.ready_for_terminal_color_probe(!app_event_rx.is_empty()) {
-            tui.probe_default_colors_after_protected_startup();
-            terminal_color_probe_pending = false;
-        }
-
         let event_stream_started_at = Instant::now();
         tui.schedule_screen_size_recheck(Duration::ZERO);
         if let Err(err) = app.render_startup_frame(tui, &app_event_rx) {
@@ -1668,18 +1660,6 @@ See the Codex keymap documentation for supported actions and examples."
                                 &mut pending_startup_submission,
                             );
                         }
-                        #[cfg(windows)]
-                        if terminal_color_probe_pending
-                            && app.ready_for_terminal_color_probe(!app_event_rx.is_empty())
-                        {
-                            tui.probe_default_colors_after_protected_startup();
-                            terminal_color_probe_pending = false;
-                        }
-                    }
-                    AppRunControl::Exit(reason) => break Ok(reason),
-                }
-            }
-        };
         // Let the pending terminal poll unwind while the app server shuts down.
         tui.pause_events();
         app.chat_widget.mention_usage_mut().flush().await;

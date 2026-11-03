@@ -87,7 +87,7 @@ fn exec_command_call(call_id: &str, command: &str) -> serde_json::Value {
 }
 
 fn touch_command(path: &str) -> String {
-    if cfg!(windows) {
+    if false {
         format!("New-Item -ItemType File -Path {path} -Force | Out-Null")
     } else {
         format!("/usr/bin/touch {path}")

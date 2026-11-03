@@ -1,5 +1,3 @@
-#[cfg(windows)]
-use std::process::Stdio;
 use std::sync::Arc;
 use std::sync::atomic::AtomicBool;
 use std::sync::atomic::Ordering;
@@ -208,11 +206,6 @@ fn terminate_process_tree(child_process: &mut Child, process_group_id: Option<u3
         kill_direct_child(child_process, "terminate");
     }
 
-    #[cfg(windows)]
-    if !kill_windows_process_tree(process_group_id) {
-        kill_direct_child(child_process, "terminate");
-    }
-
     #[cfg(not(any(unix, windows)))]
     {
         let _ = process_group_id;
@@ -231,11 +224,6 @@ fn kill_process_tree(child_process: &mut Child, process_group_id: Option<u32>) {
         warn!("failed to kill exec-server stdio process group {process_group_id}: {err}");
     }
 
-    #[cfg(windows)]
-    if !kill_windows_process_tree(process_group_id) {
-        kill_direct_child(child_process, "kill");
-    }
-
     #[cfg(not(any(unix, windows)))]
     {
         let _ = process_group_id;
@@ -246,24 +234,6 @@ fn kill_process_tree(child_process: &mut Child, process_group_id: Option<u32>) {
 fn kill_direct_child(child_process: &mut Child, action: &str) {
     if let Err(err) = child_process.start_kill() {
         debug!("failed to {action} exec-server stdio child: {err}");
-    }
-}
-
-#[cfg(windows)]
-fn kill_windows_process_tree(pid: u32) -> bool {
-    let pid = pid.to_string();
-    match codex_utils_process::background_command("taskkill")
-        .args(["/PID", pid.as_str(), "/T", "/F"])
-        .stdin(Stdio::null())
-        .stdout(Stdio::null())
-        .stderr(Stdio::null())
-        .status()
-    {
-        Ok(status) => status.success(),
-        Err(err) => {
-            warn!("failed to run taskkill for exec-server stdio process tree {pid}: {err}");
-            false
-        }
     }
 }
 

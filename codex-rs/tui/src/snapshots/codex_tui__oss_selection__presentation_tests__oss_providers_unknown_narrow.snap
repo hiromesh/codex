@@ -8,7 +8,6 @@ expression: terminal.backend()
   session.
 
 › 1. LM Studio · ? Unknown              
-  2. Ollama · ? Unknown
 
   Local LM Studio server (default port
   1234)

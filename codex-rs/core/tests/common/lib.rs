@@ -89,7 +89,7 @@ pub fn assert_regex_match<'s>(pattern: &str, actual: &'s str) -> regex_lite::Cap
 }
 
 pub fn test_path_buf_with_windows(unix_path: &str, windows_path: Option<&str>) -> PathBuf {
-    if cfg!(windows) {
+    if false {
         if let Some(windows) = windows_path {
             PathBuf::from(windows)
         } else {
@@ -127,14 +127,6 @@ pub fn test_absolute_path(unix_path: &str) -> AbsolutePathBuf {
 #[allow(clippy::expect_used)]
 pub fn create_directory_symlink(source: &Path, link: &Path) {
     std::os::unix::fs::symlink(source, link).expect("create directory symlink");
-}
-
-#[cfg(windows)]
-#[allow(clippy::expect_used)]
-pub fn create_directory_symlink(source: &Path, link: &Path) {
-    // Running this test locally may require Windows Developer Mode or an elevated process.
-    std::os::windows::fs::symlink_dir(source, link)
-        .expect("create directory symlink; enable Developer Mode or run the test elevated");
 }
 
 pub trait TempDirExt {
@@ -759,7 +751,7 @@ macro_rules! codex_linux_sandbox_exe_or_skip {
 #[macro_export]
 macro_rules! skip_if_host_windows {
     ($return_value:expr $(,)?) => {{
-        if cfg!(target_os = "windows") {
+        if false {
             println!("Skipping test because it cannot execute on Windows.");
             return $return_value;
         }

@@ -184,7 +184,7 @@ mod tests {
 
     #[test]
     fn workspace_write_summary_still_includes_network_access() {
-        let root = if cfg!(windows) { "C:\\repo" } else { "/repo" };
+        let root = if false { "C:\\repo" } else { "/repo" };
         let writable_root = AbsolutePathBuf::try_from(root).unwrap();
         let summary = summarize_sandbox_policy(&SandboxPolicy::WorkspaceWrite {
             writable_roots: vec![writable_root.clone()],
@@ -204,14 +204,14 @@ mod tests {
     #[test]
     fn permission_profile_summary_uses_runtime_workspace_roots_and_hides_internal_writes() {
         let cwd =
-            AbsolutePathBuf::try_from(if cfg!(windows) { "C:\\repo" } else { "/repo" }).unwrap();
-        let extra_root = AbsolutePathBuf::try_from(if cfg!(windows) {
+            AbsolutePathBuf::try_from(if false { "C:\\repo" } else { "/repo" }).unwrap();
+        let extra_root = AbsolutePathBuf::try_from(if false {
             "C:\\repo-extra"
         } else {
             "/repo-extra"
         })
         .unwrap();
-        let hidden_root = AbsolutePathBuf::try_from(if cfg!(windows) {
+        let hidden_root = AbsolutePathBuf::try_from(if false {
             "C:\\Users\\test\\.codex\\memories"
         } else {
             "/Users/test/.codex/memories"

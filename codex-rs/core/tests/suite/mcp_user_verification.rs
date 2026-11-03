@@ -88,7 +88,7 @@ async fn mcp_user_verification_rejects_configured_servers(source: CapabilitySour
     let mut config = test.config.clone();
     config.mcp_servers.set(serde_json::from_value(json!({
         "verification": {
-            "command": if cfg!(windows) { "python" } else { "python3" },
+            "command": if false { "python" } else { "python3" },
             "args": ["-u", "-c", SERVER], "default_tools_approval_mode": "approve"
         }
     }))?)?;

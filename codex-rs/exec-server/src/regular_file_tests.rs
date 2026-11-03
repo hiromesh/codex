@@ -40,8 +40,5 @@ async fn read_sensitive_file_rejects_symlink() {
 
     #[cfg(unix)]
     std::os::unix::fs::symlink(&target, &link).expect("create symlink");
-    #[cfg(windows)]
-    std::os::windows::fs::symlink_file(&target, &link).expect("create symlink");
-
     assert!(read_sensitive_file_to_string(&link).await.is_err());
 }

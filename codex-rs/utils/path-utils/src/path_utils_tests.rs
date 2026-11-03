@@ -122,18 +122,6 @@ mod native_workdir {
     use pretty_assertions::assert_eq;
     use std::path::PathBuf;
 
-    #[cfg(target_os = "windows")]
-    #[test]
-    fn windows_verbatim_paths_are_simplified() {
-        let path = PathBuf::from(r"\\?\D:\c\x\worktrees\2508\swift-base");
-        let normalized = normalize_for_native_workdir_with_flag(path, /*is_windows*/ true);
-
-        assert_eq!(
-            normalized,
-            PathBuf::from(r"D:\c\x\worktrees\2508\swift-base")
-        );
-    }
-
     #[test]
     fn non_windows_paths_are_unchanged() {
         let path = PathBuf::from(r"\\?\D:\c\x\worktrees\2508\swift-base");
@@ -168,13 +156,4 @@ mod path_comparison {
         ));
     }
 
-    #[cfg(windows)]
-    #[test]
-    fn matches_windows_verbatim_paths() -> std::io::Result<()> {
-        let dir = tempfile::tempdir()?;
-        let verbatim_dir = PathBuf::from(format!(r"\\?\{}", dir.path().display()));
-
-        assert!(paths_match_after_normalization(verbatim_dir, dir.path()));
-        Ok(())
-    }
 }

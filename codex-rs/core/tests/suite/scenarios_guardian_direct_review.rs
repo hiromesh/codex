@@ -250,7 +250,6 @@ fn model_input(request: &ResponsesRequest, parent: ThreadId) -> Result<String> {
     ))
 }
 
-#[cfg(not(target_os = "windows"))]
 #[tokio::test]
 async fn direct_exec_review_applies_hook_rewrite_before_policy_check() -> Result<()> {
     skip_if_no_network!(Ok(()));
@@ -354,7 +353,6 @@ prefix_rule(pattern=["git", "init", "guardian-rewritten"], decision="prompt")
     Ok(())
 }
 
-#[cfg(not(target_os = "windows"))]
 #[tokio::test]
 async fn direct_exec_review_honors_hook_denial_before_policy_skip() -> Result<()> {
     use codex_protocol::protocol::EventMsg;

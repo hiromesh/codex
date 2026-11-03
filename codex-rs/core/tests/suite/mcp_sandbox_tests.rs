@@ -50,11 +50,6 @@ async fn mcp_server_enforces_sandbox_state_with_codex_sandbox() -> Result<()> {
     let denied_path = outside_workspace.path().canonicalize()?.join("denied.txt");
     // Establish that this is an existing, writable file before applying the sandbox.
     std::fs::write(&denied_path, "original")?;
-    #[cfg(windows)]
-    std::fs::write(
-        sandbox_home.path().join("config.toml"),
-        "[windows]\nsandbox = \"unelevated\"\n",
-    )?;
     Mock::given(method("POST"))
         .and(path("/mcp"))
         .respond_with(SandboxMcpServer {
@@ -195,20 +190,10 @@ impl Respond for SandboxMcpServer {
                     .env("CODEX_TEST_WRITE_PATH", target_path)
                     .stdin(Stdio::null())
                     .args(["sandbox", "--sandbox-state-json", &state.to_string(), "--"]);
-                #[cfg(not(windows))]
                 command.args([
                     "/bin/sh",
                     "-c",
                     "printf sandboxed > \"$CODEX_TEST_WRITE_PATH\"",
-                ]);
-                #[cfg(windows)]
-                command.args([
-                    "powershell.exe",
-                    "-NoProfile",
-                    "-NonInteractive",
-                    "-Command",
-                    // Use a cmdlet that works in PowerShell's Constrained Language Mode.
-                    "Set-Content -LiteralPath $env:CODEX_TEST_WRITE_PATH -Value 'sandboxed' -Encoding Ascii -NoNewline -ErrorAction Stop",
                 ]);
                 let output = command.output().expect("launch codex sandbox");
                 let report = json!({

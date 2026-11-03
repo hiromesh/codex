@@ -1,7 +1,5 @@
 use std::collections::HashSet;
 use std::fmt;
-#[cfg(windows)]
-use std::os::windows::process::CommandExt;
 use std::path::Path;
 use std::path::PathBuf;
 use std::process::Stdio;
@@ -73,8 +71,6 @@ struct HelperProcess {
     child: Child,
     #[cfg(unix)]
     process_group_id: u32,
-    #[cfg(windows)]
-    job: codex_utils_pty::JobObject,
 }
 
 struct RawHeaderEntries {
@@ -123,9 +119,6 @@ impl Drop for HelperProcess {
     fn drop(&mut self) {
         #[cfg(unix)]
         let _ = kill_process_group(self.process_group_id);
-
-        #[cfg(windows)]
-        let _ = self.job.terminate();
 
         let _ = self.child.start_kill();
     }
@@ -429,21 +422,12 @@ impl HttpClient for HttpHeadersClient {
 }
 
 async fn run_helper(command: &str, cwd: &Path) -> Result<HeaderMap> {
-    #[cfg(windows)]
-    let shell = std::env::var_os("COMSPEC").unwrap_or_else(|| "cmd.exe".into());
-    #[cfg(not(windows))]
     let shell = "sh";
 
     // Match the repository's existing shell-command convention. The command is ordinary
     // configuration and may be visible in local process metadata; credentials belong in the
     // JSON output rather than in the command text.
     let mut process = Command::new(shell);
-    #[cfg(windows)]
-    {
-        process.args(["/Q", "/D", "/C"]);
-        process.as_std_mut().raw_arg(format!(r#""{command}""#));
-    }
-    #[cfg(not(windows))]
     process.args(["-c", command]);
     #[cfg(unix)]
     process.process_group(0);
@@ -457,16 +441,6 @@ async fn run_helper(command: &str, cwd: &Path) -> Result<HeaderMap> {
         .envs(create_env_for_mcp_server(/*extra_env*/ None, &[])?)
         .kill_on_drop(true);
 
-    #[cfg(windows)]
-    let (child, job) = {
-        let job = codex_utils_pty::JobObject::create_without_breakaway()
-            .map_err(|error| anyhow!("MCP HTTP headers helper containment failed: {error}"))?;
-        let child = job
-            .spawn_contained(&mut process)
-            .map_err(|error| anyhow!("MCP HTTP headers helper failed to start: {error}"))?;
-        (child, job)
-    };
-    #[cfg(not(windows))]
     let child = process
         .spawn()
         .map_err(|error| anyhow!("MCP HTTP headers helper failed to start: {error}"))?;
@@ -476,8 +450,6 @@ async fn run_helper(command: &str, cwd: &Path) -> Result<HeaderMap> {
             .id()
             .ok_or_else(|| anyhow!("MCP HTTP headers helper process id was unavailable"))?,
         child,
-        #[cfg(windows)]
-        job,
     };
     let output = tokio::time::timeout(HELPER_TIMEOUT, async {
         let stdout = process

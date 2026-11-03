@@ -71,11 +71,7 @@ fn connector_metadata_root(home: &Path) -> PathBuf {
     {
         home.join("Library/Application Support/Claude")
     }
-    #[cfg(target_os = "windows")]
-    {
-        home.join("AppData/Roaming/Claude")
-    }
-    #[cfg(not(any(target_os = "macos", target_os = "windows")))]
+    #[cfg(not(target_os = "macos"))]
     {
         home.join(".config/Claude")
     }

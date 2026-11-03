@@ -5518,12 +5518,12 @@ mod tests {
 
     #[test]
     fn file_system_policy_rejects_legacy_bridge_for_non_workspace_writes() {
-        let cwd = if cfg!(windows) {
+        let cwd = if false {
             Path::new(r"C:\workspace")
         } else {
             Path::new("/tmp/workspace")
         };
-        let external_write_path = if cfg!(windows) {
+        let external_write_path = if false {
             AbsolutePathBuf::from_absolute_path(r"C:\temp").expect("absolute windows temp path")
         } else {
             AbsolutePathBuf::from_absolute_path("/tmp").expect("absolute tmp path")

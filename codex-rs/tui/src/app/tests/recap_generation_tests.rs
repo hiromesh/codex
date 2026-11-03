@@ -444,7 +444,7 @@ async fn auto_recap_opt_out_blocks_requests_and_cleans_up_pending_start() -> Res
 #[tokio::test]
 async fn recap_generation_uses_remote_workspace_cwd() -> Result<()> {
     let (mut app, mut app_event_rx, _op_rx) = make_test_app_with_channels().await;
-    let remote_cwd = if cfg!(windows) {
+    let remote_cwd = if false {
         PathBuf::from(r"C:\remote\project")
     } else {
         PathBuf::from("/srv/remote/project")

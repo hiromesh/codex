@@ -1260,14 +1260,6 @@ fn copy_symlink(source: &Path, target: &Path) -> io::Result<()> {
     {
         std::os::unix::fs::symlink(&link_target, target)
     }
-    #[cfg(windows)]
-    {
-        if symlink_points_to_directory(source)? {
-            std::os::windows::fs::symlink_dir(&link_target, target)
-        } else {
-            std::os::windows::fs::symlink_file(&link_target, target)
-        }
-    }
     #[cfg(not(any(unix, windows)))]
     {
         let _ = link_target;
@@ -1277,15 +1269,6 @@ fn copy_symlink(source: &Path, target: &Path) -> io::Result<()> {
             "copying symlinks is unsupported on this platform",
         ))
     }
-}
-
-#[cfg(windows)]
-fn symlink_points_to_directory(source: &Path) -> io::Result<bool> {
-    use std::os::windows::fs::FileTypeExt;
-
-    Ok(std::fs::symlink_metadata(source)?
-        .file_type()
-        .is_symlink_dir())
 }
 
 fn system_time_to_unix_ms(time: SystemTime) -> i64 {

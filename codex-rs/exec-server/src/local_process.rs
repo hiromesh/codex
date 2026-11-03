@@ -762,8 +762,6 @@ pub(crate) fn apply_exec_metadata(
     metadata: Option<&crate::protocol::ExecMetadata>,
 ) {
     if let Some(metadata) = metadata {
-        #[cfg(windows)]
-        env.retain(|name, _| !name.eq_ignore_ascii_case(CODEX_THREAD_ID_ENV_VAR));
         match metadata.thread_id {
             Some(thread_id) => {
                 env.insert(CODEX_THREAD_ID_ENV_VAR.to_string(), thread_id.to_string());
@@ -1257,20 +1255,14 @@ mod tests {
     use opentelemetry_sdk::metrics::data::AggregatedMetrics;
     use opentelemetry_sdk::metrics::data::MetricData;
     use pretty_assertions::assert_eq;
-    #[cfg(not(target_os = "windows"))]
     use tokio::io::AsyncReadExt;
-    #[cfg(not(target_os = "windows"))]
     use tokio::io::AsyncWriteExt;
     use tokio::sync::oneshot;
     use tokio::time::timeout;
 
-    #[cfg(not(target_os = "windows"))]
     use crate::protocol::ExecServerNetworkPolicyDecision;
-    #[cfg(not(target_os = "windows"))]
     use crate::protocol::NETWORK_POLICY_REQUEST_METHOD;
-    #[cfg(not(target_os = "windows"))]
     use crate::protocol::NetworkPolicyRequestParams;
-    #[cfg(not(target_os = "windows"))]
     use crate::protocol::NetworkPolicyRequestResponse;
 
     #[cfg(target_os = "linux")]
@@ -1463,8 +1455,6 @@ mod tests {
     async fn start_process_rejects_non_native_cwd_before_launch() {
         #[cfg(unix)]
         let uri = "file://server/share/checkout";
-        #[cfg(windows)]
-        let uri = "file:///usr/local/checkout";
         let cwd = PathUri::parse(uri).expect("non-native cwd URI");
         let source = cwd
             .to_abs_path()
@@ -1521,15 +1511,11 @@ mod tests {
             .await
             .err()
             .expect("valid boundary process ID should proceed to process preparation");
-        #[cfg(not(target_os = "windows"))]
         assert!(
             error
                 .message
                 .contains("executor-local network proxy launch requires an enabled proxy")
         );
-        #[cfg(target_os = "windows")]
-        assert_eq!(error, invalid_params("argv must not be empty".to_string()));
-
         for process_id in [
             String::new(),
             "p".repeat(MAX_NETWORK_POLICY_PROCESS_ID_BYTES + 1),
@@ -1595,7 +1581,7 @@ mod tests {
             ("CODEX_THREAD_ID".into(), thread_id.to_string()),
             ("CODEX_TOOL_CALL_ID".into(), "current-call".into()),
         ]);
-        if cfg!(target_os = "windows") {
+        if false {
             expected.insert("PATHEXT".to_string(), ".COM;.EXE;.BAT;.CMD".to_string());
         }
 
@@ -1625,9 +1611,7 @@ mod tests {
             });
 
             let mut expected = HashMap::from([("OTHER".into(), "unchanged".into())]);
-            #[cfg(not(windows))]
             expected.insert("Codex_Thread_Id".into(), "mixed-case-thread".into());
-            #[cfg(not(windows))]
             expected.insert("codex_thread_id".into(), "lowercase-thread".into());
             if let Some(thread_id) = thread_id {
                 expected.insert("CODEX_THREAD_ID".into(), thread_id.to_string());
@@ -1658,7 +1642,6 @@ mod tests {
             HashMap::from([
                 ("CODEX_THREAD_ID".into(), "prewarm-thread".into()),
                 ("Codex_Thread_Id".into(), "mixed-case-thread".into()),
-                #[cfg(not(windows))]
                 ("Codex_Tool_Call_Id".into(), "mixed-case-call".into()),
             ]),
         );
@@ -1905,10 +1888,7 @@ mod tests {
         let backend = LocalProcess::default();
         let mut process = spawn_test_process(&backend, "proc-background-child").await;
         let (outgoing_tx, outgoing_rx) = mpsc::channel(NOTIFICATION_CHANNEL_CAPACITY);
-        #[cfg(not(target_os = "windows"))]
         let mut outgoing_rx = outgoing_rx;
-        #[cfg(target_os = "windows")]
-        let _outgoing_rx = outgoing_rx;
         let requests = RpcNotificationSender::new(outgoing_tx).request_sender();
         *backend
             .inner
@@ -1972,12 +1952,6 @@ mod tests {
         let stream = tokio::net::TcpStream::connect(proxy_addr)
             .await
             .expect("proxy should remain available to a child holding inherited output streams");
-        #[cfg(target_os = "windows")]
-        {
-            assert!(proxy.network_proxy_restricting_sid(None).is_some());
-            drop(stream);
-        }
-        #[cfg(not(target_os = "windows"))]
         {
             let mut stream = stream;
             stream
@@ -2024,9 +1998,6 @@ mod tests {
         .expect("process should close");
         assert!(closed_response.closed);
         assert!(network_policy_shutdown.is_cancelled());
-        #[cfg(target_os = "windows")]
-        assert_eq!(proxy.network_proxy_restricting_sid(None), None);
-        #[cfg(not(target_os = "windows"))]
         assert!(tokio::net::TcpStream::connect(proxy_addr).await.is_err());
         backend.shutdown().await;
     }
@@ -2166,8 +2137,6 @@ mod tests {
             terminator: None,
             writer_handle: None,
             resizer: None,
-            #[cfg(windows)]
-            tty: false,
         })
         .session
     }

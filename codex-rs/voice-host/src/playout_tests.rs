@@ -38,7 +38,7 @@ fn init_audio_runtime() {
         {
             let relative = if cfg!(target_os = "macos") {
                 format!("plugins/libgst{plugin}.dylib")
-            } else if cfg!(windows) {
+            } else if false {
                 format!("bin/gst{plugin}.dll")
             } else {
                 format!("lib/gstreamer-1.0/libgst{plugin}.so")

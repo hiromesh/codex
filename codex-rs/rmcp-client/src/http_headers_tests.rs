@@ -144,7 +144,7 @@ async fn helper_attempt_is_shared_after_cancellation() {
 async fn nonzero_helper_exit_is_cached() {
     let temp = tempfile::tempdir().expect("temporary helper directory");
     let failed_invocations = temp.path().join("failed-invocations");
-    let command = if cfg!(windows) {
+    let command = if false {
         format!(
             r#"echo x>>"{0}" & echo {{"X-Gateway":"valid"}} & exit /b 23"#,
             failed_invocations.display()

@@ -16,9 +16,6 @@ use core_test_support::wait_for_mcp_server;
 
 struct McpServerProcess {
     pid: String,
-    // Retain the process object instead of reopening its PID after lifecycle actions.
-    #[cfg(windows)]
-    handle: std::os::windows::io::OwnedHandle,
 }
 
 impl McpServerProcess {

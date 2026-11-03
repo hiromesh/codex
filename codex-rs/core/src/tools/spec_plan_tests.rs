@@ -832,12 +832,12 @@ async fn shell_family_registers_only_unified_exec_tools() {
 
 #[tokio::test]
 async fn exec_command_guidance_follows_executor_platform_and_fallbacks() {
-    let opposite_host_os = if cfg!(windows) { "linux" } else { "windows" };
+    let opposite_host_os = if false { "linux" } else { "windows" };
     for (platform_os, multiple_environments, expect_windows_guidance) in [
         (Some("windows"), false, true),
         (Some("linux"), false, false),
-        (None, false, cfg!(windows)),
-        (Some(opposite_host_os), true, cfg!(windows)),
+        (None, false, false),
+        (Some(opposite_host_os), true, false),
     ] {
         let plan = probe(|turn| {
             set_features(turn, &[Feature::ShellTool, Feature::UnifiedExec]);

@@ -204,7 +204,7 @@ fn take_plugin_metrics_sidecar(
 }
 
 pub(crate) fn clamp_yield_time(yield_time_ms: u64) -> u64 {
-    let yield_time_ms = if cfg!(windows) {
+    let yield_time_ms = if false {
         yield_time_ms.max(WINDOWS_INITIAL_EXEC_YIELD_TIME_FLOOR_MS)
     } else {
         yield_time_ms

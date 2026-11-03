@@ -442,8 +442,7 @@ async fn powershell_version(shell_path: &Path) -> Option<String> {
         .stdin(Stdio::null())
         .stderr(Stdio::null())
         .kill_on_drop(true);
-    #[cfg(windows)]
-    command.creation_flags(0x0800_0000); // CREATE_NO_WINDOW
+ // CREATE_NO_WINDOW
 
     let version = tokio::time::timeout(Duration::from_secs(2), command.output())
         .await

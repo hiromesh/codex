@@ -34,8 +34,6 @@ static ASYNC_SYSTEM_PROXY_RESOLUTION_PERMIT: Semaphore = Semaphore::const_new(1)
 
 #[cfg(target_os = "macos")]
 mod macos;
-#[cfg(target_os = "windows")]
-mod windows;
 
 /// Coarse semantic bucket for the HTTP or WebSocket client being constructed.
 ///
@@ -586,11 +584,6 @@ fn resolve_system_proxy_with(
 #[cfg(target_os = "macos")]
 fn resolve_platform_system_proxy(request_url: &str, origin: &RequestOrigin) -> SystemProxyDecision {
     macos::resolve(request_url, origin)
-}
-
-#[cfg(target_os = "windows")]
-fn resolve_platform_system_proxy(request_url: &str, origin: &RequestOrigin) -> SystemProxyDecision {
-    windows::resolve(request_url, origin)
 }
 
 #[cfg(not(any(target_os = "windows", target_os = "macos")))]

@@ -30,7 +30,6 @@ impl CallbackListener {
             })?);
         let redirect_uri = match server.server_addr() {
             tiny_http::ListenAddr::IP(address) => format!("http://{address}/callback"),
-            #[cfg(not(target_os = "windows"))]
             _ => return Err(io::Error::other("invalid provider OAuth loopback address")),
         };
 

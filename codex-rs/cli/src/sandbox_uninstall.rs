@@ -11,11 +11,6 @@ pub(crate) struct SandboxUninstallCommand {}
 
 impl SandboxUninstallCommand {
     pub(crate) fn run(self) -> anyhow::Result<()> {
-        #[cfg(target_os = "windows")]
-        {
-            codex_windows_sandbox::clean_up_legacy_windows_sandbox()
-        }
-        #[cfg(not(target_os = "windows"))]
         anyhow::bail!("`codex sandbox uninstall` is only supported on Windows")
     }
 }

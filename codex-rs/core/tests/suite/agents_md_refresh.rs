@@ -178,8 +178,6 @@ async fn failed_global_read_keeps_instructions_until_recovery() -> Result<()> {
     std::fs::remove_file(&source)?;
     #[cfg(unix)]
     std::os::unix::fs::symlink(GLOBAL_AGENTS_FILENAME, &source)?;
-    #[cfg(windows)]
-    std::os::windows::fs::symlink_file(GLOBAL_AGENTS_FILENAME, &source)?;
     test.submit_turn("keep instructions through the read failure")
         .await?;
     assert_eq!(

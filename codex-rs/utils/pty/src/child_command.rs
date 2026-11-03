@@ -13,8 +13,6 @@ use std::ffi::OsString;
 use std::io;
 use std::path::Path;
 use std::process::Stdio as TokioStdio;
-#[cfg(windows)]
-use winapi::um::winbase::CREATE_NO_WINDOW;
 
 use crate::child::Child;
 use crate::child::ChildKind;
@@ -101,8 +99,6 @@ impl Command {
             .stdin(TokioStdio::piped())
             .stdout(TokioStdio::piped())
             .stderr(TokioStdio::piped());
-        #[cfg(windows)]
-        inner.creation_flags(CREATE_NO_WINDOW);
         Self {
             inner,
             #[cfg(unix)]
@@ -236,12 +232,6 @@ impl Command {
         self.inner.arg0(arg0.as_ref());
         self.arg0 = Some(arg0.as_ref().to_owned());
         self
-    }
-
-    /// Preserve Job Object assignment before the child begins executing on Windows.
-    #[cfg(windows)]
-    pub fn prepare_suspended_spawn(&mut self, job: &crate::JobObject) {
-        job.prepare_suspended_spawn(&mut self.inner);
     }
 
     /// Reject original inputs that std replaced with a NUL-free placeholder.

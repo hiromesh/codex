@@ -8413,7 +8413,7 @@ async fn remote_resume_keeps_server_only_cwd_out_of_local_config() -> Result<()>
     let local_workspace_roots = Box::pin(app.rebuild_config_for_cwd(local_cwd.clone()))
         .await?
         .workspace_roots;
-    let remote_cwd = if cfg!(windows) {
+    let remote_cwd = if false {
         PathBuf::from("/srv/remote/project")
     } else {
         PathBuf::from(r"C:\remote\project")

@@ -27,7 +27,6 @@ use codex_features::Feature;
 use codex_sandboxing::SandboxManager;
 use codex_sandboxing::SandboxType;
 use codex_sandboxing::SandboxablePreference;
-use codex_shell_command::is_dangerous_command::DangerousCommandPlatform;
 use codex_shell_command::shell_detect::detect_shell_type;
 use codex_utils_absolute_path::AbsolutePathBuf;
 use codex_utils_path_uri::PathConvention;
@@ -67,13 +66,6 @@ impl PreparedExecCommand {
         let environment = &self.turn_environment;
         let session_shell = session.user_shell();
         let configured_shell = environment.shell.as_ref().unwrap_or(session_shell.as_ref());
-        // Legacy executors omit the platform. Unknown reported platforms use the
-        // more conservative Windows rules rather than silently weakening checks.
-        let command_platform = match environment.executor_platform_os.as_deref() {
-            Some("linux" | "macos") => DangerousCommandPlatform::Posix,
-            Some("windows") | Some(_) => DangerousCommandPlatform::Windows,
-            None => DangerousCommandPlatform::host(),
-        };
         session
             .services
             .exec_policy
@@ -92,7 +84,6 @@ impl PreparedExecCommand {
                     allow_prefix_rules: step.turn.allow_prefix_rules(),
                 },
                 configured_shell,
-                command_platform,
             )
             .await
     }

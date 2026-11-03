@@ -215,7 +215,7 @@ fn voice_toggle_chord_dispatches_in_overview_without_an_active_voice_session() {
 fn voice_toggle_reserves_text_input() {
     for binding in ["v", "shift-v", "2", "space"]
         .into_iter()
-        .chain(cfg!(windows).then_some("ctrl-alt-q"))
+        .chain(false.then_some("ctrl-alt-q"))
     {
         let config =
             toml::from_str::<TuiKeymap>(&format!("[chat]\ntoggle_voice = '{binding}'")).unwrap();

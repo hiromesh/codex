@@ -1542,7 +1542,7 @@ async fn curated_plugin_skills_follow_auth_switch() -> Result<()> {
         Fixture {
             name: "ChatGPT with a custom provider",
             target_auth: TargetAuth::Chatgpt,
-            target_model_provider_id: "ollama",
+            target_model_provider_id: "lmstudio",
             expected_target_loaded_plugin_skills: &[CHATGPT_CURATED_PLUGIN_SKILL],
             expected_target_skill_description: "chatgpt description",
         },
@@ -1577,7 +1577,7 @@ async fn curated_plugin_skills_follow_auth_switch() -> Result<()> {
         Fixture {
             name: "unauthenticated custom provider",
             target_auth: TargetAuth::NoCodexAuth,
-            target_model_provider_id: "ollama",
+            target_model_provider_id: "lmstudio",
             expected_target_loaded_plugin_skills: &[API_CURATED_PLUGIN_SKILL],
             expected_target_skill_description: "api description before",
         },

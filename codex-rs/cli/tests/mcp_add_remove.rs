@@ -186,7 +186,7 @@ async fn add_and_login_discover_oauth_through_configured_http_proxy() -> Result<
             .await?
             .contains_key("oauth")
     );
-    let helper_command = if cfg!(windows) {
+    let helper_command = if false {
         r#"echo {"X-Gateway":"gateway-token"}"#
     } else {
         r#"printf '{"X-Gateway":"gateway-token"}'"#

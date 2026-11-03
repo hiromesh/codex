@@ -84,14 +84,6 @@ pub(crate) async fn discover_root(
         return discovery;
     }
 
-    #[cfg(target_os = "windows")]
-    if sandbox.is_some_and(|context| {
-        context.should_read_from_sandbox() && !context.windows_sandbox_is_requested()
-    }) {
-        discovery.error = Some("filesystem sandbox is unavailable on this executor".to_string());
-        return discovery;
-    }
-
     match file_system
         .get_metadata(&path, Default::default(), sandbox)
         .await

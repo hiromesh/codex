@@ -4347,17 +4347,6 @@ fn response_request_contains_text(request: &Value, text: &str) -> bool {
 }
 
 fn realtime_tool_ok_command() -> Vec<String> {
-    #[cfg(windows)]
-    {
-        vec![
-            "powershell.exe".to_string(),
-            "-NoProfile".to_string(),
-            "-Command".to_string(),
-            "[Console]::Write('realtime-tool-ok')".to_string(),
-        ]
-    }
-
-    #[cfg(not(windows))]
     {
         vec!["printf".to_string(), "realtime-tool-ok".to_string()]
     }

@@ -6,8 +6,6 @@ use std::path::Path;
 
 use anyhow::Context;
 use anyhow::Result;
-#[cfg(windows)]
-use windows_sys::Win32::Storage::FileSystem as winfs;
 
 use crate::Daemon;
 use crate::backend;
@@ -32,45 +30,6 @@ fn selection_identity(current: &Path) -> Result<String> {
         meta.ctime(),
         meta.ctime_nsec()
     ))
-}
-
-#[cfg(windows)]
-fn selection_identity(current: &Path) -> Result<String> {
-    use std::os::windows::fs::OpenOptionsExt;
-    use std::os::windows::io::AsRawHandle;
-    use windows_sys::Win32::System::IO::DeviceIoControl;
-
-    let file = std::fs::OpenOptions::new()
-        .access_mode(winfs::FILE_READ_ATTRIBUTES)
-        .share_mode(winfs::FILE_SHARE_READ | winfs::FILE_SHARE_WRITE | winfs::FILE_SHARE_DELETE)
-        .custom_flags(winfs::FILE_FLAG_BACKUP_SEMANTICS | winfs::FILE_FLAG_OPEN_REPARSE_POINT)
-        .open(current)?;
-    // FSCTL_READ_FILE_USN_DATA, with default V2 record version. The input is always
-    // "current", so 1024 bytes accommodates its journal record including the file name.
-    let mut record = [0u8; 1024];
-    let mut returned = 0;
-    if unsafe {
-        DeviceIoControl(
-            file.as_raw_handle(),
-            0x0009_00eb,
-            std::ptr::null(),
-            0,
-            record.as_mut_ptr().cast(),
-            record.len() as u32,
-            &raw mut returned,
-            std::ptr::null_mut(),
-        )
-    } == 0
-    {
-        return Err(std::io::Error::last_os_error().into());
-    }
-    let usn = i64::from_le_bytes(record[24..32].try_into()?);
-    anyhow::ensure!(
-        returned >= 32 && u16::from_le_bytes(record[4..6].try_into()?) == 2 && usn > 0,
-        "no reliable daemon selection journal record"
-    );
-    let file_id = u64::from_le_bytes(record[8..16].try_into()?);
-    Ok(format!("{file_id:x} {usn:x}"))
 }
 
 /// Call after changing the selection, while holding the installer lock.
@@ -98,16 +57,6 @@ fn owned_mount(path: &Path) -> Result<u64> {
         meta.is_dir() || meta.is_file(),
         "not an ordinary package entry"
     );
-    #[cfg(windows)]
-    {
-        use std::os::windows::fs::MetadataExt;
-        anyhow::ensure!(
-            meta.file_attributes() & winfs::FILE_ATTRIBUTE_REPARSE_POINT == 0,
-            "package entry is a reparse point"
-        );
-        // Volume mount points on Windows are reparse points.
-        Ok(0)
-    }
     #[cfg(target_os = "linux")]
     {
         use std::os::fd::AsRawFd;

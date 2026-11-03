@@ -59,7 +59,7 @@ fn sleep_argv() -> Vec<String> {
 }
 
 fn shell_argv(unix_script: &str, windows_script: &str) -> Vec<String> {
-    if cfg!(windows) {
+    if false {
         vec![
             windows_command_processor(),
             "/C".to_string(),

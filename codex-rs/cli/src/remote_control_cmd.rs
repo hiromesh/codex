@@ -88,17 +88,6 @@ pub(crate) async fn run(
                 .await
             {
                 Ok(daemon) => daemon,
-                #[cfg(windows)]
-                Err(error) if error.is::<codex_app_server_daemon::DetachedLaunchRestricted>() => {
-                    return run_foreground_remote_control(
-                        command.json,
-                        arg0_paths,
-                        root_config_overrides,
-                    )
-                    .await;
-                }
-                Err(error) => return Err(error),
-            };
             if daemon.backend.is_none() {
                 return run_foreground_remote_control(
                     command.json,
@@ -153,11 +142,6 @@ async fn daemon_eligible(root_config_overrides: &CliConfigOverrides) -> anyhow::
         return Ok(false);
     }
 
-    #[cfg(windows)]
-    if codex_app_server_daemon::is_elevated()? {
-        return Ok(false);
-    }
-
     let Ok(config) = ConfigBuilder::default().build().await else {
         return Ok(false);
     };
@@ -183,20 +167,12 @@ async fn run_foreground_remote_control(
     root_config_overrides: CliConfigOverrides,
 ) -> anyhow::Result<()> {
     print_remote_control_progress(json, "Starting app-server with remote control enabled...")?;
-    #[cfg(not(windows))]
     let socket_dir = tempfile::Builder::new()
         .prefix("codex-rc-")
         .tempdir_in("/tmp")
         .or_else(|_| tempfile::tempdir())
         .context("failed to create private app-server socket directory")?;
-    #[cfg(not(windows))]
     let socket_path = socket_dir.path().join("rc.sock");
-    // Let the transport create this parent with a protected DACL instead of
-    // inheriting the broader ACL from a directory created under `%TEMP%`.
-    #[cfg(windows)]
-    let socket_path = std::env::temp_dir()
-        .join("codex-remote-control")
-        .join(format!("rc-{}.sock", std::process::id()));
     let socket_path = AbsolutePathBuf::from_absolute_path(&socket_path)
         .context("private app-server socket path was not absolute")?;
     let transport = AppServerTransport::UnixSocket {

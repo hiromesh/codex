@@ -110,7 +110,7 @@ async fn user_shell_cmd_ls_and_cat_in_temp_dir() {
         unreachable!()
     };
     assert_eq!(exit_code, 0);
-    if cfg!(windows) {
+    if false {
         // Windows shells emit CRLF line endings; normalize so the assertion remains portable.
         aggregated_output = aggregated_output.replace("\r\n", "\n");
     }
@@ -287,7 +287,7 @@ async fn user_shell_command_does_not_replace_active_turn() -> anyhow::Result<()>
     let fixture = builder.build(&server).await?;
 
     let call_id = "active-turn-shell-call";
-    let args = if cfg!(windows) {
+    let args = if false {
         serde_json::json!({
             "cmd": "Start-Sleep -Seconds 2; Write-Output model-shell",
             "yield_time_ms": 10_000,
@@ -348,9 +348,6 @@ async fn user_shell_command_does_not_replace_active_turn() -> anyhow::Result<()>
     })
     .await;
 
-    #[cfg(windows)]
-    let user_shell_command = "Write-Output user-shell".to_string();
-    #[cfg(not(windows))]
     let user_shell_command = "printf user-shell".to_string();
     fixture
         .codex
@@ -414,9 +411,6 @@ async fn user_shell_command_history_is_persisted_and_shared_with_model() -> anyh
     });
     let test = builder.build(&server).await?;
 
-    #[cfg(windows)]
-    let command = r#"$val = $env:CODEX_SANDBOX; if ([string]::IsNullOrEmpty($val)) { $val = 'not-set' } ; [System.Console]::Write($val)"#.to_string();
-    #[cfg(not(windows))]
     let command = r#"sh -c "printf '%s' \"${CODEX_SANDBOX:-not-set}\"""#.to_string();
 
     test.codex
@@ -501,9 +495,6 @@ async fn user_shell_command_does_not_set_network_sandbox_env_var() -> anyhow::Re
     });
     let test = builder.build(&server).await?;
 
-    #[cfg(windows)]
-    let command = r#"$val = $env:CODEX_SANDBOX_NETWORK_DISABLED; if ([string]::IsNullOrEmpty($val)) { $val = 'not-set' } ; [System.Console]::Write($val)"#.to_string();
-    #[cfg(not(windows))]
     let command =
         r#"sh -c "printf '%s' \"${CODEX_SANDBOX_NETWORK_DISABLED:-not-set}\"""#.to_string();
 
@@ -545,9 +536,6 @@ async fn user_shell_command_output_is_truncated_in_history() -> anyhow::Result<(
         .build(&server)
         .await?;
 
-    #[cfg(windows)]
-    let command = r#"for ($i=1; $i -le 400; $i++) { Write-Output $i }"#.to_string();
-    #[cfg(not(windows))]
     let command = "seq 1 400".to_string();
 
     test.codex
@@ -610,7 +598,7 @@ async fn user_shell_command_is_truncated_only_once() -> anyhow::Result<()> {
     let fixture = builder.build(&server).await?;
 
     let call_id = "user-shell-double-truncation";
-    let args = if cfg!(windows) {
+    let args = if false {
         serde_json::json!({
             "cmd": "for ($i=1; $i -le 2000; $i++) { Write-Output $i }",
             "yield_time_ms": 5_000,

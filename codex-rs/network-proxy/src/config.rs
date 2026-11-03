@@ -237,7 +237,7 @@ impl NetworkProxyConfig {
         &mut self,
         environment: &HashMap<String, String>,
     ) {
-        if cfg!(windows)
+        if false
             && self.credential_broker
             && self.has_ambiguous_windows_credential_environment(environment)
         {
@@ -806,25 +806,6 @@ mod tests {
                 mitm_ca: Some(ca),
                 ..Default::default()
             }
-        );
-    }
-
-    #[test]
-    #[cfg(windows)]
-    fn ambiguous_credential_environment_preserves_remote_proxy_support() {
-        let mut config = NetworkProxyConfig {
-            enabled: true,
-            ..Default::default()
-        };
-        let expected = crate::RemoteNetworkProxyConfig::from_effective_config(&config).unwrap();
-        config.set_credential_broker_enabled(/*enabled*/ true);
-        config.configure_credential_broker_environment(&HashMap::from([
-            ("GH_HOST".to_string(), "first.example".to_string()),
-            ("gh_host".to_string(), "second.example".to_string()),
-        ]));
-        assert_eq!(
-            crate::RemoteNetworkProxyConfig::from_effective_config(&config).unwrap(),
-            expected
         );
     }
 

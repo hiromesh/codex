@@ -44,30 +44,7 @@ impl ClaSource {
             vec![home.join("Library/Application Support/Claude")]
         }
 
-        #[cfg(target_os = "windows")]
-        {
-            let default_roaming = home.join("AppData/Roaming");
-            let default_local = home.join("AppData/Local");
-            let roaming = std::env::var_os("APPDATA")
-                .map(PathBuf::from)
-                .filter(|path| path.is_absolute())
-                .unwrap_or_else(|| default_roaming.clone());
-            let local = std::env::var_os("LOCALAPPDATA")
-                .map(PathBuf::from)
-                .filter(|path| path.is_absolute())
-                .unwrap_or_else(|| default_local.clone());
-            let mut roots = vec![
-                local.join("Packages/Claude_pzs8sxrjxfjjc/LocalCache/Roaming/Claude"),
-                roaming.join("Claude"),
-                default_local.join("Packages/Claude_pzs8sxrjxfjjc/LocalCache/Roaming/Claude"),
-                default_roaming.join("Claude"),
-            ];
-            roots.sort();
-            roots.dedup();
-            roots
-        }
-
-        #[cfg(not(any(target_os = "macos", target_os = "windows")))]
+        #[cfg(not(target_os = "macos"))]
         {
             vec![home.join(".config/Claude")]
         }

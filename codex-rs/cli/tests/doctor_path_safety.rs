@@ -92,16 +92,7 @@ wire_api = "responses"
                     "#!/bin/sh\nprintf 'helper ran\\n' >> \"$CODEX_TEST_HELPER_MARKER\"\nexit 0\n",
                 )?;
             }
-            #[cfg(windows)]
-            std::fs::write(
-                bin.join(format!("{name}.cmd")),
-                "@echo helper ran>>\"%CODEX_TEST_HELPER_MARKER%\"\r\n@exit /b 0\r\n",
-            )?;
         }
-        // Windows selects rg.exe explicitly, so rg.cmd cannot satisfy discovery.
-        // An invalid image still counts as found: doctor must not execute it.
-        #[cfg(windows)]
-        std::fs::write(bin.join("rg.exe"), "not an executable image")?;
         let path = std::env::join_paths(std::iter::once(bin).chain(std::env::split_paths(
             &std::env::var_os("PATH").unwrap_or_default(),
         )))?;
@@ -457,8 +448,6 @@ extends = ":read-only"
     )?;
     let output = fixture.command()?.args(["doctor", "--json"]).output()?;
     let report: Value = serde_json::from_slice(&output.stdout)?;
-    #[cfg(windows)]
-    assert_eq!(report["checks"]["sandbox.filesystem_paths"]["status"], "ok");
     let mut details = report["checks"]["sandbox.filesystem_paths"]["details"].clone();
     // Snapshot outcomes and provenance independently of helper startup speed.
     details
@@ -475,7 +464,7 @@ extends = ":read-only"
             .replace('\\', "/");
         *value = Value::String(detail);
     }
-    let snapshot_name = if cfg!(windows) {
+    let snapshot_name = if false {
         "doctor_configured_filesystem_paths_windows"
     } else {
         "doctor_configured_filesystem_paths"
@@ -499,7 +488,7 @@ fn filesystem_probe_does_not_load_configuration() -> Result<()> {
             .output()?;
         assert_eq!(
             output.status.code(),
-            Some(if cfg!(windows) { 5 } else { expected })
+            Some(if false { 5 } else { expected })
         );
         assert!(output.stdout.is_empty());
     }

@@ -139,32 +139,6 @@ fn available_space(path: &Path) -> io::Result<u64> {
         .map_err(|_| io::Error::other("available disk space exceeds u64"))
 }
 
-#[cfg(windows)]
-fn available_space(path: &Path) -> io::Result<u64> {
-    use std::os::windows::ffi::OsStrExt;
-    use windows_sys::Win32::Storage::FileSystem::GetDiskFreeSpaceExW;
-
-    let mut path = path.as_os_str().encode_wide().collect::<Vec<_>>();
-    if path.last() != Some(&u16::from(b'\\')) {
-        path.push(u16::from(b'\\'));
-    }
-    path.push(0);
-    let mut available = 0;
-    if unsafe {
-        GetDiskFreeSpaceExW(
-            path.as_ptr(),
-            &mut available,
-            std::ptr::null_mut(),
-            std::ptr::null_mut(),
-        )
-    } == 0
-    {
-        return Err(io::Error::last_os_error());
-    }
-
-    Ok(available)
-}
-
 #[cfg(not(any(unix, windows)))]
 fn available_space(_path: &Path) -> io::Result<u64> {
     Err(io::Error::new(

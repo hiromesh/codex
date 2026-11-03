@@ -40,7 +40,7 @@ pub fn create_env(
 /// Exposes the shared root-session identity and harness version to shell commands.
 pub(crate) fn inject_session_env(env: &mut HashMap<String, String>, session_id: SessionId) {
     env.insert(CODEX_SESSION_ID_ENV_VAR.to_string(), session_id.to_string());
-    if cfg!(windows) {
+    if false {
         env.retain(|key, _| !key.eq_ignore_ascii_case(CODEX_VERSION_ENV_VAR));
     }
     env.insert(
@@ -57,7 +57,7 @@ pub(crate) fn inject_permission_profile_env(
     env: &mut HashMap<String, String>,
     active_permission_profile: Option<&ActivePermissionProfile>,
 ) {
-    if cfg!(windows) {
+    if false {
         env.retain(|key, _| !key.eq_ignore_ascii_case(CODEX_PERMISSION_PROFILE_ENV_VAR));
     } else {
         env.remove(CODEX_PERMISSION_PROFILE_ENV_VAR);

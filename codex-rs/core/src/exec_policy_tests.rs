@@ -36,10 +36,6 @@ use tempfile::TempDir;
 use tempfile::tempdir;
 use toml::Value as TomlValue;
 
-#[cfg(windows)]
-#[path = "exec_policy_windows_tests.rs"]
-mod windows_tests;
-
 fn config_stack_for_dot_codex_folder(dot_codex_folder: &Path) -> ConfigLayerStack {
     let dot_codex_folder =
         AbsolutePathBuf::from_absolute_path(dot_codex_folder).expect("absolute dot_codex_folder");
@@ -56,7 +52,7 @@ fn config_stack_for_dot_codex_folder(dot_codex_folder: &Path) -> ConfigLayerStac
 }
 
 fn host_absolute_path(segments: &[&str]) -> String {
-    let mut path = if cfg!(windows) {
+    let mut path = if false {
         PathBuf::from(r"C:\")
     } else {
         PathBuf::from("/")
@@ -68,7 +64,7 @@ fn host_absolute_path(segments: &[&str]) -> String {
 }
 
 fn host_program_path(name: &str) -> String {
-    let executable_name = if cfg!(windows) {
+    let executable_name = if false {
         format!("{name}.exe")
     } else {
         name.to_string()
@@ -881,7 +877,6 @@ async fn heredoc_prompt_replaces_inner_requested_prefix_with_full_command() {
 }
 
 #[tokio::test]
-#[cfg(not(windows))]
 async fn heredoc_with_variable_assignment_is_not_reduced_to_allowed_prefix() {
     assert_exec_approval_requirement_for_command(
         ExecApprovalRequirementScenario {
@@ -1104,7 +1099,7 @@ async fn absolute_path_exec_approval_requirement_ignores_disallowed_host_executa
         "opt",
         "homebrew",
         "bin",
-        if cfg!(windows) { "git.exe" } else { "git" },
+        if false { "git.exe" } else { "git" },
     ]);
     let allowed_git_path_literal = starlark_string(&allowed_git_path);
     let policy_src = format!(
@@ -2098,7 +2093,7 @@ async fn forced_rm_requires_approval_or_specific_rejection_on_all_platforms() {
 }
 
 /// Note this test behaves differently on Windows because it exercises an
-/// `if cfg!(windows)` code path in render_decision_for_unmatched_command().
+/// `if false` code path in render_decision_for_unmatched_command().
 #[tokio::test]
 async fn verify_approval_requirement_for_unsafe_powershell_command() {
     // `brew install powershell` to run this test on a Mac!
@@ -2119,7 +2114,7 @@ async fn verify_approval_requirement_for_unsafe_powershell_command() {
         "-Command",
         "echo hi @(calc)",
     ])));
-    let (pwsh_approval_reason, expected_req) = if cfg!(windows) {
+    let (pwsh_approval_reason, expected_req) = if false {
         (
             r#"On Windows, SandboxPolicy::ReadOnly should be assumed to mean
                 that no sandbox is present, so anything that is not "provably
@@ -2410,81 +2405,3 @@ async fn exec_policy_warnings_ignore_untrusted_project_rules_without_config_toml
     Ok(())
 }
 
-#[tokio::test]
-async fn windows_powershell_policy_classifies_only_independent_literal_commands() {
-    for (script, expected) in [
-        (
-            "project-cli subtask start --text 'https://example.com'",
-            Decision::Allow,
-        ),
-        ("Write-Output start 'https://example.com'", Decision::Allow),
-        (
-            "Start-Process notepad.exe; Invoke-WebRequest 'http://127.0.0.1/health'",
-            Decision::Allow,
-        ),
-        ("Start-Process 'https://example.com'", Decision::Forbidden),
-        (
-            "Write-Output start 'https://example.com' | Out-String",
-            Decision::Forbidden,
-        ),
-        (
-            "$target = 'https://example.com/'; Start-Process $target",
-            Decision::Forbidden,
-        ),
-        (
-            "Write-Output 'Start-Process https://example.com'",
-            Decision::Forbidden,
-        ),
-        (
-            "wmic process call create 'powershell.exe -Command Start-Process https://example.com'",
-            Decision::Forbidden,
-        ),
-        ("cmd /c start https://example.com", Decision::Forbidden),
-        (
-            "wt cmd.exe /c start https://example.com",
-            Decision::Forbidden,
-        ),
-        (
-            "wt.exe cmd.exe /c start https://example.com",
-            Decision::Forbidden,
-        ),
-        ("wt.exe cmd.exe /c echo hello", Decision::Allow),
-        ("Remove-Item test -Force", Decision::Forbidden),
-    ] {
-        for flags in [&["-Command"][..], &["-NonInteractive", "-Command"][..]] {
-            for configured_executable in ["pwsh", "other-shell"] {
-                let manager = ExecPolicyManager::new(Arc::new(Policy::empty()));
-                let command = [vec_str(&["pwsh"]), vec_str(flags), vec_str(&[script])].concat();
-                let shell = crate::shell::Shell {
-                    shell_type: crate::shell::ShellType::PowerShell,
-                    shell_path: PathBuf::from(configured_executable),
-                };
-                let requirement = manager
-                    .create_exec_approval_requirement_for_shell(
-                        ExecApprovalRequest {
-                            command: &command,
-                            approval_policy: AskForApproval::Never,
-                            permission_profile: PermissionProfile::Disabled,
-                            environment_policy: None,
-                            sandbox_permissions: SandboxPermissions::UseDefault,
-                            prefix_rule: None,
-                            allow_prefix_rules: AllowPrefixRules::Honor,
-                        },
-                        &shell,
-                        DangerousCommandPlatform::Windows,
-                    )
-                    .await;
-                let actual = match requirement {
-                    ExecApprovalRequirement::Skip { .. } => Decision::Allow,
-                    ExecApprovalRequirement::NeedsApproval { .. } => Decision::Prompt,
-                    ExecApprovalRequirement::NeedsHumanApproval { .. } => Decision::PromptUser,
-                    ExecApprovalRequirement::Forbidden { .. } => Decision::Forbidden,
-                };
-                assert_eq!(
-                    actual, expected,
-                    "{command:?}; shell: {configured_executable}"
-                );
-            }
-        }
-    }
-}

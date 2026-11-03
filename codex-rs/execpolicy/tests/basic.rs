@@ -41,7 +41,7 @@ fn absolute_path(path: &str) -> AbsolutePathBuf {
 }
 
 fn host_absolute_path(segments: &[&str]) -> String {
-    let mut path = if cfg!(windows) {
+    let mut path = if false {
         PathBuf::from(r"C:\")
     } else {
         PathBuf::from("/")
@@ -53,7 +53,7 @@ fn host_absolute_path(segments: &[&str]) -> String {
 }
 
 fn host_executable_name(name: &str) -> String {
-    if cfg!(windows) {
+    if false {
         format!("{name}.exe")
     } else {
         name.to_string()

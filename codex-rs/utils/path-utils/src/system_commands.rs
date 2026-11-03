@@ -99,66 +99,11 @@ fn system_directories() -> Vec<PathBuf> {
             .into_iter()
             .flatten(),
     );
-    #[cfg(windows)]
-    let directories = installation_roots().into_iter().flat_map(|root| {
-        vec![
-            root.join("Git/cmd"),
-            root.join("Git/mingw64/bin"),
-            root.join("Git/usr/bin"),
-            root,
-        ]
-    });
     let roots = installation_roots();
     directories
         .filter_map(|directory| dunce::canonicalize(directory).ok())
         .filter(|directory| roots.iter().any(|root| directory.starts_with(root)))
         .collect()
-}
-
-#[cfg(windows)]
-fn installation_roots() -> Vec<PathBuf> {
-    use std::os::windows::ffi::OsStringExt;
-    use windows_sys::Win32::System::Com::CoTaskMemFree;
-    use windows_sys::Win32::UI::Shell::FOLDERID_ProgramFiles;
-    use windows_sys::Win32::UI::Shell::FOLDERID_ProgramFilesX86;
-    use windows_sys::Win32::UI::Shell::FOLDERID_System;
-    use windows_sys::Win32::UI::Shell::KF_FLAG_DEFAULT_PATH;
-    use windows_sys::Win32::UI::Shell::SHGetKnownFolderPath;
-
-    [
-        FOLDERID_ProgramFiles,
-        FOLDERID_ProgramFilesX86,
-        FOLDERID_System,
-    ]
-    .iter()
-    .filter_map(|id| {
-        let mut path = std::ptr::null_mut();
-        // SAFETY: the API writes a CoTaskMem-allocated, NUL-terminated UTF-16 path.
-        let result = unsafe {
-            SHGetKnownFolderPath(
-                id,
-                KF_FLAG_DEFAULT_PATH as u32,
-                std::ptr::null_mut(),
-                &mut path,
-            )
-        };
-        if result != 0 || path.is_null() {
-            return None;
-        }
-        // SAFETY: success guarantees the string; free it after copying.
-        let directory = unsafe {
-            let mut len = 0;
-            while *path.add(len) != 0 {
-                len += 1;
-            }
-            let directory =
-                PathBuf::from(OsString::from_wide(std::slice::from_raw_parts(path, len)));
-            CoTaskMemFree(path.cast());
-            directory
-        };
-        dunce::canonicalize(directory).ok()
-    })
-    .collect()
 }
 
 #[cfg(test)]

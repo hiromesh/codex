@@ -1406,12 +1406,12 @@ async fn check_v2_agent_reload(route: V2ReloadRoute) {
     }
 
     let mut sender_config = harness.config.clone();
-    sender_config.model_provider_id = "ollama".to_string();
+    sender_config.model_provider_id = "lmstudio".to_string();
     sender_config.model_provider = sender_config
         .model_providers
-        .get("ollama")
+        .get("lmstudio")
         .cloned()
-        .expect("ollama provider should be configured");
+        .expect("lmstudio provider should be configured");
 
     let mut parent_turn = parent_thread.session.new_default_turn().await;
     let residency_pin = match route {

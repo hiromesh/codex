@@ -12,7 +12,7 @@ fn exec_command_tool_matches_expected_spec() {
         exec_permission_approvals_enabled: false,
     });
 
-    let description = if cfg!(windows) {
+    let description = if false {
         format!(
             "Runs a command in a PTY, returning output or a session ID for ongoing interaction.{}",
             windows_shell_guidance_description()
@@ -21,7 +21,7 @@ fn exec_command_tool_matches_expected_spec() {
         "Runs a command in a PTY, returning output or a session ID for ongoing interaction."
             .to_string()
     };
-    let yield_time_ms_description = if cfg!(windows) {
+    let yield_time_ms_description = if false {
         "Maximum time to wait before returning a session ID for a still-running command. Commands that finish sooner return immediately. For ordinary commands, omit this parameter to use the 10000 ms default. Effective range on Windows is 10000-30000 ms."
     } else {
         "Wait before yielding output. Defaults to 10000 ms; effective range is 250-30000 ms."

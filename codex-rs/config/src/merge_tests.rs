@@ -366,7 +366,7 @@ fn higher_priority_credential_provider_replaces_overlapping_sources() {
             "VENDOR_TOKEN",
             false,
         ),
-        ("features", "vendor_token", "VENDOR_TOKEN", !cfg!(windows)),
+        ("features", "vendor_token", "VENDOR_TOKEN", !false),
     ] {
         let default_provider = format!(
             "[{feature_path}.network_proxy.credentials.default]\n\

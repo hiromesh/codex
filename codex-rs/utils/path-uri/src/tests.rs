@@ -1,11 +1,7 @@
 use super::*;
 use pretty_assertions::assert_eq;
-#[cfg(windows)]
-use std::ffi::OsString;
 #[cfg(unix)]
 use std::os::unix::ffi::OsStringExt;
-#[cfg(windows)]
-use std::os::windows::ffi::OsStringExt;
 use std::path::PathBuf;
 
 #[test]
@@ -60,9 +56,6 @@ fn file_uri_round_trips_an_absolute_path() {
 fn non_native_uri_io_conversion_is_invalid_input() {
     #[cfg(unix)]
     let uris = ["file://server/share/file.txt", "file:///C:/workspace"];
-    #[cfg(windows)]
-    let uris = ["file:///usr/local/file.txt"];
-
     for uri in uris {
         let uri = PathUri::parse(uri).expect("valid file URI");
         let error = uri
@@ -92,13 +85,6 @@ fn windows_uri_native_conversion_rejects_encoded_separators() {
         assert_eq!(uri.infer_path_convention(), Some(PathConvention::Windows));
         assert!(containment_path_segments(&uri.0, PathConvention::Windows).is_none());
 
-        #[cfg(windows)]
-        assert_eq!(
-            uri.to_abs_path()
-                .expect_err("encoded Windows separators must not reach native conversion")
-                .kind(),
-            io::ErrorKind::InvalidInput
-        );
     }
 }
 
@@ -342,53 +328,6 @@ fn relative_path_from_treats_fallback_uris_as_opaque() {
     assert_eq!(path.relative_path_from(&root), None);
 }
 
-#[cfg(windows)]
-#[test]
-fn file_uri_falls_back_for_windows_prefixes_without_a_uri_representation() {
-    for (native_path, expected_uri) in [
-        (r"\\.\COM1", "file:///%00/bad/path/XABcAC4AXABDAE8ATQAxAFwA"),
-        (
-            r"\\?\Volume{00000000-0000-0000-0000-000000000000}\file.rs",
-            "file:///%00/bad/path/XABcAD8AXABWAG8AbAB1AG0AZQB7ADAAMAAwADAAMAAwADAAMAAtADAAMAAwADAALQAwADAAMAAwAC0AMAAwADAAMAAtADAAMAAwADAAMAAwADAAMAAwADAAMAAwAH0AXABmAGkAbABlAC4AcgBzAA",
-        ),
-    ] {
-        let path = AbsolutePathBuf::from_absolute_path_checked(native_path)
-            .expect("Windows namespace path should be absolute");
-
-        let uri = PathUri::from_abs_path(&path);
-
-        assert_eq!(uri.to_string(), expected_uri, "converting {native_path}");
-        assert_eq!(
-            PathUri::parse(&uri.to_string())
-                .expect("fallback URI should parse")
-                .to_abs_path()
-                .expect("fallback URI should decode"),
-            path,
-            "round-tripping {native_path}"
-        );
-    }
-}
-
-#[cfg(windows)]
-#[test]
-fn file_uri_fallback_round_trips_non_unicode_windows_paths() {
-    let path_wide = r"C:\bad\"
-        .encode_utf16()
-        .chain([0xd800])
-        .collect::<Vec<_>>();
-    let path = PathBuf::from(OsString::from_wide(&path_wide));
-    let path = AbsolutePathBuf::from_absolute_path_checked(path).expect("absolute Windows path");
-
-    let uri = PathUri::from_abs_path(&path);
-    let reparsed = PathUri::parse(&uri.to_string()).expect("fallback URI should parse");
-
-    assert!(uri.to_string().starts_with(BAD_PATH_URI_PREFIX));
-    assert_eq!(
-        reparsed.to_abs_path().expect("fallback URI should decode"),
-        path
-    );
-}
-
 #[cfg(unix)]
 #[test]
 fn file_uri_falls_back_for_posix_paths_with_null_bytes() {
@@ -530,58 +469,6 @@ fn file_uri_round_trips_literal_percent_characters() {
     assert_eq!(uri.to_string(), "file:///tmp/100%25/file");
     assert_eq!(uri.encoded_path(), "/tmp/100%25/file");
     assert_eq!(uri.basename(), Some("file".to_string()));
-}
-
-#[cfg(windows)]
-#[test]
-fn host_windows_paths_round_trip_through_file_uris() {
-    for native in [
-        r"C:\temp\test-file.txt",
-        r"C:/temp/test-file.txt",
-        r"C:\temp/test-file.txt",
-        r"\\127.0.0.1\c$\temp\test-file.txt",
-        r"//127.0.0.1/c$/temp/test-file.txt",
-        r"\\LOCALHOST\c$\temp\test-file.txt",
-        r"//LOCALHOST/c$/temp/test-file.txt",
-        r"\\.\C:\temp\test-file.txt",
-        r"\\?\C:\temp\test-file.txt",
-        r"\\.\UNC\LOCALHOST\c$\temp\test-file.txt",
-        r"\\?\UNC\server\share\temp\test-file.txt",
-        r"\\.\COM1",
-        r"\\?\Volume{00000000-0000-0000-0000-000000000000}\file.txt",
-    ] {
-        let expected =
-            codex_utils_absolute_path::AbsolutePathBuf::from_absolute_path_checked(native)
-                .expect(native);
-        let uri = PathUri::from_host_native_path(native).expect(native);
-        let restored = PathUri::parse(&uri.to_string()).expect("parse URI");
-        assert_eq!(
-            restored.infer_path_convention(),
-            Some(PathConvention::Windows),
-            "{native}"
-        );
-        assert_eq!(restored.to_abs_path().expect(native), expected, "{native}");
-    }
-}
-
-#[test]
-#[cfg(windows)]
-fn file_uri_round_trips_windows_unc_paths() {
-    let path = AbsolutePathBuf::from_absolute_path_checked(r"\\server\share\src\main.rs")
-        .expect("absolute UNC path");
-    let uri = PathUri::from_abs_path(&path);
-
-    assert_eq!(uri.encoded_path(), "/share/src/main.rs");
-    assert_eq!(uri.to_abs_path().expect("UNC URI should convert"), path);
-
-    let localhost = AbsolutePathBuf::from_absolute_path_checked(r"\\localhost\share\src")
-        .expect("absolute localhost UNC path");
-    let uri = PathUri::from_abs_path(&localhost);
-    assert!(uri.to_string().starts_with(BAD_PATH_URI_PREFIX));
-    assert_eq!(
-        uri.to_abs_path().expect("opaque URI should convert"),
-        localhost
-    );
 }
 
 #[test]

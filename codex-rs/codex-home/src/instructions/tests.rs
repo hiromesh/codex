@@ -45,15 +45,6 @@ fn create_symlink_loop(path: &Path) {
     .expect("create symlink loop");
 }
 
-#[cfg(windows)]
-fn create_symlink_loop(path: &Path) {
-    std::os::windows::fs::symlink_file(
-        path.file_name().expect("override path should have a name"),
-        path,
-    )
-    .expect("create symlink loop");
-}
-
 #[tokio::test]
 async fn missing_files_return_no_instructions() {
     let home = TempDir::new().expect("temp dir");

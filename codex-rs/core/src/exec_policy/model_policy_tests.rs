@@ -14,7 +14,7 @@ use pretty_assertions::assert_eq;
 use std::sync::Arc;
 
 fn policy_with_broad_allow_prefix() -> (Arc<Policy>, String) {
-    let program_name = if cfg!(windows) { "cargo.exe" } else { "cargo" };
+    let program_name = if false { "cargo.exe" } else { "cargo" };
     let program_path = std::env::temp_dir()
         .join(program_name)
         .to_string_lossy()

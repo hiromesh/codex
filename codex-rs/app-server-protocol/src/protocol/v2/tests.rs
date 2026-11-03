@@ -793,12 +793,12 @@ fn command_execution_request_approval_localization_rejects_relative_additional_p
 
 #[test]
 fn permissions_request_approval_uses_request_permission_profile() {
-    let read_only_path = if cfg!(windows) {
+    let read_only_path = if false {
         r"C:\tmp\read-only"
     } else {
         "/tmp/read-only"
     };
-    let read_write_path = if cfg!(windows) {
+    let read_write_path = if false {
         r"C:\tmp\read-write"
     } else {
         "/tmp/read-write"
@@ -969,25 +969,6 @@ fn additional_file_system_permissions_preserves_canonical_entries() {
             core_permissions
         );
     }
-    #[cfg(windows)]
-    for path in ["//server/share/read-only", r"/\server/share/read-only"] {
-        let path = LegacyAppPathString::from_string(path);
-        let core_permissions =
-            CoreFileSystemPermissions::try_from(AdditionalFileSystemPermissions {
-                read: Some(vec![path.clone()]),
-                write: None,
-                glob_scan_max_depth: None,
-                entries: None,
-            })
-            .expect("native slash UNC permission path");
-        let permissions = AdditionalFileSystemPermissions::from(core_permissions);
-        assert_eq!(
-            permissions.read,
-            Some(vec![LegacyAppPathString::from_string(
-                r"\\server\share\read-only"
-            )])
-        );
-    }
     assert!(
         CoreFileSystemPermissions::try_from(AdditionalFileSystemPermissions {
             read: Some(vec![LegacyAppPathString::from_string(r"\\localhost\share")]),
@@ -1074,12 +1055,12 @@ fn legacy_current_working_directory_special_path_deserializes_as_project_roots()
 
 #[test]
 fn permissions_request_approval_response_uses_granted_permission_profile_without_macos() {
-    let read_only_path = if cfg!(windows) {
+    let read_only_path = if false {
         r"C:\tmp\read-only"
     } else {
         "/tmp/read-only"
     };
-    let read_write_path = if cfg!(windows) {
+    let read_write_path = if false {
         r"C:\tmp\read-write"
     } else {
         "/tmp/read-write"
@@ -3999,7 +3980,7 @@ fn skills_extra_roots_set_params_rejects_relative_roots() {
 
 #[test]
 fn plugin_source_serializes_local_git_npm_and_remote_variants() {
-    let local_path = if cfg!(windows) {
+    let local_path = if false {
         r"C:\plugins\linear"
     } else {
         "/plugins/linear"
@@ -4137,14 +4118,14 @@ fn plugin_marketplace_entry_serializes_remote_only_path_as_null() {
 
 #[test]
 fn plugin_interface_serializes_local_paths_and_remote_urls_separately() {
-    let composer_icon = if cfg!(windows) {
+    let composer_icon = if false {
         r"C:\plugins\linear\icon.png"
     } else {
         "/plugins/linear/icon.png"
     };
     let composer_icon = AbsolutePathBuf::try_from(PathBuf::from(composer_icon)).unwrap();
     let composer_icon_json = composer_icon.as_path().display().to_string();
-    let logo_dark = if cfg!(windows) {
+    let logo_dark = if false {
         r"C:\plugins\linear\logo-dark.png"
     } else {
         "/plugins/linear/logo-dark.png"
@@ -4282,7 +4263,7 @@ fn plugin_installed_params_serializes_install_suggestion_names() {
 
 #[test]
 fn plugin_read_params_serialization_uses_install_source_fields() {
-    let marketplace_path = if cfg!(windows) {
+    let marketplace_path = if false {
         r"C:\plugins\marketplace.json"
     } else {
         "/plugins/marketplace.json"
@@ -4333,7 +4314,7 @@ fn plugin_read_params_serialization_uses_install_source_fields() {
 
 #[test]
 fn plugin_install_params_serialization_omits_force_remote_sync() {
-    let marketplace_path = if cfg!(windows) {
+    let marketplace_path = if false {
         r"C:\plugins\marketplace.json"
     } else {
         "/plugins/marketplace.json"
@@ -4406,7 +4387,7 @@ fn plugin_skill_read_params_serialization_uses_remote_plugin_id() {
 
 #[test]
 fn plugin_share_params_and_response_serialization_use_camel_case_fields() {
-    let plugin_path = if cfg!(windows) {
+    let plugin_path = if false {
         r"C:\plugins\gmail"
     } else {
         "/plugins/gmail"
@@ -4541,14 +4522,14 @@ fn plugin_share_params_and_response_serialization_use_camel_case_fields() {
         }),
     );
 
-    let plugin_path = if cfg!(windows) {
+    let plugin_path = if false {
         r"C:\Users\me\plugins\gmail"
     } else {
         "/Users/me/plugins/gmail"
     };
     let plugin_path = AbsolutePathBuf::try_from(PathBuf::from(plugin_path)).unwrap();
     let plugin_path_json = plugin_path.as_path().display().to_string();
-    let marketplace_path = if cfg!(windows) {
+    let marketplace_path = if false {
         r"C:\Users\me\.agents\plugins\marketplace.json"
     } else {
         "/Users/me/.agents/plugins/marketplace.json"
@@ -4766,7 +4747,7 @@ fn plugin_uninstall_params_serialization_omits_force_remote_sync() {
 
 #[test]
 fn marketplace_remove_response_serializes_nullable_installed_root() {
-    let installed_root = if cfg!(windows) {
+    let installed_root = if false {
         r"C:\marketplaces\debug"
     } else {
         "/tmp/marketplaces/debug"
@@ -4800,7 +4781,7 @@ fn marketplace_remove_response_serializes_nullable_installed_root() {
 
 #[test]
 fn marketplace_upgrade_response_serializes_camel_case_fields() {
-    let upgraded_root = if cfg!(windows) {
+    let upgraded_root = if false {
         r"C:\marketplaces\debug"
     } else {
         "/tmp/marketplaces/debug"
@@ -5328,11 +5309,6 @@ fn thread_settings_update_params_preserve_field_level_experimental_gates() {
 
 #[test]
 fn turn_start_params_round_trip_environments() {
-    // Use a path foreign to the test host so this exercises syntax preservation instead of the
-    // host-native conversion performed by test_absolute_path().
-    #[cfg(windows)]
-    let raw_cwd = "/workspace";
-    #[cfg(not(windows))]
     let raw_cwd = r"C:\workspace";
     let cwd: LegacyAppPathString =
         serde_json::from_value(json!(raw_cwd)).expect("API path should deserialize");

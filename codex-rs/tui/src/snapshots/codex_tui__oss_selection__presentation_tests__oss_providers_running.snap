@@ -6,9 +6,8 @@ expression: terminal.backend()
   Select an open-source provider
   Choose a local AI server for this session.
 
-  1. LM Studio · ● Running
-› 2. Ollama · ● Running                                                         
+› 1. LM Studio · ● Running                                                      
 
-  Local Ollama server (Responses API, default port 11434)
+  Local LM Studio server (default port 1234)
 
   ↑/↓ choose · enter select · esc LM Studio · ⌃c exit

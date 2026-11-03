@@ -336,17 +336,6 @@ fn viewer_reuses_path_and_refreshes_static_document() {
             original_viewer_metadata.ino()
         );
     }
-    #[cfg(windows)]
-    {
-        use std::os::windows::fs::MetadataExt;
-        assert_eq!(
-            fs::metadata(&viewer_path)
-                .expect("read reused viewer metadata")
-                .creation_time(),
-            original_viewer_metadata.creation_time()
-        );
-    }
-
     fs::write(context.thread_dir.join("chart.html"), "<div>second</div>").expect("update fragment");
     let second_url = context.link_for("chart.html").expect("second viewer link");
 

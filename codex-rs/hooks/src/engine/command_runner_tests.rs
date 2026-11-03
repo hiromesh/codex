@@ -1,7 +1,5 @@
 use std::collections::HashMap;
 use std::ffi::OsString;
-#[cfg(windows)]
-use std::fs;
 #[cfg(unix)]
 use std::os::unix::ffi::OsStringExt;
 use std::path::Path;
@@ -199,66 +197,6 @@ async fn hook_shell_startup_does_not_stop_on_controlling_terminal() {
     assert_eq!(result.error, None);
 }
 
-#[cfg(windows)]
-#[tokio::test]
-async fn cmd_shell_runs_quoted_hook_command_path() {
-    let temp = tempdir().expect("create temp dir");
-    let hook_dir = temp.path().join("hook with spaces");
-    fs::create_dir(&hook_dir).expect("create hook dir");
-    let hook_path = hook_dir.join("hook.cmd");
-    fs::write(
-        &hook_path,
-        "@echo off\r\nif not \"%~1\"==\"notify\" exit /B 7\r\necho hook-ran\r\n",
-    )
-    .expect("write hook command");
-    let source_path =
-        AbsolutePathBuf::try_from(hook_path.clone()).expect("absolute hook command path");
-    let command = format!(r#""{}" notify"#, hook_path.display());
-    let env = HashMap::new();
-    let handler = ConfiguredHandler {
-        builtin: false,
-        plugin_trust: None,
-        event_name: HookEventName::SessionStart,
-        matcher: None,
-        timeout_sec: 10,
-        status_message: None,
-        additional_context_limit: Default::default(),
-        source_path: source_path.into(),
-        source: HookSource::User,
-        display_order: 0,
-        kind: ConfiguredHandlerKind::Command {
-            command: command.clone(),
-            r#async: false,
-            env: env.clone(),
-        },
-    };
-    let shells = [
-        CommandShell {
-            program: String::new(),
-            args: Vec::new(),
-        },
-        CommandShell {
-            program: std::env::var("COMSPEC").unwrap_or_else(|_| "cmd.exe".to_string()),
-            args: vec!["/c".to_string()],
-        },
-    ];
-
-    for shell in shells {
-        let (result_sender, _result_receiver) = async_channel::unbounded();
-        let runtime = CommandHookRuntime::new(
-            shell,
-            Arc::new(std::env::vars_os().collect()),
-            ThreadId::new(),
-            result_sender,
-        );
-        let result = run_command(&runtime, &handler, &command, &env, "{}", temp.path()).await;
-
-        assert_eq!(result.exit_code, Some(0), "stderr: {}", result.stderr);
-        assert_eq!(result.stdout.trim(), "hook-ran");
-        assert!(result.error.is_none());
-    }
-}
-
 #[tokio::test]
 async fn fast_exiting_hook_preserves_stdout_when_stdin_is_not_consumed() {
     let temp = tempdir().expect("create temp dir");
@@ -318,7 +256,7 @@ time.sleep(30)
     let (runtime, _result_receiver) = runtime();
 
     // Keep user shell startup files out of the pipe I/O timeout test.
-    let runtime = runtime.reconfigured(if cfg!(windows) {
+    let runtime = runtime.reconfigured(if false {
         CommandShell {
             program: "cmd.exe".to_string(),
             args: vec!["/D".to_string(), "/C".to_string()],
@@ -347,7 +285,7 @@ async fn command_hook_does_not_expose_configured_noise_auth_token() {
     let temp = tempdir().expect("create temp dir");
     let source_path = AbsolutePathBuf::try_from(temp.path().join("hooks.json"))
         .expect("absolute hook configuration path");
-    let command = if cfg!(windows) { "set" } else { "env" };
+    let command = if false { "set" } else { "env" };
     let env = HashMap::from([
         (
             CODEX_EXEC_SERVER_NOISE_AUTH_TOKEN_ENV_VAR.to_ascii_lowercase(),
@@ -414,17 +352,10 @@ async fn build_command_replays_snapshot_before_hook_overrides_and_scrubbing() {
             "configured-noise-token".to_string(),
         ),
     ]);
-    #[cfg(not(windows))]
     let (program, args, command_line) = (
         "/bin/sh",
         vec!["-c".to_string()],
         "printf '%s\\n' \"$CODEX_HOOK_SNAPSHOT\" \"$CODEX_HOOK_OVERRIDE\" \"$CODEX_HOOK_SAFE_ENV\" \"${CODEX_EXEC_SERVER_NOISE_AUTH_TOKEN-absent}\" \"$CODEX_HOOK_NON_UNICODE\"",
-    );
-    #[cfg(windows)]
-    let (program, args, command_line) = (
-        "cmd.exe",
-        vec!["/D".to_string(), "/C".to_string()],
-        "echo %CODEX_HOOK_SNAPSHOT%&echo %CODEX_HOOK_OVERRIDE%&echo %CODEX_HOOK_SAFE_ENV%&if defined CODEX_EXEC_SERVER_NOISE_AUTH_TOKEN (echo leaked) else (echo absent)",
     );
     let command = build_command(
         &CommandShell {
@@ -449,18 +380,10 @@ async fn build_command_replays_snapshot_before_hook_overrides_and_scrubbing() {
         output.stdout,
         b"captured\nconfigured\nvisible\nabsent\nv\xff\n"
     );
-    #[cfg(windows)]
-    assert_eq!(
-        output.stdout,
-        b"captured\r\nconfigured\r\nvisible\r\nabsent\r\n"
-    );
 }
 
 #[test]
 fn fallback_shell_uses_snapshot() {
-    #[cfg(windows)]
-    let (name, program) = ("comspec", r"C:\captured\cmd.exe");
-    #[cfg(not(windows))]
     let (name, program) = ("SHELL", "/captured/shell");
     assert_eq!(
         default_shell_program(&[(OsString::from(name), OsString::from(program))]),

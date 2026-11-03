@@ -126,7 +126,7 @@ async fn interrupt_aborts_server_initiated_mcp_guardian_review() -> Result<()> {
     let server = responses::start_mock_server().await;
     let mcp_servers = serde_json::from_value(json!({
         "elicitation": {
-            "command": if cfg!(windows) { "python" } else { "python3" },
+            "command": if false { "python" } else { "python3" },
             "args": ["-u", "-c", ELICITATION_SERVER],
             "default_tools_approval_mode": "approve",
         }
@@ -273,7 +273,7 @@ async fn server_initiated_mcp_elicitation_can_require_synchronous_auto_review(
     let server = responses::start_mock_server().await;
     let mcp_servers = serde_json::from_value(json!({
         "elicitation": {
-            "command": if cfg!(windows) { "python" } else { "python3" },
+            "command": if false { "python" } else { "python3" },
             "args": ["-u", "-c", ELICITATION_SERVER, serde_json::to_string(&meta)?],
             "default_tools_approval_mode": "approve",
         }
@@ -482,7 +482,7 @@ async fn node_elicitations_attribute_independent_reviews_without_changing_action
     });
     let server = responses::start_mock_server().await;
     let fixture_config = json!({
-        "command": if cfg!(windows) { "python" } else { "python3" },
+        "command": if false { "python" } else { "python3" },
         "args": ["-u", "-c", ELICITATION_SERVER, serde_json::to_string(&meta)?,
                  if browser { "browser" } else if call_id_source == CallIdSource::Host { "forward" } else { "omit" }],
         "default_tools_approval_mode": "approve",
@@ -758,7 +758,7 @@ async fn strict_browser_nested_review_requires_live_browser_identity(
         meta["_codex_apps"] = json!({"call_id": call_id});
     }
     let fixture_config = serde_json::from_value(json!({
-        "command": if cfg!(windows) { "python" } else { "python3" },
+        "command": if false { "python" } else { "python3" },
         "args": ["-u", "-c", ELICITATION_SERVER, "{}", "browser",
                  json!({"_meta": meta}).to_string(), registered_connector_id],
         "default_tools_approval_mode": "approve",
@@ -843,7 +843,7 @@ async fn user_review_preserves_unsupported_guardian_elicitations(mode: &str) -> 
     };
     let mcp_servers = serde_json::from_value(json!({
         "elicitation": {
-            "command": if cfg!(windows) { "python" } else { "python3" },
+            "command": if false { "python" } else { "python3" },
             "args": ["-u", "-c", ELICITATION_SERVER, "{}", "", params.to_string()],
             "default_tools_approval_mode": "approve",
         }

@@ -259,23 +259,6 @@ fn editor_directory_uses_next_protected_candidate_after_creation_error() {
 }
 
 #[test]
-#[cfg(windows)]
-fn editor_directory_rejects_windows_temporary_directory_outside_tmpdir_policy_root() {
-    let paths = EditorPaths::new();
-    let policy = FileSystemSandboxPolicy::workspace_write(
-        &[],
-        /*exclude_tmpdir_env_var*/ false,
-        /*exclude_slash_tmp*/ true,
-    );
-
-    assert!(
-        editor_directory(&[&paths.codex_home], &policy, &paths.cwd).is_err(),
-        "effective Windows temporary directories must not contain editor buffers"
-    );
-    assert!(!paths.codex_home.join("editor").exists());
-}
-
-#[test]
 fn editor_directory_allows_full_disk_write_policies() {
     let paths = EditorPaths::new();
 

@@ -1,8 +1,5 @@
 mod pid;
 pub(crate) mod stderr_log;
-#[cfg(windows)]
-pub(crate) mod windows;
-
 use std::collections::BTreeMap;
 use std::path::Path;
 use std::path::PathBuf;

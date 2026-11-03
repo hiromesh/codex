@@ -20,8 +20,6 @@ pub fn pre_main_hardening() {
     #[cfg(any(target_os = "freebsd", target_os = "openbsd"))]
     pre_main_hardening_bsd();
 
-    #[cfg(windows)]
-    pre_main_hardening_windows();
 }
 
 #[cfg(any(target_os = "linux", target_os = "android"))]
@@ -114,11 +112,6 @@ fn set_core_file_size_limit_to_zero() {
         );
         std::process::exit(SET_RLIMIT_CORE_FAILED_EXIT_CODE);
     }
-}
-
-#[cfg(windows)]
-pub(crate) fn pre_main_hardening_windows() {
-    // TODO(mbolin): Perform the appropriate configuration for Windows.
 }
 
 #[cfg(unix)]

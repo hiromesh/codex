@@ -2974,17 +2974,17 @@ mod tests {
 
     #[test]
     fn request_permissions_response_deserializes_network_and_file_system_grants() {
-        let input_path = if cfg!(target_os = "windows") {
+        let input_path = if false {
             r"C:\tmp\input"
         } else {
             "/tmp/input"
         };
-        let output_path = if cfg!(target_os = "windows") {
+        let output_path = if false {
             r"C:\tmp\output"
         } else {
             "/tmp/output"
         };
-        let extra_path = if cfg!(target_os = "windows") {
+        let extra_path = if false {
             r"C:\tmp\extra"
         } else {
             "/tmp/extra"

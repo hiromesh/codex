@@ -88,7 +88,6 @@ impl Drop for BlockingStdinPipe {
     }
 }
 
-#[cfg(not(target_os = "windows"))]
 fn assert_posix_snapshot_sections(snapshot: &str) {
     assert!(snapshot.contains("# Snapshot file"));
     assert!(snapshot.contains("aliases "));
@@ -100,7 +99,6 @@ fn assert_posix_snapshot_sections(snapshot: &str) {
     assert!(snapshot.contains("setopts "));
 }
 
-#[cfg(not(windows))]
 #[test]
 fn preserved_provider_context_respects_unix_environment_casing() {
     let mut env = HashMap::from([
@@ -119,32 +117,6 @@ fn preserved_provider_context_respects_unix_environment_casing() {
         env,
         HashMap::from([("gh_host".to_string(), "custom.example.com".to_string())])
     );
-}
-
-#[cfg(windows)]
-#[test]
-fn inherited_provider_context_matches_windows_environment_casing() {
-    let mut env = HashMap::new();
-    let inherited = HashMap::from([("gh_host".to_string(), "github.example.com".to_string())]);
-
-    replace_provider_context_with_trusted(
-        &mut env,
-        &inherited,
-        std::iter::once("GH_HOST".to_string()),
-        &[],
-    );
-
-    assert_eq!(
-        env,
-        HashMap::from([("GH_HOST".to_string(), "github.example.com".to_string())])
-    );
-
-    insert_env_value(&mut env, "gh_host", "github.alternate.example");
-    assert_eq!(
-        env_value(&env, "GH_HOST").map(String::as_str),
-        Some("github.alternate.example")
-    );
-    assert_eq!(env.len(), 1);
 }
 
 async fn get_snapshot(shell_type: ShellType) -> Result<String> {
@@ -1895,17 +1867,6 @@ async fn linux_bash_snapshot_includes_sections() -> Result<()> {
 async fn linux_sh_snapshot_includes_sections() -> Result<()> {
     let snapshot = get_snapshot(ShellType::Sh).await?;
     assert_posix_snapshot_sections(&snapshot);
-    Ok(())
-}
-
-#[cfg(target_os = "windows")]
-#[ignore]
-#[tokio::test]
-async fn windows_powershell_snapshot_includes_sections() -> Result<()> {
-    let snapshot = get_snapshot(ShellType::PowerShell).await?;
-    assert!(snapshot.contains("# Snapshot file"));
-    assert!(snapshot.contains("aliases "));
-    assert!(snapshot.contains("exports "));
     Ok(())
 }
 

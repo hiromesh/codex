@@ -3,8 +3,6 @@ use std::os::unix::process::ExitStatusExt;
 
 use std::collections::HashMap;
 use std::io;
-#[cfg(target_os = "windows")]
-use std::path::Path;
 use std::path::PathBuf;
 use std::process::ExitStatus;
 use std::time::Duration;
@@ -183,19 +181,6 @@ impl ExecExpiration {
                     _ = cancellation.cancelled() => ExecExpirationOutcome::Cancelled,
                     _ = tokio::time::sleep(timeout) => ExecExpirationOutcome::TimedOut,
                 }
-            }
-        }
-    }
-
-    /// If ExecExpiration is a timeout, returns the timeout in milliseconds.
-    #[cfg(target_os = "windows")]
-    pub(crate) fn timeout_ms(&self) -> Option<u64> {
-        match self {
-            ExecExpiration::Timeout(duration) => Some(duration.as_millis() as u64),
-            ExecExpiration::DefaultTimeout => Some(DEFAULT_EXEC_COMMAND_TIMEOUT_MS),
-            ExecExpiration::Cancellation(_) => None,
-            ExecExpiration::TimeoutOrCancellation { timeout, .. } => {
-                Some(timeout.as_millis() as u64)
             }
         }
     }
@@ -919,19 +904,6 @@ fn synthetic_exit_status(code: i32) -> ExitStatus {
 fn synthetic_exit_status_for_code(code: i32) -> ExitStatus {
     use std::os::unix::process::ExitStatusExt;
     std::process::ExitStatus::from_raw(code << 8)
-}
-
-#[cfg(windows)]
-fn synthetic_exit_status(code: i32) -> ExitStatus {
-    use std::os::windows::process::ExitStatusExt;
-    // On Windows the raw status is a u32. Use a direct cast to avoid
-    // panicking on negative i32 values produced by prior narrowing casts.
-    std::process::ExitStatus::from_raw(code as u32)
-}
-
-#[cfg(windows)]
-fn synthetic_exit_status_for_code(code: i32) -> ExitStatus {
-    synthetic_exit_status(code)
 }
 
 #[cfg(test)]

@@ -174,7 +174,7 @@ async fn turn_input_contributors_receive_foreign_environment_cwds() -> Result<()
     let test = builder.build_with_auto_env(&server).await?;
     let mut selection = test.executor_environment().selection().clone();
     let environment_id = selection.environment_id.clone();
-    let cwd = PathUri::parse(if cfg!(windows) {
+    let cwd = PathUri::parse(if false {
         "file:///workspace"
     } else {
         "file:///C:/workspace"

@@ -62,7 +62,7 @@ where
 }
 
 pub fn normalize_for_native_workdir(path: impl AsRef<Path>) -> PathBuf {
-    normalize_for_native_workdir_with_flag(path.as_ref().to_path_buf(), cfg!(windows))
+    normalize_for_native_workdir_with_flag(path.as_ref().to_path_buf(), false)
 }
 
 pub struct SymlinkWritePaths {

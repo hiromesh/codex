@@ -132,7 +132,7 @@ async fn session_and_settings_sync_server_provider_id() {
 
     let first_id = ThreadId::new();
     let mut first = configured_thread_session(first_id);
-    first.model_provider_id = "server-ollama".to_string();
+    first.model_provider_id = "server-lmstudio".to_string();
     chat.status_account_display = Some(StatusAccountDisplay::ChatGpt {
         email: None,
         plan: None,
@@ -150,12 +150,12 @@ async fn session_and_settings_sync_server_provider_id() {
     chat.handle_thread_session(first.clone());
     assert!(chat.daybreak_account_eligible());
     let displayed = status(&mut chat);
-    assert!(displayed.contains("Model provider:") && displayed.contains("server-ollama"));
+    assert!(displayed.contains("Model provider:") && displayed.contains("server-lmstudio"));
     assert!(!displayed.contains("local-provider.example"));
     assert!(!displayed.contains("ChatGPT workspace:"));
     assert_eq!(
         status_line_text(&chat).as_deref(),
-        Some("provider: server-ollama")
+        Some("provider: server-lmstudio")
     );
 
     let mut other = configured_thread_session(ThreadId::new());
@@ -164,10 +164,10 @@ async fn session_and_settings_sync_server_provider_id() {
     assert!(!chat.daybreak_account_eligible());
     let displayed = status(&mut chat);
     assert!(displayed.contains("server-bedrock"));
-    assert!(!displayed.contains("server-ollama"));
+    assert!(!displayed.contains("server-lmstudio"));
 
     chat.handle_thread_session_quiet(first);
-    assert_eq!(chat.config.model_provider_id, "server-ollama");
+    assert_eq!(chat.config.model_provider_id, "server-lmstudio");
     assert!(chat.daybreak_account_eligible());
     chat.bottom_pane
         .set_composer_text("/daybreak".to_string(), Vec::new(), Vec::new());
@@ -199,7 +199,7 @@ async fn session_and_settings_sync_server_provider_id() {
     assert_chatwidget_snapshot!("daybreak_hidden_after_provider_settings_change", popup);
 
     let mut restored = thread_settings_for_test("gpt-5.4", first_id);
-    restored.thread_settings.model_provider = "server-ollama".to_string();
+    restored.thread_settings.model_provider = "server-lmstudio".to_string();
     chat.handle_server_notification(
         ServerNotification::ThreadSettingsUpdated(restored),
         /*replay_kind*/ None,

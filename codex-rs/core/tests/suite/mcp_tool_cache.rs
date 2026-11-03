@@ -550,7 +550,7 @@ async fn cached_http_mcp_starts_lazily_for_subagents(
         else {
             unreachable!("expected HTTP transport");
         };
-        *http_headers_helper = Some(if cfg!(windows) {
+        *http_headers_helper = Some(if false {
             r#"echo {"X-Cache-Test":"helper"}"#.to_string()
         } else {
             r#"printf '{"X-Cache-Test":"helper"}'"#.to_string()

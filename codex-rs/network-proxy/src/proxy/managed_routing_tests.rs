@@ -79,18 +79,6 @@ async fn dedicated_listeners_preserve_http_and_socks_policy_without_restricted_t
             assert!(!addresses.contains(&addr));
             addresses.push(addr);
         }
-        #[cfg(target_os = "windows")]
-        {
-            assert_eq!(
-                proxy.network_proxy_restricting_sid(/*environment_id*/ None),
-                None
-            );
-            assert!(
-                !prepared
-                    .env
-                    .contains_key(WINDOWS_SANDBOX_PROXY_PORTS_ENV_KEY)
-            );
-        }
         tokio::time::timeout(Duration::from_secs(5), async {
             let mut stream = TcpStream::connect(http).await?;
             stream.write_all(format!(

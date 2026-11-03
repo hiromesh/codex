@@ -2077,10 +2077,6 @@ async fn global_instruction_warnings_reappear_only_after_recovery() -> Result<()
         {
             std::os::unix::fs::symlink(GLOBAL_AGENTS_OVERRIDE_FILENAME, &override_path)
         }
-        #[cfg(windows)]
-        {
-            std::os::windows::fs::symlink_file(GLOBAL_AGENTS_OVERRIDE_FILENAME, &override_path)
-        }
     };
     create_unreadable_override()?;
     let read_error = std::fs::read(&override_path).expect_err("symlink loop must be unreadable");

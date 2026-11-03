@@ -34,7 +34,6 @@ pub static CODEX_ALIASES_TEMP_DIR: Option<TestBinaryDispatchGuard> = {
 };
 
 mod abort_lifecycle;
-#[cfg(not(target_os = "windows"))]
 mod abort_tasks;
 mod additional_context;
 #[path = "agent_control_tests.rs"]
@@ -47,7 +46,6 @@ mod apply_patch_cli;
 mod apply_patch_serialization;
 #[cfg(target_os = "macos")]
 mod apply_patch_system_aliases;
-#[cfg(not(target_os = "windows"))]
 mod approvals;
 mod audio_truncation;
 mod auth_recovery_policy;
@@ -78,7 +76,6 @@ mod direct_tool_metadata;
 mod dynamic_tool_cancellation;
 mod exec;
 mod exec_policy;
-#[cfg(not(target_os = "windows"))]
 mod extension_sandbox;
 mod external_auth;
 mod fork_thread;
@@ -96,33 +93,24 @@ mod canonical_plugin_connectors;
 mod critical_path_runtime;
 mod gateway_auth;
 mod guardian_connector_trust;
-#[cfg(not(target_os = "windows"))]
 mod guardian_context_budget;
 #[path = "guardian_cyber_access_program_tests.rs"]
 mod guardian_cyber_access_program;
 mod guardian_history;
 mod guardian_mcp_elicitation;
-#[cfg(not(target_os = "windows"))]
 #[path = "guardian_persistence_tests.rs"]
 mod guardian_persistence;
 mod guardian_retained_context;
 mod guardian_retry;
-#[cfg(not(target_os = "windows"))]
 mod guardian_review;
-#[cfg(not(target_os = "windows"))]
 mod guardian_review_cancellation;
-#[cfg(not(target_os = "windows"))]
 mod guardian_subagent_authorization;
-#[cfg(not(target_os = "windows"))]
 mod hooks;
-#[cfg(not(target_os = "windows"))]
 mod hooks_executor;
-#[cfg(not(target_os = "windows"))]
 mod hooks_mcp;
 mod hooks_plugin_policy_refresh;
 mod image_rollout;
 mod injected_models_cache;
-#[cfg(not(target_os = "windows"))]
 mod interrupt_hooks;
 mod items;
 mod json_result;
@@ -182,9 +170,7 @@ mod reasoning_effort_override;
 mod remote_env;
 mod remote_models;
 mod request_compression;
-#[cfg(not(target_os = "windows"))]
 mod request_permissions;
-#[cfg(not(target_os = "windows"))]
 mod request_permissions_tool;
 mod request_plugin_install;
 mod request_user_input;

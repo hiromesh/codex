@@ -42,13 +42,6 @@ printf '%s\n' "$GOOGLE_APPLICATION_CREDENTIALS" >> credential-log
 printf '%s\n' setup-token
 "#,
     )?;
-    #[cfg(windows)]
-    let script = home.join("gcloud.cmd");
-    #[cfg(windows)]
-    std::fs::write(
-        &script,
-        "@echo off\r\nif exist fail exit /b 1\r\nsetlocal EnableDelayedExpansion\r\necho(!GOOGLE_APPLICATION_CREDENTIALS!>>credential-log\r\nendlocal\r\necho setup-token\r\n",
-    )?;
     Ok(script)
 }
 

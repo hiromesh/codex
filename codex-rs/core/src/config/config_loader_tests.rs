@@ -2161,7 +2161,7 @@ extends = "first"
             .loader_overrides(LoaderOverrides::without_managed_config_for_tests())
             .build()
             .await?;
-        let expected_enabled = !(cfg!(windows) && ambiguous);
+        let expected_enabled = !(false && ambiguous);
         if credential_masking && !expected_enabled {
             insta::assert_snapshot!(config.startup_warnings.join("\n"), @r"Credential masking is inactive because shell environment overrides contain conflicting case-insensitive provider keys. Commands will receive unmasked credentials. Remove the conflicting entries from `shell_environment_policy.set`.");
         } else {

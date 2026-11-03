@@ -173,7 +173,7 @@ async fn install_role_with_model_override(turn: &mut TurnContext) -> String {
     tokio::fs::write(
         &role_config_path,
         r#"model = "gpt-5-role-override"
-model_provider = "ollama"
+model_provider = "lmstudio"
 model_reasoning_effort = "minimal"
 "#,
     )
@@ -387,8 +387,8 @@ async fn spawn_agent_uses_explorer_role_and_preserves_approval_policy() {
     set_agent_control(&mut session, manager.agent_control());
     let mut config = (*turn.config).clone();
     let provider_info =
-        built_in_model_providers(/* openai_base_url */ /*openai_base_url*/ None)["ollama"].clone();
-    config.model_provider_id = "ollama".to_string();
+        built_in_model_providers(/* openai_base_url */ /*openai_base_url*/ None)["lmstudio"].clone();
+    config.model_provider_id = "lmstudio".to_string();
     config.model_provider = provider_info.clone();
     config
         .permissions
@@ -428,7 +428,7 @@ async fn spawn_agent_uses_explorer_role_and_preserves_approval_policy() {
         .config_snapshot()
         .await;
     assert_eq!(snapshot.approval_policy, AskForApproval::OnRequest);
-    assert_eq!(snapshot.model_provider_id, "ollama");
+    assert_eq!(snapshot.model_provider_id, "lmstudio");
 }
 
 #[tokio::test]
@@ -2299,7 +2299,7 @@ async fn spawn_agent_reapplies_runtime_sandbox_after_role_config() {
             },
             // TODO(anp): Configure this fixture with the elevated Windows backend so it can
             // enforce denied reads while reapplying the owner's restrictive policy.
-            access: if cfg!(windows) {
+            access: if false {
                 FileSystemAccessMode::Read
             } else {
                 FileSystemAccessMode::Deny

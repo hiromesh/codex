@@ -3816,7 +3816,7 @@ model_reasoning_effort = "low"
     let contents = fs::read_to_string(&host_config)?;
     fs::write(
         host_config,
-        format!("model_provider = \"ollama\"\n{contents}"),
+        format!("model_provider = \"lmstudio\"\n{contents}"),
     )?;
     let original = app.chat_widget.thread_id().expect("original thread");
     server.thread_inject_items(original, vec![serde_json::from_value(serde_json::json!({
@@ -4055,9 +4055,9 @@ terminal_visualization_instructions = true
                 params[0]["modelProvider"].as_str(),
                 params[0]["config"]["model_reasoning_effort"].as_str(),
             ],
-            [Some("gpt-5.2"), fork.then_some("ollama"), Some("high")]
+            [Some("gpt-5.2"), fork.then_some("lmstudio"), Some("high")]
         );
-        assert_eq!(app.config.model_provider_id, "ollama");
+        assert_eq!(app.config.model_provider_id, "lmstudio");
         // Injection flushes and materializes a new thread's otherwise lazy rollout.
         server.thread_inject_items(replacement, vec![serde_json::from_value(serde_json::json!({
             "type": "message", "role": "assistant", "content": [{"type": "output_text", "text": format!("replacement persistence probe {mode:?}")}]

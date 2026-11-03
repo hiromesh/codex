@@ -285,8 +285,8 @@ print({hook_output:?})
     );
 
     std::fs::write(&script_path, script).expect("write MCP permission hook script");
-    let python = if cfg!(windows) { "python" } else { "python3" };
-    let script_path_arg = if cfg!(windows) {
+    let python = if false { "python" } else { "python3" };
+    let script_path_arg = if false {
         script_path.display().to_string()
     } else {
         format!(
@@ -326,8 +326,8 @@ print({hook_output:?})
     let hooks = session.hooks().reconfigured(HooksConfig {
         feature_enabled: true,
         config_layer_stack: Some(trusted_config_layer_stack),
-        shell_program: (!cfg!(windows)).then_some("/bin/sh".to_string()),
-        shell_args: if cfg!(windows) {
+        shell_program: (!false).then_some("/bin/sh".to_string()),
+        shell_args: if false {
             Vec::new()
         } else {
             vec!["-c".to_string()]

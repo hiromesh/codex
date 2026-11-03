@@ -3,8 +3,6 @@ use std::io;
 use std::path::Path;
 use std::path::PathBuf;
 
-#[cfg(windows)]
-use std::os::windows::fs::MetadataExt;
 
 /// The filesystem boundary within which migration detection or import runs.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -95,9 +93,6 @@ pub(super) fn is_redirected_destination(path: &Path) -> io::Result<bool> {
     };
 
     let is_redirected = metadata.file_type().is_symlink();
-    #[cfg(windows)]
-    let is_redirected = is_redirected || metadata.file_attributes() & 0x0400 != 0;
-
     Ok(is_redirected)
 }
 

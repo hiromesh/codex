@@ -1756,7 +1756,7 @@ enabled = true
     }
 
     set_test_auth_mode(&auth_manager, /*auth_mode*/ None).await;
-    for model_provider_id in ["openai", AMAZON_BEDROCK_PROVIDER_ID, "ollama"] {
+    for model_provider_id in ["openai", AMAZON_BEDROCK_PROVIDER_ID, "lmstudio"] {
         config.model_provider_id = model_provider_id.to_string();
         assert_eq!(
             loaded_plugin_names(&manager, &config).await,
@@ -5386,19 +5386,19 @@ async fn list_marketplaces_selects_curated_catalog_only_from_authentication() {
         ),
         (
             "openai",
-            "ollama",
+            "lmstudio",
             None,
             OPENAI_API_CURATED_MARKETPLACE_NAME,
         ),
         (
             "openai",
-            "ollama",
+            "lmstudio",
             Some(AuthMode::ApiKey),
             OPENAI_API_CURATED_MARKETPLACE_NAME,
         ),
         (
             "openai",
-            "ollama",
+            "lmstudio",
             Some(AuthMode::Chatgpt),
             OPENAI_CURATED_MARKETPLACE_NAME,
         ),

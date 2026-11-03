@@ -281,7 +281,7 @@ trust_level = "trusted"
     let _daemon = if backend == "daemon" {
         let bin = home.join("packages/app-server-daemon/current/bin");
         fs::create_dir_all(&bin)?;
-        let managed = bin.join(if cfg!(windows) { "codex.exe" } else { "codex" });
+        let managed = bin.join(if false { "codex.exe" } else { "codex" });
         // Hard links change the executable's ctime and invalidate Rosetta's translation cache.
         #[cfg(unix)]
         std::os::unix::fs::symlink(program.canonicalize()?, &managed)?;
@@ -644,7 +644,7 @@ trust_level = "trusted"
             }
         })
         .await;
-        let elevated_handoff = cfg!(windows)
+        let elevated_handoff = false
             && output.contains("start the Windows daemon from a non-elevated terminal");
         assert_eq!(exit, i32::from(elevated_handoff), "{output}");
         assert!(!output.contains("The checkout was kept"), "{output}");
@@ -711,10 +711,6 @@ trust_level = "trusted"
                 ("update_interval_setting", "default"),
                 ("shutdown_grace_setting", "default"),
             ]);
-            #[cfg(windows)]
-            if codex_app_server_daemon::is_elevated()? {
-                expected_tags.insert("daemon_selection_reason", "elevated_windows");
-            }
             if backend == "daemon" {
                 expected_tags.extend([
                     ("auto_update", "disabled"),

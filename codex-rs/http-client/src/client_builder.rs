@@ -44,8 +44,6 @@ pub struct HttpClientBuilder {
     pub(crate) request_logging: RequestLogging,
     tls_backend: TlsBackend,
     pub(crate) tls: HttpClientTlsConfig,
-    #[cfg(windows)]
-    windows_proxy_pipe_path: Option<std::path::PathBuf>,
 }
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
@@ -189,16 +187,6 @@ impl HttpClientBuilder {
             .into_client());
         }
         let route = http_client_factory.resolve_proxy_route(request_url);
-        #[cfg(windows)]
-        if crate::windows_proxy_auth::can_authenticate_route(request_url, &route) {
-            return Ok(crate::RouteAwareClientPool::with_builder_and_initial_route(
-                http_client_factory.clone(),
-                route_class,
-                self,
-                route,
-            )?
-            .into_client());
-        }
         self.chatgpt_cookie_store = http_client_factory.chatgpt_cookie_store();
         let (builder, request_logging, default_headers) = self.into_reqwest_parts();
         let inner =
@@ -238,14 +226,6 @@ impl HttpClientBuilder {
         ))
     }
 
-    #[cfg(windows)]
-    pub(crate) fn with_windows_proxy_pipe(
-        mut self,
-        pipe: &crate::windows_proxy_auth::ProxyPipe,
-    ) -> Self {
-        self.windows_proxy_pipe_path = Some(pipe.path().to_owned());
-        self
-    }
 
     /// Builds a client using the transport's default proxy behavior.
     ///
@@ -382,10 +362,6 @@ impl HttpClientBuilder {
 
     fn base_reqwest_builder(self) -> reqwest::ClientBuilder {
         let mut builder = reqwest::Client::builder();
-        #[cfg(windows)]
-        if let Some(path) = self.windows_proxy_pipe_path {
-            builder = builder.windows_named_pipe(path);
-        }
         if self.http2_prior_knowledge {
             builder = builder.http2_prior_knowledge();
         }
@@ -435,8 +411,6 @@ impl Default for HttpClientBuilder {
             request_logging: RequestLogging::Enabled,
             tls_backend: TlsBackend::TransportDefault,
             tls: HttpClientTlsConfig::default(),
-            #[cfg(windows)]
-            windows_proxy_pipe_path: None,
         }
     }
 }

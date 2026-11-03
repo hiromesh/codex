@@ -783,14 +783,6 @@ async fn raw_multiline_paste_defers_rendering_and_submits_once() -> Result<()> {
             '\t' => KeyCode::Tab,
             ch => KeyCode::Char(ch),
         };
-        // Windows reports AltGr text as Ctrl+Alt, including with Shift held.
-        #[cfg(windows)]
-        let modifiers = match ch {
-            '한' => KeyModifiers::CONTROL | KeyModifiers::ALT,
-            '국' => KeyModifiers::SHIFT | KeyModifiers::CONTROL | KeyModifiers::ALT,
-            _ => KeyModifiers::NONE,
-        };
-        #[cfg(not(windows))]
         let modifiers = KeyModifiers::NONE;
         app.handle_tui_event(
             &mut tui,

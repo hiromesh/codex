@@ -3614,12 +3614,12 @@ allowed_approvals_reviewers = ["user"]
 
     #[test]
     fn deserialize_filesystem_deny_read_requirements() -> Result<()> {
-        let deny_read_0 = if cfg!(windows) {
+        let deny_read_0 = if false {
             r"C:\Users\alice\.gitconfig"
         } else {
             "/home/alice/.gitconfig"
         };
-        let deny_read_1 = if cfg!(windows) {
+        let deny_read_1 = if false {
             r"C:\Users\alice\.ssh"
         } else {
             "/home/alice/.ssh"
@@ -4249,7 +4249,7 @@ allowed_approvals_reviewers = ["user"]
         let config: ConfigRequirementsToml = from_str(toml_str)?;
         let requirements: ConfigRequirements = with_unknown_source(config).try_into()?;
 
-        let root = if cfg!(windows) { "C:\\repo" } else { "/repo" };
+        let root = if false { "C:\\repo" } else { "/repo" };
         assert!(
             requirements
                 .permission_profile
@@ -4364,7 +4364,7 @@ allowed_approvals_reviewers = ["user"]
         );
 
         let requirements = ConfigRequirements::try_from(requirements_with_sources)?;
-        let root = if cfg!(windows) { "C:\\repo" } else { "/repo" };
+        let root = if false { "C:\\repo" } else { "/repo" };
         let workspace_write_profile = PermissionProfile::workspace_write_with(
             &[AbsolutePathBuf::from_absolute_path(root)?],
             NetworkSandboxPolicy::Restricted,

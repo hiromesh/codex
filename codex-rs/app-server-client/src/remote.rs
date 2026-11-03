@@ -178,26 +178,11 @@ pub struct RemoteAppServerRequestHandle {
 
 enum SocketPeerPolicy {
     ExplicitEndpoint,
-    #[cfg(windows)]
-    NonElevatedCurrentUser,
 }
 
 impl RemoteAppServerClient {
     pub async fn connect(args: RemoteAppServerConnectArgs) -> IoResult<Self> {
         Self::connect_with_policy(args, SocketPeerPolicy::ExplicitEndpoint).await
-    }
-
-    /// Connects to an implicitly discovered Windows daemon, verifying its peer
-    /// token before the WebSocket handshake or any session requests.
-    #[cfg(windows)]
-    pub async fn connect_local_daemon(args: RemoteAppServerConnectArgs) -> IoResult<Self> {
-        if !matches!(args.endpoint, RemoteAppServerEndpoint::UnixSocket { .. }) {
-            return Err(IoError::new(
-                ErrorKind::InvalidInput,
-                "local daemon requires a Unix socket",
-            ));
-        }
-        Self::connect_with_policy(args, SocketPeerPolicy::NonElevatedCurrentUser).await
     }
 
     async fn connect_with_policy(
@@ -810,10 +795,6 @@ async fn connect_unix_socket_endpoint(
         })?;
     match peer_policy {
         SocketPeerPolicy::ExplicitEndpoint => {}
-        #[cfg(windows)]
-        SocketPeerPolicy::NonElevatedCurrentUser => stream.ensure_non_elevated_peer()?,
-    }
-    let websocket_config = remote_websocket_config();
     let stream = timeout(
         CONNECT_TIMEOUT,
         client_async_with_config(request, stream, Some(websocket_config)),

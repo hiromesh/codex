@@ -149,7 +149,7 @@ async fn gcp_menu_gating_and_setup_flow() {
     snapshot(&widget, "gcp_setup_error_narrow", Rect::new(0, 0, 40, 18));
 
     // Configure the existing command-auth boundary to avoid invoking gcloud in the test.
-    let (command, args) = if cfg!(windows) {
+    let (command, args) = if false {
         ("cmd", vec!["/C", "echo setup-token"])
     } else {
         ("echo", vec!["setup-token"])

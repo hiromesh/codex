@@ -70,13 +70,13 @@ fn test_api_provider_applies_current_managed_residency() {
 }
 
 #[test]
-fn test_deserialize_ollama_model_provider_toml() {
+fn test_deserialize_lmstudio_model_provider_toml() {
     let azure_provider_toml = r#"
-name = "Ollama"
+name = "LM Studio"
 base_url = "http://localhost:11434/v1"
         "#;
     let expected_provider = ModelProviderInfo {
-        name: "Ollama".into(),
+        name: "LM Studio".into(),
         base_url: Some("http://localhost:11434/v1".into()),
         model_catalog_url: None,
         env_key: None,

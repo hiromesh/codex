@@ -121,47 +121,6 @@ fn enable_append() -> io::Result<()> {
     Ok(())
 }
 
-#[cfg(windows)]
-fn enable_append() -> io::Result<()> {
-    use std::os::windows::io::AsRawHandle;
-    use std::os::windows::io::FromRawHandle;
-    use std::os::windows::io::IntoRawHandle;
-    use std::os::windows::io::OwnedHandle;
-    use windows_sys::Win32::Foundation::INVALID_HANDLE_VALUE;
-    use windows_sys::Win32::Storage::FileSystem::FILE_GENERIC_WRITE;
-    use windows_sys::Win32::Storage::FileSystem::FILE_SHARE_DELETE;
-    use windows_sys::Win32::Storage::FileSystem::FILE_SHARE_READ;
-    use windows_sys::Win32::Storage::FileSystem::FILE_SHARE_WRITE;
-    use windows_sys::Win32::Storage::FileSystem::FILE_WRITE_DATA;
-    use windows_sys::Win32::Storage::FileSystem::ReOpenFile;
-    use windows_sys::Win32::System::Console::STD_ERROR_HANDLE;
-    use windows_sys::Win32::System::Console::SetStdHandle;
-
-    let stderr = std::io::stderr();
-    // SAFETY: stderr is borrowed and remains open; reopening does not truncate it.
-    let handle = unsafe {
-        ReOpenFile(
-            stderr.as_raw_handle(),
-            // Append-only access makes writes follow EOF after truncation.
-            FILE_GENERIC_WRITE & !FILE_WRITE_DATA,
-            FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
-            /*dwflagsandattributes*/ 0,
-        )
-    };
-    if handle == INVALID_HANDLE_VALUE {
-        return Err(io::Error::last_os_error());
-    }
-    // SAFETY: ReOpenFile returned a new, valid handle owned by this function.
-    let handle = unsafe { OwnedHandle::from_raw_handle(handle) };
-    // SAFETY: the append handle is valid and retained for the process lifetime on success.
-    if unsafe { SetStdHandle(STD_ERROR_HANDLE, handle.as_raw_handle()) } == 0 {
-        return Err(io::Error::last_os_error());
-    }
-    // The process owns its new stderr. Keep the borrowed original valid for cached users.
-    let _ = handle.into_raw_handle();
-    Ok(())
-}
-
 fn prune(path: &Path, pruning_enabled: &Mutex<bool>) -> io::Result<()> {
     let Ok(enabled) = pruning_enabled.try_lock() else {
         return Ok(());

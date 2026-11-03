@@ -304,56 +304,6 @@ fn agent_plugin_mcp_rejects_explicit_null_optional_fields() {
     );
 }
 
-#[cfg(windows)]
-#[test]
-fn agent_plugin_mcp_rejects_reserved_environment_aliases_case_insensitively() {
-    let plugin_root = plugin_root();
-    let outcome = parse_agent_plugin_mcp_config(
-        &plugin_root,
-        &plugin_root.join("data"),
-        r#"{
-          "$schema":"https://agent-plugins.org/schemas/1.0.0/mcp.schema.json",
-          "mcpServers":{"reserved":{"type":"stdio","command":"python","env":{"plugin_root":"bad"}}}
-        }"#,
-    )
-    .expect("parse Agent Plugins MCP config");
-
-    assert!(outcome.servers.is_empty());
-    assert_eq!(outcome.errors.len(), 1);
-}
-
-#[cfg(windows)]
-#[test]
-fn agent_plugin_mcp_overlays_windows_environment_case_insensitively() {
-    let plugin_root = plugin_root();
-    let outcome = parse_agent_plugin_mcp_config(
-        &plugin_root,
-        &plugin_root.join("data"),
-        r#"{
-          "$schema":"https://agent-plugins.org/schemas/1.0.0/mcp.schema.json",
-          "mcpServers":{
-            "configured":{"type":"stdio","command":"python","env":{"Path":"configured"}},
-            "duplicate":{"type":"stdio","command":"python","env":{"PATH":"one","Path":"two"}}
-          }
-        }"#,
-    )
-    .expect("parse Agent Plugins MCP config");
-
-    assert_eq!(
-        outcome.servers.keys().collect::<Vec<_>>(),
-        vec!["configured"]
-    );
-    assert_eq!(outcome.errors.len(), 1);
-    let McpServerTransportConfig::Stdio { env, .. } = &outcome.servers["configured"].transport
-    else {
-        panic!("expected stdio transport");
-    };
-    assert_eq!(
-        env.as_ref().and_then(|env| env.get("PATH")),
-        Some(&"configured".to_string())
-    );
-}
-
 #[cfg(unix)]
 #[test]
 fn agent_plugin_mcp_resolves_root_before_collapsing_parent_components() {
@@ -454,20 +404,6 @@ fn agent_plugin_mcp_enforces_closed_transport_and_path_semantics() {
 
     assert_eq!(outcome.servers.keys().collect::<Vec<_>>(), vec!["valid"]);
     assert_eq!(outcome.errors.len(), 8);
-}
-
-#[cfg(windows)]
-#[test]
-fn agent_plugin_mcp_rejects_drive_relative_windows_command() {
-    let plugin_root = plugin_root();
-    let outcome = parse_agent_plugin_mcp_config(
-        &plugin_root,
-        &plugin_root.join("data"),
-        r#"{"$schema":"https://agent-plugins.org/schemas/1.0.0/mcp.schema.json","mcpServers":{"drive-relative":{"type":"stdio","command":"C:server.exe"}}}"#,
-    )
-    .expect("parse Agent Plugins MCP config");
-    assert!(outcome.servers.is_empty());
-    assert_eq!(outcome.errors.len(), 1);
 }
 
 #[test]

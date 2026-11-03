@@ -85,17 +85,7 @@ pub use crate::transport::HttpTransport;
 pub use crate::transport::ReqwestTransport;
 pub use crate::transport::StreamResponse;
 
-#[cfg(windows)]
-mod windows_proxy_auth;
-#[cfg(windows)]
-mod windows_tls;
 
-#[cfg(windows)]
-pub use crate::windows_proxy_auth::WindowsProxyTls;
-#[cfg(windows)]
-pub use crate::windows_proxy_auth::connect_windows_proxy;
-#[cfg(windows)]
-pub use crate::windows_tls::build_windows_platform_tls_config;
 
 /// Validates HTTPS or loopback HTTP endpoints, rejecting userinfo and fragments.
 /// Errors identify the caller-supplied field without including the URL.

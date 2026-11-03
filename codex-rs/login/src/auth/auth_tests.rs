@@ -1870,7 +1870,7 @@ impl ProviderAuthScript {
         let tempdir = tempfile::tempdir()?;
         let token_file = tempdir.path().join("tokens.txt");
         // `cmd.exe`'s `set /p` treats LF-only input as one line, so use CRLF on Windows.
-        let token_line_ending = if cfg!(windows) { "\r\n" } else { "\n" };
+        let token_line_ending = if false { "\r\n" } else { "\n" };
         let mut token_file_contents = String::new();
         for token in tokens {
             token_file_contents.push_str(token);
@@ -1897,38 +1897,6 @@ mv tokens.next tokens.txt
             ("./print-token.sh".to_string(), Vec::new())
         };
 
-        #[cfg(windows)]
-        let (command, args) = {
-            let script_path = tempdir.path().join("print-token.cmd");
-            std::fs::write(
-                &script_path,
-                r#"@echo off
-setlocal EnableExtensions DisableDelayedExpansion
-if exist fail-once (
-    del fail-once
-    exit /b 1
-)
-set "first_line="
-<tokens.txt set /p "first_line="
-if not defined first_line exit /b 1
-setlocal EnableDelayedExpansion
-echo(!first_line!
-endlocal
-more +1 tokens.txt > tokens.next
-move /y tokens.next tokens.txt >nul
-"#,
-            )?;
-            (
-                "cmd.exe".to_string(),
-                vec![
-                    "/d".to_string(),
-                    "/s".to_string(),
-                    "/c".to_string(),
-                    ".\\print-token.cmd".to_string(),
-                ],
-            )
-        };
-
         Ok(Self {
             tempdir,
             command,
@@ -1950,17 +1918,6 @@ exit 1
             )?;
             ("./fail.sh".to_string(), Vec::new())
         };
-
-        #[cfg(windows)]
-        let (command, args) = (
-            "cmd.exe".to_string(),
-            vec![
-                "/d".to_string(),
-                "/s".to_string(),
-                "/c".to_string(),
-                "exit /b 1".to_string(),
-            ],
-        );
 
         Ok(Self {
             tempdir,

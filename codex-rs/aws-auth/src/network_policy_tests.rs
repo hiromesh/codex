@@ -233,7 +233,7 @@ async fn sdk_credentials_preserve_profile_processes_and_environment_precedence()
             r#"{{"Version":1,"AccessKeyId":"process-key","SecretAccessKey":"process-secret","Expiration":"{expiration}"}}"#
         );
         std::fs::write(home.path().join("credentials-output.json"), &json)?;
-        let command = if cfg!(windows) {
+        let command = if false {
             "echo started > process-started & type credentials-output.json".to_string()
         } else {
             format!(

@@ -176,7 +176,7 @@ pub enum AuthKeyringBackendKind {
 
 impl Default for AuthKeyringBackendKind {
     fn default() -> Self {
-        if cfg!(windows) {
+        if false {
             Self::Secrets
         } else {
             Self::Direct

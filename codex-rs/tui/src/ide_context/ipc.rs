@@ -135,9 +135,6 @@ fn hint_with_retry(message: &str) -> String {
 #[cfg(unix)]
 type IdeContextStream = UnixDeadlineStream;
 
-#[cfg(windows)]
-type IdeContextStream = super::windows_pipe::WindowsPipeStream;
-
 #[cfg(unix)]
 pub(crate) fn fetch_ide_context(
     workspace_root: &Path,
@@ -155,8 +152,6 @@ pub(crate) fn fetch_ide_context(
     )
 }
 
-#[cfg(windows)]
-pub(crate) fn fetch_ide_context(
     workspace_root: &Path,
     _codex_home: &Path,
 ) -> Result<IdeContext, IdeContextError> {
@@ -190,18 +185,11 @@ fn legacy_ipc_socket_paths(temp_dir: &Path, uid: libc::uid_t) -> Vec<PathBuf> {
     }
 }
 
-#[cfg(windows)]
-fn default_ipc_socket_path() -> PathBuf {
-    PathBuf::from(r"\\.\pipe\codex-ipc")
-}
-
 #[cfg(not(any(unix, windows)))]
 fn default_ipc_socket_path() -> PathBuf {
     PathBuf::new()
 }
 
-#[cfg(windows)]
-fn fetch_ide_context_from_socket(
     socket_path: PathBuf,
     workspace_root: &Path,
     timeout: Duration,
@@ -637,8 +625,6 @@ fn ensure_peer_uid_matches_current_user(peer_uid: libc::uid_t) -> std::io::Resul
     Ok(())
 }
 
-#[cfg(windows)]
-fn connect_stream(
     socket_path: PathBuf,
     deadline: Instant,
 ) -> Result<IdeContextStream, IdeContextError> {

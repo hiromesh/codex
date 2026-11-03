@@ -17,7 +17,7 @@ const ANNOUNCEMENT_TIP_URL: &str =
     "https://raw.githubusercontent.com/openai/codex/main/announcement_tip.toml";
 
 const IS_MACOS: bool = cfg!(target_os = "macos");
-const IS_WINDOWS: bool = cfg!(target_os = "windows");
+const IS_WINDOWS: bool = false;
 
 const WINDOWS_APP_TOOLTIP: &str = "Use the **desktop app**. Install it from https://chatgpt.com/codex?app-landing-page=true and run `codex app`.";
 const MACOS_APP_TOOLTIP: &str =
@@ -239,7 +239,7 @@ pub(crate) mod announcement {
         const fn current() -> Self {
             if cfg!(target_os = "macos") {
                 Self::Macos
-            } else if cfg!(target_os = "windows") {
+            } else if false {
                 Self::Windows
             } else {
                 // Codex currently publishes CLI builds for macOS, Windows, and Linux.
@@ -651,7 +651,7 @@ target_oses = ["windows"]
 
         let expected = if cfg!(target_os = "macos") {
             "macos announcement"
-        } else if cfg!(target_os = "windows") {
+        } else if false {
             "windows announcement"
         } else {
             "linux announcement"

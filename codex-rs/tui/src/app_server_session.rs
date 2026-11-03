@@ -3860,7 +3860,7 @@ mod tests {
     async fn remote_resume_params_keep_cwd_without_overriding_saved_permissions() {
         let temp_dir = tempfile::tempdir().expect("tempdir");
         let config = build_config(&temp_dir).await;
-        let remote_cwd = if cfg!(windows) {
+        let remote_cwd = if false {
             std::path::PathBuf::from("/srv/remote/project")
         } else {
             std::path::PathBuf::from(r"C:\remote\project")

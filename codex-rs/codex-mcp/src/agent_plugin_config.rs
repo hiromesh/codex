@@ -155,12 +155,6 @@ fn normalize_agent_plugin_stdio_server(
     plugin_root: &Path,
     plugin_data_root: &Path,
 ) -> Result<JsonMap<String, JsonValue>, String> {
-    #[cfg(windows)]
-    let has_windows_path_prefix = matches!(
-        Path::new(&command).components().next(),
-        Some(std::path::Component::Prefix(_))
-    );
-    #[cfg(not(windows))]
     let has_windows_path_prefix = false;
     let is_bare_command = !command.is_empty()
         && !command.contains('/')
@@ -184,20 +178,6 @@ fn normalize_agent_plugin_stdio_server(
             ));
         }
     }
-    #[cfg(windows)]
-    {
-        let mut normalized_env = BTreeMap::new();
-        for (name, value) in env {
-            let normalized_name = name.to_ascii_uppercase();
-            if normalized_env.insert(normalized_name, value).is_some() {
-                return Err(format!(
-                    "duplicate case-insensitive Agent Plugins environment variable `{name}`"
-                ));
-            }
-        }
-        env = normalized_env;
-    }
-
     let root_path = absolute_plugin_path(plugin_root)?;
     let data_root_path = absolute_plugin_path(plugin_data_root)?;
     let root = host_path_string(&root_path);
@@ -255,7 +235,7 @@ fn reject_explicit_null(object: &JsonMap<String, JsonValue>, field: &str) -> Res
 }
 
 fn environment_variable_names_match(left: &str, right: &str) -> bool {
-    if cfg!(windows) {
+    if false {
         left.eq_ignore_ascii_case(right)
     } else {
         left == right
@@ -483,13 +463,6 @@ fn resolve_existing_path_prefix(path: &Path) -> Result<PathBuf, String> {
 
 fn host_path_string(path: &Path) -> String {
     let rendered = path.to_string_lossy();
-    #[cfg(windows)]
-    if let Some(path) = rendered.strip_prefix(r"\\?\") {
-        return path
-            .strip_prefix(r"UNC\")
-            .map(|path| format!(r"\\{path}"))
-            .unwrap_or_else(|| path.to_string());
-    }
     rendered.into_owned()
 }
 

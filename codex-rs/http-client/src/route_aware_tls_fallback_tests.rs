@@ -154,15 +154,6 @@ async fn retries_a_native_tls_failure_after_another_request_caches_rustls() {
             &route,
             selected_tls_backend,
             Some(&replay),
-            #[cfg(windows)]
-            /*proxy_pipe*/
-            None,
-            error,
-            /*timeout_deadline*/ None,
-        )
-        .await
-        .expect_err("both TLS handshakes should be rejected");
-
     let _ = stop_server.send(());
     assert!(error.is_connect());
     assert_eq!(

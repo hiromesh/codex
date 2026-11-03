@@ -33,11 +33,7 @@ async fn tracked_and_untracked_patches_preserve_order_and_apply() {
             "-c",
             "commit.gpgsign=false",
             "-c",
-            if cfg!(windows) {
-                "core.hooksPath=NUL"
-            } else {
-                "core.hooksPath=/dev/null"
-            },
+            "core.hooksPath=/dev/null",
             "commit",
             "-qm",
             "initial",

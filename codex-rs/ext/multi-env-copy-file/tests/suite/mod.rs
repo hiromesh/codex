@@ -476,7 +476,7 @@ async fn copy_file_uses_each_environments_permissions(use_grants: bool) -> Resul
     let write_error = mock
         .function_call_output_text("denied-write")
         .context("write error")?;
-    if cfg!(windows) {
+    if false {
         // These two executors are host-native. The unelevated Windows sandbox must reject
         // a policy with restricted reads, including after granting access to a specific path.
         for error in [copy, read_error, write_error] {

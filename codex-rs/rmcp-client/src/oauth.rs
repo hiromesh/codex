@@ -1134,12 +1134,6 @@ fn open_fallback_file_for_write(path: &std::path::Path) -> Result<fs::File> {
             .mode(0o600)
             .custom_flags(libc::O_NOFOLLOW | libc::O_NONBLOCK);
     }
-    #[cfg(windows)]
-    {
-        use std::os::windows::fs::OpenOptionsExt;
-        use windows_sys::Win32::Storage::FileSystem::FILE_FLAG_OPEN_REPARSE_POINT;
-        options.custom_flags(FILE_FLAG_OPEN_REPARSE_POINT);
-    }
     let file = options.open(path)?;
     anyhow::ensure!(
         file.metadata()?.is_file(),
@@ -1461,24 +1455,12 @@ mod tests {
     fn fallback_file_write_does_not_follow_symlinks() -> Result<()> {
         #[cfg(unix)]
         use std::os::unix::fs::symlink;
-        #[cfg(windows)]
-        use std::os::windows::fs::symlink_file as symlink;
 
         let env = TempCodexHome::new();
         let path = fallback_file_path()?;
         let target = env.path().join("symlink-target");
         fs::write(&target, "synthetic credentials")?;
         let linked = symlink(&target, &path);
-        #[cfg(windows)]
-        if linked
-            .as_ref()
-            .is_err_and(|error| error.raw_os_error() == Some(1314))
-        {
-            eprintln!("Skipping symlink test: Windows symlink privilege unavailable");
-            return Ok(());
-        }
-        linked?;
-
         assert!(open_fallback_file_for_write(&path).is_err());
 
         assert_eq!(fs::read_to_string(target)?, "synthetic credentials");

@@ -85,7 +85,7 @@ async fn exec_rejects_daybreak_for_non_openai_provider() -> anyhow::Result<()> {
         .args([
             "--oss",
             "--local-provider",
-            "ollama",
+            "lmstudio",
             "--skip-git-repo-check",
             "hello",
         ])

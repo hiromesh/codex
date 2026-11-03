@@ -28,7 +28,7 @@ pub(super) fn codex_executable() -> Dependency {
     ("codex", std::env::current_exe())
 }
 
-#[cfg(any(target_os = "linux", target_os = "windows"))]
+#[cfg(target_os = "linux")]
 pub(super) fn codex_and_launcher_dependencies(
     request: &codex_sandboxing::SandboxExecRequest,
 ) -> Vec<Dependency> {

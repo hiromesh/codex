@@ -145,13 +145,13 @@ async fn required_provider_overrides_oss_history_selection() -> Result<()> {
             ),
         )
         .harness_overrides(ConfigOverrides {
-            model_provider: Some("ollama".into()),
+            model_provider: Some("lmstudio".into()),
             ..Default::default()
         })
         .build()
         .await?;
     let mut server = crate::start_embedded_app_server_for_picker(&config).await?;
-    server.model_provider_override = Some("ollama".into());
+    server.model_provider_override = Some("lmstudio".into());
     assert_eq!(config.model_provider_id, "openai");
     assert_eq!(
         server.history_model_provider(&config).await?,

@@ -3,8 +3,6 @@ use std::process::Stdio;
 use std::time::Duration;
 
 use codex_protocol::shell_environment::scrub_non_inheritable_env_vars;
-#[cfg(windows)]
-use codex_utils_pty::JobObject;
 #[cfg(unix)]
 use codex_utils_pty::process_group::kill_process_group;
 use tokio::process::Child;
@@ -14,8 +12,6 @@ use tokio::time::timeout;
 struct KillGitProcessTreeOnDrop {
     #[cfg(unix)]
     process_id: u32,
-    #[cfg(windows)]
-    job: Option<JobObject>,
     #[cfg(unix)]
     armed: bool,
 }
@@ -40,16 +36,11 @@ fn spawn_git_command(command: &mut Command) -> Option<(Child, KillGitProcessTree
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
 
-    #[cfg(windows)]
-    let (child, job) = JobObject::spawn_background(command).ok()?;
-    #[cfg(not(windows))]
     let child = command.spawn().ok()?;
 
     let process_tree = KillGitProcessTreeOnDrop {
         #[cfg(unix)]
         process_id: child.id()?,
-        #[cfg(windows)]
-        job,
         #[cfg(unix)]
         armed: true,
     };
@@ -69,11 +60,6 @@ async fn wait_for_git_command_with_timeout_output(
 
     match result {
         Ok(Ok(output)) => {
-            #[cfg(windows)]
-            if let Some(job) = &process_tree.job {
-                job.preserve_descendants().ok()?;
-            }
-
             #[cfg(unix)]
             {
                 process_tree.armed = false;

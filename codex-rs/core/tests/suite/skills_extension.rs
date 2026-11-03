@@ -1978,7 +1978,7 @@ async fn executor_skill_invocation_is_environment_scoped_and_deduplicated() -> R
         ],
         warnings: Vec::new(),
     };
-    let read_command = if cfg!(windows) {
+    let read_command = if false {
         format!("Get-Content -LiteralPath \"{}\"", skill_path.display())
     } else {
         format!("cat {}", skill_path.display())
@@ -3363,7 +3363,7 @@ async fn production_turn_keeps_rebalanced_catalogs_stable_after_compaction_and_r
 
     insta::assert_snapshot!(
         // The in-process executor uses the host OS. Windows guidance appears when it is ready.
-        if cfg!(windows) {
+        if false {
             "cloud_skills_across_executor_readiness_windows"
         } else {
             "cloud_skills_across_executor_readiness"

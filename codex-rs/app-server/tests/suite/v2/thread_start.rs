@@ -20,7 +20,6 @@ use codex_app_server_protocol::McpServerStatusDetail;
 use codex_app_server_protocol::McpServerStatusUpdatedNotification;
 use codex_app_server_protocol::RequestId;
 use codex_app_server_protocol::SandboxMode;
-#[cfg(not(windows))]
 use codex_app_server_protocol::SandboxPolicy;
 use codex_app_server_protocol::ServerNotification;
 use codex_app_server_protocol::TextPosition;
@@ -571,9 +570,6 @@ async fn thread_start_accepts_absolute_runtime_workspace_roots() -> Result<()> {
 
     assert_eq!(response_cwd, cwd.abs());
     assert_eq!(runtime_workspace_roots, vec![extra_root.abs()]);
-    #[cfg(windows)]
-    let _ = sandbox;
-    #[cfg(not(windows))]
     {
         let SandboxPolicy::WorkspaceWrite { writable_roots, .. } = sandbox else {
             panic!("expected workspace-write sandbox");
@@ -602,9 +598,6 @@ async fn thread_start_accepts_absolute_runtime_workspace_roots() -> Result<()> {
         ..
     } = timeout(DEFAULT_READ_TIMEOUT, mcp.read_response(req_id)).await??;
     assert_eq!(runtime_workspace_roots, vec![environment_root.abs()]);
-    #[cfg(windows)]
-    let _ = sandbox;
-    #[cfg(not(windows))]
     {
         let SandboxPolicy::WorkspaceWrite { writable_roots, .. } = sandbox else {
             panic!("expected workspace-write sandbox");
@@ -943,14 +936,6 @@ async fn thread_start_without_selected_environment_includes_only_global_instruct
     Ok(())
 }
 
-#[cfg(windows)]
-fn normalize_path_for_comparison(path: impl AsRef<Path>) -> PathBuf {
-    let path = path.as_ref();
-    let path = path.display().to_string();
-    PathBuf::from(path.strip_prefix(r"\\?\").unwrap_or(&path))
-}
-
-#[cfg(not(windows))]
 fn normalize_path_for_comparison(path: impl AsRef<Path>) -> PathBuf {
     path.as_ref().to_path_buf()
 }
@@ -1574,7 +1559,7 @@ model_reasoning_effort = "high"
         .await?;
 
     let config_toml = std::fs::read_to_string(codex_home.path().join("config.toml"))?;
-    if cfg!(windows) {
+    if false {
         assert_eq!(
             first_response.sandbox,
             codex_app_server_protocol::SandboxPolicy::ReadOnly {
@@ -1705,7 +1690,7 @@ async fn thread_start_with_nested_git_cwd_respects_effective_permissions_for_pro
         .await?;
 
     let config_toml = std::fs::read_to_string(codex_home.path().join("config.toml"))?;
-    if cfg!(windows) {
+    if false {
         assert_eq!(
             sandbox,
             codex_app_server_protocol::SandboxPolicy::ReadOnly {
@@ -2015,13 +2000,6 @@ startup_timeout_sec = 60
     )
 }
 
-#[cfg(target_os = "windows")]
-fn broken_mcp_transport_toml() -> &'static str {
-    r#"command = "cmd"
-args = ["/C", "exit 1"]"#
-}
-
-#[cfg(not(target_os = "windows"))]
 fn broken_mcp_transport_toml() -> &'static str {
     r#"command = "/bin/sh"
 args = ["-c", "exit 1"]"#

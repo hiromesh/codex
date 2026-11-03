@@ -13,7 +13,7 @@ use crate::http_headers::with_http_headers_helper;
 
 use super::*;
 
-const PROXY_HEADERS_HELPER: &str = if cfg!(windows) {
+const PROXY_HEADERS_HELPER: &str = if false {
     r#"echo {"Proxy-Authorization":"Bearer proxy-token"}"#
 } else {
     r#"printf '{"Proxy-Authorization":"Bearer proxy-token"}'"#

@@ -118,23 +118,6 @@ async fn detect() -> bool {
         .spawn(move || {
             #[cfg(target_os = "macos")]
             let detected = objc2_app_kit::NSWorkspace::sharedWorkspace().isVoiceOverEnabled();
-            #[cfg(windows)]
-            let detected = {
-                use windows_sys::Win32::UI::WindowsAndMessaging::SPI_GETSCREENREADER;
-                use windows_sys::Win32::UI::WindowsAndMessaging::SystemParametersInfoW;
-                let mut enabled: windows_sys::core::BOOL = 0;
-                // SAFETY: SPI_GETSCREENREADER writes one BOOL to this valid, aligned pointer.
-                let success = unsafe {
-                    SystemParametersInfoW(
-                        SPI_GETSCREENREADER,
-                        /*uiparam*/ 0,
-                        (&mut enabled as *mut windows_sys::core::BOOL).cast(),
-                        /*fwinini*/ 0,
-                    )
-                };
-                (success != 0 && enabled != 0)
-                    || windows_screen_reader::narrator_running() == Some(true)
-            };
             let _ = tx.send(detected);
         });
     rx.await.unwrap_or(false)
@@ -183,10 +166,6 @@ async fn detect() -> bool {
 async fn detect() -> bool {
     false
 }
-
-#[cfg(windows)]
-#[path = "screen_reader_windows.rs"]
-mod windows_screen_reader;
 
 #[cfg(test)]
 #[path = "screen_reader_tests.rs"]

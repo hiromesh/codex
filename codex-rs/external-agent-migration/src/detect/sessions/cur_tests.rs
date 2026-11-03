@@ -419,12 +419,6 @@ fn set_modified_at(path: &Path, modified_at: SystemTime) {
         .expect("set transcript modified time");
 }
 
-#[cfg(windows)]
-fn encode_project_path(path: &Path) -> String {
-    path.to_string_lossy().replace([':', '\\', '/'], "-")
-}
-
-#[cfg(not(windows))]
 fn encode_project_path(path: &Path) -> String {
     path.to_string_lossy()
         .trim_start_matches('/')

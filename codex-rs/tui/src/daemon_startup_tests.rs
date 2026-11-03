@@ -236,25 +236,6 @@ async fn daemon_feature_compatibility_respects_required_and_optional_attachment(
     Ok(())
 }
 
-#[cfg(windows)]
-#[tokio::test]
-async fn daemon_connection_rejects_unprotected_socket_before_handshake() -> color_eyre::Result<()> {
-    let home = TempDir::new()?;
-    let parent = home.path().join("control");
-    std::fs::create_dir(&parent)?;
-    let socket_path = AbsolutePathBuf::from_absolute_path_checked(parent.join("server.sock"))?;
-    let mut listener = codex_uds::UnixListener::bind(socket_path.as_path()).await?;
-    let target = AppServerTarget::LocalDaemon {
-        allow_embedded_fallback: true,
-        endpoint: RemoteAppServerEndpoint::UnixSocket { socket_path },
-    };
-    tokio::select! {
-        result = app_server_connection::connect(&target) => assert!(result.is_err()),
-        _ = listener.accept() => panic!("unprotected listener must not receive a connection"),
-    }
-    Ok(())
-}
-
 #[tokio::test]
 async fn daemon_startup_falls_back_only_for_implicit_endpoints() -> color_eyre::Result<()> {
     for scenario in [

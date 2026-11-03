@@ -44,9 +44,6 @@ async fn streaming_output_harness() -> anyhow::Result<StreamingOutputHarness> {
         terminator: None,
         writer_handle: None,
         resizer: None,
-        #[cfg(windows)]
-        tty: false,
-    });
     let process = Arc::new(UnifiedExecProcess::from_spawned(spawned, SandboxType::None).await?);
     let (session, turn, rx_event) = make_session_and_context_with_rx().await;
     let context = UnifiedExecContext::new(

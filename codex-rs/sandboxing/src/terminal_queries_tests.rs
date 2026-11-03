@@ -32,9 +32,6 @@ async fn driver_backed_terminal_queries_are_answered() -> anyhow::Result<()> {
         terminator: None,
         writer_handle: None,
         resizer: None,
-        #[cfg(windows)]
-        tty: true,
-    }));
     let SpawnedProcess {
         session: _session,
         mut stdout_rx,
@@ -76,7 +73,6 @@ async fn direct_terminal_queries_are_answered() -> anyhow::Result<()> {
         env: &env,
         arg0: &None,
         sandbox: SandboxType::None,
-        windows_sandbox: None,
         tty: true,
         stdin_open: true,
         inherited_fds: codex_utils_pty::ChildFds::Inherited(&[]),

@@ -246,7 +246,7 @@ impl LocalSettings {
                         TerminalName::WindowsTerminal => false,
                         // VS Code gates Copy on native selection. Only Windows' default
                         // (plain Ctrl-C) is also forwarded by the legacy xterm.js encoder.
-                        TerminalName::VsCode => !cfg!(target_os = "windows"),
+                        TerminalName::VsCode => !false,
                         TerminalName::AppleTerminal
                         | TerminalName::Iterm2
                         | TerminalName::WarpTerminal

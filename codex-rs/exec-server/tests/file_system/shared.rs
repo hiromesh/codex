@@ -44,8 +44,6 @@ use test_case::test_case;
 use super::support::FileSystemImplementation;
 use super::support::absolute_path;
 use super::support::create_file_system_context;
-#[cfg(windows)]
-use super::support::is_unsupported_restricted_token_host;
 use super::support::read_only_sandbox;
 use super::support::workspace_write_sandbox;
 
@@ -164,10 +162,6 @@ async fn file_system_create_directory_creates_nested_directories(
             sandbox.as_ref(),
         )
         .await;
-    #[cfg(windows)]
-    if is_unsupported_restricted_token_host(&result) {
-        return Ok(());
-    }
     result.with_context(|| format!("mode={implementation}, sandboxed={sandboxed}"))?;
     assert!(nested_dir.is_dir());
 
@@ -201,10 +195,6 @@ async fn file_system_write_file_writes_bytes(
             sandbox.as_ref(),
         )
         .await;
-    #[cfg(windows)]
-    if is_unsupported_restricted_token_host(&result) {
-        return Ok(());
-    }
     result.with_context(|| format!("mode={implementation}, sandboxed={sandboxed}"))?;
     assert_eq!(std::fs::read(file_path)?, b"hello from trait");
 
@@ -774,10 +764,6 @@ async fn file_system_remove_no_follow_removes_file_and_empty_directory(
             sandbox.as_ref(),
         )
         .await;
-    #[cfg(windows)]
-    if is_unsupported_restricted_token_host(&result) {
-        return Ok(());
-    }
     result.with_context(|| format!("mode={implementation}, sandboxed={sandboxed}"))?;
     assert!(!file_path.exists());
 
@@ -1063,11 +1049,7 @@ async fn full_disk_reads_reject_foreign_permission_paths(
     std::fs::write(&file, b"note")?;
     let file = PathUri::from_host_native_path(file)?;
     let root = PathUri::from_host_native_path(tmp.path())?;
-    let foreign = PathUri::parse(if cfg!(windows) {
-        "file:///private"
-    } else {
-        "file:///C:/private"
-    })?;
+    let foreign = PathUri::parse("file:///C:/private")?;
     let policy = FileSystemSandboxPolicy::restricted(vec![
         FileSystemSandboxEntry::new(
             FileSystemPath::Special {

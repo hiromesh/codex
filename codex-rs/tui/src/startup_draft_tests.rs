@@ -618,25 +618,6 @@ fn startup_draft_allows_local_editor_shortcuts_without_startup_actions() {
     assert!(pump.app_event_rx.try_recv().is_err());
 }
 
-#[cfg(target_os = "windows")]
-#[tokio::test]
-async fn startup_draft_preserves_windows_altgr_text_input() {
-    let mut pump = startup_test_pump(std::iter::empty());
-    pump.bottom_pane.insert_str("first");
-    pump.pending_paste_newline = Some((tokio::time::Instant::now(), "\n".to_string()));
-    let mut tui = crate::tui::test_support::make_test_tui().expect("create test terminal");
-    pump.handle_event(
-        &mut tui,
-        TuiEvent::Key(KeyEvent::new(
-            KeyCode::Char('@'),
-            KeyModifiers::CONTROL | KeyModifiers::ALT,
-        )),
-    )
-    .expect("preserve printable AltGr input");
-    pump.bottom_pane.flush_composer_paste_burst();
-    assert_eq!(pump.bottom_pane.composer_text(), "first\n@");
-}
-
 #[tokio::test]
 async fn startup_draft_applies_paste_burst_preferences_without_losing_buffered_input() {
     let codex_home = tempfile::tempdir().expect("create temporary Codex home");

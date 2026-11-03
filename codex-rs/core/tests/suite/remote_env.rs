@@ -3249,7 +3249,7 @@ async fn deferred_executor_guardian_uses_newly_ready_step_environment(
             if tool == "mcp_elicitation" {
                 config.mcp_servers.set(serde_json::from_value(json!({
                     "cua_repl": {
-                        "command": if cfg!(windows) { "python" } else { "python3" },
+                        "command": if false { "python" } else { "python3" },
                         "args": ["-u", "-c", super::guardian_mcp_elicitation::ELICITATION_SERVER,
                             json!([{"codex_sensitive_action": true}]).to_string(), "forward"],
                         "default_tools_approval_mode": "approve",

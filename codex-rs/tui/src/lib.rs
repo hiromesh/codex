@@ -535,14 +535,6 @@ async fn connect_remote_app_server(
 
 async fn maybe_probe_default_daemon_socket(codex_home: &Path) -> Option<AbsolutePathBuf> {
     let socket_path = codex_app_server_client::app_server_control_socket_path(codex_home).ok()?;
-    #[cfg(windows)]
-    let (validated_path, _directory) =
-        codex_uds::validate_private_socket_path(socket_path.as_path()).ok()?;
-    #[cfg(windows)]
-    let validated_path = AbsolutePathBuf::from_absolute_path_checked(validated_path).ok()?;
-    #[cfg(windows)]
-    let probe_path = validated_path.as_path();
-    #[cfg(not(windows))]
     let probe_path = socket_path.as_path();
     match tokio::time::timeout(
         AUTO_CONNECT_DAEMON_CONNECT_TIMEOUT,
@@ -551,8 +543,6 @@ async fn maybe_probe_default_daemon_socket(codex_home: &Path) -> Option<Absolute
     .await
     {
         Ok(Ok(_stream)) => {
-            #[cfg(windows)]
-            _stream.ensure_non_elevated_peer().ok()?;
             Some(socket_path)
         }
         Ok(Err(err)) => {
@@ -1355,8 +1345,6 @@ async fn run_ratatui_app(
     let mut app_server = Some(app_server_session);
     // Folder consent runs after the picker resolves the actual destination.
     let should_show_trust_screen_flag = false;
-    #[cfg(target_os = "windows")]
-    let mut trust_decision_was_made = false;
     let startup_model_provider = initial_config.model_provider_id.clone();
     let (login_status, mut startup_account) = if workload_identity_selected {
         (LoginStatus::AuthMode(AuthMode::Chatgpt), None)
@@ -1451,11 +1439,6 @@ async fn run_ratatui_app(
                 update_action: None,
                 exit_reason: ExitReason::UserRequested,
             });
-        }
-        #[cfg(target_os = "windows")]
-        {
-            trust_decision_was_made =
-                !uses_remote_workspace && onboarding_result.directory_trust_persisted;
         }
         let reloaded_config = startup_draft
             .run_until(&mut tui, async {
@@ -2030,10 +2013,6 @@ async fn run_ratatui_app(
                     app_server_target.thread_params_mode(),
                 )
                 .with_local_codex_home(&config.codex_home);
-            }
-            #[cfg(target_os = "windows")]
-            {
-                trust_decision_was_made = true;
             }
         } else if consent.should_exit {
             if !uses_remote_workspace {

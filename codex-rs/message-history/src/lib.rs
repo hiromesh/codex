@@ -318,12 +318,6 @@ async fn ensure_owner_only_permissions(file: &File) -> Result<()> {
     Ok(())
 }
 
-#[cfg(windows)]
-// On Windows, simply succeed.
-async fn ensure_owner_only_permissions(_file: &File) -> Result<()> {
-    Ok(())
-}
-
 async fn history_metadata_for_file(path: &Path) -> (u64, usize) {
     let log_id = match fs::metadata(path).await {
         Ok(metadata) => log_identity(&metadata).unwrap_or(0),
@@ -426,12 +420,6 @@ fn lookup_history_entry(path: &Path, log_id: u64, offset: usize) -> Option<Histo
 fn log_identity(metadata: &std::fs::Metadata) -> Option<u64> {
     use std::os::unix::fs::MetadataExt;
     Some(metadata.ino())
-}
-
-#[cfg(windows)]
-fn log_identity(metadata: &std::fs::Metadata) -> Option<u64> {
-    use std::os::windows::fs::MetadataExt;
-    Some(metadata.creation_time())
 }
 
 #[cfg(not(any(unix, windows)))]

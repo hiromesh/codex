@@ -41,9 +41,6 @@ use tempfile::TempDir;
 use test_case::test_case;
 use tokio::time::timeout;
 
-#[cfg(windows)]
-const READ_TIMEOUT: Duration = Duration::from_secs(25);
-#[cfg(not(windows))]
 const READ_TIMEOUT: Duration = Duration::from_secs(10);
 const NAMESPACE: &str = "collaboration";
 const PARENT_INSTRUCTIONS: &str = "parent-only developer instructions";

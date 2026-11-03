@@ -14,8 +14,6 @@ use std::collections::BTreeMap;
 /// Startup diagnostics go to tracing, so a caller with a live TUI can keep rendering.
 pub async fn start_with_features(features: &BTreeMap<String, bool>) -> Result<LifecycleOutput> {
     ensure_supported_platform()?;
-    #[cfg(windows)]
-    crate::backend::windows::ensure_not_elevated()?;
     let mut daemon = Daemon::from_environment()?;
     daemon.log_diagnostics = true;
     let _operation_lock = daemon.acquire_operation_lock().await?;
@@ -30,8 +28,6 @@ pub async fn start_with_features(features: &BTreeMap<String, bool>) -> Result<Li
 /// then verify effective server compatibility after this operation completes.
 pub async fn restart_with_features(features: &BTreeMap<String, bool>) -> Result<LifecycleOutput> {
     ensure_supported_platform()?;
-    #[cfg(windows)]
-    crate::backend::windows::ensure_not_elevated()?;
     let daemon = Daemon::from_environment()?;
     let _operation_lock = daemon.acquire_operation_lock().await?;
     let selected = daemon.current_installation()?;

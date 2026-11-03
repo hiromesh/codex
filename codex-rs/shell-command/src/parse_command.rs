@@ -1405,7 +1405,7 @@ mod tests {
 
     #[test]
     fn powershell_with_path_is_stripped() {
-        let command = if cfg!(windows) {
+        let command = if false {
             "C:\\windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe"
         } else {
             "/usr/local/bin/powershell.exe"

@@ -120,39 +120,6 @@ fn detect() -> Option<ClockFormat> {
     parse_native_pattern(&pattern.to_string(), "hHKk")
 }
 
-#[cfg(windows)]
-fn detect() -> Option<ClockFormat> {
-    use windows_sys::Win32::Globalization::GetLocaleInfoEx;
-    use windows_sys::Win32::Globalization::LOCALE_SSHORTTIME;
-
-    // SAFETY: the first call queries the size; the second receives a writable
-    // buffer of that size. A null locale name selects the user's default locale,
-    // and user overrides remain enabled.
-    let pattern = unsafe {
-        let length = GetLocaleInfoEx(
-            std::ptr::null(),
-            LOCALE_SSHORTTIME,
-            std::ptr::null_mut(),
-            /*cchdata*/ 0,
-        );
-        if length <= 1 {
-            return None;
-        }
-        let mut buffer = vec![0; length as usize];
-        let written = GetLocaleInfoEx(
-            std::ptr::null(),
-            LOCALE_SSHORTTIME,
-            buffer.as_mut_ptr(),
-            length,
-        );
-        if written <= 1 {
-            return None;
-        }
-        String::from_utf16(&buffer[..written as usize - 1]).ok()?
-    };
-    parse_native_pattern(&pattern, "hH")
-}
-
 #[cfg(any(target_os = "macos", windows, test))]
 fn parse_native_pattern(pattern: &str, hour_symbols: &str) -> Option<ClockFormat> {
     let mut quoted = false;

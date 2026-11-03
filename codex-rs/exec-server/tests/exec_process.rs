@@ -1211,13 +1211,6 @@ async fn assert_exec_process_starts_and_exits(use_remote: bool) -> Result<()> {
         "printf '%s|%s|%s' \"$CODEX_THREAD_ID\" \"$CODEX_TOOL_CALL_ID\" \"$CUSTOM_ENV_VAR\""
             .to_string(),
     ];
-    #[cfg(windows)]
-    let argv = vec![
-        "powershell.exe".into(),
-        "-NoProfile".into(),
-        "-Command".into(),
-        "[Console]::OutputEncoding = [Text.UTF8Encoding]::new($false); [Console]::Write($env:CODEX_THREAD_ID + '|' + $env:CODEX_TOOL_CALL_ID + '|' + $env:CUSTOM_ENV_VAR)".into(),
-    ];
     let mut env = std::env::vars().collect::<HashMap<_, _>>();
     env.extend([
         ("CODEX_THREAD_ID".into(), "stale-thread".into()),

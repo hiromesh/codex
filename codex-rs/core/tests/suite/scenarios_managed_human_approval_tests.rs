@@ -2,9 +2,7 @@
 
 //! Managed checkpoints require a fresh human decision even with automatic review, hooks, and saved rules.
 
-#[cfg(not(target_os = "windows"))]
 use super::super::hooks::install_allow_permission_request_hook;
-#[cfg(not(target_os = "windows"))]
 use super::super::hooks::read_permission_request_hook_inputs;
 use super::*;
 use anyhow::Context;
@@ -14,11 +12,9 @@ use codex_protocol::config_types::ApprovalsReviewer;
 use codex_protocol::models::PermissionProfile;
 use codex_protocol::protocol::AskForApproval;
 use codex_protocol::protocol::ReviewDecision;
-#[cfg(not(target_os = "windows"))]
 use core_test_support::hooks::trust_discovered_hooks;
 use core_test_support::responses::ev_function_call;
 use core_test_support::responses::mount_sse_once;
-#[cfg(not(target_os = "windows"))]
 use pretty_assertions::assert_eq;
 use tokio_util::sync::CancellationToken;
 
@@ -28,7 +24,6 @@ async fn managed_checkpoint_requires_fresh_human_decisions() -> Result<()> {
     skip_if_wine_exec!(Ok(()), "command approval requires host-native paths");
     let server = start_mock_server().await;
     let builder = test_codex();
-    #[cfg(not(target_os = "windows"))]
     let builder = builder.with_pre_build_hook(|home| {
         install_allow_permission_request_hook(home).expect("allow permission request hook");
     });
@@ -46,7 +41,6 @@ justification = "A person must approve this command."
         )
         .with_config(|config| {
             configure_scenario_catalog(config);
-            #[cfg(not(target_os = "windows"))]
             trust_discovered_hooks(config);
             config
                 .features
@@ -108,7 +102,6 @@ justification = "A person must approve this command."
             _ => None,
         })
         .await;
-        #[cfg(not(target_os = "windows"))]
         assert_eq!(
             read_permission_request_hook_inputs(test.codex_home_path())?.len(),
             index + 1,

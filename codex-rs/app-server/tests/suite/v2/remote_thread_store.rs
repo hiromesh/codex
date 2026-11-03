@@ -781,8 +781,6 @@ fn assert_no_local_persistence_artifacts(codex_home: &Path) -> Result<()> {
     // and Bazel test runs may initialize shell snapshot storage. None is thread
     // persistence.
     entries.remove(".sandbox_migration");
-    #[cfg(windows)]
-    entries.remove(".sandbox");
     entries.remove("shell_snapshots");
     assert_eq!(
         entries,

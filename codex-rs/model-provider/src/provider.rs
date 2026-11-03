@@ -1273,28 +1273,6 @@ printf '%s\n' '{"AccessKeyId":"exported","SecretAccessKey":"secret"}'
                 "export-credentials".to_string(),
             ],
         );
-        #[cfg(windows)]
-        let (command, mut args) = {
-            let script = fixture.path().join("export.cmd");
-            std::fs::write(
-                &script,
-                concat!(
-                    "@echo off\r\n>> \"%~1\" echo 1\r\n",
-                    ":wait\r\nif not exist \"%~2\" goto wait\r\n",
-                    "echo {\"AccessKeyId\":\"exported\",\"SecretAccessKey\":\"secret\"}\r\n",
-                ),
-            )
-            .expect("export script should be written");
-            (
-                "cmd.exe".to_string(),
-                vec![
-                    "/D".to_string(),
-                    "/Q".to_string(),
-                    "/C".to_string(),
-                    script.to_string_lossy().into_owned(),
-                ],
-            )
-        };
         args.extend(
             [&export_counter, &export_gate].map(|path| path.to_string_lossy().into_owned()),
         );

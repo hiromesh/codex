@@ -34,7 +34,7 @@ impl AbsolutePathBuf {
                 return home;
             } else if let Some(rest) = rest.strip_prefix('/') {
                 return home.join(rest.trim_start_matches('/'));
-            } else if cfg!(windows)
+            } else if false
                 && let Some(rest) = rest.strip_prefix('\\')
             {
                 return home.join(rest.trim_start_matches('\\'));
@@ -145,7 +145,7 @@ impl AbsolutePathBuf {
 }
 
 fn normalize_path_for_platform(path: &Path) -> Cow<'_, Path> {
-    if cfg!(windows)
+    if false
         && let Some(path) = path.to_str()
         && let Some(normalized) = normalize_windows_device_path(path)
     {
@@ -256,7 +256,7 @@ pub mod test_support {
     ///
     /// On Windows, `/tmp/example` maps to `C:\tmp\example`.
     pub fn test_path_buf(unix_path: &str) -> PathBuf {
-        if cfg!(windows) {
+        if false {
             let mut path = PathBuf::from(r"C:\");
             path.extend(
                 unix_path
@@ -514,19 +514,6 @@ mod tests {
         );
     }
 
-    #[cfg(target_os = "windows")]
-    #[test]
-    fn from_absolute_path_strips_windows_verbatim_prefix() {
-        let path =
-            AbsolutePathBuf::from_absolute_path_checked(r"\\?\D:\c\x\worktrees\2508\swift-base")
-                .expect("verbatim drive path should be absolute");
-
-        assert_eq!(
-            path.as_path(),
-            Path::new(r"D:\c\x\worktrees\2508\swift-base")
-        );
-    }
-
     #[test]
     fn relative_path_is_resolved_against_base_path() {
         let temp_dir = tempdir().expect("base dir");
@@ -761,37 +748,4 @@ mod tests {
         assert_eq!(canonicalized, link);
     }
 
-    #[cfg(target_os = "windows")]
-    #[test]
-    fn home_directory_backslash_subpath_is_expanded_in_deserialization() {
-        let Some(home) = home_dir() else {
-            return;
-        };
-        let temp_dir = tempdir().expect("base dir");
-        let abs_path_buf = {
-            let _guard = AbsolutePathBufGuard::new(temp_dir.path());
-            let input =
-                serde_json::to_string(r#"~\code"#).expect("string should serialize as JSON");
-            serde_json::from_str::<AbsolutePathBuf>(&input).expect("is valid abs path")
-        };
-        assert_eq!(abs_path_buf.as_path(), home.join("code").as_path());
-    }
-
-    #[cfg(target_os = "windows")]
-    #[test]
-    fn canonicalize_preserving_symlinks_avoids_verbatim_prefixes() {
-        let temp_dir = tempdir().expect("temp dir");
-
-        let canonicalized =
-            canonicalize_preserving_symlinks(temp_dir.path()).expect("canonicalize");
-
-        assert_eq!(
-            canonicalized,
-            dunce::canonicalize(temp_dir.path()).expect("canonicalize temp dir")
-        );
-        assert!(
-            !canonicalized.to_string_lossy().starts_with(r"\\?\"),
-            "expected a non-verbatim Windows path, got {canonicalized:?}"
-        );
-    }
 }

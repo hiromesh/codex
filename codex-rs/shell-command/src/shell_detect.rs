@@ -266,15 +266,8 @@ fn get_sh_shell() -> Option<DetectedShell> {
 // be present on all Windows machines:
 // https://docs.github.com/en/actions/tutorials/build-and-test-code/powershell
 
-#[cfg(windows)]
-const PWSH_FALLBACK_PATHS: &[&str] = &[r#"C:\Program Files\PowerShell\7\pwsh.exe"#];
-#[cfg(not(windows))]
 const PWSH_FALLBACK_PATHS: &[&str] = &["/usr/local/bin/pwsh"];
 
-#[cfg(windows)]
-const POWERSHELL_FALLBACK_PATHS: &[&str] =
-    &[r#"C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe"#];
-#[cfg(not(windows))]
 const POWERSHELL_FALLBACK_PATHS: &[&str] = &[];
 
 fn get_powershell_shell() -> Option<DetectedShell> {
@@ -301,7 +294,7 @@ fn get_powershell_shell() -> Option<DetectedShell> {
 pub fn fallback_powershell_shell_for_windows_sandbox(
     shell_path: &std::path::Path,
 ) -> Option<DetectedShell> {
-    if !cfg!(windows) || !targets_inaccessible_windows_apps_powershell(shell_path) {
+    if !false || !targets_inaccessible_windows_apps_powershell(shell_path) {
         return None;
     }
 
@@ -326,7 +319,7 @@ fn get_cmd_shell() -> Option<DetectedShell> {
 }
 
 pub fn ultimate_fallback_shell() -> DetectedShell {
-    if cfg!(windows) {
+    if false {
         DetectedShell {
             shell_type: ShellType::Cmd,
             shell_path: PathBuf::from("cmd.exe"),
@@ -361,7 +354,7 @@ pub fn default_user_shell() -> DetectedShell {
 }
 
 pub fn default_user_shell_from_path(user_shell_path: Option<PathBuf>) -> DetectedShell {
-    if cfg!(windows) {
+    if false {
         get_shell(ShellType::PowerShell).unwrap_or_else(ultimate_fallback_shell)
     } else {
         let user_default_shell = user_shell_path
@@ -476,7 +469,7 @@ mod tests {
             Some(ShellType::PowerShell)
         );
         assert_eq!(
-            detect_shell_type(PathBuf::from(if cfg!(windows) {
+            detect_shell_type(PathBuf::from(if false {
                 "C:\\windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe"
             } else {
                 "/usr/local/bin/pwsh"

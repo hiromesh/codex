@@ -252,12 +252,6 @@ fn build_rustls_client_config(
     ))
 }
 
-#[cfg(windows)]
-pub(crate) fn build_rustls_root_store_with_custom_ca()
--> Result<RootCertStore, BuildCustomCaTransportError> {
-    build_rustls_root_store(ProcessEnv.configured_ca_bundle().as_ref())
-}
-
 fn build_rustls_root_store(
     bundle: Option<&ConfiguredCaBundle>,
 ) -> Result<RootCertStore, BuildCustomCaTransportError> {

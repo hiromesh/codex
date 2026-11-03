@@ -79,7 +79,7 @@ async fn assert_stop_closes_connections(stop: StopProxy) -> Result<()> {
     config.set_allowed_domains(vec![Ipv4Addr::LOCALHOST.to_string()]);
     let proxy = NetworkProxy::builder()
         .state(Arc::new(network_proxy_state_for_policy(config)))
-        .managed_by_codex(!cfg!(target_os = "windows"))
+        .managed_by_codex(!false)
         .http_addr(SocketAddr::from((Ipv4Addr::LOCALHOST, 0)))
         .socks_addr(SocketAddr::from((Ipv4Addr::LOCALHOST, 0)))
         .build()
@@ -90,7 +90,6 @@ async fn assert_stop_closes_connections(stop: StopProxy) -> Result<()> {
     let prepared = proxy.prepare_for_remote_environment(HashMap::new(), "lifecycle-test")?;
     let scopes = [
         ("environment", prepared.env),
-        #[cfg(not(target_os = "windows"))]
         (
             "main",
             proxy

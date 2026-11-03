@@ -106,8 +106,6 @@ impl Runtime {
                 use std::os::unix::ffi::OsStrExt;
                 CString::new(plugin.as_os_str().as_bytes())
             };
-            #[cfg(windows)]
-            let filename = CString::new(plugin.to_str().ok_or_else(runtime_error)?);
             let filename = filename.map_err(|_| runtime_error())?;
             // SAFETY: The NUL-terminated filename lives through the call. A
             // non-null result owns a plugin reference, released exactly once.
@@ -141,15 +139,6 @@ fn load(path: &Path) -> io::Result<ManuallyDrop<Library>> {
         libloading::os::unix::Library::open(
             Some(path),
             libloading::os::unix::RTLD_NOW | libloading::os::unix::RTLD_LOCAL,
-        )
-        .map(Library::from)
-    };
-    #[cfg(windows)]
-    let library = unsafe {
-        libloading::os::windows::Library::load_with_flags(
-            path,
-            libloading::os::windows::LOAD_LIBRARY_SEARCH_DLL_LOAD_DIR
-                | libloading::os::windows::LOAD_LIBRARY_SEARCH_SYSTEM32,
         )
         .map(Library::from)
     };

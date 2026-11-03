@@ -47,23 +47,6 @@ esac
             vec![script.to_string_lossy().into_owned()],
         )
     };
-    #[cfg(windows)]
-    let (command, mut args) = {
-        let script = directory.path().join("export.cmd");
-        std::fs::write(
-            &script,
-            "@echo off\r\n>> \"%~1\" echo invoked\r\n>&2 echo %~4\r\ntype \"%~2\"\r\nif \"%~3\"==\"fail\" exit /b 7\r\nif \"%~3\"==\"wait\" goto wait\r\nexit /b 0\r\n:wait\r\ngoto wait\r\n",
-        )?;
-        (
-            "cmd.exe".to_string(),
-            vec![
-                "/D".to_string(),
-                "/Q".to_string(),
-                "/C".to_string(),
-                script.to_string_lossy().into_owned(),
-            ],
-        )
-    };
     args.extend([
         directory
             .path()

@@ -649,7 +649,7 @@ mod tests {
     }
 
     fn sleep_then_print_argv() -> Vec<String> {
-        if cfg!(windows) {
+        if false {
             vec![
                 std::env::var("COMSPEC").unwrap_or_else(|_| "cmd.exe".to_string()),
                 "/C".to_string(),

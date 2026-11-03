@@ -16,7 +16,7 @@ fn detects_standalone_install_from_release_layout() -> std::io::Result<()> {
         .join("packages/standalone/releases/1.2.3-x86_64-unknown-linux-musl");
     let resources_dir = release_dir.join(RESOURCES_DIRNAME);
     fs::create_dir_all(&resources_dir)?;
-    let exe_path = release_dir.join(if cfg!(windows) { "codex.exe" } else { "codex" });
+    let exe_path = release_dir.join(if false { "codex.exe" } else { "codex" });
     fs::write(&exe_path, "")?;
     fs::write(resources_dir.join(default_rg_command()), "")?;
     fs::write(resources_dir.join(TEST_RESOURCE_NAME), "")?;
@@ -55,7 +55,7 @@ fn standalone_rg_falls_back_when_resources_are_missing() -> std::io::Result<()> 
         .path()
         .join("packages/standalone/releases/1.2.3-x86_64-unknown-linux-musl");
     fs::create_dir_all(&release_dir)?;
-    let exe_path = release_dir.join(if cfg!(windows) { "codex.exe" } else { "codex" });
+    let exe_path = release_dir.join(if false { "codex.exe" } else { "codex" });
     fs::write(&exe_path, "")?;
 
     let context = InstallContext::from_exe_with_codex_home(
@@ -90,7 +90,7 @@ fn detects_package_layout_independently_from_install_method() -> std::io::Result
 }
 "#,
     )?;
-    let exe_path = bin_dir.join(if cfg!(windows) { "codex.exe" } else { "codex" });
+    let exe_path = bin_dir.join(if false { "codex.exe" } else { "codex" });
     fs::write(&exe_path, "")?;
     fs::write(resources_dir.join(TEST_RESOURCE_NAME), "")?;
     fs::write(path_dir.join(default_rg_command()), "")?;
@@ -152,7 +152,7 @@ fn standalone_package_layout_keeps_standalone_install_method() -> std::io::Resul
     fs::create_dir_all(&resources_dir)?;
     fs::create_dir_all(&path_dir)?;
     fs::write(package_dir.join(PACKAGE_METADATA_FILENAME), "{}")?;
-    let exe_path = bin_dir.join(if cfg!(windows) { "codex.exe" } else { "codex" });
+    let exe_path = bin_dir.join(if false { "codex.exe" } else { "codex" });
     fs::write(&exe_path, "")?;
     fs::write(resources_dir.join(TEST_RESOURCE_NAME), "")?;
     fs::write(path_dir.join(default_rg_command()), "")?;
@@ -205,7 +205,7 @@ fn npm_managed_package_keeps_package_layout() -> std::io::Result<()> {
     fs::create_dir_all(&bin_dir)?;
     fs::create_dir_all(&path_dir)?;
     fs::write(package_dir.path().join(PACKAGE_METADATA_FILENAME), "{}")?;
-    let exe_path = bin_dir.join(if cfg!(windows) { "codex.exe" } else { "codex" });
+    let exe_path = bin_dir.join(if false { "codex.exe" } else { "codex" });
     fs::write(&exe_path, "")?;
     fs::write(path_dir.join(default_rg_command()), "")?;
     let canonical_path_dir = AbsolutePathBuf::from_absolute_path(path_dir.canonicalize()?)?;
@@ -232,7 +232,7 @@ fn standalone_package_rg_falls_back_when_codex_path_is_missing() -> std::io::Res
     let bin_dir = package_dir.path().join(BIN_DIRNAME);
     fs::create_dir_all(&bin_dir)?;
     fs::write(package_dir.path().join(PACKAGE_METADATA_FILENAME), "{}")?;
-    let exe_path = bin_dir.join(if cfg!(windows) { "codex.exe" } else { "codex" });
+    let exe_path = bin_dir.join(if false { "codex.exe" } else { "codex" });
     fs::write(&exe_path, "")?;
 
     let context = InstallContext::from_exe_with_codex_home(
@@ -255,7 +255,7 @@ fn bundled_file_lookups_ignore_directories() -> std::io::Result<()> {
     fs::create_dir_all(resources_dir.join(TEST_RESOURCE_NAME))?;
     fs::create_dir_all(path_dir.join(default_rg_command()))?;
     fs::write(package_dir.path().join(PACKAGE_METADATA_FILENAME), "{}")?;
-    let exe_path = bin_dir.join(if cfg!(windows) { "codex.exe" } else { "codex" });
+    let exe_path = bin_dir.join(if false { "codex.exe" } else { "codex" });
     fs::write(&exe_path, "")?;
 
     let context = InstallContext::from_exe_with_codex_home(

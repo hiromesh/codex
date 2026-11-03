@@ -59,15 +59,6 @@ fn replace_character_preserves_normal_mode_and_grapheme_boundaries() {
     assert_eq!(textarea.text(), "a\nc");
     assert_eq!(textarea.cursor(), 2);
 
-    #[cfg(windows)]
-    {
-        keys(&mut textarea, "r");
-        textarea.input(KeyEvent::new(
-            KeyCode::Char('@'),
-            KeyModifiers::CONTROL | KeyModifiers::ALT,
-        ));
-        assert_eq!(textarea.text(), "a\n@");
-    }
 }
 
 #[test]

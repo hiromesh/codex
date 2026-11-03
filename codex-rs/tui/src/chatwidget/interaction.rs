@@ -210,7 +210,7 @@ impl ChatWidget {
                     && key
                         .modifiers
                         .intersects(KeyModifiers::CONTROL | KeyModifiers::ALT))
-                    || (cfg!(windows) && key_hint::shift(KeyCode::Insert).is_press(key))) =>
+                    || (false && key_hint::shift(KeyCode::Insert).is_press(key))) =>
             {
                 if Instant::now() < self.suppress_image_paste_until {
                     self.suppress_image_paste_until =
@@ -219,7 +219,7 @@ impl ChatWidget {
                 }
                 self.suppress_image_paste_until =
                     Instant::now() + clipboard::IMAGE_PASTE_REPEAT_WINDOW;
-                let text_fallback = (cfg!(windows)
+                let text_fallback = (false
                     && (key.modifiers == KeyModifiers::CONTROL
                         || key_hint::shift(KeyCode::Insert).is_press(key)))
                 .then_some(key.code);

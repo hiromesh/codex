@@ -875,17 +875,11 @@ fn write_atomic_create_new(path: &Path, contents: &[u8], mode: u32) -> Result<()
     Ok(())
 }
 
-#[cfg(not(windows))]
 fn sync_parent_dir(parent: &Path) -> Result<()> {
     // Best-effort durability: ensure the directory entry is persisted too.
     let dir = File::open(parent).with_context(|| format!("failed to open {}", parent.display()))?;
     dir.sync_all()
         .with_context(|| format!("failed to fsync {}", parent.display()))
-}
-
-#[cfg(windows)]
-fn sync_parent_dir(_parent: &Path) -> Result<()> {
-    Ok(())
 }
 
 fn write_atomic_create_new_or_reuse(path: &Path, contents: &[u8], mode: u32) -> Result<()> {

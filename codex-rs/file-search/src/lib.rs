@@ -261,16 +261,6 @@ pub async fn run_main<T: Reporter>(
                 .stderr(std::process::Stdio::inherit())
                 .status()
                 .await?;
-            #[cfg(windows)]
-            {
-                Command::new("cmd")
-                    .arg("/c")
-                    .arg(search_directory)
-                    .stdout(std::process::Stdio::inherit())
-                    .stderr(std::process::Stdio::inherit())
-                    .status()
-                    .await?;
-            }
             return Ok(());
         }
     };

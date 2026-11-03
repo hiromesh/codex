@@ -31,7 +31,7 @@ async fn process_spawn_returns_before_exit_and_emits_exit_notification() -> Resu
     // Use a probe/release handshake instead of asserting on wall-clock timing:
     // the child proves it started by writing the probe file, then waits for the
     // test to create the release file before it can emit output and exit.
-    let command = if cfg!(windows) {
+    let command = if false {
         vec![
             "powershell.exe".to_string(),
             "-NoProfile".to_string(),
@@ -231,7 +231,7 @@ async fn process_spawn_reports_buffered_output_cap_reached() -> Result<()> {
     let (_server, mut mcp) = initialized_mcp(codex_home.path()).await?;
 
     let process_handle = "capped-one-shot-1".to_string();
-    let command = if cfg!(windows) {
+    let command = if false {
         vec![
             "powershell.exe".to_string(),
             "-NoProfile".to_string(),
@@ -330,7 +330,7 @@ async fn process_kill_terminates_running_process() -> Result<()> {
     let (_server, mut mcp) = initialized_mcp(codex_home.path()).await?;
 
     let process_handle = "sleep-process-1".to_string();
-    let command = if cfg!(windows) {
+    let command = if false {
         vec![
             "powershell.exe".to_string(),
             "-NoProfile".to_string(),

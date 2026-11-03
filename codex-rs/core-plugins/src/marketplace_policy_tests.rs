@@ -7,8 +7,6 @@ use codex_config::RequirementsLayerEntry;
 use codex_config::compose_requirements;
 use pretty_assertions::assert_eq;
 use std::fs;
-#[cfg(target_os = "windows")]
-use std::path::PathBuf;
 use tempfile::TempDir;
 
 #[path = "marketplace_policy/curated_tests.rs"]
@@ -16,38 +14,6 @@ mod curated;
 
 fn config_layer_stack(requirements_toml: &str) -> ConfigLayerStack {
     config_layer_stack_with_user_config(requirements_toml, /*user_config*/ None)
-}
-
-#[cfg(target_os = "windows")]
-#[test]
-fn primary_runtime_cache_uses_user_profile_on_windows() {
-    assert_eq!(
-        primary_runtime_cache_dir_from_user_profile(Some(PathBuf::from(r"C:\Users\user"))),
-        Some(PathBuf::from(r"C:\Users\user\.cache"))
-    );
-    assert!(is_expected_managed_path(
-        Path::new(r"\\?\c:\users\USER\.cache"),
-        Path::new(r"C:\Users/user\.cache"),
-    ));
-}
-
-#[cfg(windows)]
-#[test]
-fn managed_windows_root_accepts_redirected_target_but_not_unowned_alias() {
-    let temp = TempDir::new().unwrap();
-    let target = temp.path().join("redirected-cache");
-    let owned = temp.path().join(".cache");
-    let alias = temp.path().join("unowned-alias");
-    let other = temp.path().join("different-source");
-    fs::create_dir_all(&target).unwrap();
-    fs::create_dir_all(&other).unwrap();
-    crate::test_support::create_directory_junction(&target, &owned);
-    crate::test_support::create_directory_junction(&target, &alias);
-    let canonical = owned.canonicalize().unwrap();
-    assert!(is_expected_managed_path(&canonical, &owned));
-    assert!(is_expected_managed_path(&owned, &owned));
-    assert!(!is_expected_managed_path(&alias, &owned));
-    assert!(!is_expected_managed_path(&other, &owned));
 }
 
 fn config_layer_stack_with_user_config(

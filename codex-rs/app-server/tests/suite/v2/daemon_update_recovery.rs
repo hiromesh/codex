@@ -845,24 +845,6 @@ async fn request_shutdown(server: &Child, _socket_path: &Path) -> Result<()> {
     Ok(())
 }
 
-#[cfg(windows)]
-async fn request_shutdown(server: &Child, socket_path: &Path) -> Result<()> {
-    let pid = server.id().context("server pid")?.to_string();
-    timeout(DEFAULT_READ_TIMEOUT, async {
-        let stream = UnixStream::connect(socket_path).await?;
-        let (mut websocket, _) = client_async("ws://localhost/daemon/shutdown", stream).await?;
-        websocket.send(Message::Text(pid.clone().into())).await?;
-        let reply = websocket
-            .next()
-            .await
-            .context("missing shutdown acknowledgment")??;
-        assert_eq!(reply, Message::Text(pid.into()));
-        websocket.close(None).await?;
-        Ok(())
-    })
-    .await?
-}
-
 async fn connect_initialized(
     socket_path: &Path,
     capabilities: InitializeCapabilities,

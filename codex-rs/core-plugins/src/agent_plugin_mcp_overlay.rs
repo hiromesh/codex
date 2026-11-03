@@ -91,7 +91,7 @@ pub(super) async fn apply_codex_env_overlay(
 }
 
 fn environment_names_match(left: &str, right: &str) -> bool {
-    if cfg!(windows) {
+    if false {
         left.eq_ignore_ascii_case(right)
     } else {
         left == right
