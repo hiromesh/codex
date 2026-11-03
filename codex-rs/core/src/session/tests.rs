@@ -332,7 +332,6 @@ impl StepContext {
 
 #[path = "dynamic_tools_tests.rs"]
 mod dynamic_tools_tests;
-mod guardian_tests;
 
 fn user_message(text: &str) -> ResponseItem {
     ResponseItem::Message {
@@ -7168,7 +7167,6 @@ pub(crate) async fn make_session_and_context() -> (Session, TurnContext) {
         skills_snapshot,
     );
     session.mark_mcp_runtime_dirty();
-    crate::guardian::test_host::install(&session, &turn_context.config);
     (session, turn_context)
 }
 
@@ -7901,9 +7899,8 @@ async fn request_permissions_tool_resolves_legacy_paths_against_selected_environ
         },
     })
     .to_string();
-    let prepared_action = PreparedPermissionRequest::parse(&arguments, &environment)
-        .expect("prepare permission request")
-        .approval_action(&call_id, &turn_context_mut.sub_id);
+    PreparedPermissionRequest::parse(&arguments, &environment)
+        .expect("prepare permission request");
     turn_context_mut
         .initial_environments
         .environments
@@ -7955,16 +7952,6 @@ async fn request_permissions_tool_resolves_legacy_paths_against_selected_environ
         )),
         ..Default::default()
     };
-    assert_eq!(
-        prepared_action,
-        crate::tools::sandboxing::ApprovalAction::RequestPermissions {
-            id: call_id,
-            turn_id: turn_context.sub_id.clone(),
-            environment_id: "remote".to_string(),
-            reason: Some("need write".to_string()),
-            permissions: expected_permissions.clone(),
-        },
-    );
     assert_eq!(request.environment_id.as_deref(), Some("remote"));
     assert_eq!(request.permissions, expected_permissions);
 
@@ -9472,7 +9459,6 @@ where
         skills_snapshot,
     ));
     session.mark_mcp_runtime_dirty();
-    crate::guardian::test_host::install(&session, &turn_context.config);
     (session, turn_context, rx_event)
 }
 
@@ -9786,228 +9772,6 @@ async fn refreshed_mcp_binding_captures_current_approval_authority() {
     );
 }
 
-#[test_case(false; "legacy thread reviewer")]
-#[test_case(true; "explicit live reviewer")]
-#[tokio::test]
-async fn mcp_elicitation_reviewer_uses_active_reviewer_and_latest_runtime_policy(
-    live_update: bool,
-) {
-    let guardian_server = start_mock_server().await;
-    mount_sse_once(
-        &guardian_server,
-        sse(vec![
-            ev_response_created("guardian-review"),
-            ev_assistant_message("guardian-review", r#"{"outcome":"allow"}"#),
-            ev_completed("guardian-review"),
-        ]),
-    )
-    .await;
-    let (session, old_turn, rx) = make_session_and_context_with_auth_and_config_and_rx(
-        CodexAuth::from_api_key("Test API Key"),
-        Vec::new(),
-        |config| {
-            config.model_provider.base_url = Some(format!("{}/v1", guardian_server.uri()));
-            config
-                .mcp_servers
-                .set(
-                    serde_json::from_value(json!({
-                        "browser-use": { "command": "missing-test-mcp-server" }
-                    }))
-                    .expect("test MCP server configuration should deserialize"),
-                )
-                .expect("test MCP server should be configurable");
-        },
-    )
-    .await;
-    assert_eq!(old_turn.config.approvals_reviewer, ApprovalsReviewer::User);
-    let task = NeverEndingTask {
-        kind: TaskKind::Regular,
-        listen_to_cancellation_token: true,
-    };
-    session
-        .spawn_task(Arc::clone(&old_turn), Vec::new(), task)
-        .await;
-
-    session.mark_mcp_runtime_dirty();
-    session.refresh_mcp_if_dirty().await;
-    if live_update {
-        assert_eq!(
-            session
-                .apply_turn_settings(
-                    &old_turn.sub_id,
-                    codex_protocol::protocol::TurnSettingsUpdate {
-                        approvals_reviewer: Some(ApprovalsReviewer::AutoReview),
-                        ..Default::default()
-                    },
-                )
-                .await,
-            codex_protocol::protocol::TurnSettingsUpdateOutcome::Applied
-        );
-    } else {
-        session
-            .update_settings(SessionSettingsUpdate {
-                step_settings: StepSettingsUpdate {
-                    approvals_reviewer: Some(ApprovalsReviewer::AutoReview),
-                    ..Default::default()
-                },
-                ..Default::default()
-            })
-            .await
-            .expect("reviewer settings should update");
-        session.refresh_mcp_if_dirty().await;
-    }
-
-    let request = codex_mcp::ElicitationReviewRequest {
-        server_name: "browser-use".to_string(),
-        request_id: rmcp::model::NumberOrString::Number(7),
-        elicitation: codex_rmcp_client::Elicitation::Mcp(
-            rmcp::model::ElicitRequestParams::FormElicitationParams {
-                meta: Some(rmcp::model::RequestMetaObject::from(
-                    serde_json::Map::from_iter([
-                        ("codex_approval_kind".to_string(), json!("mcp_tool_call")),
-                        ("codex_request_type".to_string(), json!("approval_request")),
-                        ("tool_name".to_string(), json!("access_browser_origin")),
-                    ]),
-                )),
-                message: "Allow origin?".to_string(),
-                requested_schema: rmcp::model::ElicitationSchema::builder()
-                    .build()
-                    .expect("schema should build"),
-            },
-        ),
-    };
-    assert!(
-        session
-            .mcp_elicitation_reviewer()
-            .review(request.clone())
-            .await
-            .expect("elicitation review should succeed")
-            .is_some()
-    );
-    assert!(
-        std::iter::from_fn(|| rx.try_recv().ok())
-            .any(|event| matches!(event.msg, EventMsg::GuardianAssessment(_))),
-        "a valid elicitation should reach Guardian"
-    );
-
-    session
-        .update_settings(SessionSettingsUpdate {
-            step_settings: StepSettingsUpdate {
-                approval_policy: Some(AskForApproval::Never),
-                ..Default::default()
-            },
-            ..Default::default()
-        })
-        .await
-        .expect("approval policy should update");
-    session.refresh_mcp_if_dirty().await;
-    assert_eq!(
-        session
-            .mcp_elicitation_reviewer()
-            .review(request.clone())
-            .await
-            .expect("elicitation review should succeed"),
-        Some(ElicitationResponse {
-            action: ElicitationAction::Decline,
-            content: None,
-            meta: Some(json!({ "approvals_reviewer": "auto_review" })),
-        })
-    );
-
-    session
-        .update_settings(SessionSettingsUpdate {
-            permission_profile: Some(PermissionProfile::Disabled),
-            ..Default::default()
-        })
-        .await
-        .expect("permission profile should update");
-    session.refresh_mcp_if_dirty().await;
-    assert_eq!(
-        session
-            .mcp_elicitation_reviewer()
-            .review(request.clone())
-            .await
-            .expect("elicitation review should succeed"),
-        Some(ElicitationResponse {
-            action: ElicitationAction::Decline,
-            content: None,
-            meta: Some(json!({ "approvals_reviewer": "auto_review" })),
-        })
-    );
-
-    session.abort_all_tasks(TurnAbortReason::Interrupted).await;
-    let (next_turn, _) = session
-        .new_turn_with_sub_id(
-            "next-turn".to_string(),
-            SessionSettingsUpdate {
-                step_settings: StepSettingsUpdate {
-                    approvals_reviewer: Some(ApprovalsReviewer::AutoReview),
-                    ..Default::default()
-                },
-                ..Default::default()
-            },
-            Default::default(),
-        )
-        .await
-        .expect("next turn should start with the same reviewer");
-    session
-        .spawn_task(Arc::clone(&next_turn), Vec::new(), task)
-        .await;
-    session.refresh_mcp_if_dirty().await;
-    assert_eq!(
-        session
-            .mcp_elicitation_reviewer()
-            .review(request.clone())
-            .await
-            .expect("elicitation review should succeed"),
-        Some(ElicitationResponse {
-            action: ElicitationAction::Accept,
-            content: Some(json!({})),
-            meta: Some(json!({ "approvals_reviewer": "auto_review" })),
-        })
-    );
-
-    let selection = session
-        .services
-        .turn_environments
-        .selections()
-        .into_iter()
-        .next()
-        .expect("session should select its executor environment");
-    let mut owner_config = next_turn
-        .initial_environments
-        .primary()
-        .expect("ready environment")
-        .config()
-        .clone();
-    owner_config.permission_profile =
-        PermissionProfileSnapshot::legacy(PermissionProfile::read_only());
-    session
-        .environment_ready(&selection, owner_config)
-        .await
-        .expect("attachment owner should install its restricted permissions");
-    session.abort_all_tasks(TurnAbortReason::Interrupted).await;
-    let restricted_turn = session
-        .new_turn_with_default_settings("owner-restricted".to_string(), Default::default())
-        .await;
-    session.spawn_task(restricted_turn, Vec::new(), task).await;
-    session.refresh_mcp_if_dirty().await;
-    assert_eq!(
-        session
-            .mcp_elicitation_reviewer()
-            .review(request)
-            .await
-            .expect("elicitation review should succeed"),
-        Some(ElicitationResponse {
-            action: ElicitationAction::Decline,
-            content: None,
-            meta: Some(json!({ "approvals_reviewer": "auto_review" })),
-        })
-    );
-
-    session.abort_all_tasks(TurnAbortReason::Interrupted).await;
-}
-
 #[tokio::test]
 async fn cancelled_mcp_refresh_remains_pending() {
     let (session, _turn_context) = make_session_and_context().await;
@@ -10036,18 +9800,6 @@ async fn cancelled_mcp_refresh_remains_pending() {
         !session.mcp_refresh.is_pending(),
         "the next refresh should publish the pending runtime"
     );
-}
-
-#[tokio::test]
-async fn mcp_elicitation_reviewer_is_reused_across_runtime_refreshes() {
-    let (session, _turn_context) = make_session_and_context().await;
-    let session = Arc::new(session);
-    let previous = session.mcp_elicitation_reviewer();
-
-    session.mark_mcp_runtime_dirty();
-    session.refresh_mcp_if_dirty().await;
-
-    assert!(Arc::ptr_eq(&previous, &session.mcp_elicitation_reviewer()));
 }
 
 #[tokio::test]

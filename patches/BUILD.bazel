@@ -24,7 +24,6 @@ exports_files([
     "tikv-jemalloc-sys_make_env.patch",
     "tikv-jemalloc-sys_dependency_flags.patch",
     "tonic-zstd-level1.patch",
-    "webrtc-sys_hermetic_darwin_sysroot.patch",
     "windows-link.patch",
     "windows-support-remote-case-aliases.patch",
     "windows-support-native-tools.patch",

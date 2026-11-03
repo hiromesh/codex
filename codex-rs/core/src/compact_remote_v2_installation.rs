@@ -200,7 +200,7 @@ async fn build_and_install_compaction(
             RetainedImageBudget::Disabled
         },
     );
-    let reviewer_compaction_hash = reviewer_compaction_hash(sess, turn_context).await;
+    let reviewer_compaction_hash = None;
     let installed = if let Some((prefix, model_info, cutoff_world_state)) = prefix {
         let (initial_context, world_state_baseline) = sess
             .build_initial_context_with_world_state(replacement_step_context, &cutoff_world_state)
@@ -281,19 +281,4 @@ async fn build_and_install_compaction(
     Ok(true)
 }
 
-async fn reviewer_compaction_hash(sess: &Session, turn_context: &TurnContext) -> Option<String> {
-    if crate::context::GuardianContextMode::from_history(
-        sess.conversation_history_snapshot().await.as_ref(),
-    ) == crate::context::GuardianContextMode::Legacy
-        && let Some(review_turn) = sess.turn_context_for_sub_id(&turn_context.sub_id).await
-    {
-        // Previous-model compaction must remain compatible with the continuing turn's
-        // reviewer, including model changes accepted while compaction was running.
-        let mut review_context = crate::guardian::GuardianReviewContext::from(&review_turn);
-        review_context.model_info = review_turn.capture_current_model_info();
-        let (_, reviewer) = crate::guardian::resolve_review_model(sess, &review_context).await;
-        reviewer.comp_hash.clone()
-    } else {
-        None
-    }
-}
+

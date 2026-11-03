@@ -1,4 +1,5 @@
 use super::*;
+use crate::guardian::NetworkAccessTrigger;
 use crate::sandboxing::SandboxPermissions;
 use codex_direct_tool_timing::ToolBatchTiming;
 use codex_network_proxy::BlockedRequestArgs;
@@ -766,7 +767,7 @@ async fn register_call_with_default_shell_trigger(
             registration_id: registration_id.to_string(),
             turn_id: "turn-1".to_string(),
             tool_name: ToolName::plain("exec_command"),
-            trigger: GuardianNetworkAccessTrigger {
+            trigger: NetworkAccessTrigger {
                 call_id: registration_id.to_string(),
                 tool_name: "exec_command".to_string(),
                 command: vec!["curl".to_string(), "https://example.com".to_string()],
@@ -790,7 +791,7 @@ async fn register_call_with_default_shell_trigger(
 async fn active_call_preserves_triggering_command_context() {
     let service = NetworkApprovalService::default();
     let tool_name = ToolName::namespaced("mcp__example", "exec_command");
-    let expected = GuardianNetworkAccessTrigger {
+    let expected = NetworkAccessTrigger {
         call_id: "call-1".to_string(),
         tool_name: tool_name.to_string(),
         command: vec!["curl".to_string(), "https://example.com".to_string()],

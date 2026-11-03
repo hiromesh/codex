@@ -145,18 +145,6 @@ mod partial_answers;
 #[path = "scenarios_guardian_sender_context.rs"]
 mod guardian_sender_context;
 
-#[path = "scenarios_guardian_direct_review.rs"]
-mod guardian_direct_review;
-
-#[path = "scenarios_guardian_extra_policy.rs"]
-mod guardian_extra_policy;
-
-#[path = "scenarios_guardian_orchestrator_connector.rs"]
-mod guardian_orchestrator_connector;
-
-#[path = "scenarios_guardian_conversation_history_tests.rs"]
-mod guardian_conversation_history;
-
 #[path = "scenarios_mcp_resource_messages.rs"]
 mod mcp_resource_messages;
 
@@ -2330,42 +2318,6 @@ async fn prediction_fork_preserves_context_above_compaction_threshold() -> Resul
         &requests,
         &ContextSnapshotOptions::default().include_request_settings(),
     ));
-    Ok(())
-}
-
-#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn guardian_checkpoint_migration_request_history() -> Result<()> {
-    skip_if_no_network!(Ok(()));
-    use super::guardian_checkpoint_migration::migration_scenario;
-    let requests = migration_scenario().await?;
-    let mut snapshot = context_snapshot::format_request_history_snapshot(
-        "An old checkpoint retains a user restriction, assistant questions, and a verified answer. Incompatible automatic compaction keeps legacy review across restart with its saved answer; compatible manual compaction immediately activates thread-owned review.",
-        &requests,
-        &ContextSnapshotOptions::default()
-            .rewrite_known_segments()
-            .include_request_settings(),
-    );
-    // Normalize executor IDs, paths and shell wrappers in the reviewed actions.
-    for (pattern, replacement) in [
-        (
-            r#"(?m)^(\s*"environment_id": )"(?:local|remote)""#,
-            "$1\"<ENVIRONMENT>\"",
-        ),
-        (
-            r#"(The active permission profile for environment )"(?:local|remote)""#,
-            "$1\"<ENVIRONMENT>\"",
-        ),
-        (r#"(?m)^(\s*"cwd": )"[^"]*""#, "$1\"<CWD>\""),
-        (
-            r#""command": \[\s*(?:"[^"]*",\s*)*"exit 0"\s*\]"#,
-            "\"command\": [\"<SHELL>\", \"exit 0\"]",
-        ),
-    ] {
-        snapshot = regex_lite::Regex::new(pattern)?
-            .replace_all(&snapshot, replacement)
-            .into_owned();
-    }
-    insta::assert_snapshot!("guardian_checkpoint_migration", snapshot);
     Ok(())
 }
 

@@ -339,10 +339,7 @@ pub(crate) async fn handle_mcp_tool_call(
                     &call_id,
                     invocation,
                     item_metadata.clone(),
-                    ResolvedModelMessages::from_model(turn_context.model_info())
-                        .auto_review()
-                        .timeout_instructions
-                        .to_string(),
+                    "approval request timed out".to_string(),
                     /*already_started*/ true,
                 )
                 .await

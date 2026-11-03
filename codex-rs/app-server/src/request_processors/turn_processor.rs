@@ -186,49 +186,13 @@ impl TurnRequestProcessor {
 
     pub(crate) async fn thread_guardian_review(
         &self,
-        request_id: &ConnectionRequestId,
-        params: ThreadGuardianReviewParams,
-        cancellation: &CancellationToken,
+        _request_id: &ConnectionRequestId,
+        _params: ThreadGuardianReviewParams,
+        _cancellation: &CancellationToken,
     ) -> Result<Option<ClientResponsePayload>, JSONRPCErrorError> {
-        let (thread_id, thread) = self.load_thread(&params.thread_id).await?;
-        self.ensure_direct_input_allowed(request_id, thread.as_ref())
-            .await?;
-        self.config_manager
-            .check_thread_model_provider_for_input(thread.config().await.as_ref())
-            .await
-            .map_err(|error| config_load_error(&error))?;
-        match self
-            .ensure_conversation_listener(
-                thread_id,
-                request_id.connection_id,
-                /*raw_events_enabled*/ false,
-            )
-            .await?
-        {
-            EnsureConversationListenerResult::Attached => {}
-            EnsureConversationListenerResult::ConnectionClosed => return Ok(None),
-        }
-        let result =
-            thread
-                .guardian_review(cancellation)
-                .await
-                .map_err(|err| match err.details() {
-                    CodexErrorDetails::InvalidRequest(message) => invalid_request(message.clone()),
-                    _ => internal_error(format!("Guardian review failed: {err}")),
-                })?;
-        Ok(Some(
-            ThreadGuardianReviewResponse {
-                call_id: result.call_id,
-                assessment: result
-                    .assessment
-                    .map(|assessment| ThreadGuardianAssessment {
-                        outcome: assessment.outcome,
-                        risk_level: assessment.risk_level.into(),
-                        user_authorization: assessment.user_authorization.into(),
-                        rationale: assessment.rationale,
-                    }),
-            }
-            .into(),
+        // Automatic Guardian review has been removed from this build.
+        Err(invalid_request(
+            "Guardian review is not available in this build".to_string(),
         ))
     }
 

@@ -49,7 +49,6 @@ mod apply_patch_system_aliases;
 mod approvals;
 mod audio_truncation;
 mod auth_recovery_policy;
-mod auto_review;
 mod base_instructions;
 #[path = "bedrock_multi_agent_tests.rs"]
 mod bedrock_multi_agent;
@@ -83,27 +82,11 @@ mod gcp;
 mod git_enrichment;
 mod guardian_authorization;
 mod guardian_authorization_refresh;
-#[path = "guardian_cached_score_tests.rs"]
-mod guardian_cached_score;
-#[path = "guardian_checkpoint_migration_tests.rs"]
-mod guardian_checkpoint_migration;
-// Uses the same command-approval harness as guardian_review below.
 mod builtin_model_catalog;
 mod canonical_plugin_connectors;
 mod critical_path_runtime;
 mod gateway_auth;
-mod guardian_connector_trust;
-mod guardian_context_budget;
-#[path = "guardian_cyber_access_program_tests.rs"]
-mod guardian_cyber_access_program;
-mod guardian_history;
-mod guardian_mcp_elicitation;
-#[path = "guardian_persistence_tests.rs"]
-mod guardian_persistence;
 mod guardian_retained_context;
-mod guardian_retry;
-mod guardian_review;
-mod guardian_review_cancellation;
 mod guardian_subagent_authorization;
 mod hooks;
 mod hooks_executor;

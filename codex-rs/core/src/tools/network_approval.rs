@@ -63,7 +63,7 @@ const ABANDONED_NETWORK_APPROVAL_MESSAGE: &str =
 #[derive(Debug)]
 pub(crate) struct NetworkApprovalSpec {
     pub network: Option<NetworkProxy>,
-    pub trigger: GuardianNetworkAccessTrigger,
+    pub trigger: NetworkAccessTrigger,
     /// Preserve the typed identity independently of Guardian's display-name payload.
     pub tool_name: ToolName,
     pub command: String,
@@ -246,7 +246,7 @@ impl PendingHostApproval {
 struct ActiveNetworkApprovalCall {
     registration_id: String,
     turn_id: String,
-    trigger: GuardianNetworkAccessTrigger,
+    trigger: NetworkAccessTrigger,
     tool_name: ToolName,
     command: String,
     environment_id: String,

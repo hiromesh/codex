@@ -1622,16 +1622,6 @@ impl Config {
         configured.then_some(self.log_dir.as_path())
     }
 
-    /// Resolves the configured, reviewer-catalog, or bundled Guardian policy.
-    pub fn resolve_guardian_policy<'a>(
-        &'a self,
-        model_messages: ResolvedModelMessages<'a>,
-    ) -> &'a str {
-        self.guardian_policy_config
-            .as_deref()
-            .unwrap_or(model_messages.auto_review().policy)
-    }
-
     pub(crate) fn multi_agent_version_override(&self) -> Option<MultiAgentVersion> {
         if self.features.enabled(Feature::MultiAgentV2) {
             Some(MultiAgentVersion::V2)
@@ -3471,16 +3461,6 @@ impl Config {
             feature_requirements,
             &mut startup_warnings,
         )?;
-        if let Some(FeatureToml::Config(guardian)) = cfg
-            .features
-            .as_ref()
-            .and_then(|features| features.guardianv2.as_ref())
-            && guardian.async_classifier_mode.is_some()
-        {
-            startup_warnings.push(
-                "`[features.guardianv2].async_classifier_mode` is deprecated and ignored. Async classification always uses conversations; remove this setting from config.toml or profile configuration files.".to_owned(),
-            );
-        }
         let mcp_enterprise_managed_auth = McpEnterpriseManagedAuthConfig::resolve(
             &config_layer_stack,
             cfg.mcp_enterprise_managed_auth.as_ref(),
@@ -4134,15 +4114,7 @@ impl Config {
                 normalize_guardian_policy_config(auto_review.extra_policy.as_deref())
             })
         });
-        let guardian_transcript_mode = cfg
-            .features
-            .as_ref()
-            .and_then(|features| features.guardianv2.as_ref())
-            .and_then(|feature| match feature {
-                FeatureToml::Config(config) => config.transcript_mode,
-                FeatureToml::Enabled(_) => None,
-            })
-            .unwrap_or_default();
+        let guardian_transcript_mode = Default::default();
         let guardian_policy_template = cfg
             .auto_review
             .as_ref()
@@ -4528,7 +4500,7 @@ impl Config {
                 .auto_review
                 .as_ref()
                 .and_then(|auto_review| auto_review.timeout_ms)
-                .map_or(Some(codex_guardian_reviewer::REVIEW_TIMEOUT), |timeout_ms| {
+                .map_or(Some(Duration::from_secs(90)), |timeout_ms| {
                     (timeout_ms != 0).then(|| Duration::from_millis(u64::from(timeout_ms)))
                 }),
             guardian_circuit_break_action: cfg

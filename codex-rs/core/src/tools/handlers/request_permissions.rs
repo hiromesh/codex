@@ -20,7 +20,6 @@ use crate::tools::handlers::shell_spec::request_permissions_tool_description;
 use crate::tools::registry::CoreToolRuntime;
 use crate::tools::registry::ToolExecutor;
 use crate::tools::registry::with_updated_function_input;
-use crate::tools::sandboxing::ApprovalAction;
 use codex_tools::ToolName;
 use codex_tools::ToolSpec;
 use serde::Deserialize;
@@ -68,15 +67,6 @@ impl PreparedPermissionRequest {
         })
     }
 
-    pub(crate) fn approval_action(&self, call_id: &str, turn_id: &str) -> ApprovalAction {
-        ApprovalAction::RequestPermissions {
-            id: call_id.to_owned(),
-            environment_id: self.environment_id.clone(),
-            turn_id: turn_id.to_owned(),
-            reason: self.reason.clone(),
-            permissions: self.permissions.clone(),
-        }
-    }
 }
 
 #[derive(Deserialize)]
