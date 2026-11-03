@@ -36,8 +36,6 @@ pub struct SandboxState {
     pub sandbox_cwd: PathUri,
     #[serde(default)]
     pub use_legacy_landlock: bool,
-    #[serde(default)]
-    pub use_mxc: bool,
 }
 
 /// The known launcher envelope is distinct from the opaque policy. Absence never

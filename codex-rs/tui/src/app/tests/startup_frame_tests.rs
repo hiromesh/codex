@@ -178,12 +178,8 @@ async fn owned_startup_renders_visible_decisions_and_overview_before_pending_eve
             let view = app.agents_overview_view(Vec::new(), /*selected_thread_id*/ None);
             app.chat_widget.show_bottom_pane_view(Box::new(view));
         } else {
-            let preset = codex_utils_approval_presets::builtin_approval_presets()
-                .into_iter()
-                .find(|preset| preset.id == "auto")
-                .expect("auto preset");
             app.chat_widget
-                .open_windows_sandbox_enable_prompt(preset, /*profile_selection*/ None);
+                .apply_external_edit("visible startup decision".into());
         }
         let mut tui = crate::tui::test_support::make_test_tui()?;
         tui.set_owned_screen(/*owned*/ true)?;
@@ -192,7 +188,7 @@ async fn owned_startup_renders_visible_decisions_and_overview_before_pending_eve
         assert!(frame_text(&tui).contains(if overview {
             "Agent command center"
         } else {
-            "sandbox"
+            "visible startup decision"
         }));
         tui.set_owned_screen(/*owned*/ false)?;
     }

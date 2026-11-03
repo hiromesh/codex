@@ -703,7 +703,7 @@ enabled_tools = []
                         && !String::from_utf8_lossy(&request.body).contains(&expected_call_id)
                 },
                 responses::sse(vec![
-                    responses::ev_custom_tool_call(&exec_call_id, "exec", "text('child cell')"),
+                    responses::ev_function_call(&exec_call_id, "exec_command", r#"{"cmd":"echo child cell"}"#),
                     responses::ev_completed("child-exec"),
                 ]),
             )

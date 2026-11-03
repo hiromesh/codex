@@ -1,7 +1,6 @@
 use super::*;
 use codex_apply_patch::MaybeApplyPatchVerified;
 use codex_exec_server::LOCAL_FS;
-use codex_protocol::config_types::WindowsSandboxLevel;
 use codex_protocol::permissions::FileSystemAccessMode;
 use codex_protocol::permissions::FileSystemSandboxEntry;
 use codex_protocol::permissions::FileSystemSandboxPolicy;
@@ -280,7 +279,7 @@ fn write_permissions_for_paths_skip_dirs_already_writable_under_workspace_root()
 
     let permissions = write_permissions_for_paths(
         &[file_path.into()],
-        &PatchSandboxRoute::Platform(WindowsSandboxLevel::Disabled)
+        &PatchSandboxRoute::Platform
             .prepare_matching(&sandbox_policy, &local_context(&cwd.into()))
             .expect("prepare patch matching"),
     )
@@ -307,7 +306,7 @@ fn write_permissions_for_paths_keep_dirs_outside_workspace_root() {
 
     let permissions = write_permissions_for_paths(
         &[file_path.into()],
-        &PatchSandboxRoute::Platform(WindowsSandboxLevel::Disabled)
+        &PatchSandboxRoute::Platform
             .prepare_matching(&sandbox_policy, &local_context(&cwd_abs.into()))
             .expect("prepare patch matching"),
     )
@@ -335,7 +334,7 @@ fn write_permissions_for_paths_do_not_widen_workspace_root_target() {
     );
     let permissions = write_permissions_for_paths(
         &[cwd.clone().into()],
-        &PatchSandboxRoute::Platform(WindowsSandboxLevel::Disabled)
+        &PatchSandboxRoute::Platform
             .prepare_matching(&sandbox_policy, &local_context(&cwd.into()))
             .expect("prepare patch matching"),
     )
@@ -356,7 +355,7 @@ fn write_permissions_for_paths_do_not_regrant_an_already_writable_parent() {
 
     let permissions = write_permissions_for_paths(
         &[file_path.into()],
-        &PatchSandboxRoute::Platform(WindowsSandboxLevel::Disabled)
+        &PatchSandboxRoute::Platform
             .prepare_matching(&sandbox_policy, &local_context(&cwd.into()))
             .expect("prepare patch matching"),
     )

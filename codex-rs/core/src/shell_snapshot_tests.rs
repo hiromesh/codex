@@ -270,7 +270,6 @@ async fn inactive_profiles_keep_snapshots_but_active_brokers_require_sandbox() -
     use crate::tools::sandboxing::SandboxAttempt;
     use codex_exec_server::EnvironmentManager;
     use codex_exec_server::LOCAL_ENVIRONMENT_ID;
-    use codex_protocol::config_types::WindowsSandboxLevel;
     use codex_protocol::protocol::EnvironmentConfig;
     use codex_protocol::protocol::EnvironmentConfigState;
     use codex_protocol::protocol::TurnEnvironmentSelection;
@@ -379,8 +378,6 @@ async fn inactive_profiles_keep_snapshots_but_active_brokers_require_sandbox() -
         environment_hooks: Default::default(),
         allow_login_shell: false,
         workspace_roots: Vec::new(),
-        windows_sandbox_level: WindowsSandboxLevel::Disabled,
-        windows_sandbox_type: SandboxType::None,
         use_legacy_landlock: false,
         permission_profile: PermissionProfileSnapshot::legacy(permission_profile),
         shell_environment_policy: ShellEnvironmentPolicy::default(),
@@ -393,7 +390,7 @@ async fn inactive_profiles_keep_snapshots_but_active_brokers_require_sandbox() -
     let environments = ThreadEnvironments::new(
         Arc::clone(&manager),
         shell.clone(),
-        ThreadEnvironmentDefaults::new(config.clone(), config.windows_sandbox_type),
+        ThreadEnvironmentDefaults::new(config.clone()),
         snapshot_builder.clone(),
         TurnEnvironmentSnapshot::default(),
         /*non_blocking_snapshots*/ false,
@@ -444,7 +441,7 @@ async fn inactive_profiles_keep_snapshots_but_active_brokers_require_sandbox() -
             let child = ThreadEnvironments::new(
                 Arc::clone(&manager),
                 shell.clone(),
-                ThreadEnvironmentDefaults::new(config.clone(), config.windows_sandbox_type),
+                ThreadEnvironmentDefaults::new(config.clone()),
                 snapshot_builder.clone(),
                 updated.clone(),
                 /*non_blocking_snapshots*/ false,
@@ -499,8 +496,6 @@ async fn inactive_profiles_keep_snapshots_but_active_brokers_require_sandbox() -
         workspace_roots: std::slice::from_ref(&cwd_uri),
         sandbox_exe: None,
         use_legacy_landlock: false,
-        windows_sandbox_type: SandboxType::None,
-        windows_sandbox_level: WindowsSandboxLevel::Disabled,
         network_denial_cancellation_token: Some(cancellation.clone()),
         network_proxy: None,
     };

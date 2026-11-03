@@ -188,9 +188,6 @@ pub struct EnvironmentCapabilities {
     /// Whether shell state can be cached and restored entirely inside the executor.
     #[serde(default)]
     pub shell_snapshot_v2: bool,
-    /// Whether requests may explicitly select the MXC Windows sandbox backend.
-    #[serde(default)]
-    pub windows_mxc: bool,
     /// Whether a Linux filesystem sandbox preserves standard devices when `/` is writable.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub linux_root_write_preserves_devices: bool,
@@ -284,10 +281,6 @@ impl EnvironmentInfo {
 
     /// Returns information about the current local exec-server process.
     pub fn local() -> Self {
-        #[cfg(windows)]
-        let windows_mxc = codex_mxc_sandbox::is_available();
-        #[cfg(not(windows))]
-        let windows_mxc = false;
         let cwd = std::env::current_dir().ok();
         let temporary_directories = Self::local_temporary_directories_with_cwd(cwd.as_deref());
         let normalize_temp_path = |path: std::ffi::OsString| {
@@ -333,7 +326,6 @@ impl EnvironmentInfo {
                 sandboxed_file_streaming: true,
                 file_write_streaming: true,
                 shell_snapshot_v2: cfg!(unix),
-                windows_mxc,
                 linux_root_write_preserves_devices: cfg!(target_os = "linux"),
                 linux_approved_root_write_preserves_restrictions: cfg!(target_os = "linux"),
             },
@@ -514,8 +506,6 @@ pub enum ProcessSandboxType {
     None,
     MacosSeatbelt,
     LinuxSeccomp,
-    WindowsRestrictedToken,
-    WindowsMxc,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -1329,14 +1319,12 @@ mod tests {
     use super::WireFsOpenParams;
     use super::WireFsReadFileParams;
     use codex_file_system::FileSystemSandboxContext;
-    use codex_file_system::WindowsSandboxSelection;
     use codex_network_proxy::ManagedNetworkSandboxContext;
     use codex_network_proxy::NetworkProxyAuditMetadata;
     use codex_network_proxy::NetworkProxyConfig;
     use codex_network_proxy::RemoteCredentialMasking;
     use codex_network_proxy::RemoteNetworkProxyConfig;
     use codex_network_proxy::RemoteNetworkProxyLaunchConfig;
-    use codex_protocol::config_types::WindowsSandboxProxySettingsMode;
     use codex_protocol::models::ManagedFileSystemPermissions;
     use codex_protocol::models::PermissionProfile;
     use codex_protocol::permissions::FileSystemAccessMode;
@@ -1582,7 +1570,6 @@ mod tests {
                 sandboxed_file_streaming: false,
                 file_write_streaming: false,
                 shell_snapshot_v2: false,
-                windows_mxc: false,
                 linux_root_write_preserves_devices: false,
                 linux_approved_root_write_preserves_restrictions: false,
             }
@@ -1861,7 +1848,6 @@ mod tests {
         let mut sandbox =
             FileSystemSandboxContext::from_permission_profile(permissions, cwd.clone());
         sandbox.user_home_dir = Some(cwd.clone());
-        sandbox.windows_sandbox_selection = WindowsSandboxSelection::Mxc;
 
         let serialized = serde_json::to_value(&sandbox).expect("serialize sandbox");
 
@@ -1899,7 +1885,6 @@ mod tests {
             sandbox
         );
         let preserve = FileSystemSandboxContext {
-            windows_sandbox_proxy_settings_mode: Some(WindowsSandboxProxySettingsMode::Preserve),
             ..sandbox
         };
         let serialized = serde_json::to_value(&preserve).expect("serialize preserve mode");
@@ -2023,7 +2008,6 @@ mod tests {
             PermissionProfile::Disabled,
             cwd.clone(),
         );
-        sandbox.windows_sandbox_selection = WindowsSandboxSelection::Mxc;
         let open = FsOpenParams {
             handle_id: "handle".to_owned(),
             path: path.clone(),

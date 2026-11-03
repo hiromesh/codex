@@ -10,8 +10,6 @@ use codex_feedback::CODEX_APP_DIRECTORY_CACHE_ATTACHMENT_FILENAME;
 use codex_feedback::CODEX_APPS_TOOLS_CACHE_ATTACHMENT_FILENAME;
 use codex_feedback::FeedbackAttachment;
 use codex_feedback::FeedbackSnapshot;
-#[cfg(target_os = "windows")]
-use codex_feedback::WINDOWS_SANDBOX_LOG_ATTACHMENT_FILENAME;
 use codex_feedback::guardian_review_failures;
 use codex_rollout::RolloutRecorder;
 use codex_utils_absolute_path::AbsolutePathBuf;
@@ -267,12 +265,6 @@ impl FeedbackRequestProcessor {
                     Ok(attachment) => extra_attachments.insert(0, attachment),
                     Err(err) => warn!("failed to serialize feedback thread index: {err}"),
                 }
-            }
-            if let Some(sandbox_log_attachment) =
-                windows_sandbox_log_attachment(&self.config.codex_home)
-                && seen_attachment_paths.insert(sandbox_log_attachment.path.clone())
-            {
-                attachment_paths.push(sandbox_log_attachment);
             }
             for cache_attachment in tool_cache_feedback_attachments(
                 self.config.codex_home.as_path(),
@@ -541,22 +533,6 @@ fn tool_cache_feedback_attachments(
 
 fn auto_review_rollout_filename(thread_id: ThreadId) -> String {
     format!("auto-review-rollout-{thread_id}.jsonl")
-}
-
-#[cfg(target_os = "windows")]
-fn windows_sandbox_log_attachment(codex_home: &Path) -> Option<FeedbackAttachmentPath> {
-    let sandbox_log_path = codex_windows_sandbox::current_log_file_path_for_codex_home(codex_home);
-    sandbox_log_path
-        .is_file()
-        .then_some(FeedbackAttachmentPath {
-            path: sandbox_log_path,
-            attachment_filename_override: Some(WINDOWS_SANDBOX_LOG_ATTACHMENT_FILENAME.to_string()),
-        })
-}
-
-#[cfg(not(target_os = "windows"))]
-fn windows_sandbox_log_attachment(_codex_home: &Path) -> Option<FeedbackAttachmentPath> {
-    None
 }
 
 // Refresh logs after SQLite collection without changing the earlier metadata snapshot.
@@ -973,27 +949,6 @@ mod tests {
         );
     }
 
-    #[cfg(target_os = "windows")]
-    #[test]
-    fn windows_sandbox_log_attachment_uses_current_log() {
-        let codex_home = tempfile::tempdir().expect("create tempdir");
-        let sandbox_dir = codex_windows_sandbox::sandbox_dir(codex_home.path());
-        std::fs::create_dir_all(&sandbox_dir).expect("create sandbox dir");
-        let sandbox_log_path =
-            codex_windows_sandbox::current_log_file_path_for_codex_home(codex_home.path());
-        std::fs::write(&sandbox_log_path, "sandbox log").expect("write sandbox log");
-
-        let attachment = windows_sandbox_log_attachment(codex_home.path())
-            .map(|attachment| (attachment.path, attachment.attachment_filename_override));
-
-        assert_eq!(
-            attachment,
-            Some((
-                sandbox_log_path,
-                Some(WINDOWS_SANDBOX_LOG_ATTACHMENT_FILENAME.to_string())
-            ))
-        );
-    }
 }
 
 #[cfg(test)]

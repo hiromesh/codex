@@ -4,7 +4,6 @@ ROOT_OF_EXTRACTED_PACKAGE
 ├── bin
 │   ├── codex                             # CLI package only
 │   ├── codex-app-server                  # app-server package only
-│   ├── codex-code-mode-host
 │   └── codex-exec-server
 ├── codex-package.json
 ├── codex-path
@@ -17,22 +16,12 @@ Each package contains one entrypoint, not both codex and codex-app-server.
 """
 
 import json
-import os
-import re
 import subprocess
-import sys
 import tomllib
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 import pytest
-from app_server_harness import (
-    MockResponsesServer,
-    ev_completed,
-    ev_response_created,
-    sse,
-)
-from openai_codex import ApprovalMode, Codex, CodexConfig, Sandbox
 
 from fixtures import SmokePackage
 
@@ -41,7 +30,7 @@ from fixtures import SmokePackage
     ("arguments", "expected"),
     [
         pytest.param(("--help",), "Usage:", id="help"),
-        pytest.param(("features", "list"), "code_mode", id="features"),
+        pytest.param(("features", "list"), "memories", id="features"),
         pytest.param(("completion", "bash"), "codex", id="completion"),
     ],
 )
@@ -294,155 +283,3 @@ def test_packaged_executor_matches_subcommand_startup(
                 )
             )
         assert outputs[0] == outputs[1], arguments
-
-
-@pytest.mark.parametrize("entrypoint", ["codex", "codex-app-server"])
-def test_app_server_runs_code_mode_through_python_sdk(
-    package: SmokePackage,
-    responses_server: MockResponsesServer,
-    entrypoint: str,
-) -> None:
-    """Both packages run their own ripgrep through sandboxed SDK code mode."""
-    if entrypoint == "codex":
-        executable = package.cli
-        package_root = package.cli_root
-        package_path_dir = package.cli_path_dir
-        config = CodexConfig(
-            codex_bin=str(executable),
-            cwd=str(package.directory),
-            env=package.environment,
-        )
-    else:
-        executable = package.app_server
-        package_root = package.app_server_root
-        package_path_dir = package.app_server_path_dir
-        config = CodexConfig(
-            launch_args_override=(str(executable),),
-            cwd=str(package.directory),
-            env=package.environment,
-        )
-    command = "command -v rg && rg --version"
-    exec_arguments = {"cmd": command, "login": False, "yield_time_ms": 10_000}
-    responses_server.enqueue_sse(
-        sse(
-            [
-                ev_response_created("code-mode"),
-                {
-                    "type": "response.output_item.done",
-                    "item": {
-                        "type": "custom_tool_call",
-                        "call_id": "package-smoke",
-                        "name": "exec",
-                        "input": (
-                            "text(JSON.stringify(await tools.exec_command("
-                            f"{json.dumps(exec_arguments)})))"
-                        ),
-                    },
-                },
-                ev_completed("code-mode"),
-            ]
-        )
-    )
-    responses_server.enqueue_assistant_message("Done", response_id="code-mode-done")
-    with Codex(config=config) as client:
-        turn = client.thread_start(
-            ephemeral=True,
-            approval_mode=ApprovalMode.deny_all,
-            sandbox=Sandbox.workspace_write,
-        ).run("run package smoke")
-        assert turn.final_response == "Done", turn
-    # The mock also records analytics POSTs, which have no Responses input list.
-    output = next(
-        item
-        for request in responses_server.requests()
-        if request.path == "/v1/responses"
-        for item in request.input()
-        if item.get("type") == "custom_tool_call_output"
-        and item.get("call_id") == "package-smoke"
-    )["output"]
-    if not isinstance(output, str):
-        output = next(
-            item["text"] for item in output if item.get("text", "").startswith("{")
-        )
-    execution = json.loads(output)
-    execution_output = execution["output"]
-    assert execution["exit_code"] == 0, execution_output
-    assert "ripgrep" in execution_output, execution_output
-
-    # Each entrypoint must execute the ripgrep bundled in its own package.
-    reported_ripgrep_path = Path(execution_output.splitlines()[0].strip())
-    assert reported_ripgrep_path.is_relative_to(package_root), execution_output
-
-
-def _code_mode_host_symbol_address(
-    package: SmokePackage,
-    symbols: Path,
-    *arguments: str,
-) -> str:
-    symbol_output = subprocess.run(
-        ["nm", "-C", *arguments, str(symbols)],
-        cwd=package.directory,
-        env=package.environment,
-        capture_output=True,
-        text=True,
-        check=True,
-        timeout=45,
-    ).stdout
-    # Rust v0 symbols can name this crate only as the instantiating crate of
-    # a dependency's generic function. Match the demangled entrypoint instead.
-    return next(
-        parts[0]
-        for line in symbol_output.splitlines()
-        if len(parts := line.split(maxsplit=2)) == 3
-        and parts[1].lower() == "t"
-        and re.fullmatch(r"codex_code_mode_host::main(?:::h[0-9a-f]{16})?", parts[2])
-    )
-
-
-@pytest.mark.skipif(sys.platform != "linux", reason="requires Linux debug symbols")
-def test_linux_debug_symbols_resolve_packaged_code(
-    package: SmokePackage,
-    code_mode_host_debug_symbols: Path,
-) -> None:
-    """Linux host symbols resolve a packaged function and its source location."""
-    address = _code_mode_host_symbol_address(
-        package, code_mode_host_debug_symbols, "--defined-only"
-    )
-    resolved = subprocess.run(
-        [
-            "addr2line",
-            "-e",
-            str(code_mode_host_debug_symbols),
-            "-f",
-            "-C",
-            f"0x{address}",
-        ],
-        cwd=package.directory,
-        env=package.environment,
-        capture_output=True,
-        text=True,
-        check=True,
-        timeout=45,
-    ).stdout
-    assert "codex_code_mode_host" in resolved, resolved
-    source = resolved.splitlines()[-1]
-    assert source != "??:?" and source.rsplit(":", 1)[-1].isdigit(), source
-
-
-@pytest.mark.skipif(sys.platform != "darwin", reason="requires macOS debug symbols")
-def test_macos_debug_symbols_resolve_packaged_code(
-    package: SmokePackage,
-    code_mode_host_debug_symbols: Path,
-) -> None:
-    """macOS host symbols resolve a packaged function."""
-    address = _code_mode_host_symbol_address(package, code_mode_host_debug_symbols)
-    resolved = subprocess.run(
-        ["atos", "-o", str(code_mode_host_debug_symbols), f"0x{address}"],
-        cwd=package.directory,
-        env=package.environment,
-        capture_output=True,
-        text=True,
-        check=True,
-        timeout=45,
-    ).stdout
-    assert "codex_code_mode_host" in resolved, resolved

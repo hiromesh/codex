@@ -30,7 +30,6 @@ use codex_analytics::CompactionTrigger;
 use codex_analytics::TurnAnalyticsMetadata;
 use codex_models_manager::model_info::model_info_from_slug;
 use codex_protocol::AgentPath;
-use codex_protocol::config_types::WindowsSandboxLevel;
 use codex_protocol::models::PermissionProfile;
 use codex_protocol::openai_models::ReasoningEffort as ReasoningEffortConfig;
 use codex_protocol::protocol::SessionSource;
@@ -284,7 +283,6 @@ fn turn_metadata_state_includes_sandbox_metadata() {
         "turn-a".to_string(),
         cwd,
         &permission_profile,
-        WindowsSandboxLevel::Disabled,
         /*enforce_managed_network*/ false,
         /*auto_review_enabled*/ true,
         &model_info_from_slug("gpt-5.4"),
@@ -299,7 +297,7 @@ fn turn_metadata_state_includes_sandbox_metadata() {
     let thread_id = json.get("thread_id").and_then(Value::as_str);
 
     assert!(json.get("request_kind").is_none());
-    let expected_sandbox = get_platform_sandbox(/*windows_sandbox_enabled*/ false)
+    let expected_sandbox = get_platform_sandbox()
         .map(SandboxType::as_metric_tag)
         .unwrap_or("none");
     assert_eq!(sandbox_name, Some(expected_sandbox));
@@ -332,7 +330,6 @@ fn turn_metadata_state_includes_root_fork_lineage() {
         "turn-a".to_string(),
         cwd,
         &permission_profile,
-        WindowsSandboxLevel::Disabled,
         /*enforce_managed_network*/ false,
         /*auto_review_enabled*/ false,
         &model_info_from_slug("gpt-5.4"),
@@ -373,7 +370,6 @@ fn turn_metadata_state_includes_thread_spawn_subagent_parent_without_fork() {
         "turn-a".to_string(),
         cwd,
         &permission_profile,
-        WindowsSandboxLevel::Disabled,
         /*enforce_managed_network*/ false,
         /*auto_review_enabled*/ false,
         &model_info_from_slug("gpt-5.4"),
@@ -415,7 +411,6 @@ fn turn_metadata_state_omits_fork_lineage_for_context_inheriting_subagent() {
         "turn-a".to_string(),
         cwd,
         &permission_profile,
-        WindowsSandboxLevel::Disabled,
         /*enforce_managed_network*/ false,
         /*auto_review_enabled*/ false,
         &model_info_from_slug("gpt-5.4"),
@@ -467,7 +462,6 @@ fn turn_metadata_state_includes_known_parent_for_non_thread_spawn_subagents_with
             "turn-a".to_string(),
             cwd.clone(),
             &permission_profile,
-            WindowsSandboxLevel::Disabled,
             /*enforce_managed_network*/ false,
             /*auto_review_enabled*/ false,
             &model_info_from_slug("gpt-5.4"),
@@ -502,7 +496,6 @@ fn turn_metadata_state_includes_turn_started_at_unix_ms_after_start() {
         "turn-a".to_string(),
         cwd,
         &permission_profile,
-        WindowsSandboxLevel::Disabled,
         /*enforce_managed_network*/ false,
         /*auto_review_enabled*/ false,
         &model_info_from_slug("gpt-5.4"),
@@ -534,7 +527,6 @@ fn turn_metadata_state_includes_model_and_reasoning_effort_only_in_request_meta(
         "turn-a".to_string(),
         cwd,
         &permission_profile,
-        WindowsSandboxLevel::Disabled,
         /*enforce_managed_network*/ false,
         /*auto_review_enabled*/ false,
         &model_info_from_slug("gpt-5.4"),
@@ -690,7 +682,6 @@ fn turn_metadata_state_marks_user_input_requested_during_turn_only_for_mcp_reque
         "turn-a".to_string(),
         cwd,
         &permission_profile,
-        WindowsSandboxLevel::Disabled,
         /*enforce_managed_network*/ false,
         /*auto_review_enabled*/ false,
         &model_info_from_slug("gpt-5.4"),
@@ -745,7 +736,6 @@ fn turn_metadata_state_ignores_client_reserved_metadata_before_start() {
         "turn-a".to_string(),
         cwd,
         &permission_profile,
-        WindowsSandboxLevel::Disabled,
         /*enforce_managed_network*/ false,
         /*auto_review_enabled*/ false,
         &model_info_from_slug("gpt-5.4"),
@@ -841,7 +831,6 @@ fn turn_metadata_state_merges_client_metadata_without_replacing_reserved_fields(
         "turn-a".to_string(),
         cwd,
         &permission_profile,
-        WindowsSandboxLevel::Disabled,
         /*enforce_managed_network*/ false,
         /*auto_review_enabled*/ false,
         &model_info_from_slug("gpt-5.4"),
@@ -1105,7 +1094,6 @@ fn turn_metadata_state_bounds_trigger_only_for_analytics() {
             "turn-a".to_string(),
             temp_dir.path().abs(),
             &PermissionProfile::read_only(),
-            WindowsSandboxLevel::Disabled,
             /*enforce_managed_network*/ false,
             /*auto_review_enabled*/ false,
             &model_info_from_slug("gpt-5.4"),
@@ -1140,7 +1128,6 @@ fn turn_metadata_state_overlays_compaction_only_on_compaction_requests(
         "turn-a".to_string(),
         cwd,
         &permission_profile,
-        WindowsSandboxLevel::Disabled,
         /*enforce_managed_network*/ false,
         /*auto_review_enabled*/ false,
         &model_info_from_slug("gpt-5.4"),
@@ -1272,7 +1259,6 @@ async fn turn_metadata_state_preserves_subagent_parent_after_git_enrichment() {
         "turn-a".to_string(),
         repo_path,
         &permission_profile,
-        WindowsSandboxLevel::Disabled,
         /*enforce_managed_network*/ false,
         /*auto_review_enabled*/ false,
         &model_info_from_slug("gpt-5.4"),
@@ -1313,7 +1299,6 @@ async fn turn_metadata_state_coalesces_concurrent_git_enrichment() {
         "turn-a".to_string(),
         repo_path.clone(),
         &permission_profile,
-        WindowsSandboxLevel::Disabled,
         /*enforce_managed_network*/ false,
         /*auto_review_enabled*/ false,
         &model_info_from_slug("gpt-5.4"),
@@ -1370,7 +1355,6 @@ async fn dropping_turn_metadata_aborts_unused_git_enrichment() {
         "turn-a".to_string(),
         temp_dir.path().abs(),
         &PermissionProfile::read_only(),
-        WindowsSandboxLevel::Disabled,
         /*enforce_managed_network*/ false,
         /*auto_review_enabled*/ false,
         &model_info_from_slug("gpt-5.4"),
@@ -1414,7 +1398,6 @@ async fn git_enrichment_discovers_the_repository_when_it_starts() {
         "turn-a".to_string(),
         repo_path.clone(),
         &PermissionProfile::read_only(),
-        WindowsSandboxLevel::Disabled,
         /*enforce_managed_network*/ false,
         /*auto_review_enabled*/ false,
         &model_info_from_slug("gpt-5.4"),
@@ -1447,7 +1430,6 @@ async fn turn_metadata_state_git_enrichment_cancellation_is_retryable_and_errors
         "turn-a".to_string(),
         repo_path,
         &permission_profile,
-        WindowsSandboxLevel::Disabled,
         /*enforce_managed_network*/ false,
         /*auto_review_enabled*/ false,
         &model_info_from_slug("gpt-5.4"),
@@ -1491,7 +1473,6 @@ async fn turn_metadata_state_git_enrichment_cancellation_is_retryable_and_errors
         "turn-b".to_string(),
         invalid_repo.path().abs(),
         &permission_profile,
-        WindowsSandboxLevel::Disabled,
         /*enforce_managed_network*/ false,
         /*auto_review_enabled*/ false,
         &model_info_from_slug("gpt-5.4"),

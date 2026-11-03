@@ -177,7 +177,7 @@ fn test_writable_roots_constraint() {
     assert!(
         is_write_patch_constrained_to_writable_paths(
             &add_inside,
-            &PatchSandboxRoute::Platform(WindowsSandboxLevel::Disabled)
+            &PatchSandboxRoute::Platform
                 .prepare_matching(&workspace_only_file_system_policy, &local_context(&cwd_uri))
                 .expect("prepare patch matching"),
         )
@@ -187,7 +187,7 @@ fn test_writable_roots_constraint() {
     assert!(
         !is_write_patch_constrained_to_writable_paths(
             &add_outside,
-            &PatchSandboxRoute::Platform(WindowsSandboxLevel::Disabled)
+            &PatchSandboxRoute::Platform
                 .prepare_matching(&workspace_only_file_system_policy, &local_context(&cwd_uri))
                 .expect("prepare patch matching"),
         )
@@ -204,7 +204,7 @@ fn test_writable_roots_constraint() {
     assert!(
         is_write_patch_constrained_to_writable_paths(
             &add_outside,
-            &PatchSandboxRoute::Platform(WindowsSandboxLevel::Disabled)
+            &PatchSandboxRoute::Platform
                 .prepare_matching(&file_system_policy_with_parent, &local_context(&cwd_uri))
                 .expect("prepare patch matching"),
         )
@@ -233,7 +233,7 @@ fn external_sandbox_auto_approves_in_on_request() {
             &add_inside,
             AskForApproval::OnRequest,
             &permission_profile,
-            &PatchSandboxRoute::Platform(WindowsSandboxLevel::Disabled)
+            &PatchSandboxRoute::Platform
                 .prepare_matching(&file_system_sandbox_policy, &local_context(&cwd_uri))
                 .expect("prepare patch matching"),
         )
@@ -264,7 +264,7 @@ fn granular_with_all_flags_true_matches_on_request_for_out_of_root_patch() {
             &add_outside,
             AskForApproval::OnRequest,
             &permission_profile,
-            &PatchSandboxRoute::Platform(WindowsSandboxLevel::Disabled)
+            &PatchSandboxRoute::Platform
                 .prepare_matching(&file_system_sandbox_policy, &local_context(&cwd_uri))
                 .expect("prepare patch matching"),
         )
@@ -282,7 +282,7 @@ fn granular_with_all_flags_true_matches_on_request_for_out_of_root_patch() {
                 mcp_elicitations: true,
             }),
             &permission_profile,
-            &PatchSandboxRoute::Platform(WindowsSandboxLevel::Disabled)
+            &PatchSandboxRoute::Platform
                 .prepare_matching(&file_system_sandbox_policy, &local_context(&cwd_uri))
                 .expect("prepare patch matching"),
         )
@@ -319,7 +319,7 @@ fn granular_sandbox_approval_false_rejects_out_of_root_patch() {
                 mcp_elicitations: true,
             }),
             &permission_profile,
-            &PatchSandboxRoute::Platform(WindowsSandboxLevel::Disabled)
+            &PatchSandboxRoute::Platform
                 .prepare_matching(&file_system_sandbox_policy, &local_context(&cwd_uri))
                 .expect("prepare patch matching"),
         )
@@ -344,7 +344,7 @@ fn read_only_policy_rejects_patch_with_read_only_reason() {
     assert!(
         !is_write_patch_constrained_to_writable_paths(
             &action,
-            &PatchSandboxRoute::Platform(WindowsSandboxLevel::Disabled)
+            &PatchSandboxRoute::Platform
                 .prepare_matching(&file_system_sandbox_policy, &local_context(&cwd_uri))
                 .expect("prepare patch matching"),
         )
@@ -355,7 +355,7 @@ fn read_only_policy_rejects_patch_with_read_only_reason() {
             &action,
             AskForApproval::Never,
             &permission_profile,
-            &PatchSandboxRoute::Platform(WindowsSandboxLevel::Disabled)
+            &PatchSandboxRoute::Platform
                 .prepare_matching(&file_system_sandbox_policy, &local_context(&cwd_uri))
                 .expect("prepare patch matching"),
         )
@@ -399,7 +399,7 @@ fn explicit_unreadable_paths_prevent_auto_approval_for_external_sandbox() {
     assert!(
         !is_write_patch_constrained_to_writable_paths(
             &action,
-            &PatchSandboxRoute::Platform(WindowsSandboxLevel::Disabled)
+            &PatchSandboxRoute::Platform
                 .prepare_matching(&file_system_sandbox_policy, &local_context(&cwd_uri))
                 .expect("prepare patch matching"),
         )
@@ -410,7 +410,7 @@ fn explicit_unreadable_paths_prevent_auto_approval_for_external_sandbox() {
             &action,
             AskForApproval::OnRequest,
             &permission_profile,
-            &PatchSandboxRoute::Platform(WindowsSandboxLevel::Disabled)
+            &PatchSandboxRoute::Platform
                 .prepare_matching(&file_system_sandbox_policy, &local_context(&cwd_uri))
                 .expect("prepare patch matching"),
         )
@@ -454,7 +454,7 @@ fn explicit_read_only_subpaths_prevent_auto_approval_for_external_sandbox() {
     assert!(
         !is_write_patch_constrained_to_writable_paths(
             &action,
-            &PatchSandboxRoute::Platform(WindowsSandboxLevel::Disabled)
+            &PatchSandboxRoute::Platform
                 .prepare_matching(&file_system_sandbox_policy, &local_context(&cwd_uri))
                 .expect("prepare patch matching"),
         )
@@ -465,7 +465,7 @@ fn explicit_read_only_subpaths_prevent_auto_approval_for_external_sandbox() {
             &action,
             AskForApproval::OnRequest,
             &permission_profile,
-            &PatchSandboxRoute::Platform(WindowsSandboxLevel::Disabled)
+            &PatchSandboxRoute::Platform
                 .prepare_matching(&file_system_sandbox_policy, &local_context(&cwd_uri))
                 .expect("prepare patch matching"),
         )
@@ -502,7 +502,7 @@ fn missing_project_dot_codex_config_requires_approval() {
     assert!(
         !is_write_patch_constrained_to_writable_paths(
             &action,
-            &PatchSandboxRoute::Platform(WindowsSandboxLevel::Disabled)
+            &PatchSandboxRoute::Platform
                 .prepare_matching(&file_system_sandbox_policy, &local_context(&cwd_uri))
                 .expect("prepare patch matching"),
         )
@@ -513,7 +513,7 @@ fn missing_project_dot_codex_config_requires_approval() {
             &action,
             AskForApproval::OnRequest,
             &permission_profile,
-            &PatchSandboxRoute::Platform(WindowsSandboxLevel::Disabled)
+            &PatchSandboxRoute::Platform
                 .prepare_matching(&file_system_sandbox_policy, &local_context(&cwd_uri))
                 .expect("prepare patch matching"),
         )

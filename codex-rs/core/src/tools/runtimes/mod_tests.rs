@@ -19,7 +19,6 @@ use codex_network_proxy::PROXY_ACTIVE_ENV_KEY;
 use codex_network_proxy::PROXY_ENV_KEYS;
 #[cfg(target_os = "macos")]
 use codex_network_proxy::PROXY_GIT_SSH_COMMAND_ENV_KEY;
-use codex_protocol::config_types::WindowsSandboxLevel;
 use codex_protocol::models::PermissionProfile;
 use codex_protocol::sandbox::SandboxOverride;
 use codex_sandboxing::SandboxManager;
@@ -131,8 +130,6 @@ async fn explicit_escalation_prepares_exec_without_managed_network() -> anyhow::
         workspace_roots: std::slice::from_ref(&sandbox_policy_cwd),
         sandbox_exe: None,
         use_legacy_landlock: false,
-        windows_sandbox_type: SandboxType::None,
-        windows_sandbox_level: WindowsSandboxLevel::Disabled,
         network_denial_cancellation_token: None,
         network_proxy: None,
     };
@@ -151,10 +148,6 @@ async fn explicit_escalation_prepares_exec_without_managed_network() -> anyhow::
         .expect("prepare exec request");
 
     assert_eq!(exec_request.cwd, PathUri::from_abs_path(&command_cwd));
-    assert_eq!(
-        exec_request.windows_sandbox_policy_cwd,
-        PathUri::from_abs_path(&native_sandbox_policy_cwd)
-    );
     assert_eq!(exec_request.network, None);
     for key in PROXY_ENV_KEYS {
         assert_eq!(exec_request.env.get(*key), None, "{key} should be unset");

@@ -181,7 +181,7 @@ fn records_every_outcome_and_times_preparation_without_paths() -> anyhow::Result
     ];
     if matches!(
         backend::SANDBOX_TYPE,
-        SandboxType::LinuxSeccomp | SandboxType::WindowsMxc
+        SandboxType::LinuxSeccomp
     ) {
         expected_outcomes.push(["sandbox_launcher", "missing", "other"]);
     }

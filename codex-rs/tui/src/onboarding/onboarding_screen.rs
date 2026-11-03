@@ -152,22 +152,6 @@ impl OnboardingScreen {
             tui.frame_requester(),
             local_settings.tui.animations && local_settings.tui.effects.welcome,
         )));
-        #[cfg(target_os = "windows")]
-        let show_windows_create_sandbox_hint = if show_trust_screen
-            && remote_project_trust.is_none()
-            && let Some(handle) = &app_server_request_handle
-        {
-            crate::windows_sandbox::WindowsSandboxConfig::read(
-                handle.clone(),
-                config.cwd.display().to_string(),
-            )
-            .await
-            .is_ok_and(|state| !state.is_enabled())
-        } else {
-            false
-        };
-        #[cfg(not(target_os = "windows"))]
-        let show_windows_create_sandbox_hint = false;
         if show_login_screen {
             let highlighted_mode =
                 if auth_config.is_login_method_allowed(ForcedLoginMethod::Chatgpt) {
@@ -217,7 +201,6 @@ impl OnboardingScreen {
                 cancel: super::trust_directory::TrustCancelAction::Quit,
                 cwd,
                 trust_target,
-                show_windows_create_sandbox_hint,
                 should_quit: false,
                 selection: None,
                 highlighted,
@@ -969,7 +952,6 @@ mod tests {
                 cancel: super::super::trust_directory::TrustCancelAction::Quit,
                 cwd: PathBuf::from("/workspace/project"),
                 trust_target: PathBuf::from("/workspace/project"),
-                show_windows_create_sandbox_hint: false,
                 should_quit: false,
                 selection: None,
                 highlighted: TrustDirectorySelection::Trust,
@@ -1036,7 +1018,6 @@ mod tests {
                     cancel: super::super::trust_directory::TrustCancelAction::AgentsOverview,
                     cwd: PathBuf::from("/workspace/project"),
                     trust_target: PathBuf::from("/workspace/project"),
-                    show_windows_create_sandbox_hint: false,
                     should_quit: false,
                     selection: None,
                     highlighted: TrustDirectorySelection::Trust,
@@ -1067,7 +1048,6 @@ mod tests {
                 cancel: super::super::trust_directory::TrustCancelAction::Quit,
                 cwd: PathBuf::from("/workspace/project"),
                 trust_target: PathBuf::from("/workspace/project"),
-                show_windows_create_sandbox_hint: false,
                 should_quit: false,
                 selection: Some(TrustDirectorySelection::Trust),
                 highlighted: TrustDirectorySelection::Trust,

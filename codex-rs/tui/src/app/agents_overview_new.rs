@@ -44,7 +44,7 @@ impl App {
         app_server: &mut AppServerSession,
         cwd: Option<AbsolutePathBuf>,
     ) -> Result<AppRunControl> {
-        if self.reconnect.offline || self.windows_sandbox_blocks_thread_switch() {
+        if self.reconnect.offline {
             return Ok(AppRunControl::Continue);
         }
         let previous_thread = self.current_displayed_thread_id();
@@ -104,7 +104,7 @@ impl App {
         )>,
         mut startup_draft: Option<&mut StartupDraftPump>,
     ) -> Result<AppRunControl> {
-        if self.reconnect.offline || self.windows_sandbox_blocks_thread_switch() {
+        if self.reconnect.offline {
             if let Some((_, checkout)) = &managed_worktree {
                 self.agents_overview_retained_worktree_error(
                     checkout,
@@ -253,10 +253,7 @@ impl App {
         app_server: &mut AppServerSession,
         cwd: Option<AbsolutePathBuf>,
     ) {
-        if self.reconnect.offline
-            || self.pending_managed_worktree_creation
-            || self.windows_sandbox_blocks_thread_switch()
-        {
+        if self.reconnect.offline || self.pending_managed_worktree_creation {
             return;
         }
         if crate::uses_remote_workspace_or_environment(

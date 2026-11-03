@@ -24,9 +24,7 @@ impl App {
                     )
                     .await;
             }
-            if self.windows_sandbox_blocks_thread_switch()
-                || self.reject_pending_permission_root_switch()
-            {
+            if self.reject_pending_permission_root_switch() {
                 return Ok(AppRunControl::Continue);
             }
             if let Some(thread_id) = self.current_displayed_thread_id()

@@ -1032,40 +1032,6 @@ fn webmcp_requirements_preserve_managed_layer_precedence() {
 }
 
 #[test]
-fn windows_requirements_use_regular_toml_merge() {
-    let composed = compose(vec![
-        layer(
-            "req_low",
-            "Low",
-            r#"
-[windows]
-allowed_sandbox_implementations = ["unelevated"]
-"#,
-        ),
-        layer(
-            "req_high",
-            "High",
-            r#"
-[windows]
-allowed_sandbox_implementations = ["elevated"]
-"#,
-        ),
-    ])
-    .expect("compose requirements")
-    .expect("requirements present");
-
-    assert_eq!(
-        composed,
-        expected_requirements(
-            r#"
-[windows]
-allowed_sandbox_implementations = ["elevated"]
-"#
-        )
-    );
-}
-
-#[test]
 fn remote_sandbox_config_is_applied_per_layer() {
     let composed = compose_requirements_for_hostname(
         vec![

@@ -1373,26 +1373,6 @@ impl App {
         true
     }
 
-    #[cfg(target_os = "windows")]
-    pub(super) async fn verify_windows_sandbox_mode_after_setup(
-        &mut self,
-        app_server: &mut AppServerSession,
-        requested_mode: codex_app_server_protocol::WindowsSandboxSetupMode,
-    ) -> bool {
-        if !self.refresh_windows_sandbox_config(app_server).await {
-            return false;
-        }
-        if self.chat_widget.windows_sandbox_config.mode == Some(requested_mode)
-            && self
-                .chat_widget
-                .windows_sandbox_config
-                .allows(requested_mode)
-        {
-            return true;
-        }
-        self.chat_widget.add_error_message("Windows sandbox setup completed, but its mode was overridden by the effective configuration.".to_string());
-        false
-    }
 }
 
 pub(super) fn overridden_write_message(write_response: &ConfigWriteResponse) -> &str {
@@ -1927,7 +1907,6 @@ enabled = false
         app.chat_widget
             .handle_thread_session(crate::session_state::ThreadSessionState {
                 daybreak_enabled: false,
-                windows_sandbox_host: crate::app::WindowsSandboxHost::Local,
                 thread_id: ThreadId::new(),
                 forked_from_id: None,
                 fork_parent_title: None,

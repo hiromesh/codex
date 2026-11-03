@@ -19,8 +19,6 @@ pub enum SlashCommand {
     Permissions,
     Keymap,
     Vim,
-    #[strum(serialize = "setup-default-sandbox")]
-    ElevateSandbox,
     Experimental,
     #[strum(to_string = "approve")]
     AutoReview,
@@ -149,7 +147,6 @@ impl SlashCommand {
             SlashCommand::Permissions => "choose what Codex is allowed to do",
             SlashCommand::Keymap => "remap TUI shortcuts",
             SlashCommand::Vim => "toggle Vim mode for the composer",
-            SlashCommand::ElevateSandbox => "set up elevated agent sandbox",
             SlashCommand::Experimental => "toggle experimental features",
             SlashCommand::AutoReview => "approve one retry of a recent auto-review denial",
             SlashCommand::Memories => "configure memory use and generation",
@@ -259,7 +256,6 @@ impl SlashCommand {
             | SlashCommand::Keymap
             | SlashCommand::Tui
             | SlashCommand::Vim
-            | SlashCommand::ElevateSandbox
             | SlashCommand::Experimental
             | SlashCommand::Memories
             | SlashCommand::Import

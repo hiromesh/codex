@@ -704,7 +704,6 @@ mod tests {
     use codex_config::SandboxModeRequirement;
     use codex_config::Sourced;
     use codex_config::WebSearchModeRequirement;
-    use codex_config::WindowsRequirementsToml;
     use codex_config::sandbox_mode_requirement_for_permission_profile;
     use codex_config::types::FeedbackConfigToml;
     use codex_protocol::config_types::ApprovalsReviewer;
@@ -990,11 +989,6 @@ interrupt_message = false
             computer_use: None,
             browser_use: None,
             in_app_browser: None,
-            windows: Some(WindowsRequirementsToml {
-                allowed_sandbox_implementations: None,
-                allow_mxc: None,
-                require_mxc: None,
-            }),
             additional_developer_instructions: None,
             guardian_policy_config: Some("Use the managed guardian policy.".to_string()),
             guardian_extra_policy: None,
@@ -1388,7 +1382,6 @@ approval_policy = "never"
             allow_appshots: None,
             allow_remote_control: None,
             computer_use: None,
-            windows: None,
             guardian_policy_config: None,
             guardian_extra_policy: None,
             feature_requirements: None,

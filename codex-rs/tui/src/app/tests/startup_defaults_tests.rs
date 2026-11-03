@@ -38,7 +38,6 @@ pub(super) async fn run_startup_for_test(
         selection,
         codex_feedback::CodexFeedback::new(),
         /*is_first_run*/ false,
-        /*should_prompt_windows_sandbox_nux_at_startup*/ false,
         app_server_target,
         /*state_db*/ None,
         Arc::new(EnvironmentManager::default_for_tests()),
@@ -608,7 +607,6 @@ async fn fresh_startup_reads_destination_and_cleared_model_uses_catalog() -> Res
         )
         .await?;
         assert!(defaults_read.server_defaults_read);
-        assert!(!defaults_read.prompt_windows_sandbox);
         assert_eq!(config.model, None);
         let selected_model = startup_model(&config, &bootstrap, defaults_read.server_defaults_read);
         assert_ne!(selected_model, "stale-client-model");

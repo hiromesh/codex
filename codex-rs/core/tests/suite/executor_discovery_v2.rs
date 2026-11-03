@@ -4,7 +4,6 @@ use anyhow::Context;
 use anyhow::Result;
 use codex_core::TurnInputRequest;
 use codex_core::config::Config;
-use codex_core::windows_sandbox::WindowsSandboxLevelExt;
 use codex_core_plugins::ExecutorPluginProvider;
 use codex_core_plugins::PluginCatalog;
 use codex_core_plugins::PluginCatalogEntry;
@@ -36,7 +35,6 @@ use codex_mcp::CODEX_APPS_MCP_SERVER_NAME;
 use codex_mcp::McpResourceClient;
 use codex_mcp_extension::PluginProviders;
 use codex_mcp_extension::install_plugin_providers;
-use codex_protocol::config_types::WindowsSandboxLevel;
 use codex_protocol::protocol::EventMsg;
 use codex_protocol::protocol::Op;
 use codex_protocol::protocol::SKILLS_INSTRUCTIONS_OPEN_TAG;
@@ -656,8 +654,6 @@ async fn check_acquisition(enabled: bool, version: &'static str) -> Result<()> {
                 test.config.permissions.permission_profile().clone(),
             ),
             shell_environment_policy: Default::default(),
-            windows_sandbox_level: WindowsSandboxLevel::from_config(&test.config),
-            windows_sandbox_type: test.config.permissions.windows_sandbox_type,
             use_legacy_landlock: test.config.features.use_legacy_landlock(),
             exec_policy: None,
             mcp_policy: None,

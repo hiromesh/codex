@@ -10,7 +10,6 @@ use codex_core::config::Constrained;
 use codex_core::config::NetworkProxySpec;
 use codex_core::shell::ShellType;
 use codex_core::shell::get_shell;
-use codex_core::windows_sandbox::WindowsSandboxLevelExt;
 use codex_exec_server::LOCAL_ENVIRONMENT_ID;
 use codex_exec_server::REMOTE_ENVIRONMENT_ID;
 use codex_extension_api::ExtensionRegistryBuilder;
@@ -40,7 +39,6 @@ use codex_protocol::capabilities::SelectedCapabilityRoot;
 use codex_protocol::config_types::CollaborationMode;
 use codex_protocol::config_types::ModeKind;
 use codex_protocol::config_types::Settings;
-use codex_protocol::config_types::WindowsSandboxLevel;
 use codex_protocol::models::NetworkPermissions;
 use codex_protocol::models::PermissionProfile;
 use codex_protocol::models::PermissionProfileSnapshot;
@@ -1846,8 +1844,6 @@ async fn unattributed_network_request_uses_active_turn_environment_fallback(
                         .permissions
                         .shell_environment_policy
                         .clone(),
-                    windows_sandbox_level: WindowsSandboxLevel::from_config(&test.config),
-                    windows_sandbox_type: test.config.permissions.windows_sandbox_type,
                     use_legacy_landlock: test.config.features.use_legacy_landlock(),
                     exec_policy: None,
                     mcp_policy: None,
@@ -2818,8 +2814,6 @@ async fn owner_network_policy_follows_the_selected_remote_command() -> Result<()
                 workspace_roots: remote.workspace_roots.clone(),
                 permission_profile: PermissionProfileSnapshot::legacy(permission_profile),
                 shell_environment_policy: test.config.permissions.shell_environment_policy.clone(),
-                windows_sandbox_level: WindowsSandboxLevel::from_config(&test.config),
-                windows_sandbox_type: test.config.permissions.windows_sandbox_type,
                 use_legacy_landlock: test.config.features.use_legacy_landlock(),
                 exec_policy: None,
                 mcp_policy: None,
@@ -3044,8 +3038,6 @@ async fn escalated_owner_network_terminal_requires_stdin_approval(
             test.config.permissions.permission_profile().clone(),
         ),
         shell_environment_policy: test.config.permissions.shell_environment_policy.clone(),
-        windows_sandbox_level: WindowsSandboxLevel::from_config(&test.config),
-        windows_sandbox_type: test.config.permissions.windows_sandbox_type,
         use_legacy_landlock: test.config.features.use_legacy_landlock(),
         exec_policy: None,
         mcp_policy: None,

@@ -240,38 +240,16 @@ sandbox = "unelevated"
 #[tokio::test]
 async fn local_projectless_defaults_respect_trust_scope_and_explicit_settings() -> Result<()> {
     use codex_protocol::protocol::AskForApproval as Approval;
-    for (settings, project_marker, expected_profile, expected_approval, sandbox_ready) in [
-        ("", false, ":workspace", None, true),
-        #[cfg(target_os = "windows")]
-        ("", false, ":read-only", None, false),
-        ("", true, ":read-only", None, true),
-        (
-            "sandbox_mode = \"read-only\"\n",
-            false,
-            ":read-only",
-            None,
-            true,
-        ),
-        (
-            "sandbox_mode = \"read-only\"\n",
-            false,
-            ":read-only",
-            None,
-            false,
-        ),
-        (
-            "default_permissions = \":read-only\"\n",
-            false,
-            ":read-only",
-            None,
-            false,
-        ),
+    for (settings, project_marker, expected_profile, expected_approval) in [
+        ("", false, ":workspace", None),
+        ("", true, ":read-only", None),
+        ("sandbox_mode = \"read-only\"\n", false, ":read-only", None),
+        ("default_permissions = \":read-only\"\n", false, ":read-only", None),
         (
             "approval_policy = \"on-request\"\n",
             false,
             ":workspace",
             Some(Approval::OnRequest),
-            true,
         ),
     ] {
         let home = tempfile::tempdir()?;
@@ -279,13 +257,8 @@ async fn local_projectless_defaults_respect_trust_scope_and_explicit_settings() 
         let cwd = parent.path().join("notes");
         std::fs::create_dir(&cwd)?;
         let parent_path = serde_json::to_string(parent.path())?;
-        let windows = if sandbox_ready {
-            "[windows]\nsandbox = \"unelevated\"\n"
-        } else {
-            ""
-        };
         let shared_settings =
-            format!("{windows}[projects.{parent_path}]\ntrust_level = \"untrusted\"\n");
+            format!("[projects.{parent_path}]\ntrust_level = \"untrusted\"\n");
         std::fs::write(
             home.path().join("config.toml"),
             format!("{settings}{shared_settings}"),
@@ -345,10 +318,6 @@ async fn local_projectless_defaults_respect_trust_scope_and_explicit_settings() 
         if expected_approval.is_some() {
             assert_eq!(startup.approval_policy, None);
         }
-        assert_eq!(
-            startup.prompt_windows_sandbox,
-            cfg!(target_os = "windows") && !sandbox_ready && settings.is_empty() && !project_marker
-        );
         assert_eq!(
             (
                 config.permissions.permission_profile(),

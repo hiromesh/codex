@@ -26,7 +26,6 @@ use crate::session::session::Session;
 use crate::session::step_context::StepContext;
 use crate::shell::ShellType;
 use crate::tools::handlers::unified_exec::preparation::PreparedExecCommand;
-use crate::tools::sandboxing::executor_windows_sandbox_selection;
 
 impl Session {
     pub(crate) fn prewarm_shell_snapshots(
@@ -93,14 +92,6 @@ impl Session {
                         workspace_roots: environment.workspace_roots().to_vec(),
                         user_home_dir: None,
                         temporary_directories: None,
-                        windows_sandbox_selection: executor_windows_sandbox_selection(
-                            environment.config().windows_sandbox_type,
-                            environment.config().windows_sandbox_level,
-                            environment.cwd(),
-                        ),
-                        windows_sandbox_proxy_settings_mode: Some(
-                            session.windows_sandbox_proxy_settings_mode,
-                        ),
                         use_legacy_landlock: environment.config().use_legacy_landlock,
                     });
                 let mut env = apply_unified_exec_env(HashMap::new());

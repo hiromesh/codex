@@ -219,12 +219,6 @@ impl App {
             return false;
         }
         if !self.reconnect.offline {
-            #[cfg(target_os = "windows")]
-            if self.windows_sandbox_setup_is_local()
-                && let Some(message) = self.chat_widget.initial_user_message.take()
-            {
-                self.chat_widget.restore_user_message_to_composer(message);
-            }
             if let Some(owner) = self.background_voice.as_mut() {
                 owner.record_realtime_disconnect_failure();
                 owner.reset_realtime_conversation();
@@ -317,9 +311,6 @@ impl App {
                 self.environment_manager.as_ref(),
             ),
         );
-        self.chat_widget.windows_sandbox_local_server =
-            !self.app_server_target.uses_remote_workspace()
-                && app_server.app_server_platform_os() == Some("windows");
         self.chat_widget.remote_connection =
             crate::status::remote_connection::remote_connection_status_value(
                 &self.app_server_target,
@@ -386,17 +377,6 @@ impl App {
         session.worktree_source_config_builder = app_server.worktree_source_config_builder.clone();
         session.inherit_task_tool_capabilities(app_server);
         *app_server = session;
-        #[cfg(any(target_os = "windows", test))]
-        let interrupted_windows_setup = self.windows_sandbox.pending_setup.take().is_some();
-        #[cfg(any(target_os = "windows", test))]
-        {
-            if interrupted_windows_setup {
-                self.windows_sandbox.setup_started_at = None;
-                self.chat_widget.clear_windows_sandbox_setup_status();
-                self.chat_widget.windows_sandbox_elevated_setup_complete = false;
-            }
-        }
-        self.chat_widget.windows_sandbox_host = WindowsSandboxHost::Unknown;
         self.chat_widget.requires_openai_auth = bootstrap.requires_openai_auth;
         let managed_daemon = self
             .chat_widget
@@ -567,13 +547,6 @@ impl App {
             if self.startup_protected_input_boundary {
                 self.render_startup_frame(tui, app_event_rx)?;
             }
-        }
-        #[cfg(any(target_os = "windows", test))]
-        if interrupted_windows_setup {
-            self.chat_widget.add_error_message(
-                "Windows sandbox setup was interrupted. Restart Codex before using Agent mode."
-                    .to_string(),
-            );
         }
         // Only accept fresh task-tool calls once this connection and its event queue are adopted.
         if let ThreadToolTransport::Mcp(server) = app_server.thread_tool_transport() {

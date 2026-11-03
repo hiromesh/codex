@@ -4,9 +4,6 @@ use crate::context::world_state::validate_managed_developer_instructions;
 use crate::path_utils::normalize_for_native_workdir;
 use crate::unified_exec::DEFAULT_MAX_BACKGROUND_TERMINAL_TIMEOUT_MS;
 use crate::unified_exec::MIN_EMPTY_YIELD_TIME_MS;
-use crate::windows_sandbox::WindowsSandboxLevelExt;
-use crate::windows_sandbox::resolve_windows_sandbox_mode;
-use crate::windows_sandbox::windows_sandbox_level_for_legacy_checks;
 use codex_agent_roles::load_agent_roles;
 use codex_config::CloudConfigBundleLoader;
 use codex_config::ConfigLayerSource;
@@ -58,7 +55,6 @@ use codex_config::types::TuiKeymap;
 use codex_config::types::TuiNotificationSettings;
 use codex_config::types::TuiPetAnchor;
 use codex_config::types::UriBasedFileOpener;
-use codex_config::types::WindowsSandboxModeToml;
 use codex_core_plugins::PluginLoadOutcome;
 use codex_core_plugins::PluginsConfigInput;
 use codex_exec_server::ExecutorFileSystem;
@@ -113,7 +109,6 @@ use codex_protocol::config_types::TrustLevel;
 use codex_protocol::config_types::Verbosity;
 use codex_protocol::config_types::WebSearchConfig;
 use codex_protocol::config_types::WebSearchMode;
-use codex_protocol::config_types::WindowsSandboxLevel;
 use codex_protocol::models::ActivePermissionProfile;
 use codex_protocol::models::BaseInstructionsProvenance;
 use codex_protocol::models::PermissionProfile;
@@ -182,7 +177,6 @@ pub(crate) use runtime_refresh::RuntimeConfigRefresh;
 #[cfg(test)]
 mod schema;
 mod token_budget_startup;
-mod windows_sandbox_config;
 pub use auth_keyring::bootstrap_auth_config;
 pub use auth_keyring::resolve_bootstrap_auth_keyring_backend_kind;
 pub use codex_agent_roles::AgentRoleConfig;
@@ -218,11 +212,6 @@ pub use permissions::network_proxy_config_from_profile_network;
 pub use permissions::resolve_permission_profile;
 pub(crate) use resolved_permission_profile::PermissionProfileState;
 pub use token_budget_startup::TokenBudgetStartupConfig;
-pub use windows_sandbox_config::PreparedWindowsSandboxConfig;
-use windows_sandbox_config::config_allows_mxc;
-pub use windows_sandbox_config::prepare_windows_sandbox_config;
-use windows_sandbox_config::resolve_windows_sandbox_type;
-pub use windows_sandbox_config::windows_mxc_allowed_by_config;
 
 const DEFAULT_IGNORE_LARGE_UNTRACKED_DIRS: i64 = 200;
 const DEFAULT_IGNORE_LARGE_UNTRACKED_FILES: i64 = 10 * 1024 * 1024;
@@ -351,11 +340,6 @@ pub struct Permissions {
     pub allow_login_shell: bool,
     /// Policy used to build process environments for shell/unified exec.
     pub shell_environment_policy: ShellEnvironmentPolicy,
-    /// Effective Windows sandbox mode derived from `[windows].sandbox` or
-    /// legacy feature keys.
-    pub windows_sandbox_mode: Option<WindowsSandboxModeToml>,
-    /// Configured Windows backend; use `Config::effective_local_windows_sandbox_type()` for local selection.
-    pub windows_sandbox_type: SandboxType,
 }
 
 impl Permissions {
@@ -375,8 +359,6 @@ impl Permissions {
             network: None,
             allow_login_shell: true,
             shell_environment_policy: ShellEnvironmentPolicy::default(),
-            windows_sandbox_mode: None,
-            windows_sandbox_type: SandboxType::None,
         })
     }
 
@@ -1164,7 +1146,6 @@ pub struct Config {
     pub features: ManagedFeatures,
 
     /// Local rollout preference after checking network restrictions and native availability.
-    pub prefer_mxc: bool,
 
     /// Host feature defaults retained beneath explicit configuration overrides.
     pub runtime_feature_defaults: BTreeMap<Feature, bool>,
@@ -1924,7 +1905,6 @@ impl Config {
             plugins: self.plugins.clone(),
             approvals_reviewer: self.approvals_reviewer,
             environment_cwds: HashMap::new(),
-            environment_use_mxc: HashMap::new(),
             server_permission_profiles: HashMap::new(),
             codex_self_exe: self.codex_self_exe.clone(),
             codex_linux_sandbox_exe: self.codex_linux_sandbox_exe.clone(),
@@ -3387,7 +3367,6 @@ impl Config {
             approvals_reviewer: mut constrained_approvals_reviewer,
             auto_review_required_models: _,
             permission_profile: mut constrained_permission_profile,
-            windows_sandbox_mode: mut constrained_windows_sandbox_mode,
             web_search_mode: mut constrained_web_search_mode,
             allow_managed_hooks_only: _,
             allow_appshots: _,
@@ -3521,24 +3500,6 @@ impl Config {
         };
         let respect_system_proxy = features.enabled(Feature::RespectSystemProxy);
         let enable_network_proxy = features.enabled(Feature::NetworkProxy);
-        let allow_mxc =
-            cfg.windows.as_ref().and_then(|windows| windows.allow_mxc) != Some(false);
-        if !allow_mxc && resolve_windows_sandbox_mode(&cfg) == Some(WindowsSandboxModeToml::Mxc) {
-            return Err(std::io::Error::new(
-                std::io::ErrorKind::InvalidInput,
-                "windows.sandbox = \"mxc\" is not allowed when windows.allow_mxc = false",
-            ));
-        }
-        let PreparedWindowsSandboxConfig {
-            mode: windows_sandbox_mode,
-            sandbox_type: windows_sandbox_type,
-            level: windows_sandbox_level,
-        } = prepare_windows_sandbox_config(
-            resolve_windows_sandbox_mode(&cfg),
-            WindowsSandboxLevel::from_features(&features),
-            &mut constrained_windows_sandbox_mode,
-            &mut startup_warnings,
-        )?;
         let resolved_cwd = AbsolutePathBuf::try_from(normalize_for_native_workdir({
             use std::env;
 
@@ -3648,23 +3609,6 @@ impl Config {
             default_permissions_override.as_deref(),
             permission_config_syntax,
         );
-        let prefer_mxc = features.enabled(Feature::PreferMxc)
-            && config_allows_mxc(
-                &constrained_windows_sandbox_mode,
-                &effective_permission_selection,
-                profiles_are_active,
-                permission_profile.as_ref(),
-                network_requirements.as_ref(),
-                &cfg,
-                enable_network_proxy,
-            )?
-            && codex_sandboxing::windows_mxc_available();
-        let local_windows_sandbox_type =
-            resolve_windows_sandbox_type(windows_sandbox_type, prefer_mxc);
-        let legacy_windows_sandbox_level = windows_sandbox_level_for_legacy_checks(
-            local_windows_sandbox_type,
-            windows_sandbox_level,
-        );
         let explicit_permission_profile_mode = effective_permission_selection
             .persisted_profile_id_was_provided
             || default_permissions_override.is_some()
@@ -3734,10 +3678,7 @@ impl Config {
                     let default_permissions = effective_permission_selection
                         .selected_profile_id
                         .unwrap_or_else(|| {
-                            default_builtin_permission_profile_name(
-                                &active_project,
-                                legacy_windows_sandbox_level,
-                            )
+                            default_builtin_permission_profile_name(&active_project)
                         });
                     network_proxy_config_for_profile_selection(
                         effective_permission_selection.profiles.as_ref(),
@@ -3757,10 +3698,7 @@ impl Config {
             let default_permissions = effective_permission_selection
                 .selected_profile_id
                 .unwrap_or_else(|| {
-                    default_builtin_permission_profile_name(
-                        &active_project,
-                        legacy_windows_sandbox_level,
-                    )
+                    default_builtin_permission_profile_name(&active_project)
                 });
             let builtin_workspace_write_settings = if using_implicit_builtin_profile {
                 cfg.sandbox_workspace_write.as_ref().map(|settings| WorkspaceWriteSettings {
@@ -3825,7 +3763,6 @@ impl Config {
             let mut permission_profile = cfg
                 .derive_permission_profile(
                     sandbox_mode,
-                    legacy_windows_sandbox_level,
                     Some(&active_project),
                     Some(&constrained_permission_profile),
                 )
@@ -4453,7 +4390,6 @@ impl Config {
         let otel = otel::resolve_config(cfg.otel.unwrap_or_default(), &mut startup_warnings);
         let mut config = Self {
             plugins: cfg.plugins,
-            prefer_mxc,
             model,
             daybreak_enabled: cfg.daybreak.unwrap_or(false),
             service_tier,
@@ -4481,8 +4417,6 @@ impl Config {
                 network,
                 allow_login_shell,
                 shell_environment_policy,
-                windows_sandbox_mode,
-                windows_sandbox_type,
             },
             explicit_permission_profile_mode,
             custom_permission_profiles,
@@ -4809,32 +4743,6 @@ impl Config {
         } else {
             Ok(Some(s))
         }
-    }
-
-    pub fn set_windows_sandbox_enabled(&mut self, value: bool) {
-        self.permissions.windows_sandbox_mode = if value {
-            Some(WindowsSandboxModeToml::Unelevated)
-        } else if matches!(
-            self.permissions.windows_sandbox_mode,
-            Some(WindowsSandboxModeToml::Unelevated)
-        ) {
-            None
-        } else {
-            self.permissions.windows_sandbox_mode
-        };
-    }
-
-    pub fn set_windows_elevated_sandbox_enabled(&mut self, value: bool) {
-        self.permissions.windows_sandbox_mode = if value {
-            Some(WindowsSandboxModeToml::Elevated)
-        } else if matches!(
-            self.permissions.windows_sandbox_mode,
-            Some(WindowsSandboxModeToml::Elevated)
-        ) {
-            None
-        } else {
-            self.permissions.windows_sandbox_mode
-        };
     }
 
     pub fn managed_network_requirements_enabled(&self) -> bool {

@@ -1121,7 +1121,7 @@ async fn command_center_new_checkout_and_worktree_preserve_source_and_default_br
         std::fs::write(
             home.join("config.toml"),
             format!(
-                "approvals_reviewer = \"auto_review\"\nsandbox_mode = \"workspace-write\"\napproval_policy = \"on-request\"\nwindows.sandbox = \"unelevated\"\n[projects.{:?}]\ntrust_level = \"trusted\"\n",
+                "approvals_reviewer = \"auto_review\"\nsandbox_mode = \"workspace-write\"\napproval_policy = \"on-request\"\n[projects.{:?}]\ntrust_level = \"trusted\"\n",
                 codex_config::loader::project_trust_key(&source),
             ),
         )?;
@@ -1161,7 +1161,6 @@ async fn command_center_new_checkout_and_worktree_preserve_source_and_default_br
         let (mut app, mut events, _) = make_test_app_with_channels().await;
         app.config.codex_home = home.clone().abs();
         app.config.cwd = selected.cwd.clone().abs();
-        app.chat_widget.windows_sandbox_local_server = cfg!(target_os = "windows");
         app.harness_overrides.cwd = Some(selected.cwd.clone());
         trust_launch_folder(&mut app);
         let (mut server, requests, proxy) = start_recording_app_server_with_history(

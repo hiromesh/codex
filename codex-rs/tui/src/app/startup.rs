@@ -53,7 +53,6 @@ fn spawn_startup_thread_start(
 #[derive(Default)]
 pub(super) struct FreshStartupDefaults {
     pub(super) server_defaults_read: bool,
-    pub(super) prompt_windows_sandbox: bool,
     pub(super) approval_policy: Option<codex_protocol::protocol::AskForApproval>,
 }
 
@@ -100,7 +99,6 @@ pub(super) async fn prepare_fresh_startup_config(
     );
     Ok(FreshStartupDefaults {
         server_defaults_read: defaults.is_some(),
-        prompt_windows_sandbox: projectless.prompt_windows_sandbox,
         approval_policy: projectless.approval_policy,
     })
 }
@@ -244,7 +242,6 @@ impl App {
         session_selection: SessionSelection,
         feedback: codex_feedback::CodexFeedback,
         is_first_run: bool,
-        should_prompt_windows_sandbox_nux_at_startup: bool,
         app_server_target: AppServerTarget,
         state_db: Option<StateDbHandle>,
         environment_manager: Arc<EnvironmentManager>,
@@ -927,17 +924,6 @@ impl App {
             environment_manager.as_ref(),
         ));
         let thread_and_widget_ms = thread_and_widget_started_at.elapsed().as_millis();
-        chat_widget.windows_sandbox_local_server = !app_server_target.uses_remote_workspace()
-            && app_server.app_server_platform_os() == Some("windows");
-        chat_widget.windows_sandbox_host = if app_server_target.uses_remote_workspace() {
-            WindowsSandboxHost::Remote
-        } else {
-            initial_started_thread
-                .as_ref()
-                .map_or(WindowsSandboxHost::Unknown, |started| {
-                    started.session.windows_sandbox_host
-                })
-        };
         // This launch warning belongs to the TUI, independent of picker/trust client replacement.
         if let Some(warning) = daemon_startup_warning {
             app_event_tx.send(AppEvent::InsertHistoryCell(Box::new(
@@ -1033,11 +1019,6 @@ See the Codex keymap documentation for supported actions and examples."
             pending_update_action: None,
             daemon_restart: None,
             pending_shutdown_exit_thread_id: None,
-            windows_sandbox: WindowsSandboxState {
-                prompt_after_trust: should_prompt_windows_sandbox_nux_at_startup
-                    || startup_defaults.prompt_windows_sandbox,
-                ..Default::default()
-            },
             thread_event_channels: HashMap::new(),
             pending_realtime_speech_replay: HashMap::new(),
             pending_realtime_transcript_replay: HashMap::new(),

@@ -42,7 +42,6 @@ use crate::tools::runtimes::apply_patch::ApplyPatchRequest;
 use crate::tools::runtimes::apply_patch::ApplyPatchRuntime;
 use crate::tools::sandboxing::ExecApprovalRequirement;
 use crate::tools::sandboxing::ToolCtx;
-use crate::windows_sandbox::windows_sandbox_level_for_legacy_checks;
 use codex_apply_patch::ApplyPatchAction;
 use codex_apply_patch::ApplyPatchFileChange;
 use codex_apply_patch::Hunk;
@@ -242,7 +241,7 @@ fn write_permissions_for_paths(
         let parent = path
             .parent()
             .or_else(|| match sandbox_route {
-                PatchSandboxRoute::Platform(_) => {
+                PatchSandboxRoute::Platform => {
                     // Host path rules can recover parents of opaque local paths.
                     // `to_abs_path` verifies that the target round-trips losslessly.
                     path.to_abs_path().ok()?.parent().map(PathUri::from)
@@ -269,7 +268,7 @@ fn write_permissions_for_paths(
     };
 
     Ok(match sandbox_route {
-        PatchSandboxRoute::Platform(_) => normalize_additional_permissions(permissions).ok(),
+        PatchSandboxRoute::Platform => normalize_additional_permissions(permissions).ok(),
         PatchSandboxRoute::ExecutorManaged => {
             normalize_additional_permissions_with_context(permissions, context).ok()
         }
@@ -517,10 +516,7 @@ fn prepare_verified_patch(
     let sandbox_route = if turn_environment.environment.is_remote() {
         PatchSandboxRoute::ExecutorManaged
     } else {
-        PatchSandboxRoute::Platform(windows_sandbox_level_for_legacy_checks(
-            turn_environment.config().windows_sandbox_type,
-            turn_environment.config().windows_sandbox_level,
-        ))
+        PatchSandboxRoute::Platform
     };
     let environment_id = turn_environment.selection.environment_id.as_str();
     let file_paths = file_paths_for_action(&action);

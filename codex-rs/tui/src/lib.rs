@@ -265,7 +265,6 @@ mod user_prompt;
 mod version;
 mod vim_search;
 mod width;
-mod windows_sandbox;
 mod workspace_command;
 mod workspace_messages;
 
@@ -2107,10 +2106,6 @@ async fn run_ratatui_app(
 
     set_default_client_residency_requirement(config.enforce_residency.value());
     let is_first_run = config.active_project.trust_level.is_none();
-    #[cfg(target_os = "windows")]
-    let should_prompt_windows_sandbox_nux_at_startup = trust_decision_was_made;
-    #[cfg(not(target_os = "windows"))]
-    let should_prompt_windows_sandbox_nux_at_startup = false;
 
     let Cli {
         prompt,
@@ -2229,7 +2224,6 @@ async fn run_ratatui_app(
         session_selection,
         feedback,
         is_first_run,
-        should_prompt_windows_sandbox_nux_at_startup,
         app_server_target,
         state_db,
         environment_manager,

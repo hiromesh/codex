@@ -1,9 +1,9 @@
 from pathlib import Path
 
 import pytest
-from fixtures import code_mode_host_debug_symbols, package, responses_server
+from fixtures import package, responses_server
 
-__all__ = ["code_mode_host_debug_symbols", "package", "responses_server"]
+__all__ = ["package", "responses_server"]
 
 
 def pytest_addoption(parser: pytest.Parser) -> None:

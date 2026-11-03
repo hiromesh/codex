@@ -15,7 +15,6 @@ use crate::session::tests::build_world_state_from_turn_context;
 use crate::session::tests::make_session_and_context;
 use crate::tasks::InterruptedTurnHistoryMarker;
 use crate::tasks::interrupted_turn_history_marker;
-use crate::windows_sandbox::WindowsSandboxLevelExt;
 use codex_config::ConfigLayerStack;
 use codex_execpolicy::Decision;
 use codex_execpolicy::NetworkRuleProtocol;
@@ -28,7 +27,6 @@ use codex_protocol::ResponseItemId;
 use codex_protocol::approvals::ExecPolicyAmendment;
 use codex_protocol::capabilities::CapabilityRootLocation;
 use codex_protocol::capabilities::SelectedCapabilityRoot;
-use codex_protocol::config_types::WindowsSandboxLevel;
 use codex_protocol::error::CodexErrKind;
 use codex_protocol::mcp::ClientMcpExtensions;
 use codex_protocol::mcp::MCP_APP_UI_EXTENSION_ID;
@@ -1264,51 +1262,6 @@ async fn start_thread_keeps_internal_threads_hidden_from_normal_lookups() {
 }
 
 #[tokio::test]
-async fn spawn_internal_guardian_session_preserves_windows_sandbox_proxy_settings() {
-    let temp_dir = tempdir().expect("tempdir");
-    let mut config = test_config().await;
-    config.codex_home = temp_dir.path().join("codex-home").abs();
-    config.cwd = config.codex_home.abs();
-    std::fs::create_dir_all(&config.codex_home).expect("create codex home");
-
-    let manager = ThreadManager::with_models_provider_and_home_for_tests(
-        CodexAuth::from_api_key("dummy"),
-        config.model_provider.clone(),
-        config.codex_home.to_path_buf(),
-        Arc::new(codex_exec_server::EnvironmentManager::default_for_tests()),
-    );
-    let parent = manager
-        .start_thread(StartThreadOptions::new(config.clone()))
-        .await
-        .expect("start parent thread");
-    let reviewer = manager
-        .spawn_internal_session(
-            parent.thread_id,
-            StartThreadOptions {
-                session_source: Some(SessionSource::Internal(InternalSessionSource::Guardian)),
-                ..StartThreadOptions::new(config)
-            },
-        )
-        .await
-        .expect("start internal reviewer");
-
-    assert_eq!(
-        (
-            parent.thread.session.windows_sandbox_proxy_settings_mode,
-            reviewer.thread.session.windows_sandbox_proxy_settings_mode,
-        ),
-        (
-            codex_sandboxing::WindowsSandboxProxySettingsMode::Reconcile,
-            codex_sandboxing::WindowsSandboxProxySettingsMode::Preserve,
-        )
-    );
-
-    manager
-        .shutdown_all_threads_bounded(Duration::from_secs(10))
-        .await;
-}
-
-#[tokio::test]
 async fn fork_internal_session_uses_only_the_selected_history() {
     let temp_dir = tempdir().expect("tempdir");
     let mut config = test_config().await;
@@ -1518,8 +1471,6 @@ async fn spawn_internal_session_preserves_parent_lineage_without_forking_history
             workspace_roots: reviewer_environment.workspace_roots.clone(),
             permission_profile: config.permissions.permission_profile_state().snapshot(),
             shell_environment_policy: Default::default(),
-            windows_sandbox_level: WindowsSandboxLevel::from_config(&config),
-            windows_sandbox_type: config.permissions.windows_sandbox_type,
             use_legacy_landlock: config.features.use_legacy_landlock(),
             exec_policy: Some(codex_execpolicy::RequirementsExecPolicy::new(
                 codex_execpolicy::Policy::empty(),

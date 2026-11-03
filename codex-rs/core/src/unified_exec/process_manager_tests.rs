@@ -229,11 +229,7 @@ fn exec_server_params_use_path_uri_and_env_policy_overlay_contract() {
         expiration: crate::exec::ExecExpiration::DefaultTimeout,
         capture_policy: crate::exec::ExecCapturePolicy::ShellTool,
         sandbox: codex_sandboxing::SandboxType::None,
-        windows_sandbox_policy_cwd: cwd.clone().into(),
-        windows_sandbox_workspace_roots: vec![cwd],
-        windows_sandbox_level: codex_protocol::config_types::WindowsSandboxLevel::Disabled,
         permission_profile: permission_profile.clone(),
-        windows_sandbox_filesystem_overrides: None,
         arg0: None,
         exec_server_sandbox: None,
         exec_server_enforce_managed_network: true,
@@ -241,13 +237,11 @@ fn exec_server_params_use_path_uri_and_env_policy_overlay_contract() {
         exec_server_network_proxy: None,
     };
 
-    let proxy_settings_mode = codex_sandboxing::WindowsSandboxProxySettingsMode::Preserve;
     let params_for_request = |request: &ExecRequest| {
         exec_server_params_for_request(
             /*process_id*/ 123,
             request,
             /*tool_ctx*/ None,
-            proxy_settings_mode,
             /*tty*/ true,
         )
     };
@@ -295,13 +289,6 @@ fn exec_server_params_use_path_uri_and_env_policy_overlay_contract() {
     );
     let first = params_for_request(&request);
     let second = params_for_request(&request);
-    assert_eq!(
-        first
-            .sandbox
-            .as_ref()
-            .and_then(|sandbox| sandbox.windows_sandbox_proxy_settings_mode),
-        Some(codex_sandboxing::WindowsSandboxProxySettingsMode::Preserve)
-    );
     assert!(first.process_id.as_str().starts_with("123-"));
     assert!(second.process_id.as_str().starts_with("123-"));
     assert_ne!(first.process_id, second.process_id);
@@ -490,7 +477,7 @@ async fn failed_initial_end_for_unstored_process_uses_fallback_output() {
 
     emit_failed_initial_exec_end_if_unstored(
         /*process_stored*/ false,
-        Some(codex_protocol::sandbox::SandboxType::WindowsMxc),
+        Some(codex_protocol::sandbox::SandboxType::LinuxSeccomp),
         &context,
         &request,
         request.prepared.cwd.clone(),
@@ -515,7 +502,7 @@ async fn failed_initial_end_for_unstored_process_uses_fallback_output() {
     assert_eq!(item.id, "call-unified-denied");
     assert_eq!(
         item.sandbox_type,
-        Some(codex_protocol::sandbox::SandboxType::WindowsMxc)
+        Some(codex_protocol::sandbox::SandboxType::LinuxSeccomp)
     );
     assert_eq!(
         item.status,

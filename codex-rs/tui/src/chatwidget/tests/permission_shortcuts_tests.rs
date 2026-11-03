@@ -12,10 +12,6 @@ async fn permission_shortcuts_cycle_builtin_modes() {
     chat.set_feature_enabled(Feature::GuardianApproval, /*enabled*/ true);
     chat.chat_keymap.next_permission_mode = vec![crate::key_hint::plain(KeyCode::F(8))];
     chat.chat_keymap.previous_permission_mode = vec![crate::key_hint::plain(KeyCode::F(7))];
-    #[cfg(target_os = "windows")]
-    {
-        chat.set_windows_sandbox_mode(Some(WindowsSandboxSetupMode::Unelevated));
-    }
     chat.permission_discovery = Some(crate::permission_discovery::PermissionDiscovery::local(
         &chat.config,
     ));
@@ -74,41 +70,6 @@ async fn permission_shortcuts_cycle_builtin_modes() {
             "pending shortcut must not be duplicated"
         );
         chat.complete_permission_shortcut(thread_id);
-    }
-    #[cfg(target_os = "windows")]
-    {
-        chat.set_windows_sandbox_mode(/*mode*/ None);
-        chat.config
-            .permissions
-            .set_permission_profile(PermissionProfile::read_only())
-            .unwrap();
-        chat.config.approvals_reviewer = User;
-        chat.handle_key_event(KeyEvent::from(KeyCode::F(8)));
-        assert!(matches!(
-            rx.try_recv(),
-            Ok(AppEvent::ApplyPermissionShortcut {
-                selection: PermissionProfileSelection {
-                    approvals_reviewer: Some(AutoReview),
-                    ..
-                },
-                ..
-            })
-        ));
-        assert!(rx.try_recv().is_err());
-        chat.complete_permission_shortcut(thread_id);
-        chat.windows_sandbox_host = crate::app::WindowsSandboxHost::Remote;
-        chat.handle_key_event(KeyEvent::from(KeyCode::F(8)));
-        assert!(matches!(
-            rx.try_recv(),
-            Ok(AppEvent::ApplyPermissionShortcut {
-                selection: PermissionProfileSelection {
-                    profile_id,
-                    approvals_reviewer: Some(User),
-                    ..
-                },
-                ..
-            }) if profile_id == ":workspace"
-        ));
     }
 }
 

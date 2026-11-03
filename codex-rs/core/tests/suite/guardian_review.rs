@@ -15,7 +15,6 @@ use codex_core::config::Config;
 use codex_core::config::Constrained;
 use codex_core::config::CurrentTimeReminderConfig;
 use codex_core::sandboxing::SandboxPermissions;
-use codex_core::windows_sandbox::WindowsSandboxLevelExt;
 use codex_extension_api::ExtensionRegistryBuilder;
 use codex_extension_api::ToolFinishInput;
 use codex_extension_api::ToolLifecycleContributor;
@@ -32,7 +31,6 @@ use codex_otel::MetricsClient;
 use codex_otel::MetricsConfig;
 use codex_protocol::ThreadId;
 use codex_protocol::config_types::ApprovalsReviewer;
-use codex_protocol::config_types::WindowsSandboxLevel;
 use codex_protocol::models::ContentItem;
 use codex_protocol::models::PermissionProfile;
 use codex_protocol::models::PermissionProfileSnapshot;
@@ -1877,8 +1875,6 @@ async fn guardian_session_is_reused_for_consecutive_tool_reviews_without_prewarm
             test.config.permissions.permission_profile().clone(),
         ),
         shell_environment_policy: Default::default(),
-        windows_sandbox_level: WindowsSandboxLevel::from_config(&test.config),
-        windows_sandbox_type: test.config.permissions.windows_sandbox_type,
         use_legacy_landlock: test.config.features.use_legacy_landlock(),
         exec_policy: None,
         mcp_policy: None,

@@ -2,7 +2,6 @@
 //! Labels never inspect the filesystem and must not be used for authorization.
 
 use crate::responses_metadata::CodexResponsesMetadata;
-use codex_file_system::WindowsSandboxSelection;
 use codex_protocol::models::PermissionProfile;
 use codex_sandboxing::SandboxType;
 use codex_sandboxing::get_platform_sandbox;
@@ -21,15 +20,10 @@ impl SandboxTags {
     pub(crate) fn new(
         profile: &PermissionProfile,
         cwd: &Path,
-        windows_sandbox_selection: WindowsSandboxSelection,
         enforce_managed_network: bool,
     ) -> Self {
         Self {
-            sandbox: permission_profile_sandbox_tag(
-                profile,
-                windows_sandbox_selection,
-                enforce_managed_network,
-            ),
+            sandbox: permission_profile_sandbox_tag(profile, enforce_managed_network),
             policy: permission_profile_policy_tag(profile, cwd),
         }
     }
@@ -57,10 +51,8 @@ pub(crate) fn record_policy_metadata(
 
 fn permission_profile_sandbox_tag(
     profile: &PermissionProfile,
-    windows_sandbox_selection: impl Into<WindowsSandboxSelection>,
     enforce_managed_network: bool,
 ) -> &'static str {
-    let windows_sandbox_selection = windows_sandbox_selection.into();
     match profile {
         PermissionProfile::Disabled => return "none",
         PermissionProfile::External { .. } => return "external",
@@ -78,18 +70,9 @@ fn permission_profile_sandbox_tag(
             }
         }
     }
-    match windows_sandbox_selection {
-        WindowsSandboxSelection::Mxc => SandboxType::WindowsMxc.as_metric_tag(),
-        WindowsSandboxSelection::Elevated => "windows_elevated",
-        WindowsSandboxSelection::RestrictedToken => {
-            SandboxType::WindowsRestrictedToken.as_metric_tag()
-        }
-        WindowsSandboxSelection::Disabled => {
-            get_platform_sandbox(/*windows_sandbox_enabled*/ false)
-                .map(SandboxType::as_metric_tag)
-                .unwrap_or("none")
-        }
-    }
+    get_platform_sandbox()
+        .map(SandboxType::as_metric_tag)
+        .unwrap_or("none")
 }
 
 fn permission_profile_policy_tag(profile: &PermissionProfile, cwd: &Path) -> &'static str {

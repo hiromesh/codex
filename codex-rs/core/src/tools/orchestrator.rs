@@ -93,8 +93,6 @@ impl ToolOrchestrator {
             workspace_roots: attempt.workspace_roots,
             sandbox_exe: attempt.sandbox_exe,
             use_legacy_landlock: attempt.use_legacy_landlock,
-            windows_sandbox_type: attempt.windows_sandbox_type,
-            windows_sandbox_level: attempt.windows_sandbox_level,
             network_denial_cancellation_token: network_approval
                 .as_ref()
                 .map(ActiveNetworkApproval::cancellation_token),
@@ -341,15 +339,10 @@ impl ToolOrchestrator {
                 )
             }
         };
-        let windows_sandbox_type = codex_protocol::sandbox::effective_windows_sandbox_type(
-            sandbox_config.windows_sandbox_type,
-            sandbox_config.windows_sandbox_level,
-        );
         let initial_sandbox = if sandbox_requested && !executor_managed_process_sandbox {
             sandbox_manager.select_initial(
                 initial_permissions,
                 sandbox_preference,
-                windows_sandbox_type,
                 managed_network_active,
             )
         } else {
@@ -363,11 +356,7 @@ impl ToolOrchestrator {
             .sandbox_cwd(req)
             .cloned()
             .unwrap_or_else(|| environment.cwd().clone());
-        let codex_sandbox_exe = if cfg!(windows) {
-            turn_ctx.config.codex_self_exe.as_ref()
-        } else {
-            turn_ctx.config.codex_linux_sandbox_exe.as_ref()
-        };
+        let codex_sandbox_exe = turn_ctx.config.codex_linux_sandbox_exe.as_ref();
         let initial_attempt = SandboxAttempt {
             sandbox_override,
             sandbox: initial_sandbox,
@@ -380,8 +369,6 @@ impl ToolOrchestrator {
             workspace_roots,
             sandbox_exe: codex_sandbox_exe,
             use_legacy_landlock: sandbox_config.use_legacy_landlock,
-            windows_sandbox_type,
-            windows_sandbox_level: sandbox_config.windows_sandbox_level,
             network_denial_cancellation_token: None,
             network_proxy: None,
         };
@@ -564,7 +551,6 @@ impl ToolOrchestrator {
                     sandbox_manager.select_initial(
                         initial_permissions,
                         sandbox_preference,
-                        windows_sandbox_type,
                         managed_network_active,
                     )
                 } else {
@@ -589,8 +575,6 @@ impl ToolOrchestrator {
                     workspace_roots,
                     sandbox_exe: retry_sandbox_exe,
                     use_legacy_landlock: sandbox_config.use_legacy_landlock,
-                    windows_sandbox_type,
-                    windows_sandbox_level: sandbox_config.windows_sandbox_level,
                     network_denial_cancellation_token: None,
                     network_proxy: None,
                 };

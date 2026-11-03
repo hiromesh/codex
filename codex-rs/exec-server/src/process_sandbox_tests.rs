@@ -4,8 +4,6 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use codex_exec_server_protocol::JSONRPCErrorError;
-#[cfg(unix)]
-use codex_file_system::WindowsSandboxSelection;
 #[cfg(target_os = "macos")]
 use codex_network_proxy::ManagedNetworkSandboxContext;
 use codex_network_proxy::NetworkPolicyAuditObserver;
@@ -167,19 +165,6 @@ async fn sandbox_request_wraps_native_argv_on_executor() {
         Some("/usr/bin/sandbox-exec")
     );
 
-    let mut params = params;
-    params.sandbox.as_mut().unwrap().windows_sandbox_selection = WindowsSandboxSelection::Mxc;
-    let error = prepare_exec_request(
-        &params,
-        HashMap::new(),
-        Some(&runtime_paths),
-        /*network_policy_decider*/ None,
-        /*network_policy_audit_observer*/ None,
-    )
-    .await
-    .err()
-    .expect("unsupported MXC must fail closed");
-    assert_eq!(error.message, "native MXC is unavailable on this executor");
 }
 
 #[cfg(unix)]

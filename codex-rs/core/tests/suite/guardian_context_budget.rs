@@ -26,7 +26,6 @@ use core_test_support::ThreadIdle;
 use core_test_support::responses;
 use core_test_support::responses::ev_assistant_message;
 use core_test_support::responses::ev_completed;
-use core_test_support::responses::ev_custom_tool_call;
 use core_test_support::responses::ev_function_call;
 use core_test_support::responses::ev_response_created;
 use core_test_support::responses::sse;
@@ -38,8 +37,6 @@ use pretty_assertions::assert_eq;
 use serde_json::json;
 use std::sync::Arc;
 use test_case::test_case;
-
-use super::image_rollout::RecordingFileAttachmentStore;
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn independent_review_preserves_oversized_instruction_order() -> Result<()> {
@@ -211,17 +208,23 @@ enum ReviewerResponse {
     Decision,
     ToolContinuation,
     CachedCompactionContinuation,
-    FileImageContinuation,
     UncompactableContinuation,
     CompactionError,
     NextReview,
+}
+
+fn large_output_command(lines: usize) -> String {
+    if cfg!(windows) {
+        format!("1..{lines} | ForEach-Object {{ 'inspection-output' }}")
+    } else {
+        format!("yes inspection-output | head -n {lines}")
+    }
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 #[test_case(1, ReviewerResponse::Decision; "required_context_fails_closed")]
 #[test_case(4_500, ReviewerResponse::ToolContinuation; "oversized_tool_continuation_compacts")]
 #[test_case(7_000, ReviewerResponse::CachedCompactionContinuation; "cached_compaction_fits_reviewer_budget")]
-#[test_case(4_500, ReviewerResponse::FileImageContinuation; "uploaded_original_image_history_compacts")]
 #[test_case(5_000, ReviewerResponse::UncompactableContinuation; "ineffective_compaction_fails_closed")]
 #[test_case(5_000, ReviewerResponse::CompactionError; "compaction_service_error_does_not_request_user_approval")]
 #[test_case(6_000, ReviewerResponse::NextReview; "incoming_review_compacts_existing_history")]
@@ -247,10 +250,6 @@ async fn review_respects_complete_context_budget(
         )
         .with_model_info_override("gpt-5.6-luna", move |model| {
             model.context_window = Some(window);
-            if matches!(reviewer_response, ReviewerResponse::FileImageContinuation) {
-                model.supports_image_detail_original = true;
-                model.use_responses_lite = false;
-            }
             model
                 .model_messages
                 .as_mut()
@@ -286,10 +285,6 @@ async fn review_respects_complete_context_budget(
                 prefill_token_weight: 1.0,
             });
         });
-    let image_store = Arc::new(RecordingFileAttachmentStore::default());
-    if matches!(reviewer_response, ReviewerResponse::FileImageContinuation) {
-        builder = builder.with_image_store(image_store.clone());
-    }
     let test = builder.build_with_auto_env(&server).await?;
     let command = json!({"cmd": "echo guardian-budget-test", "sandbox_permissions": "require_escalated", "justification": "Run the requested command."}).to_string();
     let mut commentary =
@@ -330,24 +325,19 @@ async fn review_respects_complete_context_budget(
                         })
                         .to_string(),
                     ),
-                    ReviewerResponse::CachedCompactionContinuation => ev_custom_tool_call(
+                    ReviewerResponse::CachedCompactionContinuation => ev_function_call(
                         "reviewer-inspect",
-                        "exec",
-                        "text('inspection-output'.repeat(1000));",
+                        "exec_command",
+                        &json!({"cmd": large_output_command(/*lines*/ 1_000), "login": false})
+                            .to_string(),
                     ),
                     ReviewerResponse::ToolContinuation
                     | ReviewerResponse::UncompactableContinuation
-                    | ReviewerResponse::CompactionError => ev_custom_tool_call(
+                    | ReviewerResponse::CompactionError => ev_function_call(
                         "reviewer-inspect",
-                        "exec",
-                        "text('inspection-output'.repeat(600));",
-                    ),
-                    // A tiny inline image fits before upload. Its opaque original-detail file
-                    // reference must reserve 10k tokens in reviewer history and force compaction.
-                    ReviewerResponse::FileImageContinuation => ev_custom_tool_call(
-                        "reviewer-inspect",
-                        "exec",
-                        r#"image("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGP4z8DwHwAFAAH/iZk9HQAAAABJRU5ErkJggg==", "original");"#,
+                        "exec_command",
+                        &json!({"cmd": large_output_command(/*lines*/ 600), "login": false})
+                            .to_string(),
                     ),
                 },
                 ev_completed("review"),
@@ -358,7 +348,6 @@ async fn review_respects_complete_context_budget(
         reviewer_response,
         ReviewerResponse::ToolContinuation
             | ReviewerResponse::CachedCompactionContinuation
-            | ReviewerResponse::FileImageContinuation
     ) {
         events.insert(
             /*index*/ 2,
@@ -468,39 +457,18 @@ async fn review_respects_complete_context_budget(
             reviewer_response,
             ReviewerResponse::ToolContinuation
                 | ReviewerResponse::CachedCompactionContinuation
-                | ReviewerResponse::FileImageContinuation
         );
         assert_eq!(requests.len(), if recovered { 4 } else { 3 });
         assert_eq!(guardian_requests.len(), if recovered { 2 } else { 1 });
         if recovered {
             assert_eq!(compact_requests.len(), 1);
             let compact = &compact_requests[0];
-            if matches!(reviewer_response, ReviewerResponse::FileImageContinuation) {
-                let uploads = image_store
-                    .uploads
-                    .lock()
-                    .expect("image upload tracker lock is not poisoned");
-                let [upload] = uploads.as_slice() else {
-                    panic!("persistent Guardian should upload one image");
-                };
-                assert!(
-                    !upload.ephemeral,
-                    "persistent Guardian should request durable attachment storage"
-                );
-                // The file reservation also protects the compaction request itself: an output
-                // larger than its window is replaced before the summary request is sent.
-                assert_eq!(
-                    compact.custom_tool_call_output("reviewer-inspect")["output"],
-                    "Output exceeded the available model context and was truncated"
-                );
-            } else {
-                assert!(
-                    compact
-                        .body_json()
-                        .to_string()
-                        .contains("inspection-output")
-                );
-            }
+            assert!(
+                compact
+                    .body_json()
+                    .to_string()
+                    .contains("inspection-output")
+            );
             let recovered = guardian_requests[1].body_json();
             assert!(
                 recovered["input"]

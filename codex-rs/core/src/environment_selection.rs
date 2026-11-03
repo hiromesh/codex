@@ -1503,7 +1503,6 @@ mod tests {
     use codex_exec_server_test_support::environment_manager_without_environments;
     use codex_http_client::HttpClientFactory;
     use codex_http_client::OutboundProxyPolicy;
-    use codex_protocol::config_types::WindowsSandboxLevel;
     use codex_protocol::models::ActivePermissionProfile;
     use codex_protocol::models::PermissionProfile;
     use codex_protocol::permissions::FileSystemSandboxPolicyContext;
@@ -1533,8 +1532,6 @@ mod tests {
             environment_hooks: Default::default(),
             allow_login_shell: true,
             workspace_roots: Vec::new(),
-            windows_sandbox_level: WindowsSandboxLevel::Disabled,
-            windows_sandbox_type: codex_protocol::sandbox::SandboxType::None,
             use_legacy_landlock: false,
             permission_profile: PermissionProfileSnapshot::legacy(PermissionProfile::read_only()),
             shell_environment_policy: Default::default(),
@@ -1552,7 +1549,7 @@ mod tests {
         let turn_environments = Arc::new(ThreadEnvironments::new(
             environment_manager,
             crate::shell::default_user_shell(),
-            ThreadEnvironmentDefaults::new(test_environment_config(), SandboxType::None),
+            ThreadEnvironmentDefaults::new(test_environment_config()),
             ShellSnapshot::disabled(),
             TurnEnvironmentSnapshot::default(),
             /*non_blocking_snapshots*/ false,
@@ -1715,8 +1712,6 @@ url = "ws://127.0.0.1:8765"
             environment_hooks: Default::default(),
             allow_login_shell: false,
             workspace_roots: Vec::new(),
-            windows_sandbox_level: WindowsSandboxLevel::Disabled,
-            windows_sandbox_type: codex_protocol::sandbox::SandboxType::None,
             use_legacy_landlock: false,
             permission_profile: PermissionProfileSnapshot::active_with_profile_workspace_roots(
                 PermissionProfile::read_only(),
@@ -1732,10 +1727,7 @@ url = "ws://127.0.0.1:8765"
         let turn_environments = ThreadEnvironments::new(
             Arc::new(EnvironmentManager::default_for_tests()),
             local_shell.clone(),
-            ThreadEnvironmentDefaults::new(
-                expected_config.clone(),
-                expected_config.windows_sandbox_type,
-            ),
+            ThreadEnvironmentDefaults::new(expected_config.clone()),
             ShellSnapshot::disabled(),
             TurnEnvironmentSnapshot::default(),
             /*non_blocking_snapshots*/ false,
@@ -1914,7 +1906,7 @@ url = "ws://127.0.0.1:8765"
         let environments = Arc::new(ThreadEnvironments::new(
             manager,
             crate::shell::default_user_shell(),
-            ThreadEnvironmentDefaults::new(test_environment_config(), SandboxType::None),
+            ThreadEnvironmentDefaults::new(test_environment_config()),
             ShellSnapshot::disabled(),
             TurnEnvironmentSnapshot::default(),
             /*non_blocking_snapshots*/ false,
@@ -1966,15 +1958,8 @@ url = "ws://127.0.0.1:8765"
         );
     }
 
-    #[test_case::test_case(SandboxType::None, SandboxType::None, WindowsSandboxLevel::Disabled; "legacy")]
-    #[test_case::test_case(SandboxType::WindowsRestrictedToken, SandboxType::WindowsMxc, WindowsSandboxLevel::Elevated; "local preference")]
-    #[test_case::test_case(SandboxType::WindowsMxc, SandboxType::WindowsMxc, WindowsSandboxLevel::Disabled; "explicit MXC")]
     #[tokio::test]
-    async fn snapshot_refreshes_readiness_in_selection_order(
-        configured_sandbox: SandboxType,
-        local_sandbox: SandboxType,
-        legacy_level: WindowsSandboxLevel,
-    ) {
+    async fn snapshot_refreshes_readiness_in_selection_order() {
         let listener = TcpListener::bind("127.0.0.1:0")
             .await
             .expect("bind websocket listener");
@@ -1993,8 +1978,6 @@ url = "ws://127.0.0.1:8765"
             environment_hooks: Default::default(),
             allow_login_shell: false,
             workspace_roots: Vec::new(),
-            windows_sandbox_level: legacy_level,
-            windows_sandbox_type: configured_sandbox,
             use_legacy_landlock: false,
             permission_profile: PermissionProfileSnapshot::active_with_profile_workspace_roots(
                 PermissionProfile::read_only(),
@@ -2008,7 +1991,6 @@ url = "ws://127.0.0.1:8765"
             selected_capability_roots: Vec::new(),
         };
         let expected_local_config = EnvironmentConfig {
-            windows_sandbox_type: local_sandbox,
             ..expected_config.clone()
         };
         let cwd = PathUri::from_abs_path(&cwd);
@@ -2029,7 +2011,7 @@ url = "ws://127.0.0.1:8765"
         let turn_environments = ThreadEnvironments::new(
             Arc::clone(&manager),
             crate::shell::default_user_shell(),
-            ThreadEnvironmentDefaults::new(test_environment_config(), local_sandbox),
+            ThreadEnvironmentDefaults::new(test_environment_config()),
             ShellSnapshot::disabled(),
             TurnEnvironmentSnapshot::default(),
             /*non_blocking_snapshots*/ true,
@@ -2044,7 +2026,6 @@ url = "ws://127.0.0.1:8765"
         assert_eq!(
             initial.primary().expect("local environment").config(),
             &EnvironmentConfig {
-                windows_sandbox_type: local_sandbox,
                 ..test_environment_config()
             },
         );
@@ -2119,7 +2100,7 @@ url = "ws://127.0.0.1:8765"
         let child = ThreadEnvironments::new(
             manager,
             crate::shell::default_user_shell(),
-            ThreadEnvironmentDefaults::new(next_config.clone(), local_sandbox),
+            ThreadEnvironmentDefaults::new(next_config.clone()),
             ShellSnapshot::disabled(),
             attached.clone(),
             /*non_blocking_snapshots*/ true,
@@ -2183,7 +2164,6 @@ url = "ws://127.0.0.1:8765"
             vec![
                 next_config.clone(),
                 EnvironmentConfig {
-                    windows_sandbox_type: local_sandbox,
                     ..next_config
                 }
             ]
@@ -2210,7 +2190,7 @@ url = "ws://127.0.0.1:8765"
         let environments = ThreadEnvironments::new(
             Arc::clone(&manager),
             crate::shell::default_user_shell(),
-            ThreadEnvironmentDefaults::new(test_environment_config(), SandboxType::None),
+            ThreadEnvironmentDefaults::new(test_environment_config()),
             ShellSnapshot::disabled(),
             TurnEnvironmentSnapshot::default(),
             /*non_blocking_snapshots*/ true,
@@ -2315,7 +2295,7 @@ url = "ws://127.0.0.1:8765"
         let environments = Arc::new(ThreadEnvironments::new(
             Arc::clone(&manager),
             crate::shell::default_user_shell(),
-            ThreadEnvironmentDefaults::new(test_environment_config(), SandboxType::None),
+            ThreadEnvironmentDefaults::new(test_environment_config()),
             ShellSnapshot::disabled(),
             TurnEnvironmentSnapshot::default(),
             /*non_blocking_snapshots*/ true,
@@ -2427,8 +2407,6 @@ url = "ws://127.0.0.1:8765"
             environment_hooks: Default::default(),
             allow_login_shell: false,
             workspace_roots: Vec::new(),
-            windows_sandbox_level: WindowsSandboxLevel::Disabled,
-            windows_sandbox_type: codex_protocol::sandbox::SandboxType::None,
             use_legacy_landlock: false,
             permission_profile: PermissionProfileSnapshot::active_with_profile_workspace_roots(
                 PermissionProfile::read_only(),
@@ -2444,7 +2422,7 @@ url = "ws://127.0.0.1:8765"
         let environments = ThreadEnvironments::new(
             manager,
             crate::shell::default_user_shell(),
-            ThreadEnvironmentDefaults::new(child_config.clone(), child_config.windows_sandbox_type),
+            ThreadEnvironmentDefaults::new(child_config.clone()),
             ShellSnapshot::disabled(),
             TurnEnvironmentSnapshot {
                 environments: vec![TurnEnvironmentState::Ready(inherited)],
@@ -2496,7 +2474,7 @@ url = "ws://127.0.0.1:8765"
         let parent = ThreadEnvironments::new(
             Arc::clone(&manager),
             crate::shell::default_user_shell(),
-            ThreadEnvironmentDefaults::new(test_environment_config(), SandboxType::WindowsMxc),
+            ThreadEnvironmentDefaults::new(test_environment_config()),
             ShellSnapshot::disabled(),
             TurnEnvironmentSnapshot::default(),
             /*non_blocking_snapshots*/ false,
@@ -2507,8 +2485,6 @@ url = "ws://127.0.0.1:8765"
             environment_hooks: Default::default(),
             allow_login_shell: false,
             workspace_roots: selection.workspace_roots.clone(),
-            windows_sandbox_level: WindowsSandboxLevel::Disabled,
-            windows_sandbox_type: codex_protocol::sandbox::SandboxType::None,
             use_legacy_landlock: false,
             permission_profile: PermissionProfileSnapshot::legacy(PermissionProfile::read_only()),
             shell_environment_policy: Default::default(),
@@ -2522,7 +2498,6 @@ url = "ws://127.0.0.1:8765"
         parent.update_selections(std::slice::from_ref(&owner_selection));
 
         let child_thread_config = EnvironmentConfig {
-            windows_sandbox_type: SandboxType::WindowsMxc,
             permission_profile: PermissionProfileSnapshot::legacy(
                 PermissionProfile::workspace_write(),
             ),
@@ -2541,7 +2516,7 @@ url = "ws://127.0.0.1:8765"
         let child = ThreadEnvironments::new(
             manager,
             crate::shell::default_user_shell(),
-            ThreadEnvironmentDefaults::new(child_thread_config.clone(), SandboxType::WindowsMxc),
+            ThreadEnvironmentDefaults::new(child_thread_config.clone()),
             ShellSnapshot::disabled(),
             parent.snapshot().await,
             /*non_blocking_snapshots*/ false,

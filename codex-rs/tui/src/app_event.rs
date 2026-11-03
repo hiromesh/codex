@@ -175,13 +175,6 @@ pub(crate) enum ConsolidationScrollbackReflow {
     Required,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[cfg_attr(not(target_os = "windows"), allow(dead_code))]
-pub(crate) enum WindowsSandboxEnableMode {
-    Elevated,
-    Legacy,
-}
-
 #[derive(Debug, Clone)]
 #[cfg_attr(not(target_os = "windows"), allow(dead_code))]
 pub(crate) struct ConnectorsSnapshot {
@@ -1420,50 +1413,6 @@ pub(crate) enum AppEvent {
         selection: PermissionProfileSelection,
     },
 
-    /// Refresh server-owned Windows state after selecting a thread or project.
-    #[cfg_attr(not(target_os = "windows"), allow(dead_code))]
-    RefreshWindowsSandbox {
-        thread_id: ThreadId,
-    },
-
-    /// Prompt to enable the Windows sandbox feature before using Agent mode.
-    #[cfg_attr(not(target_os = "windows"), allow(dead_code))]
-    OpenWindowsSandboxEnablePrompt {
-        preset: ApprovalPreset,
-        profile_selection: Option<PermissionProfileSelection>,
-    },
-
-    /// Open the Windows sandbox fallback prompt after declining or failing elevation.
-    #[cfg_attr(not(target_os = "windows"), allow(dead_code))]
-    OpenWindowsSandboxFallbackPrompt {
-        preset: ApprovalPreset,
-        profile_selection: Option<PermissionProfileSelection>,
-    },
-
-    /// Begin the elevated Windows sandbox setup flow.
-    #[cfg_attr(not(target_os = "windows"), allow(dead_code))]
-    BeginWindowsSandboxElevatedSetup {
-        preset: ApprovalPreset,
-        profile_selection: Option<PermissionProfileSelection>,
-    },
-
-    /// Begin the non-elevated Windows sandbox setup flow.
-    #[cfg_attr(not(target_os = "windows"), allow(dead_code))]
-    BeginWindowsSandboxLegacySetup {
-        preset: ApprovalPreset,
-        profile_selection: Option<PermissionProfileSelection>,
-    },
-
-    /// Enable the Windows sandbox feature and switch to Agent mode.
-    #[cfg_attr(not(target_os = "windows"), allow(dead_code))]
-    EnableWindowsSandboxForAgentMode {
-        preset: ApprovalPreset,
-        mode: WindowsSandboxEnableMode,
-        profile_selection: Option<PermissionProfileSelection>,
-    },
-
-    /// Update the Windows sandbox feature mode without changing approval presets.
-    #[cfg_attr(not(target_os = "windows"), allow(dead_code))]
 
     /// Update the current approval policy in the running app and widget.
     UpdateAskForApprovalPolicy(AskForApproval),

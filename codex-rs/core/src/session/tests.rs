@@ -50,7 +50,6 @@ use codex_config::loader::project_trust_key;
 use codex_config::types::McpServerConfig;
 use codex_config::types::McpServerTransportConfig;
 use codex_config::types::ToolSuggestDisabledTool;
-use codex_config::types::WindowsSandboxModeToml;
 use core_test_support::test_codex::TurnInputRequest as ExternalTurnInputRequest;
 
 use codex_features::Feature;
@@ -1239,7 +1238,6 @@ async fn start_managed_network_proxy_applies_execpolicy_network_rules() -> anyho
         &spec,
         &exec_policy,
         &permission_profile,
-        SandboxType::None,
         /*network_policy_decider*/ None,
         /*blocked_request_observer*/ None,
         /*managed_network_requirements_enabled*/ false,
@@ -1285,7 +1283,6 @@ async fn start_managed_network_proxy_ignores_invalid_execpolicy_network_rules() 
         &spec,
         &exec_policy,
         &permission_profile,
-        SandboxType::None,
         /*network_policy_decider*/ None,
         /*blocked_request_observer*/ None,
         /*managed_network_requirements_enabled*/ false,
@@ -1326,7 +1323,6 @@ async fn managed_network_proxy_decider_survives_full_access_start() -> anyhow::R
         &spec,
         &exec_policy,
         &full_access_permission_profile,
-        SandboxType::None,
         Some(network_policy_decider),
         /*blocked_request_observer*/ None,
         /*managed_network_requirements_enabled*/ true,
@@ -1405,7 +1401,6 @@ async fn new_turn_refreshes_managed_network_proxy_for_sandbox_change() -> anyhow
         &spec,
         &Policy::empty(),
         &initial_permission_profile,
-        SandboxType::None,
         Some(Arc::clone(&network_policy_decider)),
         /*blocked_request_observer*/ None,
         /*managed_network_requirements_enabled*/ false,
@@ -1432,7 +1427,6 @@ async fn new_turn_refreshes_managed_network_proxy_for_sandbox_change() -> anyhow
             .expect("test setup should allow permission profile");
         #[cfg(windows)]
         {
-            state.session_configuration.windows_sandbox_type = SandboxType::WindowsMxc;
         }
     }
     session
@@ -4646,8 +4640,6 @@ async fn set_rate_limits_retains_previous_credits() {
         permission_profile_state: config.permissions.permission_profile_state().clone(),
         allow_login_shell: config.permissions.allow_login_shell,
         shell_environment_policy: config.permissions.shell_environment_policy.clone(),
-        windows_sandbox_level: WindowsSandboxLevel::from_config(&config),
-        windows_sandbox_type: config.permissions.windows_sandbox_type,
         use_legacy_landlock: config.features.use_legacy_landlock(),
         legacy_fallback_cwd: config.cwd.clone(),
         runtime_workspace_roots: config.workspace_roots.clone(),
@@ -4769,8 +4761,6 @@ async fn set_rate_limits_updates_plan_type_when_present() {
         permission_profile_state: config.permissions.permission_profile_state().clone(),
         allow_login_shell: config.permissions.allow_login_shell,
         shell_environment_policy: config.permissions.shell_environment_policy.clone(),
-        windows_sandbox_level: WindowsSandboxLevel::from_config(&config),
-        windows_sandbox_type: config.permissions.windows_sandbox_type,
         use_legacy_landlock: config.features.use_legacy_landlock(),
         legacy_fallback_cwd: config.cwd.clone(),
         runtime_workspace_roots: config.workspace_roots.clone(),
@@ -5394,8 +5384,6 @@ pub(crate) async fn make_session_configuration_for_tests() -> SessionConfigurati
         permission_profile_state: config.permissions.permission_profile_state().clone(),
         allow_login_shell: config.permissions.allow_login_shell,
         shell_environment_policy: config.permissions.shell_environment_policy.clone(),
-        windows_sandbox_level: WindowsSandboxLevel::from_config(&config),
-        windows_sandbox_type: config.permissions.windows_sandbox_type,
         use_legacy_landlock: config.features.use_legacy_landlock(),
         legacy_fallback_cwd: config.cwd.clone(),
         runtime_workspace_roots: config.workspace_roots.clone(),
@@ -5565,7 +5553,6 @@ async fn resolved_environments_for_configuration(
         default_user_shell(),
         ThreadEnvironmentDefaults::new(
             session_configuration.inferred_environment_config(),
-            session_configuration.windows_sandbox_type,
         ),
         ShellSnapshot::disabled(),
         TurnEnvironmentSnapshot::default(),
@@ -6599,7 +6586,6 @@ async fn mcp_runtime_keeps_local_backend_without_a_selected_local_environment() 
     let mut desired = session
         .latest_mcp_desired_state(/*auth*/ None, turn.initial_environments.clone())
         .await;
-    Arc::make_mut(&mut desired.config).prefer_mxc = true;
     desired.environments.environments.clear();
     let runtime = session.build_mcp_runtime_input(
         &desired,
@@ -6610,10 +6596,6 @@ async fn mcp_runtime_keeps_local_backend_without_a_selected_local_environment() 
         },
         &[],
         /*elicitation_reviewer*/ None,
-    );
-    assert_eq!(
-        runtime.config.environment_use_mxc,
-        HashMap::from([(DEFAULT_MCP_SERVER_ENVIRONMENT_ID.to_string(), cfg!(windows))])
     );
 }
 
@@ -6972,8 +6954,6 @@ pub(crate) async fn make_session_and_context() -> (Session, TurnContext) {
         permission_profile_state: config.permissions.permission_profile_state().clone(),
         allow_login_shell: config.permissions.allow_login_shell,
         shell_environment_policy: config.permissions.shell_environment_policy.clone(),
-        windows_sandbox_level: WindowsSandboxLevel::from_config(&config),
-        windows_sandbox_type: config.permissions.windows_sandbox_type,
         use_legacy_landlock: config.features.use_legacy_landlock(),
         legacy_fallback_cwd: config.cwd.clone(),
         runtime_workspace_roots: config.workspace_roots.clone(),
@@ -7013,7 +6993,6 @@ pub(crate) async fn make_session_and_context() -> (Session, TurnContext) {
         default_user_shell(),
         ThreadEnvironmentDefaults::new(
             session_configuration.inferred_environment_config(),
-            session_configuration.windows_sandbox_type,
         ),
         ShellSnapshot::disabled(),
         resolved_environments,
@@ -7148,8 +7127,6 @@ pub(crate) async fn make_session_and_context() -> (Session, TurnContext) {
 
         isolation: codex_extension_api::SessionIsolation::Inherit,
         tool_policy: Arc::default(),
-        windows_sandbox_proxy_settings_mode:
-            codex_sandboxing::WindowsSandboxProxySettingsMode::Reconcile,
         multi_agent_version: OnceLock::from(config.multi_agent_version_from_features()),
         mcp_refresh: McpRefresh::new(),
         mcp_tool_approval_metadata: Default::default(),
@@ -7287,8 +7264,6 @@ async fn make_session_with_config_and_rx(
         permission_profile_state: config.permissions.permission_profile_state().clone(),
         allow_login_shell: config.permissions.allow_login_shell,
         shell_environment_policy: config.permissions.shell_environment_policy.clone(),
-        windows_sandbox_level: WindowsSandboxLevel::from_config(&config),
-        windows_sandbox_type: config.permissions.windows_sandbox_type,
         use_legacy_landlock: config.features.use_legacy_landlock(),
         legacy_fallback_cwd: config.cwd.clone(),
         runtime_workspace_roots: config.workspace_roots.clone(),
@@ -7365,7 +7340,6 @@ async fn make_session_with_config_and_rx(
         /*external_time_provider*/ None,
         Some(config.multi_agent_version_from_features()),
         GitEnrichmentPolicy::Fresh,
-        codex_sandboxing::WindowsSandboxProxySettingsMode::Reconcile,
     )
     .await?;
 
@@ -7423,8 +7397,6 @@ async fn make_session_with_history_source_and_agent_control_and_rx(
         permission_profile_state: config.permissions.permission_profile_state().clone(),
         allow_login_shell: config.permissions.allow_login_shell,
         shell_environment_policy: config.permissions.shell_environment_policy.clone(),
-        windows_sandbox_level: WindowsSandboxLevel::from_config(&config),
-        windows_sandbox_type: config.permissions.windows_sandbox_type,
         use_legacy_landlock: config.features.use_legacy_landlock(),
         legacy_fallback_cwd: config.cwd.clone(),
         runtime_workspace_roots: config.workspace_roots.clone(),
@@ -7509,7 +7481,6 @@ async fn make_session_with_history_source_and_agent_control_and_rx(
         /*external_time_provider*/ None,
         Some(config.multi_agent_version_from_features()),
         GitEnrichmentPolicy::Fresh,
-        codex_sandboxing::WindowsSandboxProxySettingsMode::Reconcile,
     )
     .await?;
 
@@ -9288,8 +9259,6 @@ where
         permission_profile_state: config.permissions.permission_profile_state().clone(),
         allow_login_shell: config.permissions.allow_login_shell,
         shell_environment_policy: config.permissions.shell_environment_policy.clone(),
-        windows_sandbox_level: WindowsSandboxLevel::from_config(&config),
-        windows_sandbox_type: config.permissions.windows_sandbox_type,
         use_legacy_landlock: config.features.use_legacy_landlock(),
         legacy_fallback_cwd: config.cwd.clone(),
         runtime_workspace_roots: config.workspace_roots.clone(),
@@ -9328,7 +9297,6 @@ where
         default_user_shell(),
         ThreadEnvironmentDefaults::new(
             session_configuration.inferred_environment_config(),
-            session_configuration.windows_sandbox_type,
         ),
         ShellSnapshot::disabled(),
         resolved_turn_environments.clone(),
@@ -9463,8 +9431,6 @@ where
 
         isolation: codex_extension_api::SessionIsolation::Inherit,
         tool_policy: Arc::default(),
-        windows_sandbox_proxy_settings_mode:
-            codex_sandboxing::WindowsSandboxProxySettingsMode::Reconcile,
         multi_agent_version: OnceLock::from(config.multi_agent_version_from_features()),
         mcp_refresh: McpRefresh::new(),
         mcp_tool_approval_metadata: Default::default(),
@@ -10308,12 +10274,10 @@ async fn capability_discovery_uses_environment_permission_profile() {
         .permissions
         .set_permission_profile(PermissionProfile::Disabled)
         .expect("unrestricted permission profile should be allowed");
-    config.permissions.windows_sandbox_mode = Some(WindowsSandboxModeToml::Unelevated);
     config
         .features
         .disable(Feature::UseLegacyLandlock)
         .expect("disable legacy Landlock");
-    turn_context.windows_sandbox_level = WindowsSandboxLevel::RestrictedToken;
     let mut environment = turn_context
         .initial_environments
         .primary()
@@ -10333,7 +10297,6 @@ async fn capability_discovery_uses_environment_permission_profile() {
             &file_system_policy,
             NetworkSandboxPolicy::Restricted,
         ));
-    environment_config.windows_sandbox_level = WindowsSandboxLevel::Elevated;
     environment_config.use_legacy_landlock = true;
     let expected_sandbox = FileSystemSandboxContext {
         sandbox_override: SandboxOverride::NoOverride,
@@ -10342,12 +10305,6 @@ async fn capability_discovery_uses_environment_permission_profile() {
         workspace_roots: environment.workspace_roots().to_vec(),
         user_home_dir: environment.user_home_dir.clone(),
         temporary_directories: environment.temporary_directories.clone(),
-        windows_sandbox_selection: if cfg!(windows) {
-            codex_file_system::WindowsSandboxSelection::Elevated
-        } else {
-            codex_file_system::WindowsSandboxSelection::Disabled
-        },
-        windows_sandbox_proxy_settings_mode: None,
         use_legacy_landlock: true,
     };
     let environment_id = environment.selection.environment_id.clone();

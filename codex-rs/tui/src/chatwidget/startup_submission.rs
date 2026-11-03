@@ -59,12 +59,6 @@ impl ChatWidget {
         {
             return;
         }
-        #[cfg(any(target_os = "windows", test))]
-        if self.windows_sandbox_host == crate::app::WindowsSandboxHost::Local
-            && self.elevated_windows_sandbox_setup_required()
-        {
-            return;
-        }
         let Some(confirmed) = self.input_queue.startup_submission.take() else {
             crate::startup_recovery::clear();
             return;

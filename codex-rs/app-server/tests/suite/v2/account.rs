@@ -479,17 +479,9 @@ async fn startup_enforces_requirements_at_the_correct_load_stage(
         .build()
         .await?;
 
-    if cfg!(windows) && fetch_cloud && (!local_mxc || !codex_sandboxing::windows_mxc_available()) {
-        assert!(
-            !timeout(DEFAULT_READ_TIMEOUT, mcp.wait_for_exit())
-                .await??
-                .success()
-        );
-    } else {
-        timeout(DEFAULT_READ_TIMEOUT, mcp.initialize()).await??;
-        if !fetch_cloud {
-            assert_eq!(read_account(&mut mcp).await?.account, None);
-        }
+    timeout(DEFAULT_READ_TIMEOUT, mcp.initialize()).await??;
+    if !fetch_cloud {
+        assert_eq!(read_account(&mut mcp).await?.account, None);
     }
     assert_eq!(
         mock_server

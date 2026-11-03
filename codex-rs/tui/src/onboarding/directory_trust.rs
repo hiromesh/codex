@@ -105,7 +105,6 @@ pub(crate) async fn check_directory_trust(
                 cancel: cancel.unwrap_or(TrustCancelAction::AgentsOverview),
                 cwd: project.cwd,
                 trust_target: project.trust_target,
-                show_windows_create_sandbox_hint: false,
                 should_quit: false,
                 selection: None,
                 highlighted: TrustDirectorySelection::Trust,

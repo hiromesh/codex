@@ -14,4 +14,4 @@ expression: terminal.backend()
 › 1. Trust and continue                                               
   2. Quit
 
-  enter continue and create sandbox · esc quit
+  enter continue · esc quit

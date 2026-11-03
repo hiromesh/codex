@@ -78,7 +78,6 @@ impl AppServerSession {
         }
         let session = thread_session_state_from_thread_response(
             &thread.id,
-            crate::windows_sandbox::host_from_environments(thread.environments.as_deref()),
             thread.forked_from_id.clone(),
             thread.name.clone(),
             thread.path.clone(),

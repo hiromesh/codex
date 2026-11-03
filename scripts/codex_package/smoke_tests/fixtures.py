@@ -89,8 +89,6 @@ network_access = true
 writable_roots = []
 
 [features]
-code_mode_only = true
-code_mode_host = true
 memories = false
 apps = false
 plugins = false
@@ -190,50 +188,3 @@ stream_max_retries = 0
             yield server
         finally:
             config_path.write_text(original_config)
-
-
-@pytest.fixture(scope="session")
-def code_mode_host_debug_symbols(
-    pytestconfig: pytest.Config,
-    tmp_path_factory: pytest.TempPathFactory,
-) -> Path:
-    target = pytestconfig.getoption("package_target")
-    binaries = {
-        "codex",
-        "codex-app-server",
-        "codex-code-mode-host",
-        "codex-exec-server",
-    }
-
-    if "apple-darwin" in target:
-        markers = {
-            binary: f"/{binary}.dSYM/Contents/Resources/DWARF/" for binary in binaries
-        }
-    else:
-        markers = {binary: f"/{binary}.debug" for binary in binaries}
-
-    destination = tmp_path_factory.mktemp("codex-debug-symbols")
-    found: set[str] = set()
-    symbol_path = None
-    with tarfile.open(pytestconfig.getoption("symbols_archive"), "r|gz") as archive:
-        for member in archive:
-            if not member.isfile():
-                continue
-            for binary, marker in markers.items():
-                if "apple-darwin" in target:
-                    _, found_marker, dwarf_name = member.name.partition(marker)
-                    matches = bool(
-                        found_marker and dwarf_name and "/" not in dwarf_name
-                    )
-                else:
-                    matches = member.name.endswith(marker)
-                if not matches:
-                    continue
-                found.add(binary)
-                if binary == "codex-code-mode-host":
-                    archive.extract(member, destination, filter="data")
-                    symbol_path = destination / member.name
-                break
-    assert found == binaries, found
-    assert symbol_path is not None
-    return symbol_path

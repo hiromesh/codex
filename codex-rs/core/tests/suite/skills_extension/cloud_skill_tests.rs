@@ -72,7 +72,7 @@ async fn explicit_only_cloud_skill_is_hidden_but_can_be_invoked() -> Result<()> 
     const REPEATED_MAIN_READ_CALL_ID: &str = "read-explicit-only-main-again";
     const INVALID_CURSOR_CALL_ID: &str = "read-explicit-only-invalid-cursor";
     const MISSING_PACKAGE_CALL_ID: &str = "read-missing-package";
-    const CODE_MODE_CALL_ID: &str = "code-mode-skill-read";
+    const READ_FULL_RESOURCE_CALL_ID: &str = "full-skill-resource-read";
 
     // Fill the shared 300-byte page through the emoji; ignoring escaping would fit everything.
     let read_prefix = "a".repeat(184);
@@ -401,12 +401,15 @@ async fn explicit_only_cloud_skill_is_hidden_but_can_be_invoked() -> Result<()> 
         vec![
             sse(vec![
                 ev_response_created("resp-5"),
-                responses::ev_custom_tool_call(
-                    CODE_MODE_CALL_ID,
-                    "exec",
-                    &format!(
-                        "const result = await tools.skills__read({{package: {SKILL_PACKAGE:?}, resource: {REFERENCED_RESOURCE:?}}}); text(JSON.stringify({{contents: result.contents, next_cursor: result.next_cursor}}));"
-                    ),
+                responses::ev_function_call_with_namespace(
+                    READ_FULL_RESOURCE_CALL_ID,
+                    "skills",
+                    "read",
+                    &json!({
+                        "package": SKILL_PACKAGE,
+                        "resource": REFERENCED_RESOURCE,
+                    })
+                    .to_string(),
                 ),
                 ev_completed("resp-5"),
             ]),
@@ -414,19 +417,20 @@ async fn explicit_only_cloud_skill_is_hidden_but_can_be_invoked() -> Result<()> 
         ],
     )
     .await;
-    test.submit_turn("Read the complete skill resource using code mode.")
+    test.submit_turn("Read the complete skill resource.")
         .await?;
     let requests = response.requests();
     assert_eq!(requests.len(), 2);
-    let output = requests[1].custom_tool_call_output(CODE_MODE_CALL_ID);
-    let nested_result = output["output"]
-        .as_array()
-        .and_then(|items| items.last())
-        .and_then(|item| item["text"].as_str())
-        .ok_or_else(|| anyhow::anyhow!("code mode should return the nested skill result"))?;
+    let output = requests[1]
+        .function_call_output_text(READ_FULL_RESOURCE_CALL_ID)
+        .expect("skills.read should return the complete resource");
     assert_eq!(
-        serde_json::from_str::<Value>(nested_result)?,
-        json!({"contents": referenced_contents, "next_cursor": null})
+        serde_json::from_str::<Value>(&output)?,
+        json!({
+            "resource": REFERENCED_RESOURCE,
+            "contents": referenced_contents,
+            "next_cursor": null,
+        })
     );
 
     Ok(())

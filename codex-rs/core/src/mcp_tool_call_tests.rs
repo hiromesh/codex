@@ -1381,8 +1381,6 @@ async fn mcp_sandbox_cwd_uses_matching_server_environment_uri() -> anyhow::Resul
                     environment_hooks: Default::default(),
                     allow_login_shell: true,
                     workspace_roots: Vec::new(),
-                    windows_sandbox_level: turn_context.windows_sandbox_level,
-                    windows_sandbox_type: turn_context.config.permissions.windows_sandbox_type,
                     use_legacy_landlock: turn_context.config.features.use_legacy_landlock(),
                     permission_profile: turn_context
                         .config

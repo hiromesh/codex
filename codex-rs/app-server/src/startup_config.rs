@@ -151,10 +151,6 @@ async fn read_startup_config(
     } else {
         config
     };
-    // Validate and emit the fetched snapshot, or the fresh signed-out snapshot.
-    config
-        .validate_windows_mxc_requirement()
-        .map_err(startup_error)?;
     let auth_config = config.auth_config();
     auth_config.validate().map_err(startup_error)?;
     let allowed_login_methods = auth_config.managed_auth_policy.allowed_login_methods(

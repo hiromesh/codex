@@ -77,7 +77,6 @@ fn unmatched_powershell_read_requires_approval_without_sandbox() {
             UnmatchedCommandContext {
                 approval_policy: AskForApproval::UnlessTrusted,
                 permission_profile: &PermissionProfile::read_only(),
-                windows_sandbox_level: WindowsSandboxLevel::Disabled,
                 sandbox_permissions: SandboxPermissions::UseDefault,
                 command_origin: ExecPolicyCommandOrigin::PowerShell,
             },
@@ -90,8 +89,6 @@ fn read_only_windows_sandbox_runs_unmatched_commands_under_sandbox() {
     let command = vec!["cmd.exe".to_string(), "/c".to_string(), "dir".to_string()];
 
     for windows_sandbox_level in [
-        WindowsSandboxLevel::RestrictedToken,
-        WindowsSandboxLevel::Elevated,
     ] {
         assert_eq!(
             Decision::Allow,
@@ -120,7 +117,6 @@ fn read_only_windows_policy_without_sandbox_backend_still_requires_approval() {
             UnmatchedCommandContext {
                 approval_policy: AskForApproval::Never,
                 permission_profile: &PermissionProfile::read_only(),
-                windows_sandbox_level: WindowsSandboxLevel::Disabled,
                 sandbox_permissions: SandboxPermissions::UseDefault,
                 command_origin: ExecPolicyCommandOrigin::Generic,
             },
@@ -160,7 +156,6 @@ fn writable_windows_policy_without_sandbox_backend_still_requires_approval() {
             UnmatchedCommandContext {
                 approval_policy: AskForApproval::Never,
                 permission_profile: &permission_profile,
-                windows_sandbox_level: WindowsSandboxLevel::Disabled,
                 sandbox_permissions: SandboxPermissions::UseDefault,
                 command_origin: ExecPolicyCommandOrigin::Generic,
             },

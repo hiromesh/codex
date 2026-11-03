@@ -108,17 +108,6 @@ impl ChatWidget {
     }
 
     #[cfg_attr(not(target_os = "windows"), allow(dead_code))]
-    pub(crate) fn set_windows_sandbox_mode(&mut self, mode: Option<WindowsSandboxSetupMode>) {
-        self.windows_sandbox_config.mode = mode;
-        #[cfg(target_os = "windows")]
-        {
-            let enabled = self.builtin_command_flags().allow_elevate_sandbox;
-            self.bottom_pane
-                .set_windows_degraded_sandbox_active(enabled);
-        }
-    }
-
-    #[cfg_attr(not(target_os = "windows"), allow(dead_code))]
     pub(crate) fn set_feature_enabled(&mut self, feature: Feature, enabled: bool) -> bool {
         if let Err(err) = self.config.features.set_enabled(feature, enabled) {
             tracing::warn!(
@@ -557,15 +546,6 @@ impl ChatWidget {
         self.refresh_status_surfaces();
         self.sync_service_tier_commands();
         if cwd_changed {
-            #[cfg(target_os = "windows")]
-            if self.windows_sandbox_local_server
-                && let Some(thread_id) = self.thread_id
-            {
-                self.windows_sandbox_config = Default::default();
-                self.set_windows_sandbox_mode(/*mode*/ None);
-                self.app_event_tx
-                    .send(AppEvent::RefreshWindowsSandbox { thread_id });
-            }
             self.invalidate_connector_scope();
             self.refresh_skills_for_current_cwd(/*force_reload*/ true);
             self.refresh_connector_mentions(/*force_refresh*/ false);

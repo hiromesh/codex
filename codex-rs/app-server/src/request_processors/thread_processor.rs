@@ -35,7 +35,6 @@ use codex_app_server_protocol::ThreadSectionAppearance;
 use codex_app_server_protocol::ThreadSectionChangedNotification;
 use codex_app_server_protocol::ThreadSectionMoveParams;
 use codex_app_server_protocol::ThreadSectionMoveResponse;
-use codex_config::types::WindowsSandboxModeToml;
 use codex_extension_api::ExtensionDataInit;
 use codex_extension_api::ThreadIdleCause;
 use codex_protocol::SanitizedGitUrl;
@@ -5500,22 +5499,7 @@ impl ThreadRequestProcessor {
         };
         let history_cwd = Some(source_thread.cwd.clone());
 
-        // Persist Windows sandbox mode.
         let mut cli_overrides = cli_overrides.unwrap_or_default();
-        if cfg!(windows) && !experimental_prediction_mode {
-            let mode = self.config.permissions.windows_sandbox_mode.or_else(|| {
-                match WindowsSandboxLevel::from_config(&self.config) {
-                    WindowsSandboxLevel::Elevated => Some(WindowsSandboxModeToml::Elevated),
-                    WindowsSandboxLevel::RestrictedToken => {
-                        Some(WindowsSandboxModeToml::Unelevated)
-                    }
-                    WindowsSandboxLevel::Disabled => None,
-                }
-            });
-            if let Some(mode) = mode {
-                cli_overrides.insert("windows.sandbox".to_string(), serde_json::json!(mode));
-            }
-        }
         let request_overrides = if cli_overrides.is_empty() {
             None
         } else {

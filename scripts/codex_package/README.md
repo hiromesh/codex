@@ -19,7 +19,6 @@ The builder creates a canonical Codex package directory:
 ├── codex-package.json
 ├── bin
 │   ├── <entrypoint>
-│   ├── codex-code-mode-host
 │   └── codex-exec-server
 ├── codex-resources
 │   └── bwrap                             # Linux only
@@ -51,7 +50,6 @@ grouped `cargo build` command per package when they are needed and no prebuilt
 override was provided:
 
 - all targets: the selected entrypoint, unless `--entrypoint-bin` is provided
-- all targets: `codex-code-mode-host`, unless `--code-mode-host-bin` is provided
 - all targets: `codex-exec-server`, unless `--exec-server-bin` is provided
 - Linux targets: `bwrap`, unless `--bwrap-bin` is provided
 
@@ -61,11 +59,11 @@ explicit target. Release jobs that already built and signed/notarized the
 entrypoint should pass `--entrypoint-bin` so the package contains that exact
 binary instead of rebuilding it.
 
-Release jobs should likewise pass `--code-mode-host-bin` and `--exec-server-bin`
-so the package preserves the signed host and executor beside the entrypoint.
+Release jobs should likewise pass `--exec-server-bin` so the package preserves
+the signed executor beside the entrypoint.
 
 On Linux and macOS, the builder strips symbols from the **package copies** of
-source-built release-profile entrypoint, code-mode host, and executor binaries. Cargo outputs
+source-built release-profile entrypoint and executor binaries. Cargo outputs
 retain their symbols for debugging. The default `--strip auto` also preserves
 development/profiling builds and prebuilt inputs
 byte-for-byte, including signatures. Use `--strip all` to also strip prebuilt

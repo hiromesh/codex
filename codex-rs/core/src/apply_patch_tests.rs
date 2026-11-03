@@ -65,7 +65,7 @@ async fn patch_approval_requirement_uses_action_policy_before_turn_policy() {
     let requirement = patch_approval_requirement(
         &step,
         &environment,
-        &PatchSandboxRoute::Platform(codex_protocol::config_types::WindowsSandboxLevel::Disabled)
+        &PatchSandboxRoute::Platform
             .prepare_matching(&file_system_policy, &context)
             .expect("prepare patch matching"),
         &action,

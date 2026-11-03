@@ -2266,7 +2266,7 @@ mod tests {
         }];
         let footer_note = Line::from(vec![
             "Note: ".dim(),
-            "Use /setup-default-sandbox".cyan(),
+            "Use /permissions".cyan(),
             " to allow network access.".dim(),
         ]);
         let view = new_view(

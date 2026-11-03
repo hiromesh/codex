@@ -71,8 +71,6 @@ mod migrate_rollouts;
 mod plugin_cmd;
 mod queue_cmd;
 mod remote_control_cmd;
-#[cfg(target_os = "windows")]
-mod sandbox_setup;
 mod sandbox_uninstall;
 mod state_db_recovery;
 #[cfg(not(windows))]
@@ -441,8 +439,6 @@ enum SandboxSubcommand {
 type HostSandboxArgs = codex_cli::SeatbeltCommand;
 #[cfg(target_os = "linux")]
 type HostSandboxArgs = codex_cli::LandlockCommand;
-#[cfg(target_os = "windows")]
-type HostSandboxArgs = codex_cli::WindowsCommand;
 
 #[cfg(not(any(target_os = "macos", target_os = "linux", target_os = "windows")))]
 type HostSandboxArgs = UnsupportedSandboxArgs;
@@ -1648,20 +1644,6 @@ async fn dispatch_cli(
                 &mut sandbox_cli.config_overrides,
                 root_config_overrides.clone(),
             );
-            #[cfg(target_os = "windows")]
-            if let Some(setup_cli) = sandbox_setup::parse_setup_command(&sandbox_cli.command)? {
-                reject_remote_mode_for_subcommand(
-                    root_remote.as_deref(),
-                    root_remote_auth_token_env.as_deref(),
-                    "sandbox setup",
-                )?;
-                let cli_overrides = sandbox_cli
-                    .config_overrides
-                    .parse_overrides()
-                    .map_err(anyhow::Error::msg)?;
-                sandbox_setup::run(setup_cli, config_profile.cloned(), cli_overrides).await?;
-                return Ok(None);
-            }
             reject_remote_mode_for_subcommand(
                 root_remote.as_deref(),
                 root_remote_auth_token_env.as_deref(),
@@ -1681,13 +1663,6 @@ async fn dispatch_cli(
             .await?;
             #[cfg(target_os = "linux")]
             codex_cli::run_command_under_landlock(
-                sandbox_cli,
-                arg0_paths.codex_linux_sandbox_exe.clone(),
-                loader_overrides,
-            )
-            .await?;
-            #[cfg(target_os = "windows")]
-            codex_cli::run_command_under_windows_sandbox(
                 sandbox_cli,
                 arg0_paths.codex_linux_sandbox_exe.clone(),
                 loader_overrides,

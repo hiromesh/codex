@@ -32,7 +32,6 @@ use codex_core::TurnInputRequest;
 use codex_core::TurnStartOptions;
 use codex_core::X_CODEX_ROUTING_HINT_HEADER;
 use codex_core::config::Config;
-use codex_core::windows_sandbox::WindowsSandboxLevelExt;
 use codex_exec_server::CreateDirectoryOptions;
 use codex_exec_server::Environment;
 use codex_exec_server::HttpRedirectPolicy;
@@ -55,7 +54,6 @@ use codex_protocol::config_types::ModeKind;
 use codex_protocol::config_types::ReasoningSummary;
 use codex_protocol::config_types::ServiceTier;
 use codex_protocol::config_types::Settings;
-use codex_protocol::config_types::WindowsSandboxLevel;
 use codex_protocol::mcp_policy::McpServerIdentity;
 use codex_protocol::mcp_policy::McpServerRequirement;
 use codex_protocol::mcp_policy::PluginMcpRequirements;
@@ -957,8 +955,6 @@ async fn environment_mcp_policy_filters_runtime_config_and_model_tools(
                     fixture.config.permissions.permission_profile().clone(),
                 ),
                 shell_environment_policy: Default::default(),
-                windows_sandbox_level: WindowsSandboxLevel::from_config(&fixture.config),
-                windows_sandbox_type: fixture.config.permissions.windows_sandbox_type,
                 use_legacy_landlock: fixture.config.features.use_legacy_landlock(),
                 exec_policy: None,
                 mcp_policy: Some(mcp_policy),
@@ -1075,8 +1071,6 @@ async fn future_environment_mcp_policy_applies_on_the_next_turn() -> anyhow::Res
             fixture.config.permissions.permission_profile().clone(),
         ),
         shell_environment_policy: Default::default(),
-        windows_sandbox_level: WindowsSandboxLevel::from_config(&fixture.config),
-        windows_sandbox_type: fixture.config.permissions.windows_sandbox_type,
         use_legacy_landlock: fixture.config.features.use_legacy_landlock(),
         exec_policy: None,
         mcp_policy: Some(EnvironmentMcpPolicy {
@@ -2483,7 +2477,6 @@ async fn local_stdio_server_uses_runtime_fallback_cwd_when_config_omits_cwd() ->
                     codex_linux_sandbox_exe: fixture.config.codex_linux_sandbox_exe.clone(),
                     sandbox_cwd: PathUri::from_abs_path(&fixture.config.cwd),
                     use_legacy_landlock: false,
-                    use_mxc: false,
                 })?),
             );
         }
@@ -2492,22 +2485,20 @@ async fn local_stdio_server_uses_runtime_fallback_cwd_when_config_omits_cwd() ->
     Ok(())
 }
 
-#[test_case("rmcp", false, false, false, Some("catalog policy"), Some("native catalog policy"), false; "both disabled")]
-#[test_case("rmcp", true, false, false, Some("catalog policy"), Some("native catalog policy"), false; "auto review required")]
-#[test_case("rmcp", false, true, false, Some("catalog policy"), Some("native catalog policy"), false; "disabled")]
-#[test_case("rmcp", true, true, false, Some("catalog policy"), Some("native catalog policy"), false; "both enabled")]
-#[test_case("rmcp", false, false, true, Some("catalog policy"), Some("native catalog policy"), false; "attachment-owned permissions preserve foreign workspace roots")]
-#[test_case("node_repl", false, false, false, Some("  # Policy A\r\n{literal} <raw> & café\n"), Some("\t# Native A\n{{literal}} & desktop\r\n"), false; "node repl raw policy")]
-#[test_case("cua_repl", false, false, false, Some("\t# Policy B\n${literal} </policy>\r\n "), Some("  # Native B\r\n<computer> ${native}\n "), false; "cua repl raw policy")]
-#[test_case("node_repl", false, false, false, None, None, false; "node repl missing policy")]
-#[test_case("cua_repl", false, false, false, Some(""), Some("native retained"), false; "cua repl empty policy")]
-#[test_case("node_repl", false, false, false, Some(" \r\n\t"), Some("native retained"), false; "node repl blank policy")]
-#[test_case("node_repl", false, false, false, None, Some("native retained"), false; "node repl missing browser policy")]
-#[test_case("cua_repl", false, false, false, Some("browser retained"), None, false; "cua repl missing computer policy")]
-#[test_case("node_repl", false, false, false, Some("browser retained"), Some(""), false; "node repl empty computer policy")]
-#[test_case("cua_repl", false, false, false, Some("browser retained"), Some(" \r\n\t"), false; "cua repl blank computer policy")]
-#[test_case("cua_repl", false, false, false, None, None, true; "mxc backend handoff")]
-#[test_case("cua_repl", false, false, true, None, None, true; "mxc preference does not leak to attachment")]
+#[test_case("rmcp", false, false, false, Some("catalog policy"), Some("native catalog policy"); "both disabled")]
+#[test_case("rmcp", true, false, false, Some("catalog policy"), Some("native catalog policy"); "auto review required")]
+#[test_case("rmcp", false, true, false, Some("catalog policy"), Some("native catalog policy"); "disabled")]
+#[test_case("rmcp", true, true, false, Some("catalog policy"), Some("native catalog policy"); "both enabled")]
+#[test_case("rmcp", false, false, true, Some("catalog policy"), Some("native catalog policy"); "attachment-owned permissions preserve foreign workspace roots")]
+#[test_case("node_repl", false, false, false, Some("  # Policy A\r\n{literal} <raw> & café\n"), Some("\t# Native A\n{{literal}} & desktop\r\n"); "node repl raw policy")]
+#[test_case("cua_repl", false, false, false, Some("\t# Policy B\n${literal} </policy>\r\n "), Some("  # Native B\r\n<computer> ${native}\n "); "cua repl raw policy")]
+#[test_case("node_repl", false, false, false, None, None; "node repl missing policy")]
+#[test_case("cua_repl", false, false, false, Some(""), Some("native retained"); "cua repl empty policy")]
+#[test_case("node_repl", false, false, false, Some(" \r\n\t"), Some("native retained"); "node repl blank policy")]
+#[test_case("node_repl", false, false, false, None, Some("native retained"); "node repl missing browser policy")]
+#[test_case("cua_repl", false, false, false, Some("browser retained"), None; "cua repl missing computer policy")]
+#[test_case("node_repl", false, false, false, Some("browser retained"), Some(""); "node repl empty computer policy")]
+#[test_case("cua_repl", false, false, false, Some("browser retained"), Some(" \r\n\t"); "cua repl blank computer policy")]
 #[tokio::test(flavor = "multi_thread", worker_threads = 1)]
 async fn stdio_mcp_tool_call_includes_sandbox_state_meta(
     server_name: &'static str,
@@ -2516,7 +2507,6 @@ async fn stdio_mcp_tool_call_includes_sandbox_state_meta(
     attachment_owned_permissions: bool,
     browser_policy: Option<&str>,
     computer_policy: Option<&str>,
-    prefer_mxc: bool,
 ) -> anyhow::Result<()> {
     // TODO(anp): Remove after packaging a Windows stdio test server for Wine exec.
     skip_if_wine_exec!(
@@ -2590,7 +2580,6 @@ async fn stdio_mcp_tool_call_includes_sandbox_state_meta(
         .with_auth(CodexAuth::create_dummy_chatgpt_auth_for_testing())
         .with_model("gpt-5.5")
         .with_config(move |config| {
-            config.prefer_mxc = prefer_mxc;
             // The real CLI is explicitly provided; the test harness is not a CLI.
             config.codex_self_exe = Some(
                 AbsolutePathBuf::from_absolute_path_checked(
@@ -2679,8 +2668,6 @@ async fn stdio_mcp_tool_call_includes_sandbox_state_meta(
                         owner_permission_profile.clone(),
                     ),
                     shell_environment_policy: Default::default(),
-                    windows_sandbox_level: WindowsSandboxLevel::from_config(&fixture.config),
-                    windows_sandbox_type: fixture.config.permissions.windows_sandbox_type,
                     use_legacy_landlock: fixture.config.features.use_legacy_landlock(),
                     exec_policy: None,
                     mcp_policy: None,
@@ -2807,7 +2794,6 @@ async fn stdio_mcp_tool_call_includes_sandbox_state_meta(
         codex_linux_sandbox_exe: fixture.config.codex_linux_sandbox_exe.clone(),
         sandbox_cwd: PathUri::from_abs_path(&fixture.config.cwd),
         use_legacy_landlock: false,
-        use_mxc: prefer_mxc && cfg!(windows) && !attachment_owned_permissions,
     })?;
     let expected_launcher = (remote_aware_environment_id()
         == codex_config::DEFAULT_MCP_SERVER_ENVIRONMENT_ID)

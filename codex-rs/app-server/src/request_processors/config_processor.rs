@@ -44,7 +44,6 @@ use codex_app_server_protocol::NetworkRequirements;
 use codex_app_server_protocol::NetworkUnixSocketPermission;
 use codex_app_server_protocol::NewThreadModelDefaults;
 use codex_app_server_protocol::SandboxMode;
-use codex_app_server_protocol::WindowsSandboxImplementation;
 use codex_config::ConfigRequirementsToml;
 use codex_config::HookEventsToml;
 use codex_config::HookHandlerConfig as CoreHookHandlerConfig;
@@ -539,23 +538,6 @@ pub(crate) fn map_requirements_to_api(
                 .filter_map(map_sandbox_mode_requirement_to_api)
                 .collect()
         }),
-        allowed_windows_sandbox_implementations: requirements.windows.and_then(|windows| {
-            windows
-                .allowed_sandbox_implementations
-                .map(|implementations| {
-                    implementations
-                        .into_iter()
-                        .map(|implementation| match implementation {
-                            codex_config::WindowsSandboxImplementationToml::Elevated => {
-                                WindowsSandboxImplementation::Elevated
-                            }
-                            codex_config::WindowsSandboxImplementationToml::Unelevated => {
-                                WindowsSandboxImplementation::Unelevated
-                            }
-                        })
-                        .collect()
-                })
-        }),
         allowed_permission_profiles: requirements.allowed_permission_profiles,
         default_permissions: requirements.default_permissions,
         allowed_web_search_modes: requirements.allowed_web_search_modes.map(|modes| {
@@ -956,8 +938,7 @@ mod tests {
     use codex_app_server_protocol::ComputerUseWindowsExeRequirement;
     use codex_app_server_protocol::ComputerUseWindowsRequirements;
     use codex_app_server_protocol::FeedbackRequirements;
-    use codex_app_server_protocol::WindowsSandboxImplementation;
-    use codex_config::AllowDenyRequirementToml;
+        use codex_config::AllowDenyRequirementToml;
     use codex_config::AutoReviewRequirementsToml;
     use codex_config::BrowserUseAccessApprovalLifetimeToml;
     use codex_config::BrowserUseOriginPolicyToml;
@@ -971,7 +952,6 @@ mod tests {
     use codex_config::LoaderOverrides;
     use codex_config::ModelsRequirementsToml;
     use codex_config::NewThreadModelDefaultsToml;
-    use codex_config::WindowsRequirementsToml;
     use codex_config::types::FeedbackConfigToml;
     use codex_config::types::ToolSuggestDisabledTool;
     use codex_exec_server::EnvironmentManager;
@@ -1285,30 +1265,7 @@ client_id = "mcp-client"
         );
     }
 
-    #[test]
-    fn requirements_api_includes_allowed_windows_sandbox_implementations() {
-        let mapped = map_test_requirements(ConfigRequirementsToml {
-            windows: Some(WindowsRequirementsToml {
-                allowed_sandbox_implementations: Some(vec![
-                    codex_config::WindowsSandboxImplementationToml::Elevated,
-                    codex_config::WindowsSandboxImplementationToml::Unelevated,
-                ]),
-                allow_mxc: None,
-                require_mxc: None,
-            }),
-            ..ConfigRequirementsToml::default()
-        });
-
-        assert_eq!(
-            mapped.allowed_windows_sandbox_implementations,
-            Some(vec![
-                WindowsSandboxImplementation::Elevated,
-                WindowsSandboxImplementation::Unelevated,
-            ])
-        );
-    }
-
-    #[test]
+        #[test]
     fn requirements_api_includes_exact_managed_values() {
         let sqlite_home = AbsolutePathBuf::try_from(std::env::temp_dir().join("managed-state"))
             .expect("managed sqlite home should be absolute");

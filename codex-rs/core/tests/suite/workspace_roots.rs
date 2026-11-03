@@ -3,7 +3,6 @@ use anyhow::Result;
 use codex_core::EnvironmentConfig;
 use codex_exec_server::CreateDirectoryOptions;
 use codex_exec_server::RemoveOptions;
-use codex_protocol::config_types::WindowsSandboxLevel;
 use codex_protocol::models::PermissionProfile;
 use codex_protocol::models::PermissionProfileSnapshot;
 use codex_protocol::permissions::NetworkSandboxPolicy;
@@ -44,14 +43,7 @@ fn workspace_roots_profile() -> PermissionProfile {
 
 async fn workspace_roots_test(server: &MockServer) -> Result<TestCodex> {
     let mut builder = test_codex().with_config(|config| {
-        #[cfg(windows)]
-        {
-            config.cwd = dunce::canonicalize(config.cwd.as_path())
-                .expect("test workspace should be canonicalizable")
-                .abs();
-        }
         config.workspace_roots = vec![config.cwd.clone()];
-        config.set_windows_sandbox_enabled(/*value*/ true);
     });
     builder.build_with_auto_env(server).await
 }
@@ -234,8 +226,6 @@ async fn workspace_roots_allow_file_and_command_writes_in_secondary_root(
             if !owner_resolved_roots {
                 config.workspace_roots.push(secondary_root);
             }
-            // Owner-provided sandbox settings must work independently of thread defaults.
-            config.set_windows_sandbox_enabled(!owner_resolved_roots);
         })
         .with_workspace_setup(|cwd, fs| async move {
             let secondary_root = cwd
@@ -278,8 +268,6 @@ async fn workspace_roots_allow_file_and_command_writes_in_secondary_root(
                         workspace_roots_profile(),
                     ),
                     shell_environment_policy: Default::default(),
-                    windows_sandbox_level: WindowsSandboxLevel::RestrictedToken,
-                    windows_sandbox_type: SandboxType::WindowsRestrictedToken,
                     use_legacy_landlock: test.config.features.use_legacy_landlock(),
                     exec_policy: None,
                     mcp_policy: None,

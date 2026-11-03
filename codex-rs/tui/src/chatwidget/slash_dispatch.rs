@@ -6,7 +6,6 @@
 //! slash-command recall follows the same submitted-input rule as ordinary text.
 
 use super::*;
-use crate::app::WindowsSandboxHost;
 use crate::app_event::ManagedWorktreeMode;
 use crate::app_event::ThreadGoalSetMode;
 use crate::bottom_pane::prompt_args::parse_slash_name;
@@ -424,54 +423,6 @@ impl ChatWidget {
             SlashCommand::Keymap => {
                 self.open_keymap_picker();
             }
-            SlashCommand::ElevateSandbox => {
-                #[cfg(target_os = "windows")]
-                {
-                    if !self.builtin_command_flags().allow_elevate_sandbox {
-                        // This command should not be visible/recognized outside degraded mode,
-                        // but guard anyway in case something dispatches it directly.
-                        return;
-                    }
-
-                    let Some(preset) = builtin_approval_presets()
-                        .into_iter()
-                        .find(|preset| preset.id == "auto")
-                    else {
-                        // Avoid panicking in interactive UI; treat this as a recoverable
-                        // internal error.
-                        self.add_error_message(
-                            "Internal error: missing the 'auto' approval preset.".to_string(),
-                        );
-                        return;
-                    };
-
-                    if let Err(err) = self
-                        .config
-                        .permissions
-                        .approval_policy
-                        .can_set(&preset.approval)
-                    {
-                        self.add_error_message(err.to_string());
-                        return;
-                    }
-
-                    self.session_telemetry.counter(
-                        "codex.windows_sandbox.setup_elevated_sandbox_command",
-                        /*inc*/ 1,
-                        &[],
-                    );
-                    self.app_event_tx
-                        .send(AppEvent::BeginWindowsSandboxElevatedSetup {
-                            preset,
-                            profile_selection: None,
-                        });
-                }
-                #[cfg(not(target_os = "windows"))]
-                {
-                    let _ = &self.session_telemetry;
-                    // Not supported; on non-Windows this command should never be reachable.
-                }
-            }
             SlashCommand::Experimental => {
                 self.open_experimental_popup();
             }
@@ -814,16 +765,6 @@ impl ChatWidget {
             SlashCommand::Statusline => {
                 self.handle_status_line_command_args(trimmed);
                 self.app_event_tx.send(AppEvent::SettingsSelectionClosed);
-            }
-            SlashCommand::Permissions
-                if self.windows_sandbox_local_server
-                    && self.windows_sandbox_host != WindowsSandboxHost::Remote
-                    && self.windows_sandbox_config.requirements.is_none() =>
-            {
-                self.set_queue_autosend_suppressed(/*suppressed*/ true);
-                self.app_event_tx.send(AppEvent::ResolvePermissionProfile {
-                    profile_id: trimmed.to_string(),
-                });
             }
             SlashCommand::Permissions => self.select_permission_profile(trimmed),
             SlashCommand::Export => {
@@ -1246,19 +1187,6 @@ impl ChatWidget {
     }
 
     pub(super) fn builtin_command_flags(&self) -> BuiltinCommandFlags {
-        #[cfg(target_os = "windows")]
-        let allow_elevate_sandbox = {
-            let windows_sandbox_level = self.windows_sandbox_config.level();
-            matches!(windows_sandbox_level, WindowsSandboxLevel::RestrictedToken)
-                && self.windows_sandbox_local_server
-                && self.windows_sandbox_host == crate::app::WindowsSandboxHost::Local
-                && self
-                    .windows_sandbox_config
-                    .allows(WindowsSandboxSetupMode::Elevated)
-        };
-        #[cfg(not(target_os = "windows"))]
-        let allow_elevate_sandbox = false;
-
         BuiltinCommandFlags {
             collaboration_modes_enabled: self.collaboration_modes_enabled(),
             connectors_enabled: self.connectors_enabled(),
@@ -1269,7 +1197,6 @@ impl ChatWidget {
             daybreak_command_description: self.daybreak_command_description(),
             voice_command_enabled: self.realtime_conversation_available_for_thread,
             worktrees_enabled: self.local_worktree_operations,
-            allow_elevate_sandbox,
             side_conversation_active: self.active_side_conversation,
         }
     }
@@ -1344,7 +1271,6 @@ impl ChatWidget {
             | SlashCommand::Agents
             | SlashCommand::MultiAgents
             | SlashCommand::Permissions
-            | SlashCommand::ElevateSandbox
             | SlashCommand::Experimental
             | SlashCommand::AutoReview
             | SlashCommand::Memories

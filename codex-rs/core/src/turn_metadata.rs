@@ -25,7 +25,6 @@ use crate::responses_metadata::subagent_metadata_kind;
 use crate::sandbox_tags::SandboxTags;
 use crate::sandbox_tags::record_policy_metadata;
 use crate::session::step_settings::ResolvedStepSettings;
-use codex_file_system::WindowsSandboxSelection;
 use codex_git_utils::SanitizedGitUrl;
 use codex_git_utils::get_git_remote_urls_assume_git_repo;
 use codex_git_utils::get_has_changes_in_repo;
@@ -228,17 +227,11 @@ impl TurnMetadataState {
         turn_id: String,
         cwd: AbsolutePathBuf,
         permission_profile: &PermissionProfile,
-        windows_sandbox_selection: impl Into<WindowsSandboxSelection>,
         enforce_managed_network: bool,
         auto_review_enabled: bool,
         model_info: &ModelInfo,
     ) -> Self {
-        let sandbox_tags = SandboxTags::new(
-            permission_profile,
-            cwd.as_path(),
-            windows_sandbox_selection.into(),
-            enforce_managed_network,
-        );
+        let sandbox_tags = SandboxTags::new(permission_profile, cwd.as_path(), enforce_managed_network);
         let agent_name = session_source
             .get_agent_path()
             .unwrap_or_else(AgentPath::root)

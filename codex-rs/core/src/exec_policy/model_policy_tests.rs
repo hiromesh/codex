@@ -8,7 +8,6 @@ use codex_execpolicy::MatchOptions;
 use codex_execpolicy::Policy;
 use codex_execpolicy::PolicyParser;
 use codex_execpolicy::RequirementsExecPolicy;
-use codex_protocol::config_types::WindowsSandboxLevel;
 use codex_protocol::models::PermissionProfile;
 use codex_protocol::protocol::AskForApproval;
 use pretty_assertions::assert_eq;
@@ -141,7 +140,6 @@ async fn cyber_policy_requires_approval_for_broad_wrapped_and_resolved_prefixes(
                 approval_policy: AskForApproval::OnRequest,
                 permission_profile: PermissionProfile::read_only(),
                 environment_policy: None,
-                windows_sandbox_level: WindowsSandboxLevel::Disabled,
                 sandbox_permissions: SandboxPermissions::RequireEscalated,
                 prefix_rule: Some(vec!["cargo".to_string(), "install".to_string()]),
                 allow_prefix_rules: AllowPrefixRules::IgnoreForCyberModel,
@@ -174,7 +172,6 @@ async fn cyber_policy_keeps_heuristically_safe_commands_inside_the_sandbox() {
             approval_policy: AskForApproval::OnRequest,
             permission_profile: PermissionProfile::read_only(),
             environment_policy: None,
-            windows_sandbox_level: WindowsSandboxLevel::RestrictedToken,
             sandbox_permissions: SandboxPermissions::UseDefault,
             prefix_rule: None,
             allow_prefix_rules: AllowPrefixRules::IgnoreForCyberModel,
@@ -194,7 +191,6 @@ async fn cyber_policy_keeps_heuristically_safe_commands_inside_the_sandbox() {
             approval_policy: AskForApproval::OnRequest,
             permission_profile: PermissionProfile::read_only(),
             environment_policy: None,
-            windows_sandbox_level: WindowsSandboxLevel::RestrictedToken,
             sandbox_permissions: SandboxPermissions::UseDefault,
             prefix_rule: None,
             allow_prefix_rules: AllowPrefixRules::Honor,

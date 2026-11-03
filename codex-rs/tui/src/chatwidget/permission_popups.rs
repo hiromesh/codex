@@ -1,12 +1,9 @@
 //! Permission and approval popup flows for `ChatWidget`.
 //!
-//! This module presents permission choices and confirmations in the shared picker;
-//! Windows-specific sandbox prompting lives beside it in
-//! `windows_sandbox_prompts`.
+//! This module presents permission choices and confirmations in the shared picker.
 
 use super::permissions_menu::permission_preset_description;
 use super::*;
-use crate::style::accent_color;
 use codex_protocol::openai_models::MODEL_SPECIALTY_CYBER;
 
 impl ChatWidget {
@@ -34,7 +31,6 @@ impl ChatWidget {
     }
 
     pub(super) fn open_legacy_permissions_popup(&mut self) {
-        let include_read_only = cfg!(target_os = "windows");
         let current_approval =
             AskForApproval::from(self.config.permissions.approval_policy.value());
         let current_permission_profile = self.config.permissions.permission_profile().clone();
@@ -42,22 +38,6 @@ impl ChatWidget {
         let current_review_policy = self.config.approvals_reviewer;
         let mut items: Vec<SelectionItem> = Vec::new();
         let presets: Vec<ApprovalPreset> = builtin_approval_presets();
-
-        #[cfg(target_os = "windows")]
-        let windows_sandbox_level = self.windows_sandbox_config.level();
-        #[cfg(target_os = "windows")]
-        let windows_degraded_sandbox_enabled =
-            matches!(windows_sandbox_level, WindowsSandboxLevel::RestrictedToken)
-                && self.windows_sandbox_local_server
-                && self.windows_sandbox_host == crate::app::WindowsSandboxHost::Local;
-        #[cfg(not(target_os = "windows"))]
-        let windows_degraded_sandbox_enabled = false;
-
-        let show_elevate_sandbox_hint = windows_degraded_sandbox_enabled
-            && self
-                .windows_sandbox_config
-                .allows(WindowsSandboxSetupMode::Elevated)
-            && presets.iter().any(|preset| preset.id == "auto");
 
         let guardian_disabled_reason = |enabled: bool| {
             let mut next_features = self.config.features.get().clone();
@@ -70,12 +50,7 @@ impl ChatWidget {
         };
 
         for preset in presets.into_iter() {
-            if !include_read_only && preset.id == "read-only" {
-                continue;
-            }
-            let base_name = if preset.id == "auto" && windows_degraded_sandbox_enabled {
-                format!("{ASK_FOR_APPROVAL_LABEL} (non-admin sandbox)")
-            } else if preset.id == "auto" {
+            let base_name = if preset.id == "auto" {
                 ASK_FOR_APPROVAL_LABEL.to_string()
             } else {
                 preset.label.to_string()
@@ -98,7 +73,7 @@ impl ChatWidget {
                 base_name.clone(),
                 ApprovalsReviewer::User,
                 /*profile_selection*/ None,
-                /*return_to_permissions*/ !include_read_only,
+                /*return_to_permissions*/ true,
             );
             if preset.id == "auto" {
                 items.push(SelectionItem {
@@ -138,7 +113,7 @@ impl ChatWidget {
                             APPROVE_FOR_ME_LABEL.to_string(),
                             ApprovalsReviewer::AutoReview,
                             /*profile_selection*/ None,
-                            /*return_to_permissions*/ !include_read_only,
+                            /*return_to_permissions*/ true,
                         ),
                         dismiss_on_select: true,
                         disabled_reason: approval_disabled_reason
@@ -164,17 +139,7 @@ impl ChatWidget {
             }
         }
 
-        let footer_note = show_elevate_sandbox_hint.then(|| {
-            vec![
-                "The non-admin sandbox protects your files and prevents network access under most circumstances. However, it carries greater risk if prompt injected. To upgrade to the default sandbox, run ".dim(),
-                "/setup-default-sandbox".fg(accent_color()),
-                ".".dim(),
-            ]
-            .into()
-        });
-
         self.bottom_pane.show_selection_view(SelectionViewParams {
-            footer_note,
             items,
             title: Some("Update Model Permissions".into()),
             ..SelectionViewParams::picker()
@@ -338,21 +303,6 @@ impl ChatWidget {
             )
         };
         let requires_confirmation = preset.id == "full-access";
-        #[cfg(target_os = "windows")]
-        if preset.id == "auto"
-            && matches!(
-                self.windows_sandbox_host,
-                crate::app::WindowsSandboxHost::Mixed | crate::app::WindowsSandboxHost::Unknown
-            )
-        {
-            let preset = preset.clone();
-            return vec![Box::new(move |tx| {
-                tx.send(AppEvent::OpenWindowsSandboxEnablePrompt {
-                    preset: preset.clone(),
-                    profile_selection: profile_selection.clone(),
-                });
-            })];
-        }
         if requires_confirmation {
             let preset = preset.clone();
             return vec![Box::new(move |tx| {
@@ -362,25 +312,6 @@ impl ChatWidget {
                     profile_selection: profile_selection.clone(),
                 });
             })];
-        }
-        if approvals_reviewer == ApprovalsReviewer::User && preset.id == "auto" {
-            #[cfg(target_os = "windows")]
-            {
-                if self.windows_sandbox_host == crate::app::WindowsSandboxHost::Remote {
-                    // The remote server owns the permission choice. Its executor
-                    // cannot be set up from this TUI's Windows account.
-                    return apply_actions();
-                }
-                if !self.windows_sandbox_config.is_enabled() {
-                    let preset = preset.clone();
-                    return vec![Box::new(move |tx| {
-                        tx.send(AppEvent::OpenWindowsSandboxEnablePrompt {
-                            preset: preset.clone(),
-                            profile_selection: profile_selection.clone(),
-                        });
-                    })];
-                }
-            }
         }
         apply_actions()
     }

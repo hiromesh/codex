@@ -2044,16 +2044,6 @@ async fn tool_messages_follow_mid_turn_model_changes() -> Result<()> {
             "additionalProperties": false,
         })
     };
-    let wait_parameters = |model: &str| {
-        json!({
-            "type": "object",
-            "properties": {
-                "cell_id": {"type": "string", "description": format!("Cell on {model}.")},
-            },
-            "required": ["cell_id"],
-            "additionalProperties": false,
-        })
-    };
     let async_parameters = |model: &str| {
         json!({
             "type": "object",
@@ -2176,9 +2166,6 @@ async fn tool_messages_follow_mid_turn_model_changes() -> Result<()> {
                     "multi_agent_messages": multi_agent_messages,
                     "channel_post_description": channel_post["description"].as_str().expect("post description").lines().next(),
                     "channel_post_required": channel_post["parameters"]["required"],
-                    "exec_description": tool("exec")["description"],
-                    "wait_description": tool("wait")["description"],
-                    "wait_parameters": tool("wait")["parameters"],
                 })
             })
             .collect::<Vec<_>>(),
@@ -2196,9 +2183,6 @@ async fn tool_messages_follow_mid_turn_model_changes() -> Result<()> {
                     .collect::<serde_json::Map<String, Value>>(),
                 "channel_post_description": format!("post description for {model}."),
                 "channel_post_required": ["text"],
-                "exec_description": format!("Exec description for {model}.\n\nSome deferred nested tools may be omitted from this description. They are still available on the global `tools` object and listed in `ALL_TOOLS`.\nTo find one, filter `ALL_TOOLS` by `name` and `description`.\n\nTool availability can change between calls."),
-                "wait_description": format!("Wait description for {model}."),
-                "wait_parameters": wait_parameters(model),
             }))
             .to_vec(),
     );

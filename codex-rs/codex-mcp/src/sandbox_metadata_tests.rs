@@ -15,7 +15,6 @@ fn sandbox_state_serializes_skip_missing_entries_as_missing_path_behavior() {
         codex_linux_sandbox_exe: None,
         sandbox_cwd,
         use_legacy_landlock: false,
-        use_mxc: false,
     };
 
     let serialized = serde_json::to_value(&sandbox_state).expect("serialize sandbox state");

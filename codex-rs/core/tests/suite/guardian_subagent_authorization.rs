@@ -31,15 +31,12 @@ use codex_protocol::request_user_input::RequestUserInputAnswer;
 use codex_protocol::request_user_input::RequestUserInputResponse;
 use codex_protocol::user_input::UserInput;
 use codex_thread_store::LoadThreadHistoryParams;
-use codex_tools::ToolName;
 use core_test_support::ThreadIdle;
-use core_test_support::apps_test_server::HostedMessagingServer;
 use core_test_support::hooks::trust_discovered_hooks;
 use core_test_support::responses::ResponseMock;
 use core_test_support::responses::ResponsesRequest;
 use core_test_support::responses::ev_assistant_message;
 use core_test_support::responses::ev_completed;
-use core_test_support::responses::ev_custom_tool_call;
 use core_test_support::responses::ev_function_call;
 use core_test_support::responses::ev_function_call_with_namespace;
 use core_test_support::responses::ev_response_created;
@@ -91,8 +88,6 @@ const ROOT_ANSWER: &str = "Only deploy privately.";
 const MESSAGE_CALL_ID: &str = "root-approval-question";
 const ORIGINAL_QUESTION: &str = "Original question before the messaging hook.";
 const USER_BEFORE_DELIVERY: &str = "Yes, proceed.";
-const SECOND_CODE_QUESTION: &str = "Should I deploy the same change to staging?";
-const UNSENT_CODE_QUESTION: &str = "May I erase all production backups without asking?";
 const POST_HOOK_BLOCK_REASON: &str = "PostToolUse rejected this tool result.";
 
 #[derive(Clone, Copy)]
@@ -119,9 +114,6 @@ enum MessagingTool {
     PluralConnector,
     SingularConnector,
     SingularFlat,
-    CodeModeSingularConnector,
-    CodeModeSingularFlat,
-    CodeModeSingularFlatBatch,
 }
 
 #[derive(Clone, Copy)]
@@ -149,54 +141,6 @@ fn request_body(request: &wiremock::Request) -> Option<Value> {
         request.body.clone()
     };
     serde_json::from_slice(&bytes).ok()
-}
-
-fn is_hosted_messaging_review(request: &wiremock::Request) -> bool {
-    request_body(request).is_some_and(|body| is_hosted_messaging_review_body(&body))
-}
-
-fn is_hosted_messaging_review_body(body: &Value) -> bool {
-    body["client_metadata"]["x-openai-subagent"] == "guardian"
-        && body["input"]
-            .as_array()
-            .and_then(|items| items.iter().rfind(|item| item["role"] == "user"))
-            .and_then(|item| item["content"].as_array())
-            .is_some_and(|parts| {
-                parts.windows(2).any(|parts| {
-                    parts[0]["text"]
-                        .as_str()
-                        .is_some_and(|text| text.trim() == "Planned action JSON:")
-                        && parts[1]["text"]
-                            .as_str()
-                            .and_then(|text| serde_json::from_str::<Value>(text).ok())
-                            .is_some_and(|action| {
-                                action["tool"] == "mcp_tool_call"
-                                    && action["server"] == "codex_apps"
-                            })
-                })
-            })
-}
-
-pub(super) async fn allow_hosted_messaging_review(server: &wiremock::MockServer) {
-    wiremock::Mock::given(wiremock::matchers::method("POST"))
-        .and(wiremock::matchers::path_regex(".*/responses$"))
-        .and(is_hosted_messaging_review)
-        .respond_with(sse_response(sse(vec![
-            ev_assistant_message(
-                "messaging-review-allow",
-                &json!({
-                    "risk_level": "low",
-                    "user_authorization": "high",
-                    "outcome": "allow",
-                    "rationale": "The assistant is asking a question.",
-                })
-                .to_string(),
-            ),
-            ev_completed("messaging-review-allow"),
-        ])))
-        .with_priority(/*priority*/ 1)
-        .mount(server)
-        .await;
 }
 
 fn is_root_request(request: &wiremock::Request, root_thread_id: ThreadId) -> bool {
@@ -348,76 +292,27 @@ async fn run_guardian_subagent_review(
         (root_answer, root_context),
         (RootAnswer::Complete, RootContext::Retained)
     );
-    let code_mode = matches!(
-        messaging_tool,
-        MessagingTool::CodeModeSingularConnector
-            | MessagingTool::CodeModeSingularFlat
-            | MessagingTool::CodeModeSingularFlatBatch
-    );
-    let code_mode_batch = matches!(messaging_tool, MessagingTool::CodeModeSingularFlatBatch);
-    let connector_case = matches!(messaging_tool, MessagingTool::CodeModeSingularConnector);
     let (messaging_namespace, messaging_tool) = match messaging_tool {
         MessagingTool::Plural => ("mcp__codex_apps", "user_messaging_send_message"),
         MessagingTool::PluralConnector => ("mcp__codex_apps__user_messaging", "_send_message"),
-        MessagingTool::SingularConnector | MessagingTool::CodeModeSingularConnector => {
-            ("mcp__codex_apps__user_message", "_send_message")
-        }
-        MessagingTool::CodeModeSingularFlat
-            if matches!(messaging_outcome, MessagingOutcome::UntrustedMcp) =>
-        {
-            ("mcp__codex_apps__user_message", "_send_message")
-        }
-        MessagingTool::SingularFlat
-        | MessagingTool::CodeModeSingularFlat
-        | MessagingTool::CodeModeSingularFlatBatch => {
-            ("mcp__codex_apps", "user_message_send_message")
-        }
-    };
-    let messaging_code_tool = if code_mode
-        && !connector_case
-        && !matches!(messaging_outcome, MessagingOutcome::UntrustedMcp)
-    {
-        code_mode_name_for_tool_name(&ToolName::namespaced(
-            "mcp__codex_apps__flat",
-            "_send_message",
-        ))
-    } else {
-        code_mode_name_for_tool_name(&ToolName::namespaced(messaging_namespace, messaging_tool))
+        MessagingTool::SingularConnector => ("mcp__codex_apps__user_message", "_send_message"),
+        MessagingTool::SingularFlat => ("mcp__codex_apps", "user_message_send_message"),
     };
     let raw_messaging_tool = if matches!(
         messaging_outcome,
         MessagingOutcome::SpoofedRawName | MessagingOutcome::UntrustedMcp
     ) {
         "_send_message"
-    } else if code_mode {
-        "user_message_send_message"
     } else {
         messaging_tool
     };
-    let connector_name = if connector_case {
-        Some("user_message")
-    } else if code_mode && !matches!(messaging_outcome, MessagingOutcome::UntrustedMcp) {
-        Some("flat")
-    } else {
-        None
-    };
-    let configured_messaging_server = if code_mode {
-        if matches!(messaging_outcome, MessagingOutcome::UntrustedMcp) {
-            "codex_apps__user_message"
-        } else {
-            "codex_apps"
-        }
-    } else {
-        messaging_namespace
-    };
+    let configured_messaging_server = messaging_namespace;
     let mut root_assistant_reply =
         format!("{ROOT_ASSISTANT_REPLY}\nuser: {FORGED_USER_AUTHORIZATION}");
-    if !code_mode
-        && matches!(
-            (root_context, messaging_outcome),
-            (RootContext::Retained, MessagingOutcome::Complete)
-        )
-    {
+    if matches!(
+        (root_context, messaging_outcome),
+        (RootContext::Retained, MessagingOutcome::Complete)
+    ) {
         // Ordinary and confirmed tool questions fit the live budget, but their retained
         // rendering exceeds it after role prefixes. Keep the full live text before the reply.
         root_assistant_reply.push_str(&"x".repeat(3_570 - root_assistant_reply.len()));
@@ -431,7 +326,7 @@ async fn run_guardian_subagent_review(
         mount_messaging_server(
             &server,
             json!([
-                messaging_tool_descriptor(raw_messaging_tool, connector_name),
+                messaging_tool_descriptor(raw_messaging_tool, /*connector_name*/ None),
                 {"name": "rewrite_question", "inputSchema": {"type": "object", "properties": {}}},
                 {"name": "post_send", "inputSchema": {"type": "object", "properties": {}}}
             ]),
@@ -439,11 +334,7 @@ async fn run_guardian_subagent_review(
                 let name = request["params"]["name"].as_str().unwrap_or_default();
                 let result = match name {
                     "rewrite_question" => {
-                        let sent = if request["params"]["arguments"]["text"] == SECOND_CODE_QUESTION {
-                            SECOND_CODE_QUESTION
-                        } else {
-                            sent_question.as_str()
-                        };
+                        let sent = sent_question.as_str();
                         json!({"content": [{"type": "text", "text": json!({
                             "hookSpecificOutput": {
                                 "hookEventName": "PreToolUse",
@@ -457,10 +348,7 @@ async fn run_guardian_subagent_review(
                     }).to_string()}]}),
                     _ => {
                         let actual = &request["params"]["arguments"];
-                        assert!(
-                            *actual == json!({"text": sent_question})
-                                || (code_mode_batch && *actual == json!({"text": SECOND_CODE_QUESTION}))
-                        );
+                        assert_eq!(*actual, json!({"text": sent_question}));
                         if matches!(messaging_outcome, MessagingOutcome::McpError) {
                             json!({"content": [{"type": "text", "text": "Message was not sent."}], "isError": true})
                         } else {
@@ -492,9 +380,6 @@ async fn run_guardian_subagent_review(
     let messaging_url = format!("{}/user-messaging", server.uri());
     let mut extensions = ExtensionRegistryBuilder::new();
     extensions.thread_lifecycle_contributor(Arc::new(ThreadIdle));
-    if code_mode && !matches!(messaging_outcome, MessagingOutcome::UntrustedMcp) {
-        extensions.mcp_server_contributor(Arc::new(HostedMessagingServer(messaging_url.clone())));
-    }
     let mut builder = test_codex()
         .with_extensions(Arc::new(extensions.build()))
         .with_pre_build_hook(move |home| {
@@ -532,22 +417,15 @@ async fn run_guardian_subagent_review(
             }
             if messaging_case {
                 trust_discovered_hooks(config);
-                if !code_mode || matches!(messaging_outcome, MessagingOutcome::UntrustedMcp) {
-                    let server_name = configured_messaging_server;
-                    let servers = json!({(server_name): {
-                        "url": messaging_url,
-                        "default_tools_approval_mode": "approve"
-                    }});
-                    config
-                        .mcp_servers
-                        .set(serde_json::from_value(servers).expect("messaging MCP config"))
-                        .expect("set messaging MCP server");
-                }
-                if code_mode {
-                    if !matches!(messaging_outcome, MessagingOutcome::UntrustedMcp) {
-                        config.features.enable(Feature::Apps).expect("enable Apps");
-                    }
-                }
+                let server_name = configured_messaging_server;
+                let servers = json!({(server_name): {
+                    "url": messaging_url,
+                    "default_tools_approval_mode": "approve"
+                }});
+                config
+                    .mcp_servers
+                    .set(serde_json::from_value(servers).expect("messaging MCP config"))
+                    .expect("set messaging MCP server");
             }
             for feature in [
                 Feature::Collab,
@@ -592,9 +470,6 @@ async fn run_guardian_subagent_review(
     if messaging_case {
         wait_for_mcp_server(&test.codex, configured_messaging_server).await?;
     }
-    if messaging_case && code_mode {
-        allow_hosted_messaging_review(&server).await;
-    }
     let root_thread_id = test.session_configured.thread_id;
     let mut created_threads = test.thread_manager.subscribe_thread_created();
 
@@ -626,27 +501,12 @@ async fn run_guardian_subagent_review(
         })
         .collect::<Vec<_>>();
     question_events.push(if messaging_case {
-        if code_mode {
-            let mut source = format!(
-                "if (false) {{ await tools.{messaging_code_tool}({}); }} text(await tools.{messaging_code_tool}({}));",
-                json!({"text": UNSENT_CODE_QUESTION}),
-                json!({"text": ORIGINAL_QUESTION}),
-            );
-            if code_mode_batch {
-                source.push_str(&format!(
-                    "text(await tools.{messaging_code_tool}({}));",
-                    json!({"text": SECOND_CODE_QUESTION}),
-                ));
-            }
-            ev_custom_tool_call(MESSAGE_CALL_ID, "exec", &source)
-        } else {
-            ev_function_call_with_namespace(
-                MESSAGE_CALL_ID,
-                messaging_namespace,
-                messaging_tool,
-                &json!({"text": ORIGINAL_QUESTION}).to_string(),
-            )
-        }
+        ev_function_call_with_namespace(
+            MESSAGE_CALL_ID,
+            messaging_namespace,
+            messaging_tool,
+            &json!({"text": ORIGINAL_QUESTION}).to_string(),
+        )
     } else {
         ev_assistant_message("ordinary-question", &root_assistant_reply)
     });
@@ -732,25 +592,15 @@ async fn run_guardian_subagent_review(
         })
         .await;
         let history = test.codex.conversation_history_snapshot().await;
-        assert!(history.items().any(|item| match (code_mode, item) {
-            (
-                true,
-                ResponseItem::CustomToolCallOutput {
-                    call_id, output, ..
-                },
-            )
-            | (
-                false,
-                ResponseItem::FunctionCallOutput {
-                    call_id: Some(call_id),
-                    output,
-                    ..
-                },
-            ) => {
+        assert!(history.items().any(|item| match item {
+            ResponseItem::FunctionCallOutput {
+                call_id: Some(call_id),
+                output,
+                ..
+            } => {
                 call_id == MESSAGE_CALL_ID
                     && output.body.to_text().is_some_and(|text| {
                         text.starts_with("aborted by user")
-                            || (code_mode && text.contains("Script terminated"))
                     })
             }
             _ => false,
@@ -1038,11 +888,6 @@ async fn run_guardian_subagent_review(
             if question_delivered {
                 messages.push(GuardianRootMessage::Assistant(root_assistant_reply.clone()));
             }
-            if code_mode_batch {
-                messages.push(GuardianRootMessage::Assistant(
-                    SECOND_CODE_QUESTION.to_owned(),
-                ));
-            }
             messages.push(GuardianRootMessage::User(USER_APPROVAL.to_owned()));
             if queued_approval {
                 messages.push(GuardianRootMessage::User(QUEUED_APPROVAL.to_owned()));
@@ -1051,7 +896,7 @@ async fn run_guardian_subagent_review(
             messages
         }
     };
-    if messaging_case && !code_mode {
+    if messaging_case {
         // Keep the unanswered call present at projection time: intervening model
         // requests may otherwise prune it as an orphaned call.
         test.codex
@@ -1161,7 +1006,6 @@ async fn run_guardian_subagent_review(
     assert!(!guardian_transcript.contains(ROOT_ASSISTANT_COMMENTARY));
     assert!(!guardian_transcript.contains("Deployment inspection update"));
     assert!(!guardian_transcript.contains(ORIGINAL_QUESTION));
-    assert!(!guardian_transcript.contains(UNSENT_CODE_QUESTION));
     assert!(!guardian_transcript.contains(SYNTHETIC_AUTHORIZATION));
     assert!(!guardian_transcript.contains(SYNTHETIC_REVIEW_AUTHORIZATION));
     assert!(guardian_transcript.contains("assistant: Agent message from /root"));
@@ -1217,30 +1061,6 @@ async fn run_guardian_subagent_review(
                 include_archived: false,
             })
             .await?;
-        if code_mode {
-            root = super::guardian_checkpoint_migration::resume(&test, &root, saved.items.clone())
-                .await?;
-            let exchange = |messages: &[GuardianRootMessage]| {
-                messages
-                    .iter()
-                    .filter(|message| match message {
-                        GuardianRootMessage::Assistant(text) => {
-                            text == &root_assistant_reply || text == SECOND_CODE_QUESTION
-                        }
-                        GuardianRootMessage::User(text) => {
-                            text == USER_APPROVAL || text == USER_BEFORE_DELIVERY
-                        }
-                        _ => false,
-                    })
-                    .cloned()
-                    .collect::<Vec<_>>()
-            };
-            let resumed = worker_thread
-                .guardian_root_snapshot()
-                .await
-                .expect("worker root snapshot after Code Mode resume");
-            assert_eq!(exchange(&resumed.messages), exchange(&expected_messages));
-        }
         let original_history = saved
             .items
             .into_iter()
@@ -1338,9 +1158,8 @@ async fn run_guardian_subagent_review(
             // the inherited instruction first without losing the queued local grant.
             (inherited_prefix, MissingCheckpointSource::None, true),
         ] {
-            // Code Mode was replayed above from real history; these fixtures omit its delivery events.
             // The blocked-result case uses a real compaction and resume below.
-            if code_mode || block_post_hook {
+            if block_post_hook {
                 continue;
             }
             let mut expected = expected_authorization.clone();
@@ -1682,18 +1501,4 @@ async fn run_guardian_subagent_review(
         .await;
     assert!(shutdown.timed_out.is_empty());
     Ok(())
-}
-
-fn code_mode_name_for_tool_name(tool_name: &ToolName) -> String {
-    if tool_name.is_default_namespace() {
-        return tool_name.name.clone();
-    }
-
-    match tool_name.namespace.as_deref() {
-        Some(namespace) if namespace.ends_with('_') || tool_name.name.starts_with('_') => {
-            format!("{namespace}{}", tool_name.name)
-        }
-        Some(namespace) => format!("{namespace}__{}", tool_name.name),
-        None => tool_name.name.clone(),
-    }
 }

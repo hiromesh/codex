@@ -14,11 +14,10 @@ use codex_protocol::protocol::GranularApprovalConfig;
 
 #[derive(Default)]
 pub(crate) struct AppliedDefaults {
-    pub(crate) prompt_windows_sandbox: bool,
     pub(crate) approval_policy: Option<AskForApproval>,
 }
 
-/// Returns the selected product approval policy and whether Windows sandbox setup is required.
+/// Returns the selected product approval policy.
 pub(crate) fn apply_defaults(
     config: &mut Config,
     overrides: &ConfigOverrides,
@@ -84,11 +83,6 @@ pub(crate) fn apply_defaults(
             .as_ref()
             .map_or(granular, |policy| policy.to_core());
         let _ = config.permissions.approval_policy.set(granular);
-    }
-    #[cfg(target_os = "windows")]
-    if config.effective_local_windows_sandbox_type() == codex_sandboxing::SandboxType::None {
-        applied.prompt_windows_sandbox = true;
-        return applied;
     }
     if config
         .permissions

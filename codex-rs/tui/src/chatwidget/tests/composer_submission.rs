@@ -424,7 +424,6 @@ async fn submission_preserves_text_elements_and_local_images() {
     let rollout_file = NamedTempFile::new().unwrap();
     let configured = crate::session_state::ThreadSessionState {
         daybreak_enabled: false,
-        windows_sandbox_host: crate::app::WindowsSandboxHost::Local,
         thread_id,
         forked_from_id: None,
         fork_parent_title: None,
@@ -534,7 +533,6 @@ async fn submission_includes_configured_active_permission_profile() {
     let expected_active_permission_profile = ActivePermissionProfile::new("custom");
     let configured = crate::session_state::ThreadSessionState {
         daybreak_enabled: false,
-        windows_sandbox_host: crate::app::WindowsSandboxHost::Local,
         thread_id,
         forked_from_id: None,
         fork_parent_title: None,
@@ -590,7 +588,6 @@ async fn submission_omits_active_permission_profile_for_legacy_snapshot() {
     };
     let configured = crate::session_state::ThreadSessionState {
         daybreak_enabled: false,
-        windows_sandbox_host: crate::app::WindowsSandboxHost::Local,
         thread_id,
         forked_from_id: None,
         fork_parent_title: None,
@@ -636,7 +633,6 @@ async fn submission_with_remote_and_local_images_keeps_local_placeholder_numberi
     let rollout_file = NamedTempFile::new().unwrap();
     let configured = crate::session_state::ThreadSessionState {
         daybreak_enabled: false,
-        windows_sandbox_host: crate::app::WindowsSandboxHost::Local,
         thread_id,
         forked_from_id: None,
         fork_parent_title: None,
@@ -737,7 +733,6 @@ async fn enter_with_only_remote_images_submits_user_turn() {
     let rollout_file = NamedTempFile::new().unwrap();
     let configured = crate::session_state::ThreadSessionState {
         daybreak_enabled: false,
-        windows_sandbox_host: crate::app::WindowsSandboxHost::Local,
         thread_id,
         forked_from_id: None,
         fork_parent_title: None,
@@ -807,7 +802,6 @@ async fn shift_enter_with_only_remote_images_does_not_submit_user_turn() {
     let rollout_file = NamedTempFile::new().unwrap();
     let configured = crate::session_state::ThreadSessionState {
         daybreak_enabled: false,
-        windows_sandbox_host: crate::app::WindowsSandboxHost::Local,
         thread_id,
         forked_from_id: None,
         fork_parent_title: None,
@@ -849,7 +843,6 @@ async fn enter_with_only_remote_images_does_not_submit_when_modal_is_active() {
     let rollout_file = NamedTempFile::new().unwrap();
     let configured = crate::session_state::ThreadSessionState {
         daybreak_enabled: false,
-        windows_sandbox_host: crate::app::WindowsSandboxHost::Local,
         thread_id,
         forked_from_id: None,
         fork_parent_title: None,
@@ -891,7 +884,6 @@ async fn enter_with_only_remote_images_does_not_submit_when_input_disabled() {
     let rollout_file = NamedTempFile::new().unwrap();
     let configured = crate::session_state::ThreadSessionState {
         daybreak_enabled: false,
-        windows_sandbox_host: crate::app::WindowsSandboxHost::Local,
         thread_id,
         forked_from_id: None,
         fork_parent_title: None,
@@ -936,7 +928,6 @@ async fn submission_prefers_selected_duplicate_skill_path() {
     let rollout_file = NamedTempFile::new().unwrap();
     let configured = crate::session_state::ThreadSessionState {
         daybreak_enabled: false,
-        windows_sandbox_host: crate::app::WindowsSandboxHost::Local,
         thread_id,
         forked_from_id: None,
         fork_parent_title: None,

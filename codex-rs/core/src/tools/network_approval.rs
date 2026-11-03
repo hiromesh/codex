@@ -1276,15 +1276,7 @@ pub(crate) async fn execution_network_proxy(
                 policy,
                 permission_profile,
                 session.services.exec_policy.current().as_ref(),
-                environment.map_or(
-                    codex_network_proxy::LocalBindingPolicy::DefaultFalse,
-                    |environment| {
-                        crate::windows_sandbox::local_binding_policy_for_sandbox(
-                            environment.config().windows_sandbox_type,
-                            environment.executor_platform_os.as_deref(),
-                        )
-                    },
-                ),
+                codex_network_proxy::LocalBindingPolicy::DefaultFalse,
             )
         })
         .transpose()
@@ -1383,10 +1375,7 @@ pub(crate) async fn remote_network_proxy_launch(
     };
     let launch = network
         .remote_launch_config(
-            crate::windows_sandbox::local_binding_policy_for_sandbox(
-                environment.config().windows_sandbox_type,
-                environment.executor_platform_os.as_deref(),
-            ),
+            codex_network_proxy::LocalBindingPolicy::DefaultFalse,
             credential_masking,
         )
         .await

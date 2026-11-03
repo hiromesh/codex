@@ -407,9 +407,6 @@ impl App {
         started: Option<(Config, crate::app_server_session::AppServerStartedThread)>,
         mut startup_draft: Option<&mut StartupDraftPump>,
     ) -> color_eyre::Result<AppRunControl> {
-        if self.windows_sandbox_blocks_thread_switch() {
-            return Ok(AppRunControl::Continue);
-        }
         let is_new_session = started.is_some();
         if self.current_displayed_thread_id() == Some(root_thread_id)
             && (!self.thread_unavailable(root_thread_id)

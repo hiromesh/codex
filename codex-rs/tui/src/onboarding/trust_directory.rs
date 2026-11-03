@@ -33,7 +33,6 @@ pub(crate) struct TrustDirectoryWidget {
     pub cancel: TrustCancelAction,
     pub cwd: PathBuf,
     pub trust_target: PathBuf,
-    pub show_windows_create_sandbox_hint: bool,
     pub should_quit: bool,
     pub selection: Option<TrustDirectorySelection>,
     pub highlighted: TrustDirectorySelection,
@@ -122,11 +121,7 @@ impl WidgetRef for &TrustDirectoryWidget {
             0,
             Paragraph::new(Line::from(vec![
                 keys::CONFIRM[0].into(),
-                if self.show_windows_create_sandbox_hint && !self.restricted {
-                    " continue and create sandbox".dim()
-                } else {
-                    " continue".dim()
-                },
+                " continue".dim(),
                 " · ".dim(),
                 keys::CANCEL[0].into(),
                 match self.cancel {
@@ -284,7 +279,6 @@ mod tests {
             cancel: TrustCancelAction::Quit,
             cwd: PathBuf::from("/workspace/project"),
             trust_target: PathBuf::from("/workspace/project"),
-            show_windows_create_sandbox_hint: false,
             should_quit: false,
             selection: None,
             highlighted: TrustDirectorySelection::Trust,
@@ -300,7 +294,6 @@ mod tests {
             cancel: TrustCancelAction::Quit,
             cwd: PathBuf::from("."),
             trust_target: PathBuf::from("."),
-            show_windows_create_sandbox_hint: false,
             should_quit: false,
             selection: None,
             highlighted: TrustDirectorySelection::Quit,
@@ -344,8 +337,7 @@ mod tests {
 
     #[test]
     fn renders_snapshot_for_git_repo() {
-        let mut widget = widget(/*error*/ None);
-        widget.show_windows_create_sandbox_hint = true;
+        let widget = widget(/*error*/ None);
 
         let mut terminal =
             Terminal::new(VT100Backend::new(/*width*/ 70, /*height*/ 14)).expect("terminal");

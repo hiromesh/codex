@@ -27,7 +27,6 @@ use codex_exec_server::WalkOutcome;
 use codex_exec_server::WriteFileOptions;
 use codex_extension_api::Instructions;
 use codex_features::Feature;
-use codex_protocol::config_types::WindowsSandboxLevel;
 use codex_protocol::models::PermissionProfile;
 use codex_protocol::protocol::EnvironmentConfig;
 use codex_protocol::protocol::EnvironmentConfigState;
@@ -377,8 +376,6 @@ fn resolved_local_environments<const N: usize>(
                             environment_hooks: Default::default(),
                             allow_login_shell: true,
                             workspace_roots: Vec::new(),
-                            windows_sandbox_level: WindowsSandboxLevel::Disabled,
-                            windows_sandbox_type: codex_protocol::sandbox::SandboxType::None,
                             use_legacy_landlock: false,
                             permission_profile: PermissionProfileSnapshot::legacy(
                                 PermissionProfile::read_only(),

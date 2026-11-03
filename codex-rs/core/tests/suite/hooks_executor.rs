@@ -7,14 +7,12 @@ use codex_core::StartThreadOptions;
 use codex_core::TurnInputRequest;
 use codex_core::shell::ShellType;
 use codex_core::shell::get_shell;
-use codex_core::windows_sandbox::WindowsSandboxLevelExt;
 use codex_exec_server::CreateDirectoryOptions;
 use codex_exec_server::EnvironmentConfigReadParams;
 use codex_exec_server::ExecServerRuntimeOptions;
 use codex_features::Feature;
 use codex_protocol::capabilities::CapabilityRootLocation;
 use codex_protocol::capabilities::SelectedCapabilityRoot;
-use codex_protocol::config_types::WindowsSandboxLevel;
 use codex_protocol::models::PermissionProfileSnapshot;
 use codex_protocol::protocol::EnvironmentConfigState;
 use codex_protocol::protocol::EventMsg;
@@ -1463,8 +1461,6 @@ impl ExecutorHookFixture {
                         self.test.config.permissions.permission_profile().clone(),
                     ),
                     shell_environment_policy: Default::default(),
-                    windows_sandbox_level: WindowsSandboxLevel::from_config(&self.test.config),
-                    windows_sandbox_type: self.test.config.permissions.windows_sandbox_type,
                     use_legacy_landlock: self.test.config.features.use_legacy_landlock(),
                     exec_policy: None,
                     mcp_policy: None,

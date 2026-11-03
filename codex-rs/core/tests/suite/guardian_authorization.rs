@@ -94,10 +94,16 @@ async fn guardian_revalidates_owning_session_before_allow(
                 gate: None,
                 body: responses::sse(vec![
                     responses::ev_response_created("parent-start"),
-                    responses::ev_custom_tool_call(
+                    responses::ev_function_call(
                         "reviewed-tool",
-                        "exec",
-                        "yield_control(); await tools.exec_command({cmd: 'printf authorized', login: false, sandbox_permissions: 'require_escalated', justification: 'Exercise Guardian authorization freshness.'});",
+                        "exec_command",
+                        &json!({
+                            "cmd": "printf authorized",
+                            "login": false,
+                            "sandbox_permissions": "require_escalated",
+                            "justification": "Exercise Guardian authorization freshness."
+                        })
+                        .to_string(),
                     ),
                 ]),
             },

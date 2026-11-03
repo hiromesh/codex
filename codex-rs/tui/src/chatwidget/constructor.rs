@@ -145,11 +145,6 @@ impl ChatWidget {
             snapshot_local_images: false,
             pending_image_submission: None,
             local_worktree_operations: true,
-            windows_sandbox_local_server: false,
-            windows_sandbox_config: Default::default(),
-            windows_sandbox_host: crate::app::WindowsSandboxHost::Unknown,
-            #[cfg(any(target_os = "windows", test))]
-            windows_sandbox_elevated_setup_complete: false,
             token_info: None,
             token_usage_pending: false,
             rate_limit_snapshots_by_limit_id: BTreeMap::new(),

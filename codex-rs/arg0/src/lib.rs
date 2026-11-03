@@ -12,8 +12,6 @@ use codex_exec_server::CODEX_FS_HELPER_ARG1;
 use codex_install_context::InstallContext;
 use codex_sandboxing::landlock::CODEX_LINUX_SANDBOX_ARG0;
 use codex_utils_home_dir::find_codex_home;
-#[cfg(target_os = "windows")]
-use codex_windows_sandbox::CODEX_WINDOWS_SANDBOX_ARG1;
 #[cfg(unix)]
 use std::os::unix::fs::symlink;
 use tempfile::TempDir;
@@ -77,19 +75,12 @@ pub fn arg0_dispatch() -> Option<Arg0PathEntryGuard> {
     }
 
     let argv1 = args.next().unwrap_or_default();
-    if argv1 == codex_sandboxing::CODEX_WINDOWS_MXC_ARG1 {
-        codex_sandboxing::run_windows_mxc_main();
-    }
     #[cfg(unix)]
     if argv1 == CODEX_ARG0_EXEC_HELPER_ARG1 {
         codex_exec_server::run_arg0_exec_helper_main();
     }
     if argv1 == CODEX_FS_HELPER_ARG1 {
         codex_exec_server::run_fs_helper_main();
-    }
-    #[cfg(target_os = "windows")]
-    if argv1 == CODEX_WINDOWS_SANDBOX_ARG1 {
-        codex_windows_sandbox::run_windows_sandbox_wrapper_main();
     }
     if argv1 == CODEX_CORE_APPLY_PATCH_ARG1 {
         let patch_arg = args.next().and_then(|s| s.to_str().map(str::to_owned));
@@ -390,20 +381,6 @@ fn prepare_aliases_in_home(
             let link = path.join(filename);
             symlink(&exe, &link)?;
         }
-
-        #[cfg(windows)]
-        {
-            let batch_script = path.join(format!("{filename}.bat"));
-            let exe = windows_batch_executable_path(&exe, path);
-            std::fs::write(
-                &batch_script,
-                format!(
-                    r#"@echo off
-"{exe}" {CODEX_CORE_APPLY_PATCH_ARG1} %*
-"#,
-                ),
-            )?;
-        }
     }
 
     let updated_path_env_var = path_env_with_entry(path, existing_path);
@@ -429,14 +406,6 @@ fn prepare_aliases_in_home(
     ))
 }
 
-#[cfg(windows)]
-fn windows_batch_executable_path(executable: &Path, alias_directory: &Path) -> String {
-    pathdiff::diff_paths(executable, alias_directory)
-        .filter(|relative_path| relative_path.is_relative())
-        .map(|relative_path| format!("%~dp0{}", relative_path.display()))
-        .unwrap_or_else(|| executable.display().to_string())
-}
-
 fn path_env_with_package_path_dir(
     install_context: &InstallContext,
     existing_path: Option<OsString>,
@@ -449,11 +418,7 @@ fn path_env_with_package_path_dir(
 }
 
 fn path_env_with_entry(path_entry: &Path, existing_path: Option<OsString>) -> OsString {
-    #[cfg(unix)]
     const PATH_SEPARATOR: &str = ":";
-
-    #[cfg(windows)]
-    const PATH_SEPARATOR: &str = ";";
 
     let capacity = path_entry.as_os_str().len()
         + existing_path
@@ -544,8 +509,6 @@ mod tests {
     use pretty_assertions::assert_eq;
     use std::fs;
     use std::fs::File;
-    #[cfg(windows)]
-    use std::os::windows::process::CommandExt;
     use std::path::Path;
     use std::path::PathBuf;
     use tempfile::TempDir;
@@ -597,50 +560,6 @@ mod tests {
             install_context,
             path_dir,
         })
-    }
-
-    #[cfg(windows)]
-    #[test]
-    fn windows_batch_alias_preserves_unicode_executable_paths() -> anyhow::Result<()> {
-        let root = TempDir::new()?;
-        let profile = root.path().join("用户");
-        let alias_directory = profile.join(".codex").join("tmp").join("arg0");
-        let executable_directory = profile.join("bin");
-        fs::create_dir_all(&alias_directory)?;
-        fs::create_dir_all(&executable_directory)?;
-
-        let system_root = std::env::var_os("SystemRoot")
-            .ok_or_else(|| anyhow::anyhow!("missing Windows system root"))?;
-        let command_shell = PathBuf::from(system_root).join("System32").join("cmd.exe");
-        let executable = executable_directory.join("cmd.exe");
-        codex_utils_cargo_bin::copy_executable(&command_shell, &executable)?;
-
-        let batch_path = alias_directory.join("apply_patch.bat");
-        let executable_path = super::windows_batch_executable_path(&executable, &alias_directory);
-        fs::write(
-            &batch_path,
-            format!("@echo off\r\n\"{executable_path}\" /d /c exit 37\r\n"),
-        )?;
-
-        let output = std::process::Command::new(command_shell)
-            .args(["/d", "/c"])
-            .raw_arg(format!("chcp 437>nul & call \"{}\"", batch_path.display()))
-            .output()?;
-
-        assert_eq!(output.status.code(), Some(37));
-        Ok(())
-    }
-
-    #[cfg(windows)]
-    #[test]
-    fn windows_batch_alias_preserves_cross_volume_executable_paths() {
-        assert_eq!(
-            super::windows_batch_executable_path(
-                Path::new(r"D:\Tools\codex.exe"),
-                Path::new(r"C:\Users\person\.codex\tmp\arg0"),
-            ),
-            r"D:\Tools\codex.exe",
-        );
     }
 
     #[test]
@@ -768,7 +687,7 @@ mod tests {
         let home = tempfile::tempdir()?;
         let temporary = home.path().join("tmp");
         let own_root = temporary.join(format!("arg0-{}", std::env::consts::OS));
-        let foreign_os = if cfg!(windows) { "linux" } else { "windows" };
+        let foreign_os = "foreign";
         let foreign_root = temporary.join(format!("arg0-{foreign_os}"));
         let legacy_root = temporary.join("arg0");
         // Unlocked foreign directories model a live peer whose lock is invisible
@@ -793,11 +712,7 @@ mod tests {
         // Older versions clean only this root. Run that cleanup while a new
         // helper is live, then confirm the advertised helper remains usable.
         janitor_cleanup(&legacy_root)?;
-        let helper = guard._temp_dir.path().join(if cfg!(windows) {
-            "apply_patch.bat"
-        } else {
-            "apply_patch"
-        });
+        let helper = guard._temp_dir.path().join("apply_patch");
         assert!(helper.is_file());
         assert_eq!(
             fs::read(foreign_root.join("codex-arg0-existing/helper"))?,

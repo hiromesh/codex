@@ -3,7 +3,6 @@ use std::collections::HashMap;
 use std::time::Duration;
 
 use codex_exec_server_protocol::JSONRPCErrorError;
-use codex_protocol::config_types::WindowsSandboxLevel;
 use codex_protocol::models::PermissionProfile;
 use codex_protocol::permissions::FileSystemAccessMode;
 use codex_protocol::permissions::FileSystemPath;
@@ -157,7 +156,7 @@ impl FileSystemSandboxRunner {
         let sandbox_manager = sandbox_manager.with_allowed_symlinked_codex_home(
             self.runtime_paths.allowed_symlinked_codex_home.clone(),
         );
-        let (sandbox, windows_sandbox_level) = crate::sandbox_selection::select_sandbox(
+        let sandbox = crate::sandbox_selection::select_sandbox(
             &sandbox_manager,
             permission_profile,
             sandbox_context,
@@ -185,9 +184,6 @@ impl FileSystemSandboxRunner {
         };
         let mut request = sandbox_manager
             .transform_for_direct_spawn(SandboxDirectSpawnTransformRequest {
-                workspace_roots,
-                windows_sandbox_proxy_settings_mode:
-                    codex_sandboxing::WindowsSandboxProxySettingsMode::Preserve,
                 transform: SandboxTransformRequest {
                     command,
                     permissions: permission_profile,
@@ -196,14 +192,8 @@ impl FileSystemSandboxRunner {
                     environment_id: None,
                     network: None,
                     sandbox_policy_cwd: &cwd.uri,
-                    sandbox_exe: if cfg!(windows) {
-                        Some(self.runtime_paths.codex_self_exe.as_path())
-                    } else {
-                        self.runtime_paths.codex_linux_sandbox_exe.as_deref()
-                    },
+                    sandbox_exe: self.runtime_paths.codex_linux_sandbox_exe.as_deref(),
                     use_legacy_landlock: sandbox_context.use_legacy_landlock,
-                    windows_sandbox_level: windows_sandbox_level
-                        .unwrap_or(WindowsSandboxLevel::Disabled),
                 },
             })
             .map_err(|err| invalid_request(format!("failed to prepare fs sandbox: {err}")))?;

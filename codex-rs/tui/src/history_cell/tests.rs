@@ -602,7 +602,6 @@ fn image_generation_call_renders_saved_path() {
 fn session_configured_event(model: &str) -> ThreadSessionState {
     ThreadSessionState {
         daybreak_enabled: false,
-        windows_sandbox_host: crate::app::WindowsSandboxHost::Local,
         thread_id: ThreadId::new(),
         forked_from_id: None,
         fork_parent_title: None,

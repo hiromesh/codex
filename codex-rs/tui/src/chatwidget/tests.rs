@@ -114,7 +114,6 @@ pub(super) use codex_app_server_protocol::TurnStatus as AppServerTurnStatus;
 pub(super) use codex_app_server_protocol::UserInput;
 pub(super) use codex_app_server_protocol::UserInput as AppServerUserInput;
 pub(super) use codex_app_server_protocol::WarningNotification;
-pub(super) use codex_app_server_protocol::WindowsSandboxSetupMode;
 pub(super) use codex_config::ConfigLayerStack;
 pub(super) use codex_config::Constrained;
 pub(super) use codex_config::ConstraintError;

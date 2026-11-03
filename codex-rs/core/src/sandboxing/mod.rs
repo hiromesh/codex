@@ -18,20 +18,14 @@ use codex_file_system::FileSystemSandboxContext;
 use codex_network_proxy::ManagedNetworkSandboxContext;
 use codex_network_proxy::NetworkProxy;
 use codex_network_proxy::RemoteNetworkProxyLaunchConfig;
-use codex_protocol::config_types::WindowsSandboxLevel;
 use codex_protocol::error::CodexErr;
 use codex_protocol::exec_output::ExecToolCallOutput;
 use codex_protocol::models::PermissionProfile;
 pub use codex_protocol::models::SandboxPermissions;
 use codex_sandboxing::SandboxExecRequest;
 use codex_sandboxing::SandboxType;
-use codex_sandboxing::WindowsSandboxFilesystemOverrides;
-use codex_sandboxing::resolve_windows_elevated_filesystem_overrides;
-use codex_sandboxing::resolve_windows_restricted_token_filesystem_overrides;
-use codex_sandboxing::windows_sandbox_uses_elevated_backend;
 use codex_utils_absolute_path::AbsolutePathBuf;
 use codex_utils_path_uri::PathUri;
-use codex_utils_string::truncate_middle_with_token_budget;
 use std::collections::HashMap;
 
 #[derive(Debug)]
@@ -58,13 +52,7 @@ pub struct ExecRequest {
     pub expiration: ExecExpiration,
     pub capture_policy: ExecCapturePolicy,
     pub sandbox: SandboxType,
-    pub windows_sandbox_policy_cwd: PathUri,
-    pub windows_sandbox_workspace_roots: Vec<AbsolutePathBuf>,
-    // TODO(anp): Reconcile these backend copies with TurnEnvironment::sandbox_context
-    // and exec_server_sandbox so local and remote launches use the same settings.
-    pub windows_sandbox_level: WindowsSandboxLevel,
     pub permission_profile: PermissionProfile,
-    pub(crate) windows_sandbox_filesystem_overrides: Option<WindowsSandboxFilesystemOverrides>,
     pub arg0: Option<String>,
     pub(crate) exec_server_sandbox: Option<FileSystemSandboxContext>,
     pub(crate) exec_server_enforce_managed_network: bool,
@@ -83,13 +71,10 @@ impl ExecRequest {
         expiration: ExecExpiration,
         capture_policy: ExecCapturePolicy,
         sandbox: SandboxType,
-        windows_sandbox_workspace_roots: Vec<AbsolutePathBuf>,
-        windows_sandbox_level: WindowsSandboxLevel,
         permission_profile: PermissionProfile,
         arg0: Option<String>,
     ) -> Self {
         let cwd = PathUri::from_abs_path(&cwd);
-        let windows_sandbox_policy_cwd = cwd.clone();
         Self {
             command,
             cwd,
@@ -101,11 +86,7 @@ impl ExecRequest {
             expiration,
             capture_policy,
             sandbox,
-            windows_sandbox_policy_cwd,
-            windows_sandbox_workspace_roots,
-            windows_sandbox_level,
             permission_profile,
-            windows_sandbox_filesystem_overrides: None,
             arg0,
             exec_server_sandbox: None,
             exec_server_enforce_managed_network: false,
@@ -117,18 +98,16 @@ impl ExecRequest {
     pub(crate) async fn from_sandbox_exec_request(
         request: SandboxExecRequest,
         options: ExecOptions,
-        windows_sandbox_workspace_roots: Vec<AbsolutePathBuf>,
     ) -> Result<Self, CodexErr> {
         codex_exec_server::run_integrity_checks(&request).await;
         let SandboxExecRequest {
             command,
             cwd,
-            sandbox_policy_cwd: windows_sandbox_policy_cwd,
+            sandbox_policy_cwd: _,
             mut env,
             network,
             network_environment_id,
             sandbox,
-            windows_sandbox_level,
             permission_profile,
             arg0,
             ..
@@ -137,37 +116,6 @@ impl ExecRequest {
             expiration,
             capture_policy,
         } = options;
-        let windows_sandbox_filesystem_overrides = if sandbox == SandboxType::WindowsRestrictedToken
-        {
-            let sandbox_policy_cwd = windows_sandbox_policy_cwd
-                .to_abs_path()
-                .map_err(|err| CodexErr::InvalidRequest(format!("invalid sandbox cwd: {err}")))?;
-            let use_windows_elevated_backend =
-                windows_sandbox_uses_elevated_backend(windows_sandbox_level);
-            if use_windows_elevated_backend {
-                resolve_windows_elevated_filesystem_overrides(
-                    sandbox,
-                    &permission_profile,
-                    &sandbox_policy_cwd,
-                    use_windows_elevated_backend,
-                    &env,
-                )
-            } else {
-                resolve_windows_restricted_token_filesystem_overrides(
-                    sandbox,
-                    &permission_profile,
-                    &sandbox_policy_cwd,
-                    windows_sandbox_level,
-                )
-            }
-            .map_err(|error| {
-                CodexErr::UnsupportedOperation(
-                    truncate_middle_with_token_budget(&error, /*max_tokens*/ 900).0,
-                )
-            })?
-        } else {
-            None
-        };
         let network_sandbox_policy = permission_profile.network_sandbox_policy();
         if !network_sandbox_policy.is_enabled() {
             env.insert(
@@ -190,11 +138,7 @@ impl ExecRequest {
             expiration,
             capture_policy,
             sandbox,
-            windows_sandbox_policy_cwd,
-            windows_sandbox_workspace_roots,
-            windows_sandbox_level,
             permission_profile,
-            windows_sandbox_filesystem_overrides,
             arg0,
             exec_server_sandbox: None,
             exec_server_enforce_managed_network: false,

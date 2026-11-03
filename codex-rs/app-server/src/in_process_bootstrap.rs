@@ -131,7 +131,6 @@ pub(super) async fn configure(
         .load_startup_config(Some(config.cwd.to_path_buf()))
         .await?
         .config;
-    config.validate_windows_mxc_requirement_from(&policy_config)?;
     let auth_config = codex_login::AuthConfig {
         chatgpt_base_url: Some(policy_config.chatgpt_base_url.clone()),
         forced_login_method: policy_config.forced_login_method,

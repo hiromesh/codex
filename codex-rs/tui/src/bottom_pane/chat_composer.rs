@@ -530,7 +530,6 @@ fn parent_owned_command_is_allowed(command: SlashCommand, args: &str) -> bool {
                 | SlashCommand::Vim
                 | SlashCommand::Keymap
                 | SlashCommand::Config
-                | SlashCommand::ElevateSandbox
                 | SlashCommand::Experimental
                 | SlashCommand::Memories
                 | SlashCommand::Quit
@@ -668,7 +667,6 @@ pub(crate) struct ChatComposer {
     goal_command_enabled: bool,
     voice_command_enabled: bool,
     worktrees_enabled: bool,
-    windows_degraded_sandbox_active: bool,
     side_conversation_active: bool,
     history_search: Option<HistorySearchSession>,
     vim_history: VimHistory,
@@ -850,7 +848,6 @@ impl ChatComposer {
             goal_command_enabled: false,
             voice_command_enabled: false,
             worktrees_enabled: false,
-            windows_degraded_sandbox_active: false,
             side_conversation_active: false,
             history_search: None,
             vim_history: VimHistory::default(),
@@ -1172,13 +1169,6 @@ impl ChatComposer {
     fn image_paste_enabled(&self) -> bool {
         self.config.image_paste_enabled
     }
-    #[cfg(target_os = "windows")]
-    pub fn set_windows_degraded_sandbox_active(&mut self, enabled: bool) {
-        self.update_slash_command_catalog(|composer| {
-            composer.windows_degraded_sandbox_active = enabled
-        });
-    }
-
     pub fn cursor_pos(&self, area: Rect) -> Option<(u16, u16)> {
         self.cursor_pos_with_options(area, ComposerRenderOptions::default())
     }

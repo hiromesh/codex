@@ -1323,9 +1323,6 @@ impl App {
         let mut session = self.primary_session_configured.clone()?;
         session.thread_id = thread_id;
         session.daybreak_enabled = notification.thread.daybreak_enabled.unwrap_or(false);
-        session.windows_sandbox_host = crate::windows_sandbox::host_from_environments(
-            notification.thread.environments.as_deref(),
-        );
         session.thread_name = notification.thread.name.clone();
         session.model_provider_id = notification.thread.model_provider.clone();
         session

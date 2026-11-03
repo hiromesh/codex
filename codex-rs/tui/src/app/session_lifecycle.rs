@@ -514,13 +514,6 @@ impl App {
         chat_widget.remote_connection = self.chat_widget.remote_connection.clone();
         chat_widget.snapshot_local_images = self.app_server_target.uses_remote_workspace();
         chat_widget.set_local_worktree_operations(self.chat_widget.local_worktree_operations);
-        chat_widget.windows_sandbox_local_server = self.chat_widget.windows_sandbox_local_server;
-        chat_widget.windows_sandbox_host = WindowsSandboxHost::Unknown;
-        #[cfg(any(target_os = "windows", test))]
-        {
-            chat_widget.windows_sandbox_elevated_setup_complete =
-                self.chat_widget.windows_sandbox_elevated_setup_complete;
-        }
         chat_widget.inherit_backend_banner_state(&mut self.chat_widget);
         chat_widget.inherit_security_setup(&mut self.chat_widget);
         chat_widget
@@ -565,13 +558,6 @@ impl App {
             return Ok(());
         }
         if self.reject_pending_permission_root_switch() {
-            return Ok(());
-        }
-        if self.windows_sandbox_blocks_thread_switch() {
-            self.chat_widget.add_info_message(
-                "Finish Windows sandbox setup before switching threads.".to_string(),
-                /*hint*/ None,
-            );
             return Ok(());
         }
         if self.active_thread_id == Some(thread_id) {
@@ -1381,13 +1367,6 @@ impl App {
                 .remove(&target_session.thread_id);
             self.repaint_agents_overview();
             tui.frame_requester().schedule_frame();
-            return Ok(AppRunControl::Continue);
-        }
-        if self.windows_sandbox_blocks_thread_switch() {
-            self.chat_widget.add_info_message(
-                "Finish Windows sandbox setup before switching threads.".to_string(),
-                /*hint*/ None,
-            );
             return Ok(AppRunControl::Continue);
         }
 

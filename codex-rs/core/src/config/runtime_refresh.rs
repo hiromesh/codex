@@ -202,7 +202,6 @@ impl Config {
         if enterprise_retired {
             config.disable_mcp_enterprise_auth();
         }
-        config.validate_windows_mxc_requirement()?;
         Ok(config)
     }
 

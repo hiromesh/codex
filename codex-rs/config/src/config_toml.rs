@@ -31,7 +31,6 @@ use crate::types::SkillsConfig;
 use crate::types::ToolSuggestConfig;
 use crate::types::Tui;
 use crate::types::UriBasedFileOpener;
-use crate::types::WindowsToml;
 use codex_features::FeaturesToml;
 use codex_model_provider_info::AMAZON_BEDROCK_PROVIDER_ID;
 use codex_model_provider_info::AMAZON_BEDROCK_RUNTIME_PROVIDER_ID;
@@ -51,13 +50,11 @@ use codex_protocol::config_types::TrustLevel;
 use codex_protocol::config_types::Verbosity;
 use codex_protocol::config_types::WebSearchMode;
 use codex_protocol::config_types::WebSearchToolConfig;
-use codex_protocol::config_types::WindowsSandboxLevel;
 use codex_protocol::models::PermissionProfile;
 use codex_protocol::openai_models::ReasoningEffort;
 use codex_protocol::permissions::NetworkSandboxPolicy;
 use codex_protocol::protocol::AskForApproval;
 use codex_utils_absolute_path::AbsolutePathBuf;
-use codex_utils_path_uri::Platform;
 use schemars::JsonSchema;
 use serde::Deserialize;
 use serde::Deserializer;
@@ -555,10 +552,6 @@ pub struct ConfigToml {
     /// OTEL configuration.
     pub otel: Option<OtelConfigToml>,
 
-    /// Windows-specific configuration.
-    #[serde(default)]
-    pub windows: Option<WindowsToml>,
-
     /// Collection of in-product notices (different from notifications)
     /// See [`crate::types::Notice`] for more details
     pub notice: Option<Notice>,
@@ -826,26 +819,6 @@ pub struct GhostSnapshotToml {
     pub disable_warnings: Option<bool>,
 }
 
-/// Apply the executor's sandbox availability to an already selected sandbox mode.
-///
-/// Call this before resolving workspace-write settings so unused writable roots
-/// do not affect the read-only fallback. Named permission profiles are resolved
-/// separately and must not be downgraded through this helper.
-pub fn effective_sandbox_mode(
-    mode: SandboxMode,
-    platform: Platform,
-    windows_sandbox_level: WindowsSandboxLevel,
-) -> SandboxMode {
-    if platform == Platform::Windows
-        && windows_sandbox_level == WindowsSandboxLevel::Disabled
-        && mode == SandboxMode::WorkspaceWrite
-    {
-        SandboxMode::ReadOnly
-    } else {
-        mode
-    }
-}
-
 impl TryFrom<toml::Value> for ConfigToml {
     type Error = toml::de::Error;
 
@@ -865,7 +838,6 @@ impl ConfigToml {
     pub async fn derive_permission_profile(
         &self,
         sandbox_mode_override: Option<SandboxMode>,
-        windows_sandbox_level: WindowsSandboxLevel,
         active_project: Option<&ProjectConfig>,
         permission_profile_constraint: Option<&crate::Constrained<PermissionProfile>>,
     ) -> PermissionProfile {
@@ -879,13 +851,7 @@ impl ConfigToml {
                     .map(|_| SandboxMode::WorkspaceWrite)
             })
             .unwrap_or_default();
-        let effective_sandbox_mode = effective_sandbox_mode(
-            resolved_sandbox_mode,
-            Platform::native(),
-            windows_sandbox_level,
-        );
-
-        let permission_profile = match effective_sandbox_mode {
+        let permission_profile = match resolved_sandbox_mode {
             SandboxMode::ReadOnly => PermissionProfile::read_only(),
             SandboxMode::WorkspaceWrite => match self.sandbox_workspace_write.as_ref() {
                 Some(SandboxWorkspaceWrite {
@@ -1055,37 +1021,6 @@ mod tests {
 
     const WORKSPACE_ID_A: &str = "123e4567-e89b-42d3-a456-426614174000";
     const WORKSPACE_ID_B: &str = "123e4567-e89b-42d3-a456-426614174001";
-
-    #[test]
-    fn sandbox_mode_uses_executor_platform_and_sandbox_level() {
-        use Platform::Linux;
-        use Platform::Macos;
-        use Platform::Unknown;
-        use Platform::Windows;
-        use SandboxMode::DangerFullAccess;
-        use SandboxMode::ReadOnly;
-        use SandboxMode::WorkspaceWrite;
-        use WindowsSandboxLevel::Disabled;
-        use WindowsSandboxLevel::Elevated;
-        use WindowsSandboxLevel::RestrictedToken;
-
-        for (mode, platform, level, expected) in [
-            (WorkspaceWrite, Windows, Disabled, ReadOnly),
-            (WorkspaceWrite, Windows, RestrictedToken, WorkspaceWrite),
-            (WorkspaceWrite, Windows, Elevated, WorkspaceWrite),
-            (WorkspaceWrite, Linux, Disabled, WorkspaceWrite),
-            (WorkspaceWrite, Macos, Disabled, WorkspaceWrite),
-            (WorkspaceWrite, Unknown, Disabled, WorkspaceWrite),
-            (ReadOnly, Windows, Disabled, ReadOnly),
-            (DangerFullAccess, Windows, Disabled, DangerFullAccess),
-        ] {
-            assert_eq!(
-                effective_sandbox_mode(mode, platform, level),
-                expected,
-                "{mode:?}, {platform:?}, {level:?}"
-            );
-        }
-    }
 
     #[test]
     fn thread_unload_delay_requires_nonnegative_seconds() {

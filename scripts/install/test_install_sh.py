@@ -109,7 +109,7 @@ class InstallShTest(unittest.TestCase):
         self.assertIn("/codex-npm-", requests[1])
         self.assertNotIn("codex-package_SHA256SUMS", requests[1])
 
-    def test_macos_install_exposes_code_mode_host_beside_codex(self) -> None:
+    def test_macos_install_symlinks_codex_into_install_bin(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
             archive_path, checksum_path, metadata_json = create_package_release(root)
@@ -127,13 +127,8 @@ class InstallShTest(unittest.TestCase):
             install_bin = root / "install-bin"
             current = root / "codex-home" / "packages" / "standalone" / "current"
             codex_path = install_bin / "codex"
-            host_path = install_bin / "codex-code-mode-host"
             self.assertEqual(os.readlink(codex_path), str(current / "bin" / "codex"))
-            self.assertEqual(
-                os.readlink(host_path),
-                str(current / "bin" / "codex-code-mode-host"),
-            )
-            self.assertTrue(os.access(host_path, os.X_OK))
+            self.assertTrue(os.access(codex_path, os.X_OK))
 
     def test_releases_latest_installs_verified_package_by_default(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -417,7 +412,7 @@ class InstallShTest(unittest.TestCase):
             )
             self.assertEqual(first.returncode, 0, first.stderr)
             oldest = releases / f"{versions[0]}-{target}"
-            helper = oldest / "bin/codex-code-mode-host"
+            helper = oldest / "bin/codex-exec-server"
             shutil.copy("/bin/sleep", helper)
             if system.sysname == "Darwin":
                 # A copied macOS system binary cannot run with its platform signature.
@@ -1230,10 +1225,6 @@ def create_package_release(
     write_executable(
         package_dir / "bin" / "codex",
         f"#!/bin/sh\nprintf 'codex-cli {binary_version}\\n'\n",
-    )
-    write_executable(
-        package_dir / "bin" / "codex-code-mode-host",
-        "#!/bin/sh\nexit 0\n",
     )
     write_executable(package_dir / "codex-path" / "rg", "#!/bin/sh\nexit 0\n")
     if "linux" in target:

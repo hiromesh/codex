@@ -534,7 +534,6 @@ impl ConfigManager {
         )
         .await
         .and_then(|config| {
-            config.validate_windows_mxc_requirement()?;
             Ok(config)
         })
     }
@@ -617,7 +616,6 @@ impl ConfigManager {
         )
         .await
         .and_then(|config| {
-            config.validate_windows_mxc_requirement()?;
             Ok(config)
         })
     }
@@ -659,7 +657,6 @@ impl ConfigManager {
         )
         .await
         .and_then(|config| {
-            config.validate_windows_mxc_requirement()?;
             Ok(config)
         })
     }

@@ -87,7 +87,6 @@ pub(crate) async fn make_test_app() -> Box<App> {
         pending_update_action: None,
         daemon_restart: None,
         pending_shutdown_exit_thread_id: None,
-        windows_sandbox: WindowsSandboxState::default(),
         thread_event_channels: HashMap::new(),
         pending_realtime_speech_replay: HashMap::new(),
         pending_realtime_transcript_replay: HashMap::new(),

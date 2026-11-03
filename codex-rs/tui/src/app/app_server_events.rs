@@ -10,8 +10,6 @@ use super::app_server_requests::BufferedServerRequest;
 use crate::app_command::AppCommand;
 use crate::app_event::AppEvent;
 use crate::app_event::RateLimitRefreshOrigin;
-#[cfg(any(target_os = "windows", test))]
-use crate::app_event::WindowsSandboxEnableMode;
 use crate::app_info::app_info_from_api;
 use crate::app_server_session::AppServerSession;
 use crate::app_server_session::status_account_display_from_auth_mode;
@@ -551,57 +549,6 @@ impl App {
             ServerNotificationThreadTarget::Global => {}
         }
 
-        #[cfg(any(target_os = "windows", test))]
-        if let ServerNotification::WindowsSandboxSetupCompleted(result) = notification {
-            let Some((mode, preset, profile_selection)) =
-                self.windows_sandbox.pending_setup.clone()
-            else {
-                return;
-            };
-            let expected_mode = match mode {
-                WindowsSandboxEnableMode::Elevated => {
-                    codex_app_server_protocol::WindowsSandboxSetupMode::Elevated
-                }
-                WindowsSandboxEnableMode::Legacy => {
-                    codex_app_server_protocol::WindowsSandboxSetupMode::Unelevated
-                }
-            };
-            if result.mode != expected_mode {
-                return;
-            }
-            if result.success {
-                self.app_event_tx
-                    .send(AppEvent::EnableWindowsSandboxForAgentMode {
-                        preset,
-                        mode,
-                        profile_selection,
-                    });
-            } else if mode == WindowsSandboxEnableMode::Elevated {
-                self.app_event_tx
-                    .send(AppEvent::OpenWindowsSandboxFallbackPrompt {
-                        preset,
-                        profile_selection,
-                    });
-            } else {
-                self.windows_sandbox.pending_setup = None;
-                self.chat_widget.clear_windows_sandbox_setup_status();
-                self.windows_sandbox.setup_started_at = None;
-                if self
-                    .chat_widget
-                    .recover_inline_permission_profile_selection()
-                {
-                    self.app_event_tx.send(AppEvent::SettingsSelectionClosed);
-                } else {
-                    self.chat_widget
-                        .retain_input_after_failed_permission_selection();
-                }
-                self.chat_widget.add_error_message(format!(
-                    "Windows sandbox setup failed: {}",
-                    result.error.unwrap_or_else(|| "unknown error".to_string())
-                ));
-            }
-            return;
-        }
 
         self.chat_widget
             .handle_server_notification(notification, /*replay_kind*/ None);

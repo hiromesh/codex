@@ -1,32 +1,19 @@
-//! Catalog resource-tool text reaches direct calls and Code Mode without changing MCP execution.
+//! Catalog resource-tool text reaches direct calls without changing MCP execution.
 
 use super::super::rmcp_client::remote_aware_environment_id;
 use super::super::rmcp_client::remote_aware_stdio_server_bin;
 use anyhow::Result;
-use codex_core::ConfigRefreshOutcome;
-use codex_features::Feature;
-use codex_protocol::openai_models::ToolMode;
-use codex_protocol::protocol::EventMsg;
-use codex_protocol::protocol::McpStartupStatus;
-use core_test_support::apps_test_server::AppsTestServer;
-use core_test_support::context_snapshot;
-use core_test_support::context_snapshot::ContextSnapshotOptions;
 use core_test_support::responses;
 use core_test_support::skip_if_no_network;
 use core_test_support::skip_if_wine_exec;
 use core_test_support::test_codex::test_codex;
-use core_test_support::wait_for_event_match;
 use core_test_support::wait_for_mcp_server;
 use pretty_assertions::assert_eq;
 use serde_json::json;
 use std::collections::HashMap;
-use std::sync::Arc;
-use std::sync::Mutex;
-use test_case::test_case;
 
-#[test_case(ToolMode::Direct; "direct")]
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn mcp_resource_messages(tool_mode: ToolMode) -> Result<()> {
+async fn mcp_resource_messages() -> Result<()> {
     skip_if_no_network!(Ok(()));
     skip_if_wine_exec!(Ok(()), "requires a Windows test_stdio_server binary");
     let server = responses::start_mock_server().await;
@@ -79,7 +66,6 @@ async fn mcp_resource_messages(tool_mode: ToolMode) -> Result<()> {
                 .expect("configure resources server");
         })
         .with_model_info_override("gpt-6-astra", move |model| {
-            model.tool_mode = Some(tool_mode);
             model.use_responses_lite = false;
             let model_messages = model.model_messages.as_mut().expect("model messages");
             model_messages

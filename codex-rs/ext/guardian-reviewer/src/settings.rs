@@ -44,7 +44,7 @@ pub fn guardian_cyber_access_program(
 pub fn reviewer_tool_policy() -> ToolPolicy {
     ToolPolicy {
         allowed_tools: Some(
-            ["exec_command", "write_stdin", "view_image", "exec", "wait"]
+            ["exec_command", "write_stdin", "view_image"]
                 .into_iter()
                 .map(ToolName::plain)
                 .collect(),

@@ -1,7 +1,6 @@
 //! Reviews terminal input against retained launch permissions and current policy.
 //! Permission snapshots stay host-owned; neither an earlier approval nor a policy
-//! change alters the sandbox of an already-running process. Native launches keep
-//! their configured Windows sandbox selection; executor launches use executor defaults.
+//! change alters the sandbox of an already-running process.
 //! Runtime-internal grants alone do not require review; agent grants and policy drift do.
 
 use super::ProcessEntry;
@@ -12,7 +11,6 @@ use crate::session::turn_context::TurnContext;
 use crate::session::turn_context::TurnEnvironment;
 use crate::tools::sandboxing::ApprovalAction;
 use crate::tools::sandboxing::ToolError;
-use crate::windows_sandbox::windows_sandbox_level_for_legacy_checks;
 use codex_features::Feature;
 use codex_file_system::FileSystemSandboxContext;
 use codex_network_proxy::EnvironmentNetworkPolicy;
@@ -55,18 +53,7 @@ impl TerminalPolicy {
         sandbox_source: TerminalSandboxSource,
         additional_permissions: Option<AdditionalPermissionProfile>,
     ) -> Self {
-        let mut sandbox = environment.sandbox_context(additional_permissions);
-        if matches!(sandbox_source, TerminalSandboxSource::Native)
-            && windows_sandbox_level_for_legacy_checks(
-                environment.config().windows_sandbox_type,
-                environment.config().windows_sandbox_level,
-            ) == codex_protocol::config_types::WindowsSandboxLevel::Disabled
-        {
-            // The filesystem helper applies executor defaults, but native process
-            // launches honor Disabled. Preserve it so later enablement is detected.
-            sandbox.windows_sandbox_selection =
-                codex_protocol::config_types::WindowsSandboxLevel::Disabled.into();
-        }
+        let sandbox = environment.sandbox_context(additional_permissions);
         Self {
             sandbox,
             environment_network: environment.config().network_policy.clone(),

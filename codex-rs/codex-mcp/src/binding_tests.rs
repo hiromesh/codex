@@ -118,9 +118,6 @@ async fn test_step(
     config
         .server_permission_profiles
         .insert(SERVER_NAME.to_string(), config.permission_profile.clone());
-    config
-        .environment_use_mxc
-        .insert(format!("{label}-environment"), label == "new");
     let config = Arc::new(config);
     let prepared = PreparedMcpCall::new(
         Arc::clone(&connections),
@@ -231,25 +228,21 @@ async fn prepared_call_keeps_captured_connection_and_authority_after_refresh() -
             old_call.config().approval_policy.value(),
             old_call.permission_profile(),
             old_call.config().approvals_reviewer,
-            old_call.config().environment_use_mxc.get("old-environment"),
         ),
         (
             AskForApproval::Never,
             &PermissionProfile::Disabled,
             ApprovalsReviewer::User,
-            Some(&false),
         )
     );
     assert_eq!(
         (
             new_call.config().approval_policy.value(),
             new_call.config().approvals_reviewer,
-            new_call.config().environment_use_mxc.get("new-environment"),
         ),
         (
             AskForApproval::OnRequest,
             ApprovalsReviewer::AutoReview,
-            Some(&true)
         )
     );
 
@@ -500,7 +493,6 @@ async fn sandbox_executable_requires_local_stdio_and_a_full_cli() -> anyhow::Res
                 std::env::current_dir()?,
             )?,
             use_legacy_landlock: false,
-            use_mxc: false,
         };
         let expected_state = serde_json::to_value(&state)?;
         let mut metadata = Some(serde_json::json!({

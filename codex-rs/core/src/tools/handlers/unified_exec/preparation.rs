@@ -23,7 +23,6 @@ use crate::tools::handlers::parse_arguments_with_base_path;
 use crate::tools::handlers::resolve_sandbox_permissions;
 use crate::tools::sandboxing::ApprovalAction;
 use crate::tools::sandboxing::ExecApprovalRequirement;
-use crate::windows_sandbox::windows_sandbox_level_for_legacy_checks;
 use codex_features::Feature;
 use codex_sandboxing::SandboxManager;
 use codex_sandboxing::SandboxType;
@@ -84,10 +83,6 @@ impl PreparedExecCommand {
                     approval_policy: step.settings.approval_policy(),
                     permission_profile: environment.permission_profile().clone(),
                     environment_policy: environment.config().exec_policy.as_ref(),
-                    windows_sandbox_level: windows_sandbox_level_for_legacy_checks(
-                        environment.config().windows_sandbox_type,
-                        environment.config().windows_sandbox_level,
-                    ),
                     sandbox_permissions: if self.permissions.permissions_preapproved {
                         SandboxPermissions::UseDefault
                     } else {
@@ -150,10 +145,6 @@ impl<'a> ParsedExecCommand<'a> {
             && SandboxManager::new().select_initial(
                 turn_environment.permission_profile(),
                 SandboxablePreference::Auto,
-                codex_protocol::sandbox::effective_windows_sandbox_type(
-                    turn_environment.config().windows_sandbox_type,
-                    turn_environment.config().windows_sandbox_level,
-                ),
                 step.turn.network.is_some(),
             ) != SandboxType::None;
         // `to_abs_path()` alone cannot identify foreign drive paths: `file:///C:/repo` is

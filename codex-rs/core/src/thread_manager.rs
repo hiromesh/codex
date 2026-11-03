@@ -1554,7 +1554,7 @@ impl ThreadManager {
         source_thread_id: ThreadId,
     ) -> CodexResult<(StartThreadOptions, CodexThreadSettingsOverrides)> {
         let parent = self.get_thread(source_thread_id).await?;
-        let (config, settings, windows_sandbox_level, environments, reasoning_effort_pin) =
+        let (config, settings, environments, reasoning_effort_pin) =
             parent.session.fork_config().await;
         let mut thread_extension_init = ExtensionDataInit::default();
         thread_extension_init.insert(reasoning_effort_pin);
@@ -1571,7 +1571,6 @@ impl ThreadManager {
             },
             CodexThreadSettingsOverrides {
                 collaboration_mode: Some(settings.collaboration_mode),
-                windows_sandbox_level: Some(windows_sandbox_level),
                 ..Default::default()
             },
         ))
@@ -2496,14 +2495,6 @@ impl ThreadManagerState {
             starting.retain(|runtime| runtime.strong_count() != 0);
             starting.push(Arc::downgrade(&source_changed_during_startup));
         }
-        let windows_sandbox_proxy_settings_mode = if matches!(
-            &session_source,
-            SessionSource::Internal(InternalSessionSource::Guardian)
-        ) {
-            codex_sandboxing::WindowsSandboxProxySettingsMode::Preserve
-        } else {
-            codex_sandboxing::WindowsSandboxProxySettingsMode::Reconcile
-        };
         let spawn_result = Session::spawn(SessionSpawnArgs {
             attached_thread,
             startup,
@@ -2570,7 +2561,6 @@ impl ThreadManagerState {
             } else {
                 GitEnrichmentPolicy::Fresh
             },
-            windows_sandbox_proxy_settings_mode,
         })
         .await;
         let (session, io) = match spawn_result {

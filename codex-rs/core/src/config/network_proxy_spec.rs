@@ -17,8 +17,6 @@ use codex_network_proxy::NetworkProxyHandle;
 use codex_network_proxy::NetworkProxyState;
 use codex_network_proxy::build_config_state;
 use codex_network_proxy::host_and_port_from_network_addr;
-#[cfg(any(target_os = "windows", test))]
-use codex_network_proxy::managed_proxy_ports;
 use codex_network_proxy::normalize_host;
 use codex_network_proxy::validate_policy_against_constraints;
 use codex_protocol::models::PermissionProfile;
@@ -103,56 +101,6 @@ impl NetworkProxySpec {
 
     pub fn socks_enabled(&self) -> bool {
         self.config.enable_socks5
-    }
-
-    #[cfg(any(target_os = "windows", test))]
-    pub(crate) fn configured_proxy_ports(&self) -> std::io::Result<Vec<u16>> {
-        managed_proxy_ports(&self.config).map_err(std::io::Error::other)
-    }
-
-    #[cfg(any(target_os = "windows", test))]
-    pub(crate) fn allow_local_binding(&self) -> bool {
-        self.config.allow_local_binding()
-    }
-
-    /// Returns the firewall settings and listener identities used by the Windows provisioning service.
-    #[cfg(target_os = "windows")]
-    pub fn windows_sandbox_proxy_listeners(
-        &self,
-    ) -> std::io::Result<(
-        codex_windows_sandbox::WindowsSandboxProvisioningSettings,
-        codex_windows_sandbox::WindowsSandboxProxyListeners,
-    )> {
-        if !self.config.enabled {
-            return Ok((
-                codex_windows_sandbox::WindowsSandboxProvisioningSettings::default(),
-                codex_windows_sandbox::WindowsSandboxProxyListeners::default(),
-            ));
-        }
-
-        let proxy_ports = self.configured_proxy_ports()?;
-        let http_port = self
-            .proxy_host_and_port()
-            .rsplit_once(':')
-            .and_then(|(_, port)| port.parse::<u16>().ok())
-            .ok_or_else(|| std::io::Error::other("invalid HTTP proxy listener port"))?;
-        let socks_port = self.config.enable_socks5.then(|| {
-            proxy_ports
-                .iter()
-                .copied()
-                .find(|port| *port != http_port)
-                .unwrap_or(http_port)
-        });
-        Ok((
-            codex_windows_sandbox::WindowsSandboxProvisioningSettings {
-                proxy_ports,
-                allow_local_binding: self.config.allow_local_binding(),
-            },
-            codex_windows_sandbox::WindowsSandboxProxyListeners {
-                http_ports: vec![http_port],
-                socks_ports: socks_port.into_iter().collect(),
-            },
-        ))
     }
 
     pub fn from_config_and_constraints(

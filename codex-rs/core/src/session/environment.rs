@@ -13,7 +13,6 @@ use codex_protocol::protocol::AgentStatus;
 use codex_protocol::protocol::EnvironmentConfig;
 use codex_protocol::protocol::EnvironmentConfigState;
 use codex_protocol::protocol::TurnEnvironmentSelection;
-use codex_protocol::sandbox::SandboxType;
 
 use crate::config::ConstraintError;
 use crate::config::ConstraintResult;
@@ -28,24 +27,16 @@ use crate::session::session::SessionSettingsUpdate;
 #[derive(Clone)]
 pub(crate) struct ThreadEnvironmentDefaults {
     pub(crate) common: EnvironmentConfig,
-    // Chosen once when the session starts; it does not apply to remote environments.
-    local_windows_sandbox_type: SandboxType,
 }
 
 impl ThreadEnvironmentDefaults {
-    pub(crate) fn new(common: EnvironmentConfig, local_windows_sandbox_type: SandboxType) -> Self {
-        Self {
-            common,
-            local_windows_sandbox_type,
-        }
+    pub(crate) fn new(common: EnvironmentConfig) -> Self {
+        Self { common }
     }
 
     pub(crate) fn for_selection(&self, selection: &TurnEnvironmentSelection) -> EnvironmentConfig {
         let mut config = self.common.clone();
         config.workspace_roots = selection.workspace_roots.clone();
-        if selection.environment_id == LOCAL_ENVIRONMENT_ID {
-            config.windows_sandbox_type = self.local_windows_sandbox_type;
-        }
         config
     }
 }

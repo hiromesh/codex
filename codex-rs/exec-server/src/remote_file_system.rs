@@ -601,12 +601,6 @@ async fn read_sandbox<'a>(
             path.validate_config_path(convention).is_err()
         })
     });
-    if sandbox.is_some_and(|sandbox| {
-        sandbox.windows_sandbox_selection == crate::WindowsSandboxSelection::Mxc
-    }) {
-        let info = client.environment_info().await.map_err(map_remote_error)?;
-        crate::sandbox_selection::validate_remote_mxc(&info)?;
-    }
     Ok(sandbox)
 }
 

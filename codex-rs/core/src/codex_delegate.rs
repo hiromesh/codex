@@ -62,7 +62,6 @@ pub(crate) async fn run_codex_thread_interactive(
     isolation: codex_extension_api::SessionIsolation,
     initial_history: Option<InitialHistory>,
     git_enrichment_policy: GitEnrichmentPolicy,
-    windows_sandbox_proxy_settings_mode: codex_sandboxing::WindowsSandboxProxySettingsMode,
 ) -> Result<(Arc<Session>, SessionIo), CodexErr> {
     if config.permissions.approval_policy.value() != AskForApproval::Never {
         return Err(CodexErr::InvalidRequest(
@@ -167,7 +166,6 @@ pub(crate) async fn run_codex_thread_interactive(
         external_time_provider: Some(Arc::clone(&parent_session.services.time_provider)),
         inherited_multi_agent_version: Some(MultiAgentVersion::Disabled),
         git_enrichment_policy,
-        windows_sandbox_proxy_settings_mode,
     })
     .or_cancel(&cancel_token)
     .await;
@@ -262,7 +260,6 @@ pub(crate) async fn run_codex_thread_one_shot(
         codex_extension_api::SessionIsolation::Inherit,
         initial_history,
         GitEnrichmentPolicy::Fresh,
-        codex_sandboxing::WindowsSandboxProxySettingsMode::Reconcile,
     ))
     .await?;
 

@@ -81,13 +81,6 @@ fn test_exec_request(
         ExecExpiration::DefaultTimeout,
         ExecCapturePolicy::ShellTool,
         SandboxType::None,
-        turn.config
-            .effective_workspace_roots()
-            .iter()
-            .map(PathUri::to_abs_path)
-            .collect::<std::io::Result<Vec<_>>>()
-            .expect("test workspace roots are host-native"),
-        turn.windows_sandbox_level,
         permission_profile,
         arg0,
     )
@@ -116,7 +109,6 @@ async fn exec_command_with_tty(
                 process_id,
                 &request,
                 /*tool_ctx*/ None,
-                codex_sandboxing::WindowsSandboxProxySettingsMode::Reconcile,
                 /*network_policy_decider*/ None,
                 tty,
                 turn.initial_environments
@@ -808,7 +800,6 @@ async fn completed_pipe_commands_preserve_exit_code() -> anyhow::Result<()> {
             /*process_id*/ 1234,
             &request,
             /*tool_ctx*/ None,
-            codex_sandboxing::WindowsSandboxProxySettingsMode::Reconcile,
             /*network_policy_decider*/ None,
             /*tty*/ false,
             &environment,
@@ -850,7 +841,6 @@ async fn unified_exec_uses_remote_exec_server_when_configured() -> anyhow::Resul
             /*process_id*/ 1234,
             &request,
             /*tool_ctx*/ None,
-            codex_sandboxing::WindowsSandboxProxySettingsMode::Reconcile,
             /*network_policy_decider*/ None,
             /*tty*/ true,
             remote_test_env.environment(),

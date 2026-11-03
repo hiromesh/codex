@@ -32,10 +32,6 @@ pub(crate) fn sandbox_type_from_protocol(
         Some(ProcessSandboxType::None) => Some(SandboxType::None),
         Some(ProcessSandboxType::MacosSeatbelt) => Some(SandboxType::MacosSeatbelt),
         Some(ProcessSandboxType::LinuxSeccomp) => Some(SandboxType::LinuxSeccomp),
-        Some(ProcessSandboxType::WindowsRestrictedToken) => {
-            Some(SandboxType::WindowsRestrictedToken)
-        }
-        Some(ProcessSandboxType::WindowsMxc) => Some(SandboxType::WindowsMxc),
     }
 }
 

@@ -41,7 +41,7 @@ fn danger_full_access_defaults_to_no_sandbox_without_network_requirements() {
 fn danger_full_access_uses_platform_sandbox_with_network_requirements() {
     let manager = SandboxManager::new();
     let expected =
-        get_platform_sandbox(/*windows_sandbox_enabled*/ false).unwrap_or(SandboxType::None);
+        get_platform_sandbox().unwrap_or(SandboxType::None);
     let sandbox = manager.select_initial(
         &PermissionProfile::Disabled,
         SandboxablePreference::Auto,
@@ -55,7 +55,7 @@ fn danger_full_access_uses_platform_sandbox_with_network_requirements() {
 fn restricted_file_system_uses_platform_sandbox_without_managed_network() {
     let manager = SandboxManager::new();
     let expected =
-        get_platform_sandbox(/*windows_sandbox_enabled*/ false).unwrap_or(SandboxType::None);
+        get_platform_sandbox().unwrap_or(SandboxType::None);
     let permissions = PermissionProfile::from_runtime_permissions(
         &FileSystemSandboxPolicy::restricted(vec![FileSystemSandboxEntry {
             path: FileSystemPath::Special {
@@ -87,7 +87,7 @@ fn explicit_mxc_only_overrides_the_windows_sandbox() {
     let expected = if cfg!(windows) {
         SandboxType::WindowsMxc
     } else {
-        get_platform_sandbox(/*windows_sandbox_enabled*/ false).unwrap_or(SandboxType::None)
+        get_platform_sandbox().unwrap_or(SandboxType::None)
     };
     assert_eq!(sandbox, expected);
 }

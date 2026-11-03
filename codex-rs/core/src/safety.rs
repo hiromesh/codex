@@ -1,6 +1,5 @@
 use codex_apply_patch::ApplyPatchAction;
 use codex_apply_patch::ApplyPatchFileChange;
-use codex_protocol::config_types::WindowsSandboxLevel;
 use codex_protocol::models::PermissionProfile;
 use codex_protocol::permissions::FileSystemSandboxPolicy;
 use codex_protocol::permissions::FileSystemSandboxPolicyContext;
@@ -25,7 +24,7 @@ pub enum SafetyCheck {
 #[derive(Debug, Clone, Copy)]
 pub(crate) enum PatchSandboxRoute {
     ExecutorManaged,
-    Platform(WindowsSandboxLevel),
+    Platform,
 }
 
 /// Keeps configured permissions and prepared local matching separate for one patch.
@@ -43,7 +42,7 @@ impl PatchSandboxRoute {
         context: &FileSystemSandboxPolicyContext<'a>,
     ) -> io::Result<PatchPolicyMatcher<'a>> {
         let local_matching = match self {
-            Self::Platform(_) => Some(configured_policy.prepare_local_matching(context)?),
+            Self::Platform => Some(configured_policy.prepare_local_matching(context)?),
             Self::ExecutorManaged => None,
         };
         Ok(PatchPolicyMatcher {
@@ -94,9 +93,7 @@ pub fn assess_patch_safety(
         );
     let sandbox_available = match matching.sandbox_route {
         PatchSandboxRoute::ExecutorManaged => true,
-        PatchSandboxRoute::Platform(windows_sandbox_level) => {
-            get_platform_sandbox(windows_sandbox_level != WindowsSandboxLevel::Disabled).is_some()
-        }
+        PatchSandboxRoute::Platform => get_platform_sandbox().is_some(),
     };
 
     // Even though the patch appears to be constrained to writable paths, it is

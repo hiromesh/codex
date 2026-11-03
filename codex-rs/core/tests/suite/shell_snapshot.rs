@@ -7,7 +7,6 @@ use codex_core::config::NetworkProxySpec;
 #[cfg(unix)]
 use codex_core::shell::get_shell_by_model_provided_path;
 #[cfg(unix)]
-use codex_core::windows_sandbox::WindowsSandboxLevelExt;
 use codex_features::Feature;
 #[cfg(unix)]
 use codex_network_proxy::NetworkProxyConfig;
@@ -23,7 +22,6 @@ use codex_protocol::config_types::ShellEnvironmentPolicy;
 #[cfg(unix)]
 use codex_protocol::config_types::TrustLevel;
 #[cfg(unix)]
-use codex_protocol::config_types::WindowsSandboxLevel;
 use codex_protocol::models::PermissionProfile;
 #[cfg(unix)]
 use codex_protocol::models::PermissionProfileSnapshot;
@@ -771,8 +769,6 @@ async fn shell_snapshot_v2_guardian_uses_its_resolved_permissions_and_tools(
         workspace_roots: requests.environment_requests[0].workspace_roots.clone(),
         permission_profile: PermissionProfileSnapshot::legacy(PermissionProfile::Disabled),
         shell_environment_policy: test.config.permissions.shell_environment_policy.clone(),
-        windows_sandbox_level: WindowsSandboxLevel::from_config(&test.config),
-        windows_sandbox_type: test.config.permissions.windows_sandbox_type,
         use_legacy_landlock: test.config.features.use_legacy_landlock(),
         exec_policy: None,
         mcp_policy: None,

@@ -24,7 +24,6 @@ use crate::tools::network_approval::remote_network_proxy_launch;
 use crate::tools::runtimes::RuntimePathPrepends;
 use crate::tools::runtimes::exec_env_for_sandbox_permissions;
 use crate::tools::runtimes::maybe_wrap_shell_lc_with_snapshot;
-use crate::tools::runtimes::prepare_powershell_command_for_windows_sandbox;
 use crate::tools::sandboxing::Approvable;
 use crate::tools::sandboxing::ApprovalAction;
 use crate::tools::sandboxing::ExecApprovalRequirement;
@@ -33,7 +32,6 @@ use crate::tools::sandboxing::Sandboxable;
 use crate::tools::sandboxing::ToolCtx;
 use crate::tools::sandboxing::ToolError;
 use crate::tools::sandboxing::ToolRuntime;
-use crate::tools::sandboxing::executor_windows_sandbox_selection;
 use crate::tools::sandboxing::managed_network_for_sandbox_permissions;
 use crate::tools::sandboxing::sandbox_permissions_preserving_denied_reads;
 use crate::unified_exec::TerminalPermissions;
@@ -247,7 +245,6 @@ impl<'a> ToolRuntime<UnifiedExecRequest<'_>, UnifiedExecAttempt> for UnifiedExec
         let prepared = req.prepared;
         let base_command = &prepared.resolved.command;
         let requested_shell = &prepared.resolved.shell.shell;
-        let windows_sandbox_proxy_settings_mode = ctx.session.windows_sandbox_proxy_settings_mode;
         let session_shell = ctx.session.user_shell();
         let environment_shell = prepared
             .turn_environment
@@ -543,19 +540,6 @@ impl<'a> ToolRuntime<UnifiedExecRequest<'_>, UnifiedExecAttempt> for UnifiedExec
         {
             network.restore_and_disable_brokered_credentials(&mut env, &mut command);
         }
-        // The executor selection is Disabled for non-Windows target paths, so this
-        // preparation is a no-op for PowerShell on other platforms.
-        let command = prepare_powershell_command_for_windows_sandbox(
-            &command,
-            Some(&requested_shell.shell_type),
-            attempt.sandbox_requested,
-            executor_windows_sandbox_selection(
-                attempt.windows_sandbox_type,
-                attempt.windows_sandbox_level,
-                attempt.sandbox_cwd,
-            ),
-            environment_is_remote,
-        );
         let command = if matches!(requested_shell.shell_type, ShellType::PowerShell) {
             prefix_powershell_script_with_utf8(&command)
         } else {
@@ -640,7 +624,6 @@ impl<'a> ToolRuntime<UnifiedExecRequest<'_>, UnifiedExecAttempt> for UnifiedExec
                 /*environment_id*/ Some(&prepared.turn_environment.selection.environment_id),
                 req.exec_server_env_config.clone(),
                 req.shell_snapshot.clone(),
-                windows_sandbox_proxy_settings_mode,
                 prepared.tty,
                 prepared.turn_environment.environment.as_ref(),
             )
@@ -722,7 +705,6 @@ mod tests {
     use crate::tools::sandboxing::ToolRuntime;
     use codex_exec_server::Environment;
     use codex_exec_server::LOCAL_ENVIRONMENT_ID;
-    use codex_protocol::config_types::WindowsSandboxLevel;
     use codex_protocol::models::PermissionProfile;
     use codex_protocol::protocol::EnvironmentConfig;
     use codex_protocol::protocol::EnvironmentConfigState;
@@ -745,8 +727,6 @@ mod tests {
                     environment_hooks: Default::default(),
                     allow_login_shell: true,
                     workspace_roots: Vec::new(),
-                    windows_sandbox_level: WindowsSandboxLevel::Disabled,
-                    windows_sandbox_type: codex_sandboxing::SandboxType::None,
                     use_legacy_landlock: false,
                     permission_profile: PermissionProfileSnapshot::legacy(
                         PermissionProfile::read_only(),

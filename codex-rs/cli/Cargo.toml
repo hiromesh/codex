@@ -111,15 +111,6 @@ which = { workspace = true }
 [target.'cfg(all(target_os = "linux", target_env = "musl", any(target_arch = "x86_64", target_arch = "aarch64")))'.dependencies]
 tikv-jemallocator = { workspace = true }
 
-[target.'cfg(target_os = "windows")'.dependencies]
-codex_windows_sandbox = { package = "codex-windows-sandbox", path = "../windows-sandbox-rs" }
-windows-sys = { workspace = true, features = [
-    "Win32_Foundation",
-    "Win32_Storage_Packaging_Appx",
-    "Win32_System_Console",
-    "Win32_System_Threading",
-] }
-
 [dev-dependencies]
 app_test_support = { workspace = true }
 assert_cmd = { workspace = true }

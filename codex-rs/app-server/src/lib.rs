@@ -588,7 +588,6 @@ pub async fn run_main_with_transport_options(
             })?
         }
     };
-    config.validate_windows_mxc_requirement()?;
     config.auth_config().validate()?;
     let auth_manager =
         AuthManager::shared_from_config(&config, /*enable_codex_api_key_env*/ false)

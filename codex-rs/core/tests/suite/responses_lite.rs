@@ -111,6 +111,7 @@ async fn base_instructions_use_input_items(responses_lite: bool) -> Result<()> {
             })
             .with_config(|config| {
                 config.base_instructions = Some("test instructions".to_string());
+                config.update_plan_enabled = true;
             })
     };
     let test = builder().build(&server).await?;
@@ -175,16 +176,14 @@ async fn base_instructions_use_input_items(responses_lite: bool) -> Result<()> {
             .collect::<Vec<_>>();
         assert_eq!(functions_namespaces.len(), 1);
         assert_eq!(functions_namespaces[0]["description"], "");
-        assert!(has_namespaced_tool(tools, "functions", "wait"));
-        assert!(has_namespaced_tool(tools, "functions", "exec"));
+        assert!(has_namespaced_tool(tools, "functions", "update_plan"));
         assert!(
             tools
                 .iter()
                 .all(|tool| { !matches!(tool["type"].as_str(), Some("function" | "custom")) })
         );
     } else {
-        assert!(tools.iter().any(|tool| tool["name"] == "exec"));
-        assert!(tools.iter().any(|tool| tool["name"] == "wait"));
+        assert!(tools.iter().any(|tool| tool["name"] == "update_plan"));
     }
     let client_metadata = body["client_metadata"]
         .as_object()

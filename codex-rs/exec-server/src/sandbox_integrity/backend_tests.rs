@@ -1,7 +1,6 @@
 //! Exercise backend policy preparation and dependency discovery.
 
 use super::backend;
-use codex_protocol::config_types::WindowsSandboxLevel;
 use codex_protocol::models::PermissionProfile;
 use codex_protocol::permissions::FileSystemAccessMode;
 use codex_protocol::permissions::FileSystemPath;
@@ -59,7 +58,6 @@ pub(super) fn sandbox_request(
         network: None,
         network_environment_id: None,
         sandbox: backend::SANDBOX_TYPE,
-        windows_sandbox_level: WindowsSandboxLevel::Disabled,
         permission_profile: PermissionProfile::from_runtime_permissions(
             policy,
             NetworkSandboxPolicy::Restricted,

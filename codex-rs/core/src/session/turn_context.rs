@@ -10,8 +10,6 @@ use crate::exec_policy::AllowPrefixRules;
 use crate::shell_snapshot::ShellSnapshot;
 use crate::shell_snapshot::ShellSnapshotFile;
 use crate::shell_snapshot::ShellSnapshotSandbox;
-use crate::tools::sandboxing::configured_windows_sandbox_selection;
-use crate::tools::sandboxing::executor_windows_sandbox_selection;
 use arc_swap::ArcSwap;
 use codex_core_plugins::PluginCommandAttribution;
 use codex_core_plugins::ResolvedPluginMetricsOperation;
@@ -250,32 +248,7 @@ impl TurnEnvironment {
             workspace_roots: self.workspace_roots().to_vec(),
             user_home_dir: self.user_home_dir.clone(),
             temporary_directories: self.temporary_directories.clone(),
-            windows_sandbox_selection: executor_windows_sandbox_selection(
-                config.windows_sandbox_type,
-                config.windows_sandbox_level,
-                self.cwd(),
-            ),
-            windows_sandbox_proxy_settings_mode: None,
             use_legacy_landlock: config.use_legacy_landlock,
-        }
-    }
-
-    pub(crate) fn windows_sandbox_selection_for_turn_metadata(
-        &self,
-    ) -> codex_file_system::WindowsSandboxSelection {
-        let config = self.config();
-        if self.environment.is_remote() {
-            executor_windows_sandbox_selection(
-                config.windows_sandbox_type,
-                config.windows_sandbox_level,
-                self.cwd(),
-            )
-        } else {
-            configured_windows_sandbox_selection(
-                config.windows_sandbox_type,
-                config.windows_sandbox_level,
-                self.cwd(),
-            )
         }
     }
 
@@ -363,9 +336,6 @@ pub struct TurnContext {
     pub(crate) developer_instructions: Option<String>,
     pub(crate) multi_agent_version: MultiAgentVersion,
     pub(crate) network: Option<NetworkProxy>,
-    // TODO(anp): Reconcile this parallel turn snapshot with TurnEnvironment::sandbox_context
-    // so owner-provided environment settings govern the remaining sandbox decisions.
-    pub(crate) windows_sandbox_level: WindowsSandboxLevel,
     pub(crate) available_models: Vec<ModelPreset>,
     pub(crate) final_output_json_schema: Option<Value>,
     pub(crate) turn_metadata_state: Arc<TurnMetadataState>,
@@ -446,7 +416,6 @@ impl TurnContext {
             developer_instructions: None,
             multi_agent_version: MultiAgentVersion::Disabled,
             network: self.network.clone(),
-            windows_sandbox_level: self.windows_sandbox_level,
             #[allow(deprecated)]
             cwd: self.cwd.clone(),
             final_output_json_schema: None,
@@ -857,7 +826,6 @@ impl TurnContext {
             developer_instructions: self.developer_instructions.clone(),
             multi_agent_version: self.multi_agent_version,
             network: self.network.clone(),
-            windows_sandbox_level: self.windows_sandbox_level,
             available_models,
             final_output_json_schema: self.final_output_json_schema.clone(),
             turn_metadata_state: self.turn_metadata_state.clone(),
@@ -1079,16 +1047,6 @@ impl Session {
             per_turn_config.permissions.approval_policy.value(),
             per_turn_config.approvals_reviewer,
         );
-        let windows_sandbox_selection = environments
-            .primary()
-            .map(TurnEnvironment::windows_sandbox_selection_for_turn_metadata)
-            .unwrap_or_else(|| {
-                configured_windows_sandbox_selection(
-                    session_configuration.windows_sandbox_type,
-                    session_configuration.windows_sandbox_level,
-                    &PathUri::from_abs_path(&cwd),
-                )
-            });
         let per_turn_config = Arc::new(per_turn_config);
         let turn_metadata_state = Arc::new(TurnMetadataState::new(
             session_id.to_string(),
@@ -1100,7 +1058,6 @@ impl Session {
             sub_id.clone(),
             cwd.clone(),
             &permission_profile,
-            windows_sandbox_selection,
             network.is_some(),
             auto_review_enabled,
             model_info,
@@ -1140,7 +1097,6 @@ impl Session {
             developer_instructions: session_configuration.developer_instructions.clone(),
             multi_agent_version,
             network,
-            windows_sandbox_level: session_configuration.windows_sandbox_level,
             available_models,
             final_output_json_schema: None,
             turn_metadata_state,

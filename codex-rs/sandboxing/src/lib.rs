@@ -11,9 +11,6 @@ pub mod seatbelt;
 mod spawn;
 mod terminal_queries;
 mod violation;
-mod windows;
-#[cfg(windows)]
-mod windows_mxc;
 
 #[cfg(target_os = "linux")]
 pub use bwrap::find_executable_in_search_paths;
@@ -23,10 +20,6 @@ pub use bwrap::find_pre_sandbox_executable_in_path;
 pub use bwrap::find_system_bwrap_in_path;
 #[cfg(target_os = "linux")]
 pub use bwrap::system_bwrap_warning;
-pub use codex_mxc_sandbox::CODEX_WINDOWS_MXC_ARG1;
-pub use codex_mxc_sandbox::is_available as windows_mxc_available;
-pub use codex_mxc_sandbox::run_main as run_windows_mxc_main;
-pub use codex_windows_sandbox::WindowsSandboxProxySettingsMode;
 pub use denial::is_likely_executor_managed_sandbox_denied;
 pub use denial::is_likely_sandbox_denied;
 pub use linux_pid_namespace::LinuxSandboxPidNamespace;
@@ -45,7 +38,6 @@ pub use sandbox_integrity::FileContentsChecker;
 pub use sandbox_integrity::IntegrityFinding;
 pub use sandbox_integrity::IntegrityFindingDetails;
 pub use spawn::SpawnRequest;
-pub use spawn::WindowsSandboxSpawnRequest;
 pub use spawn::spawn_process;
 pub use violation::FileSystemSandboxViolation;
 pub use violation::FileSystemSandboxViolationReason;
@@ -55,12 +47,6 @@ pub use violation::SandboxViolationEvent;
 pub use violation::record_filesystem_sandbox_violation;
 pub use violation::record_network_sandbox_violation;
 pub use violation::record_sandbox_violation;
-pub use windows::WindowsSandboxFilesystemOverrides;
-pub use windows::permission_profile_supports_windows_restricted_token_sandbox;
-pub use windows::resolve_windows_elevated_filesystem_overrides;
-pub use windows::resolve_windows_restricted_token_filesystem_overrides;
-pub use windows::unsupported_windows_restricted_token_sandbox_reason;
-pub use windows::windows_sandbox_uses_elevated_backend;
 
 use codex_protocol::error::CodexErr;
 
@@ -85,7 +71,7 @@ impl From<SandboxTransformError> for CodexErr {
             SandboxTransformError::EnvironmentNetworkProxy(message) => {
                 CodexErr::UnsupportedOperation(message)
             }
-            SandboxTransformError::WindowsMxcPreparation(message) => {
+            SandboxTransformError::UnsupportedSandbox(message) => {
                 CodexErr::UnsupportedOperation(message)
             }
             #[cfg(target_os = "macos")]
@@ -100,10 +86,6 @@ impl From<SandboxTransformError> for CodexErr {
             SandboxTransformError::SeatbeltUnavailable => CodexErr::UnsupportedOperation(
                 "seatbelt sandbox is only available on macOS".to_string(),
             ),
-            #[cfg(target_os = "windows")]
-            SandboxTransformError::WindowsSandboxPreparation(message) => {
-                CodexErr::UnsupportedOperation(message)
-            }
         }
     }
 }

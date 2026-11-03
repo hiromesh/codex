@@ -17,7 +17,6 @@ use codex_exec_server::CapabilityRootsDiscoverResponse;
 use codex_exec_server::FileSystemSandboxContext;
 use codex_exec_server::InitializeParams;
 use codex_exec_server::InitializeResponse;
-use codex_exec_server::WindowsSandboxSelection;
 use codex_exec_server_protocol::CapabilityRootDiscoverRequest;
 use codex_exec_server_protocol::EXEC_METHOD;
 #[cfg(unix)]
@@ -259,7 +258,6 @@ async fn executor_legacy_missing_or_null_sandbox_cwd_keeps_absolute_requests_wor
         PermissionProfile::from_runtime_permissions(&process_policy, NetworkSandboxPolicy::Enabled),
         cwd.clone(),
     );
-    process_sandbox.windows_sandbox_selection = WindowsSandboxSelection::RestrictedToken;
     let sandbox =
         FileSystemSandboxContext::from_permission_profile(PermissionProfile::Disabled, cwd.clone());
     let requests = [
@@ -1054,8 +1052,6 @@ async fn v2_helper_batches_roots_and_bounds_its_response() -> anyhow::Result<()>
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn sandboxed_discovery_batches_roots_without_combining_different_permissions()
 -> anyhow::Result<()> {
-    #[cfg(windows)]
-    crate::skip_if_mxc_unavailable!(Ok(()));
     let workspace = tempfile::tempdir()?;
     let first_root = workspace.path().join("first");
     let second_root = workspace.path().join("second");
@@ -1414,9 +1410,6 @@ fn write_file(path: &std::path::Path, contents: &str) -> anyhow::Result<()> {
     Ok(())
 }
 
-fn with_native_sandbox(mut sandbox: FileSystemSandboxContext) -> FileSystemSandboxContext {
-    if cfg!(windows) {
-        sandbox.windows_sandbox_selection = WindowsSandboxSelection::Mxc;
-    }
+fn with_native_sandbox(sandbox: FileSystemSandboxContext) -> FileSystemSandboxContext {
     sandbox
 }
