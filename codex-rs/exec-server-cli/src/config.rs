@@ -10,7 +10,6 @@ use codex_core::config::find_codex_home;
 use codex_core::config::load_config_toml_with_layer_stack;
 use codex_login::AuthManager;
 use codex_login::CodexAuth;
-use codex_login::read_codex_access_token_from_env;
 use codex_protocol::auth::AuthMode;
 use codex_utils_absolute_path::AbsolutePathBuf;
 use codex_utils_cli::CliConfigOverrides;
@@ -28,25 +27,7 @@ const REMOTE_AUTH_MODES: &[AuthMode] = &[
 pub(super) async fn load_exec_server_remote_auth_provider(
     config: &codex_core::config::Config,
     base_url: &str,
-    use_agent_identity_auth: bool,
 ) -> anyhow::Result<codex_api::SharedAuthProvider> {
-    if use_agent_identity_auth {
-        read_codex_access_token_from_env().ok_or_else(|| {
-            anyhow::anyhow!("CODEX_ACCESS_TOKEN is required when --use-agent-identity-auth is set")
-        })?;
-        let auth = AuthManager::shared_from_config(config, /*enable_codex_api_key_env*/ false)
-            .await?
-            .auth()
-            .await
-            .ok_or_else(|| anyhow::anyhow!("Agent Identity authentication is unavailable"))?;
-        if !matches!(auth, CodexAuth::AgentIdentity(_)) {
-            anyhow::bail!(
-                "CODEX_ACCESS_TOKEN did not provide permitted Agent Identity authentication"
-            );
-        }
-        return Ok(codex_model_provider::auth_provider_from_auth(&auth));
-    }
-
     let (auth_manager, auth) = load_exec_server_remote_auth(
         config,
         "remote exec-server registration requires ChatGPT authentication or API key authentication; run `codex login` or set CODEX_API_KEY",
@@ -55,7 +36,7 @@ pub(super) async fn load_exec_server_remote_auth_provider(
 
     if !is_supported_exec_server_remote_auth(&auth) {
         anyhow::bail!(
-            "remote exec-server registration requires ChatGPT authentication or API key authentication; Agent Identity auth requires --use-agent-identity-auth"
+            "remote exec-server registration requires ChatGPT authentication or API key authentication"
         );
     }
 
@@ -63,12 +44,7 @@ pub(super) async fn load_exec_server_remote_auth_provider(
         validate_api_key_remote_host(base_url)?;
     }
 
-    if auth_manager.is_workload_identity_selected() {
-        Ok(codex_model_provider::auth_provider_from_auth_manager(
-            auth_manager,
-            &auth,
-        ))
-    } else if auth.is_chatgpt_auth() {
+    if auth.is_chatgpt_auth() {
         Ok(exec_server_auth::chatgpt_auth_provider(
             auth_manager,
             &auth,

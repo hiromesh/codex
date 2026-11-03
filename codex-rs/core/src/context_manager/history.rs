@@ -50,7 +50,6 @@ use codex_prompts::render_model_instructions;
 use codex_protocol::DEFAULT_FUNCTION_NAMESPACE;
 use codex_protocol::items::TurnItem;
 use codex_protocol::models::AgentMessageInputContent;
-use codex_protocol::models::AudioReference;
 use codex_protocol::models::BaseInstructions;
 use codex_protocol::models::ContentItem;
 use codex_protocol::models::FunctionCallOutputBody;
@@ -65,7 +64,6 @@ use codex_protocol::protocol::TokenUsage;
 use codex_protocol::protocol::TokenUsageInfo;
 use codex_protocol::protocol::TurnContextItem;
 use codex_protocol::protocol::WorldStateItem;
-use codex_utils_audio::estimate_audio_token_count;
 use codex_utils_cache::BlockingLruCache;
 use codex_utils_cache::sha1_digest;
 use codex_utils_output_truncation::TruncationPolicy;
@@ -88,10 +86,7 @@ use codex_features::Feature;
 
 static GUARDIAN_REVIEW_CONTEXT_REVISION: AtomicU64 = AtomicU64::new(/*v*/ 1);
 
-// Responses validates uploaded audio against its 20-minute duration limit.
 // File durations are unavailable locally, so budget that maximum at the existing
-// inline estimate of 10 audio tokens per second.
-pub(crate) const FILE_AUDIO_TOKENS_ESTIMATE: usize = 20 * 60 * 10;
 
 fn next_guardian_review_context_revision() -> u64 {
     GUARDIAN_REVIEW_CONTEXT_REVISION.fetch_add(/*val*/ 1, Ordering::Relaxed)
@@ -597,7 +592,7 @@ impl ContextManager {
                 .and_then(|metadata| metadata.history_truncation_token_limit)
                 .map(TruncationPolicy::Tokens)
                 .unwrap_or_else(|| with_serialization_allowance(policy));
-            truncate_function_output_payload(output, policy, estimate_audio_token_count);
+            truncate_function_output_payload(output, policy);
         }
         if let Some(review_history) = &mut self.review_history
             && !is_guardian_context_message(item)
@@ -625,7 +620,7 @@ impl ContextManager {
     }
 
     /// Returns the history prepared for sending to the model. This applies a proper
-    /// normalization and drops un-suited items. Unsupported image and audio content
+    /// normalization and drops un-suited items. Unsupported image content
     /// is stripped from messages and tool outputs according to `input_modalities`.
     /// Unavailable file images are replaced with text placeholders.
     pub(crate) async fn for_prompt(
@@ -1032,7 +1027,7 @@ impl ContextManager {
     /// This function enforces a couple of invariants on the in-memory history:
     /// 1. every call (function/custom) has a corresponding output entry
     /// 2. every output has a corresponding call entry or names an external tool event
-    /// 3. unsupported image and audio content is stripped from messages and tool outputs
+    /// 3. unsupported image content is stripped from messages and tool outputs
     pub(crate) fn normalize_history(&mut self, input_modalities: &[InputModality]) {
         let items = Arc::make_mut(&mut self.items);
 
@@ -1045,8 +1040,6 @@ impl ContextManager {
         // strip images when model does not support them
         normalize::strip_images_when_unsupported(input_modalities, items);
 
-        // strip audio when model does not support it
-        normalize::strip_audio_when_unsupported(input_modalities, items);
 
         self.last_model_output_item_count = items
             .iter()
@@ -1196,7 +1189,6 @@ fn estimate_response_item_model_visible_bytes(item: &ResponseItem) -> i64 {
                 ContentItem::InputImage { image, detail } => {
                     estimate_image_reference_bytes(image, *detail)
                 }
-                ContentItem::InputAudio { audio } => estimate_audio_reference_bytes(audio),
             })
             .fold(0i64, i64::saturating_add),
         ResponseItem::AgentMessage {
@@ -1402,24 +1394,6 @@ pub(crate) fn estimate_image_reference_bytes(
     }
 }
 
-fn estimate_audio_bytes(audio_url: &str) -> i64 {
-    i64::try_from(approx_bytes_for_tokens(estimate_audio_token_count(
-        audio_url,
-    )))
-    .unwrap_or(i64::MAX)
-}
-
-/// Audio estimate for callers that only have the reference. Uploaded file durations are not
-/// available locally, so file references use the maximum duration accepted by Responses.
-fn estimate_audio_reference_bytes(audio: &AudioReference) -> i64 {
-    match audio {
-        AudioReference::Inline { audio_url } => estimate_audio_bytes(audio_url),
-        AudioReference::File { .. } => {
-            i64::try_from(approx_bytes_for_tokens(FILE_AUDIO_TOKENS_ESTIMATE)).unwrap_or(i64::MAX)
-        }
-    }
-}
-
 fn estimate_function_output_bytes(output: &FunctionCallOutputBody) -> i64 {
     match output {
         FunctionCallOutputBody::Text(text) => text_bytes(text),
@@ -1429,9 +1403,6 @@ fn estimate_function_output_bytes(output: &FunctionCallOutputBody) -> i64 {
                 FunctionCallOutputContentItem::InputText { text } => text_bytes(text),
                 FunctionCallOutputContentItem::InputImage { image, detail } => {
                     estimate_image_reference_bytes(image, *detail)
-                }
-                FunctionCallOutputContentItem::InputAudio { audio_url } => {
-                    estimate_audio_bytes(audio_url)
                 }
                 FunctionCallOutputContentItem::EncryptedContent { encrypted_content } => {
                     i64::try_from(estimate_encrypted_function_output_length(

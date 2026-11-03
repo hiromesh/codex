@@ -140,12 +140,6 @@ impl McpEventStreamOpener {
 
     fn matches_auth(&self, current: Option<&CodexAuth>) -> bool {
         match (self.connection.auth.as_ref(), current) {
-            (Some(CodexAuth::AgentIdentity(expected)), Some(CodexAuth::AgentIdentity(current))) => {
-                expected.record() == current.record()
-            }
-            (Some(CodexAuth::AgentIdentity(_)), _) | (_, Some(CodexAuth::AgentIdentity(_))) => {
-                false
-            }
             (Some(expected), Some(current)) => {
                 expected.get_account_id() == current.get_account_id()
                     && expected.get_chatgpt_user_id() == current.get_chatgpt_user_id()

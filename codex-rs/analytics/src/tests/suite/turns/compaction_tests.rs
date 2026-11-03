@@ -1,31 +1,17 @@
 //! Compaction fact, wire payload, and implementation tests.
 
-use crate::events::AppServerRpcTransport;
 use crate::events::CodexCompactionEventRequest;
 use crate::events::TrackEventRequest;
-use crate::facts::AnalyticsFact;
 use crate::facts::CodexCompactionEvent;
-use crate::facts::CodexErrKind;
 use crate::facts::CompactionImplementation;
 use crate::facts::CompactionPhase;
 use crate::facts::CompactionReason;
 use crate::facts::CompactionStatus;
 use crate::facts::CompactionStrategy;
 use crate::facts::CompactionTrigger;
-use crate::facts::CustomAnalyticsFact;
-use crate::reducer::AnalyticsReducer;
 use crate::tests::support::sample_app_server_client_metadata;
 use crate::tests::support::sample_runtime_metadata;
-use crate::tests::support::sample_thread_resume_response_with_source;
-use crate::tests::support::sample_turn_started_notification;
-use codex_app_server_protocol::ClientInfo;
-use codex_app_server_protocol::InitializeCapabilities;
-use codex_app_server_protocol::InitializeParams;
-use codex_app_server_protocol::RequestId;
-use codex_app_server_protocol::SessionSource as AppServerSessionSource;
-use codex_app_server_protocol::ThreadSource as AppServerThreadSource;
 use codex_login::default_client::DEFAULT_ORIGINATOR;
-use codex_protocol::protocol::SubAgentSource;
 use codex_protocol::protocol::ThreadSource;
 use pretty_assertions::assert_eq;
 use serde_json::json;
@@ -62,7 +48,6 @@ fn compaction_event_serializes_expected_shape() {
         /*subagent_source*/ None,
         /*parent_thread_id*/ None,
     );
-    event_params.voice_session_id = Some("voice-session-1".to_string());
     let event = TrackEventRequest::Compaction(Box::new(CodexCompactionEventRequest {
         event_type: "codex_compaction_event",
         event_params,
@@ -100,7 +85,6 @@ fn compaction_event_serializes_expected_shape() {
                 "phase": "mid_turn",
                 "strategy": "memento",
                 "status": "completed",
-                "voice_session_id": "voice-session-1",
                 "codex_error_kind": null,
                 "codex_error_http_status_code": null,
                 "usage_limit_window_minutes": null,
@@ -124,258 +108,4 @@ fn compaction_implementation_serializes_remote_v2() {
         .expect("serialize compaction implementation");
 
     assert_eq!(payload, json!("responses_compaction_v2"));
-}
-
-#[tokio::test]
-async fn compaction_events_keep_authoritative_voice_session_across_consecutive_calls() {
-    let mut reducer = AnalyticsReducer::default();
-    let mut events = Vec::new();
-    let parent_thread_id =
-        codex_protocol::ThreadId::from_string("22222222-2222-2222-2222-222222222222")
-            .expect("valid parent thread id");
-
-    reducer
-        .ingest(
-            AnalyticsFact::Initialize {
-                connection_id: 7,
-                params: InitializeParams {
-                    client_info: ClientInfo {
-                        name: "codex-tui".to_string(),
-                        title: None,
-                        version: "1.0.0".to_string(),
-                    },
-                    capabilities: Some(InitializeCapabilities {
-                        required_human_approval: false,
-                        explicit_gateway_oauth: false,
-                        experimental_api: false,
-                        request_attestation: false,
-                        opt_out_notification_methods: None,
-                        mcp_server_openai_form_elicitation: false,
-                        extensions: None,
-                    }),
-                },
-                product_client_id: DEFAULT_ORIGINATOR.to_string(),
-                runtime: sample_runtime_metadata(),
-                rpc_transport: AppServerRpcTransport::Websocket,
-            },
-            &mut events,
-        )
-        .await;
-    reducer
-        .ingest(
-            AnalyticsFact::ClientResponse {
-                connection_id: 7,
-                request_id: RequestId::Integer(2),
-                response: Box::new(sample_thread_resume_response_with_source(
-                    "thread-1",
-                    /*ephemeral*/ false,
-                    "gpt-5",
-                    AppServerSessionSource::SubAgent(SubAgentSource::ThreadSpawn {
-                        parent_thread_id,
-                        depth: 1,
-                        agent_path: None,
-                        agent_nickname: None,
-                        agent_role: None,
-                    }),
-                    Some(AppServerThreadSource::Subagent),
-                    Some(parent_thread_id.to_string()),
-                )),
-                thread_originator: None,
-            },
-            &mut events,
-        )
-        .await;
-    events.clear();
-
-    reducer
-        .ingest(
-            AnalyticsFact::RealtimeSessionStarted {
-                thread_id: "thread-1".to_string(),
-                realtime_session_id: None,
-                started_at: 100,
-            },
-            &mut events,
-        )
-        .await;
-    reducer
-        .ingest(
-            AnalyticsFact::RealtimeSessionUpdated {
-                thread_id: "thread-1".to_string(),
-                realtime_session_id: "voice-session-1".to_string(),
-            },
-            &mut events,
-        )
-        .await;
-    reducer
-        .ingest(
-            AnalyticsFact::Notification(Box::new(sample_turn_started_notification(
-                "thread-1",
-                "turn-compact-1",
-            ))),
-            &mut events,
-        )
-        .await;
-    reducer
-        .ingest(
-            AnalyticsFact::RealtimeSessionClosed {
-                thread_id: "thread-1".to_string(),
-                closed_at: 150,
-            },
-            &mut events,
-        )
-        .await;
-
-    reducer
-        .ingest(
-            AnalyticsFact::RealtimeSessionStarted {
-                thread_id: "thread-1".to_string(),
-                realtime_session_id: None,
-                started_at: 200,
-            },
-            &mut events,
-        )
-        .await;
-    reducer
-        .ingest(
-            AnalyticsFact::RealtimeSessionUpdated {
-                thread_id: "thread-1".to_string(),
-                realtime_session_id: "voice-session-2".to_string(),
-            },
-            &mut events,
-        )
-        .await;
-    reducer
-        .ingest(
-            AnalyticsFact::Notification(Box::new(sample_turn_started_notification(
-                "thread-1",
-                "turn-compact-2",
-            ))),
-            &mut events,
-        )
-        .await;
-
-    reducer
-        .ingest(
-            AnalyticsFact::Custom(CustomAnalyticsFact::Compaction(Box::new(
-                CodexCompactionEvent {
-                    thread_id: "thread-1".to_string(),
-                    turn_id: "turn-compact-1".to_string(),
-                    trigger: CompactionTrigger::Manual,
-                    reason: CompactionReason::UserRequested,
-                    implementation: CompactionImplementation::Responses,
-                    phase: CompactionPhase::StandaloneTurn,
-                    strategy: CompactionStrategy::Memento,
-                    status: CompactionStatus::Failed,
-                    codex_error_kind: Some(CodexErrKind::ContextWindowExceeded),
-                    codex_error_http_status_code: None,
-                    usage_limit_window_minutes: None,
-                    active_context_tokens_before: 131_000,
-                    active_context_tokens_after: 131_000,
-                    retained_image_count: None,
-                    compaction_summary_tokens: None,
-                    cached_input_tokens: None,
-                    cache_write_input_tokens: None,
-                    started_at: 110,
-                    completed_at: 210,
-                    duration_ms: Some(1200),
-                },
-            ))),
-            &mut events,
-        )
-        .await;
-
-    reducer
-        .ingest(
-            AnalyticsFact::RealtimeSessionClosed {
-                thread_id: "thread-1".to_string(),
-                closed_at: 250,
-            },
-            &mut events,
-        )
-        .await;
-    reducer
-        .ingest(
-            AnalyticsFact::Custom(CustomAnalyticsFact::Compaction(Box::new(
-                CodexCompactionEvent {
-                    thread_id: "thread-1".to_string(),
-                    turn_id: "turn-compact-2".to_string(),
-                    trigger: CompactionTrigger::Auto,
-                    reason: CompactionReason::ContextLimit,
-                    implementation: CompactionImplementation::ResponsesCompactionV2,
-                    phase: CompactionPhase::MidTurn,
-                    strategy: CompactionStrategy::Memento,
-                    status: CompactionStatus::Completed,
-                    codex_error_kind: None,
-                    codex_error_http_status_code: None,
-                    usage_limit_window_minutes: None,
-                    active_context_tokens_before: 100_000,
-                    active_context_tokens_after: 20_000,
-                    retained_image_count: None,
-                    compaction_summary_tokens: None,
-                    cached_input_tokens: None,
-                    cache_write_input_tokens: None,
-                    started_at: 210,
-                    completed_at: 251,
-                    duration_ms: Some(800),
-                },
-            ))),
-            &mut events,
-        )
-        .await;
-
-    let payload = serde_json::to_value(&events).expect("serialize events");
-    assert_eq!(payload.as_array().expect("events array").len(), 2);
-    assert_eq!(payload[0]["event_type"], "codex_compaction_event");
-    assert_eq!(payload[0]["event_params"]["session_id"], "session-thread-1");
-    assert_eq!(payload[0]["event_params"]["thread_id"], "thread-1");
-    assert_eq!(payload[0]["event_params"]["turn_id"], "turn-compact-1");
-    assert_eq!(
-        payload[0]["event_params"]["voice_session_id"],
-        "voice-session-1"
-    );
-    assert_eq!(
-        payload[0]["event_params"]["codex_error_kind"],
-        json!("context_window_exceeded")
-    );
-    assert_eq!(
-        payload[0]["event_params"]["codex_error_http_status_code"],
-        json!(null)
-    );
-    assert_eq!(
-        payload[0]["event_params"]["app_server_client"]["product_client_id"],
-        DEFAULT_ORIGINATOR
-    );
-    assert_eq!(
-        payload[0]["event_params"]["app_server_client"]["client_name"],
-        "codex-tui"
-    );
-    assert_eq!(
-        payload[0]["event_params"]["app_server_client"]["rpc_transport"],
-        "websocket"
-    );
-    assert_eq!(
-        payload[0]["event_params"]["runtime"]["codex_rs_version"],
-        "0.1.0"
-    );
-    assert_eq!(payload[0]["event_params"]["thread_source"], "subagent");
-    assert_eq!(
-        payload[0]["event_params"]["subagent_source"],
-        "thread_spawn"
-    );
-    assert_eq!(
-        payload[0]["event_params"]["parent_thread_id"],
-        "22222222-2222-2222-2222-222222222222"
-    );
-    assert_eq!(payload[0]["event_params"]["trigger"], "manual");
-    assert_eq!(payload[0]["event_params"]["reason"], "user_requested");
-    assert_eq!(payload[0]["event_params"]["implementation"], "responses");
-    assert_eq!(payload[0]["event_params"]["phase"], "standalone_turn");
-    assert_eq!(payload[0]["event_params"]["strategy"], "memento");
-    assert_eq!(payload[0]["event_params"]["status"], "failed");
-    assert_eq!(payload[1]["event_params"]["turn_id"], "turn-compact-2");
-    assert_eq!(
-        payload[1]["event_params"]["voice_session_id"],
-        "voice-session-2"
-    );
-    assert_eq!(payload[1]["event_params"]["status"], "completed");
 }

@@ -20,10 +20,6 @@ impl ChatWidget {
             self.cancel_startup_submission();
         }
         self.cancel_image_submission();
-        // The app-server transport can fail while the separate WebRTC helper
-        // still sends microphone audio. Retire local media before showing offline UI.
-        self.record_realtime_disconnect_failure();
-        let _ = self.reset_realtime_conversation();
         if let Some(questions) = &mut self.bottom_pane.questions {
             questions.delivery_enabled = false;
         }

@@ -574,9 +574,7 @@ fn recent_images(
             ResponseItem::Message { content, .. } => {
                 image_references.extend(content.iter().rev().filter_map(|item| match item {
                     ContentItem::InputImage { image, .. } => Some(image.clone()),
-                    ContentItem::InputText { .. }
-                    | ContentItem::InputAudio { .. }
-                    | ContentItem::OutputText { .. } => None,
+                    ContentItem::InputText { .. } | ContentItem::OutputText { .. } => None,
                 }));
             }
             ResponseItem::FunctionCallOutput { output, .. }
@@ -631,7 +629,6 @@ fn output_images(output: &FunctionCallOutputPayload) -> impl Iterator<Item = &Im
         .filter_map(|item| match item {
             FunctionCallOutputContentItem::InputImage { image, .. } => Some(image),
             FunctionCallOutputContentItem::InputText { .. }
-            | FunctionCallOutputContentItem::InputAudio { .. }
             | FunctionCallOutputContentItem::EncryptedContent { .. } => None,
         })
 }

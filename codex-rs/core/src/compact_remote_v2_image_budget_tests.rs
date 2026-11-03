@@ -1,5 +1,4 @@
 use super::*;
-use codex_protocol::models::AudioReference;
 use codex_protocol::models::ContentItemKind;
 use codex_protocol::models::ImageReference;
 use codex_protocol::models::InternalChatMessageMetadataPassthrough;
@@ -78,7 +77,7 @@ fn image_only_boundary_is_atomic_and_does_not_backfill_older_messages() {
 }
 
 #[test]
-fn later_image_parts_preserve_labels_audio_and_annotations() {
+fn later_image_parts_preserve_labels_and_annotations() {
     let parts = vec![
         text("earlier text"),
         text(&local_image_open_tag_text_with_path(
@@ -88,11 +87,6 @@ fn later_image_parts_preserve_labels_audio_and_annotations() {
         image(),
         text(&image_close_tag_text()),
         text("keep"),
-        ContentItem::InputAudio {
-            audio: AudioReference::Inline {
-                audio_url: "data:audio/wav;base64,abc".to_string(),
-            },
-        },
     ];
     let kinds = (0..parts.len())
         .map(|i| ContentItemKind(format!("part.{i}")))
@@ -139,11 +133,6 @@ fn image_treatment_preserves_text_only_boundary_behavior() {
         text("earlier text"),
         text(&"middle".repeat(20)),
         text("later text"),
-        ContentItem::InputAudio {
-            audio: AudioReference::Inline {
-                audio_url: "data:audio/wav;base64,abc".to_string(),
-            },
-        },
     ]));
     for max_tokens in [0, 1, 4, 16, 100] {
         assert_eq!(

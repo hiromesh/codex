@@ -111,10 +111,6 @@ impl UserMessageItem {
             image_order,
             local_images: self.local_image_paths(),
             local_image_details: self.local_image_details(),
-            audio: Some(self.audio_urls()),
-            audio_references: self.audio_references(),
-            audio_order: self.audio_order(),
-            local_audio: self.local_audio_paths(),
             text_elements: self.text_elements(),
         }
     }

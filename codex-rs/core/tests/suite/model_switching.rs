@@ -18,7 +18,6 @@ use codex_protocol::config_types::SERVICE_TIER_DEFAULT_REQUEST_VALUE;
 use codex_protocol::config_types::ServiceTier;
 use codex_protocol::config_types::Settings;
 use codex_protocol::mcp::ClientMcpExtensions;
-use codex_protocol::models::AudioReference;
 use codex_protocol::models::BaseInstructionsProvenance;
 use codex_protocol::models::ImageReference;
 use codex_protocol::models::PermissionProfile;
@@ -848,12 +847,8 @@ async fn model_change_projects_media_without_changing_live_or_replayed_history(
     let mut multimodal_model = test_model_info(
         multimodal_model_slug,
         "Test Multimodal Model",
-        "supports image and audio input",
-        vec![
-            InputModality::Text,
-            InputModality::Image,
-            InputModality::Audio,
-        ],
+        "supports image input",
+        vec![InputModality::Text, InputModality::Image],
     );
     multimodal_model.supports_image_detail_original = true;
     let text_model = test_model_info(
@@ -908,11 +903,6 @@ async fn model_change_projects_media_without_changing_live_or_replayed_history(
                     },
                     detail: None,
                 },
-                UserInput::Audio {
-                    audio: AudioReference::Inline {
-                        audio_url: "data:audio/wav;base64,YXVkaW8=".to_string(),
-                    },
-                },
                 UserInput::Text {
                     text: "first turn".to_string(),
                     text_elements: Vec::new(),
@@ -939,29 +929,17 @@ async fn model_change_projects_media_without_changing_live_or_replayed_history(
     assert_eq!(requests.len(), 2, "expected two model requests");
 
     let first_request = requests.first().expect("expected first request");
-    assert!(first_request.has_content_kinds(&["user.image", "user.audio", "user.text"]));
+    assert!(first_request.has_content_kinds(&["user.image", "user.text"]));
     assert!(
         !first_request.message_input_image_urls("user").is_empty(),
         "first request should include the uploaded image"
     );
-    assert_eq!(
-        first_request.message_input_audio_urls("user"),
-        vec!["data:audio/wav;base64,YXVkaW8=".to_string()]
-    );
 
     let second_request = requests.last().expect("expected second request");
-    assert!(second_request.has_content_kinds(&[
-        "images.unsupported",
-        "audio.unsupported",
-        "user.text",
-    ]));
+    assert!(second_request.has_content_kinds(&["images.unsupported", "user.text"]));
     assert!(
         second_request.message_input_image_urls("user").is_empty(),
         "second request should strip unsupported image content"
-    );
-    assert!(
-        second_request.message_input_audio_urls("user").is_empty(),
-        "second request should strip unsupported audio content"
     );
     let second_user_texts = second_request.message_input_texts("user");
     assert!(
@@ -969,12 +947,6 @@ async fn model_change_projects_media_without_changing_live_or_replayed_history(
             .iter()
             .any(|text| text == "image content omitted because you do not support image input"),
         "second request should include the image-omitted placeholder text"
-    );
-    assert!(
-        second_user_texts
-            .iter()
-            .any(|text| text == "audio content omitted because you do not support audio input"),
-        "second request should include the audio-omitted placeholder text"
     );
 
     let original = first_request

@@ -66,7 +66,6 @@ fn app_used_event_serializes_expected_shape() {
                     invocation_type: Some(InvocationType::Implicit),
                 },
             ),
-            voice_session_id: None,
             elicitation_type: None,
         },
     });
@@ -85,7 +84,6 @@ fn app_used_event_serializes_expected_shape() {
                 "product_client_id": TEST_PRODUCT_CLIENT_ID,
                 "invoke_type": "implicit",
                 "model_slug": "gpt-5",
-                "voice_session_id": null,
                 "elicitation_type": null
             }
         })

@@ -47,7 +47,6 @@ mod apply_patch_serialization;
 #[cfg(target_os = "macos")]
 mod apply_patch_system_aliases;
 mod approvals;
-mod audio_truncation;
 mod auth_recovery_policy;
 mod base_instructions;
 #[path = "bedrock_multi_agent_tests.rs"]

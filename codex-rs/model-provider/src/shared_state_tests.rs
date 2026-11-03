@@ -2,7 +2,6 @@
 //! Discovery and inference must preserve primary auth and reject requests when gateway auth fails.
 
 use super::*;
-use crate::AgentIdentitySessionFallback;
 use crate::ProviderAuthScope;
 use crate::create_model_provider;
 use crate::test_support::seed_gateway_auth;
@@ -15,7 +14,6 @@ use codex_http_client::ReqwestTransport;
 use codex_login::AuthHeaders;
 use codex_login::AuthManager;
 use codex_login::CodexAuth;
-use codex_login::auth::AgentIdentityAuthPolicy;
 use codex_login::default_client::ClientRedirectPolicy;
 use codex_login::default_client::create_client_for_route;
 use codex_model_provider_info::GatewayOAuthDelivery;
@@ -23,7 +21,6 @@ use codex_model_provider_info::ModelProviderInfo;
 use codex_models_manager::manager::RefreshStrategy;
 use codex_protocol::error::CodexErrorDetails;
 use codex_protocol::protocol::CodexErrorInfo;
-use codex_protocol::protocol::SessionSource;
 use http::HeaderMap;
 use http::HeaderName;
 use http::HeaderValue;
@@ -108,11 +105,7 @@ async fn gateway_credentials_accompany_primary_auth_in_models_and_responses() {
             .await;
         let (api, auth) = provider.api_provider_and_auth().await.unwrap();
         let scoped = provider
-            .api_auth_for_scope(ProviderAuthScope {
-                agent_identity_policy: AgentIdentityAuthPolicy::JwtOnly,
-                session_source: SessionSource::Cli,
-                agent_identity_session_fallback: AgentIdentitySessionFallback::default(),
-            })
+            .api_auth_for_scope(ProviderAuthScope::default())
             .await
             .unwrap();
         let mut expected = HeaderMap::from_iter([

@@ -4,9 +4,7 @@ use codex_core::config::CurrentTimeReminderConfig;
 use codex_core::config::RolloutBudgetConfig;
 use codex_core::config::TokenBudgetConfig;
 use codex_features::Feature;
-use codex_protocol::models::AudioReference;
 use codex_protocol::models::ImageReference;
-use codex_protocol::openai_models::InputModality;
 use codex_protocol::protocol::AdditionalContextEntry;
 use codex_protocol::protocol::AdditionalContextKind;
 use codex_protocol::protocol::EventMsg;
@@ -37,9 +35,6 @@ async fn first_request_item_types_roles_and_content_annotations() -> Result<()> 
     )
     .await;
     let test = test_codex()
-        .with_model_info_override("gpt-5.5", |model_info| {
-            model_info.input_modalities.push(InputModality::Audio);
-        })
         .with_config(|config| {
             config.update_plan_enabled = true;
             config.developer_instructions = Some("Keep world-state annotations aligned.".into());
@@ -120,7 +115,6 @@ async fn first_request_item_types_roles_and_content_annotations() -> Result<()> 
                     },
                     detail: None,
                 },
-                UserInput::Audio { audio: AudioReference::Inline { audio_url: "data:audio/wav;base64,AAAA".to_string() } },
             ])
             .with_additional_context(BTreeMap::from([
                 (
@@ -215,7 +209,7 @@ async fn first_request_item_types_roles_and_content_annotations() -> Result<()> 
     message user ["environments.environment_context"]
     message developer ["additional_content.automation_info"]
     message user ["additional_content.browser_info"]
-    message user ["user.text","user.image","user.audio"]
+    message user ["user.text","user.image"]
     message developer ["rollout_budget.remaining_tokens"]
     message developer ["current_time.reminder"]
     "#);

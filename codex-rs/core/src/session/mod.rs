@@ -189,7 +189,6 @@ use codex_thread_store::ResumeThreadParams;
 use codex_thread_store::ThreadPersistenceMetadata;
 use codex_thread_store::ThreadStore;
 use codex_thread_store::ThreadStoreResumePreparation;
-use codex_utils_audio::prepare_response_items as prepare_audio_response_items;
 use codex_utils_git_discovery::GitRootDiscovery;
 use codex_utils_output_truncation::with_serialization_allowance;
 use codex_utils_path_uri::PathUri;
@@ -1887,7 +1886,6 @@ impl Session {
             &InlineAttachmentStore,
         ))
         .await;
-        prepare_audio_response_items(&mut prepared_history);
         assert_eq!(
             prepared_history.len(),
             metadata.len(),
@@ -3495,7 +3493,6 @@ impl Session {
             self.services.image_store.as_ref(),
         ))
         .await;
-        prepare_audio_response_items(&mut items);
         // Most response items get their passthrough turn ID at the durable history boundary.
         for item in &mut items {
             Self::stamp_response_item_for_history(item, &turn_context.sub_id);
@@ -3568,7 +3565,6 @@ impl Session {
                                 "user.text"
                             }
                             ContentItem::InputImage { .. } => "user.image",
-                            ContentItem::InputAudio { .. } => "user.audio",
                         }
                         .to_string(),
                     )

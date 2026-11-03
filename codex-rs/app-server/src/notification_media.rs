@@ -22,7 +22,7 @@ pub(crate) fn without_notification_media(notification: ServerNotification) -> Se
             match &mut notification.item {
                 ResponseItem::Message { content, .. } => {
                     content.retain(|item| match item {
-                        ContentItem::InputImage { .. } | ContentItem::InputAudio { .. } => false,
+                        ContentItem::InputImage { .. } => false,
                         ContentItem::InputText { .. } | ContentItem::OutputText { .. } => true,
                     });
                 }
@@ -30,8 +30,7 @@ pub(crate) fn without_notification_media(notification: ServerNotification) -> Se
                 | ResponseItem::CustomToolCallOutput { output, .. } => {
                     if let Some(items) = output.content_items_mut() {
                         items.retain(|item| match item {
-                            FunctionCallOutputContentItem::InputImage { .. }
-                            | FunctionCallOutputContentItem::InputAudio { .. } => false,
+                            FunctionCallOutputContentItem::InputImage { .. } => false,
                             FunctionCallOutputContentItem::InputText { .. }
                             | FunctionCallOutputContentItem::EncryptedContent { .. } => true,
                         });
@@ -134,10 +133,9 @@ fn without_thread_item_media(mut item: ThreadItemPayload) -> ThreadItemPayload {
     match &mut item {
         ThreadItemPayload::UserMessage { content, .. } => {
             content.retain(|item| match item {
-                UserInput::Image { .. } | UserInput::Audio { .. } => false,
+                UserInput::Image { .. } => false,
                 UserInput::Text { .. }
                 | UserInput::LocalImage { .. }
-                | UserInput::LocalAudio { .. }
                 | UserInput::Skill { .. }
                 | UserInput::Mention { .. } => true,
             });
@@ -147,8 +145,7 @@ fn without_thread_item_media(mut item: ThreadItemPayload) -> ThreadItemPayload {
             ..
         } => {
             content_items.retain(|item| match item {
-                DynamicToolCallOutputContentItem::InputImage { .. }
-                | DynamicToolCallOutputContentItem::InputAudio { .. } => false,
+                DynamicToolCallOutputContentItem::InputImage { .. } => false,
                 DynamicToolCallOutputContentItem::InputText { .. } => true,
             });
         }
@@ -157,8 +154,7 @@ fn without_thread_item_media(mut item: ThreadItemPayload) -> ThreadItemPayload {
             ..
         } => {
             items.retain(|item| match item {
-                FunctionCallOutputContentItem::InputImage { .. }
-                | FunctionCallOutputContentItem::InputAudio { .. } => false,
+                FunctionCallOutputContentItem::InputImage { .. } => false,
                 FunctionCallOutputContentItem::InputText { .. }
                 | FunctionCallOutputContentItem::EncryptedContent { .. } => true,
             });

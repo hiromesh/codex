@@ -13,9 +13,6 @@ use crate::facts::CustomAnalyticsFact;
 use crate::facts::ElicitationType;
 use crate::facts::InvocationType;
 use crate::facts::PluginUsedInput;
-use crate::facts::SkillInvocation;
-use crate::facts::SkillInvocationLocation;
-use crate::facts::SkillInvokedInput;
 use crate::facts::TurnProfileFact;
 use crate::facts::TurnResolvedConfigFact;
 use crate::reducer::AnalyticsReducer;
@@ -31,7 +28,6 @@ use crate::tests::support::sample_turn_completed_notification;
 use crate::tests::support::sample_turn_profile;
 use crate::tests::support::sample_turn_resolved_config;
 use crate::tests::support::sample_turn_start_response;
-use crate::tests::support::sample_turn_started_notification;
 use crate::tests::support::test_tracking_context;
 use crate::tests::support::test_turn_metadata;
 use codex_app_server_protocol::ClientRequest;
@@ -44,10 +40,7 @@ use codex_app_server_protocol::ServerNotification;
 use codex_app_server_protocol::ThreadArchiveParams;
 use codex_app_server_protocol::ThreadArchiveResponse;
 use codex_app_server_protocol::ThreadClosedNotification;
-use codex_app_server_protocol::ThreadRealtimeClosedNotification;
-use codex_app_server_protocol::ThreadRealtimeStartedNotification;
 use codex_app_server_protocol::TurnStatus as AppServerTurnStatus;
-use codex_protocol::protocol::RealtimeConversationVersion;
 use pretty_assertions::assert_eq;
 use serde_json::json;
 
@@ -460,240 +453,6 @@ async fn item_completed_without_turn_state_does_not_create_turn_state() {
         .await;
 
     assert!(out.is_empty());
-}
-
-#[tokio::test]
-async fn voice_handoff_attributes_plugin_events_after_realtime_closes() {
-    let mut reducer = AnalyticsReducer::default();
-    let mut events = Vec::new();
-    ingest_turn_prerequisites(
-        &mut reducer,
-        &mut events,
-        /*include_initialize*/ true,
-        /*include_resolved_config*/ true,
-        /*include_started*/ false,
-        /*include_token_usage*/ true,
-    )
-    .await;
-    reducer
-        .ingest(
-            AnalyticsFact::Notification(Box::new(ServerNotification::ThreadRealtimeStarted(
-                ThreadRealtimeStartedNotification {
-                    thread_id: "thread-2".to_string(),
-                    realtime_session_id: Some("work-voice-123".to_string()),
-                    version: RealtimeConversationVersion::V2,
-                },
-            ))),
-            &mut events,
-        )
-        .await;
-    reducer
-        .ingest(
-            AnalyticsFact::RealtimeHandoffRequested {
-                thread_id: "thread-2".to_string(),
-            },
-            &mut events,
-        )
-        .await;
-    reducer
-        .ingest(
-            AnalyticsFact::Notification(Box::new(ServerNotification::ThreadRealtimeClosed(
-                ThreadRealtimeClosedNotification {
-                    thread_id: "thread-2".to_string(),
-                    reason: None,
-                },
-            ))),
-            &mut events,
-        )
-        .await;
-    reducer
-        .ingest(
-            AnalyticsFact::Notification(Box::new(sample_turn_started_notification(
-                "thread-2", "turn-2",
-            ))),
-            &mut events,
-        )
-        .await;
-    reducer
-        .ingest(
-            AnalyticsFact::Custom(CustomAnalyticsFact::AppUsed(AppUsedInput {
-                tracking: test_tracking_context("thread-2", "turn-2"),
-                app: AppInvocation {
-                    connector_id: Some("drive".to_string()),
-                    app_name: Some("Drive".to_string()),
-                    invocation_type: Some(InvocationType::Implicit),
-                },
-                elicitation_type: None,
-            })),
-            &mut events,
-        )
-        .await;
-    reducer
-        .ingest(
-            AnalyticsFact::Custom(CustomAnalyticsFact::SkillInvoked(SkillInvokedInput {
-                tracking: test_tracking_context("thread-2", "turn-2"),
-                invocations: vec![SkillInvocation {
-                    skill_name: "sample:doc".to_string(),
-                    location: SkillInvocationLocation::Resource {
-                        id: "resource-1".to_string(),
-                        skill_id: Some("sample:doc".to_string()),
-                        scope: None,
-                    },
-                    plugin_id: Some("sample@test".to_string()),
-                    remote_plugin_id: None,
-                    invocation_type: InvocationType::Explicit,
-                }],
-            })),
-            &mut events,
-        )
-        .await;
-    reducer
-        .ingest(
-            AnalyticsFact::Notification(Box::new(sample_turn_completed_notification(
-                "thread-2",
-                "turn-2",
-                AppServerTurnStatus::Completed,
-                /*codex_error_info*/ None,
-            ))),
-            &mut events,
-        )
-        .await;
-
-    for event_type in ["codex_app_used", "skill_invocation", "codex_turn_event"] {
-        let event = events
-            .iter()
-            .map(|event| serde_json::to_value(event).expect("serialize analytics event"))
-            .find(|event| event["event_type"] == event_type)
-            .unwrap_or_else(|| panic!("missing {event_type}"));
-        assert_eq!(event["event_params"]["voice_session_id"], "work-voice-123");
-    }
-    reducer
-        .ingest(
-            AnalyticsFact::Notification(Box::new(sample_turn_started_notification(
-                "thread-2", "turn-3",
-            ))),
-            &mut events,
-        )
-        .await;
-    reducer
-        .ingest(
-            AnalyticsFact::Custom(CustomAnalyticsFact::AppUsed(AppUsedInput {
-                tracking: test_tracking_context("thread-2", "turn-3"),
-                app: AppInvocation {
-                    connector_id: Some("drive".to_string()),
-                    app_name: Some("Drive".to_string()),
-                    invocation_type: Some(InvocationType::Implicit),
-                },
-                elicitation_type: None,
-            })),
-            &mut events,
-        )
-        .await;
-    let text_app = serde_json::to_value(events.last().expect("text app event"))
-        .expect("serialize text app event");
-    assert_eq!(text_app["event_params"]["voice_session_id"], json!(null));
-}
-
-#[tokio::test]
-async fn voice_handoff_steering_active_turn_does_not_tag_next_text_turn() {
-    let mut reducer = AnalyticsReducer::default();
-    let mut events = Vec::new();
-    reducer
-        .ingest(
-            AnalyticsFact::Notification(Box::new(sample_turn_started_notification(
-                "thread-2", "turn-2",
-            ))),
-            &mut events,
-        )
-        .await;
-    reducer
-        .ingest(
-            AnalyticsFact::Notification(Box::new(ServerNotification::ThreadRealtimeStarted(
-                ThreadRealtimeStartedNotification {
-                    thread_id: "thread-2".to_string(),
-                    realtime_session_id: Some("work-voice-123".to_string()),
-                    version: RealtimeConversationVersion::V2,
-                },
-            ))),
-            &mut events,
-        )
-        .await;
-    reducer
-        .ingest(
-            AnalyticsFact::RealtimeHandoffRequested {
-                thread_id: "thread-2".to_string(),
-            },
-            &mut events,
-        )
-        .await;
-    reducer
-        .ingest(
-            AnalyticsFact::Notification(Box::new(ServerNotification::ThreadRealtimeClosed(
-                ThreadRealtimeClosedNotification {
-                    thread_id: "thread-2".to_string(),
-                    reason: None,
-                },
-            ))),
-            &mut events,
-        )
-        .await;
-    reducer
-        .ingest(
-            AnalyticsFact::Custom(CustomAnalyticsFact::AppUsed(AppUsedInput {
-                tracking: test_tracking_context("thread-2", "turn-2"),
-                app: AppInvocation {
-                    connector_id: Some("drive".to_string()),
-                    app_name: Some("Drive".to_string()),
-                    invocation_type: Some(InvocationType::Implicit),
-                },
-                elicitation_type: None,
-            })),
-            &mut events,
-        )
-        .await;
-    let voice_app = serde_json::to_value(events.last().expect("voice app event"))
-        .expect("serialize voice app event");
-    assert_eq!(
-        voice_app["event_params"]["voice_session_id"],
-        "work-voice-123"
-    );
-
-    reducer
-        .ingest(
-            AnalyticsFact::Notification(Box::new(sample_turn_completed_notification(
-                "thread-2",
-                "turn-2",
-                AppServerTurnStatus::Completed,
-                /*codex_error_info*/ None,
-            ))),
-            &mut events,
-        )
-        .await;
-    reducer
-        .ingest(
-            AnalyticsFact::Notification(Box::new(sample_turn_started_notification(
-                "thread-2", "turn-3",
-            ))),
-            &mut events,
-        )
-        .await;
-    reducer
-        .ingest(
-            AnalyticsFact::Custom(CustomAnalyticsFact::AppUsed(AppUsedInput {
-                tracking: test_tracking_context("thread-2", "turn-3"),
-                app: AppInvocation {
-                    connector_id: Some("drive".to_string()),
-                    app_name: Some("Drive".to_string()),
-                    invocation_type: Some(InvocationType::Implicit),
-                },
-                elicitation_type: None,
-            })),
-            &mut events,
-        )
-        .await;
-    let text_app = serde_json::to_value(events.last().expect("text app event"))
-        .expect("serialize text app event");
-    assert_eq!(text_app["event_params"]["voice_session_id"], json!(null));
 }
 
 #[tokio::test]

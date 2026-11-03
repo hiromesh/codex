@@ -4814,26 +4814,6 @@ async fn direct_input_to_multi_agent_v2_subagent_is_rejected(
             }),
         ),
         (
-            "thread/realtime/start",
-            json!({
-                "outputModality": "text",
-                "realtimeStartInstructions": "Replace the child's instructions.",
-            }),
-        ),
-        (
-            "thread/realtime/appendText",
-            json!({"text": "Steer the child through realtime."}),
-        ),
-        (
-            "thread/realtime/appendAudio",
-            json!({"audio": {"data": "AAA=", "sampleRate": 24000, "numChannels": 1}}),
-        ),
-        (
-            "thread/realtime/appendSpeech",
-            json!({"text": "Speak through the child."}),
-        ),
-        ("thread/realtime/stop", json!({})),
-        (
             "thread/goal/set",
             json!({"objective": "Replace the child's goal."}),
         ),

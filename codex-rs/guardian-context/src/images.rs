@@ -142,7 +142,6 @@ impl TranscriptImages {
                                 include_image(image, *detail)
                             }
                             ContentItem::InputText { .. }
-                            | ContentItem::InputAudio { .. }
                             | ContentItem::OutputText { .. } => {}
                         }
                     }
@@ -158,7 +157,6 @@ impl TranscriptImages {
                                     include_image(image, *detail)
                                 }
                                 FunctionCallOutputContentItem::InputText { .. }
-                                | FunctionCallOutputContentItem::InputAudio { .. }
                                 | FunctionCallOutputContentItem::EncryptedContent { .. } => {}
                             }
                         }
@@ -179,7 +177,6 @@ impl TranscriptImages {
                         ..
                     }
                     | ContentItem::InputText { .. }
-                    | ContentItem::InputAudio { .. }
                     | ContentItem::OutputText { .. } => {}
                 }
             }

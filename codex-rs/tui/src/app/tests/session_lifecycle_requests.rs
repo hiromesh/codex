@@ -380,9 +380,6 @@ pub(super) enum HistoryCapabilities {
     ConfigReadUnsupported(i64),
     ConfigReadFails,
     SuperBindingsUnsupported,
-    ConfigReadUnknownVoice,
-    VoiceCatalogCustom,
-    VoiceCatalogUnavailable,
 }
 
 /// Returns and resets `(thread/loaded/list, thread/read)` request counts.
@@ -440,49 +437,23 @@ pub(super) async fn start_recording_app_server_with_history(
     thread_params_mode: crate::app_server_session::ThreadParamsMode,
     loader_overrides: LoaderOverrides,
 ) -> Result<RecordingAppServer> {
-    start_recording_app_server_with_realtime_speech(
+    start_recording_app_server_with_history_options(
         config,
         history_capabilities,
         blocked_thread_list,
         failed_thread_name,
         thread_params_mode,
-        RealtimeRequestBehavior::Forward,
         loader_overrides,
     )
     .await
 }
 
-#[derive(Clone, Copy, PartialEq, Eq)]
-pub(super) enum RealtimeRequestBehavior {
-    Forward,
-    AcceptStart,
-    AcceptSpeech,
-    AcceptSpeechAndStallStop,
-}
-
-pub(super) async fn start_recording_realtime_speech_app_server(
-    config: &Config,
-    realtime_behavior: RealtimeRequestBehavior,
-) -> Result<RecordingAppServer> {
-    start_recording_app_server_with_realtime_speech(
-        config,
-        HistoryCapabilities::Current,
-        /*blocked_thread_list*/ None,
-        /*failed_thread_name*/ None,
-        crate::app_server_session::ThreadParamsMode::Embedded,
-        realtime_behavior,
-        LoaderOverrides::default(),
-    )
-    .await
-}
-
-pub(super) async fn start_recording_app_server_with_realtime_speech(
+pub(super) async fn start_recording_app_server_with_history_options(
     config: &Config,
     history_capabilities: HistoryCapabilities,
     mut blocked_thread_list: Option<(ThreadId, oneshot::Sender<()>, oneshot::Receiver<()>)>,
     failed_thread_name: Option<&'static str>,
     thread_params_mode: crate::app_server_session::ThreadParamsMode,
-    realtime_behavior: RealtimeRequestBehavior,
     loader_overrides: LoaderOverrides,
 ) -> Result<RecordingAppServer> {
     let state_db =
@@ -563,11 +534,6 @@ pub(super) async fn start_recording_app_server_with_realtime_speech(
                         .lock()
                         .expect("request recorder lock")
                         .push(request.clone());
-                    if realtime_behavior == RealtimeRequestBehavior::AcceptSpeechAndStallStop
-                        && request.method == "thread/realtime/stop"
-                    {
-                        continue;
-                    }
                     let request_id = request.id.clone();
                     let params = request.params.as_ref();
                     let requires_pagination = match request.method.as_str() {
@@ -598,20 +564,7 @@ pub(super) async fn start_recording_app_server_with_realtime_speech(
                             .is_some_and(|tools| {
                                 tools.iter().any(|tool| tool["type"] == "namespace")
                             });
-                    let fake_realtime_response = (realtime_behavior
-                        == RealtimeRequestBehavior::AcceptStart
-                        && request.method == "thread/realtime/start")
-                        || (matches!(
-                            realtime_behavior,
-                            RealtimeRequestBehavior::AcceptSpeech
-                                | RealtimeRequestBehavior::AcceptSpeechAndStallStop
-                        ) && request.method == "thread/realtime/appendSpeech");
-                    let response = if fake_realtime_response {
-                        JSONRPCMessage::Response(JSONRPCResponse {
-                            id: request_id,
-                            result: serde_json::json!({}),
-                        })
-                    } else if (matches!(
+                    let response = if (matches!(
                         history_capabilities,
                         HistoryCapabilities::ItemsListFails
                             | HistoryCapabilities::ItemsAndSummaryTurnsFail
@@ -668,17 +621,6 @@ pub(super) async fn start_recording_app_server_with_realtime_speech(
                                 data: None,
                                 message: "Invalid configuration: unknown key `super-left`"
                                     .to_string(),
-                            },
-                        })
-                    } else if history_capabilities == HistoryCapabilities::VoiceCatalogUnavailable
-                        && request.method == "thread/realtime/listVoices"
-                    {
-                        JSONRPCMessage::Error(JSONRPCError {
-                            id: request_id,
-                            error: JSONRPCErrorError {
-                                code: -32601,
-                                data: None,
-                                message: "method not found".to_string(),
                             },
                         })
                     } else if matches!(
@@ -809,25 +751,7 @@ pub(super) async fn start_recording_app_server_with_realtime_speech(
                                 },
                             })
                         } else {
-                            let unknown_voice = history_capabilities
-                                == HistoryCapabilities::ConfigReadUnknownVoice
-                                && matches!(&request, ClientRequest::ConfigRead { .. });
-                            let custom_voice_catalog = history_capabilities
-                                == HistoryCapabilities::VoiceCatalogCustom
-                                && matches!(
-                                    &request,
-                                    ClientRequest::ThreadRealtimeListVoices { .. }
-                                );
                             let mut result = embedded.request(request).await?;
-                            if unknown_voice && let Ok(value) = &mut result {
-                                value["config"]["realtime"]["voice"] =
-                                    serde_json::json!("future_voice");
-                            }
-                            if custom_voice_catalog && let Ok(value) = &mut result {
-                                value["voices"]["v1"] =
-                                    serde_json::json!(["maple", "cove", "juniper"]);
-                                value["voices"]["defaultV1"] = serde_json::json!("maple");
-                            }
                             if background {
                                 let terminal = r#"{"data":[{"itemId":"x","processId":"x","command":"x","cwd":"/"}],"nextCursor":null}"#;
                                 result = Ok(serde_json::from_str(terminal)?);

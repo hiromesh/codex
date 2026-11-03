@@ -47,7 +47,7 @@ impl ComposedContext {
                             item.content,
                             SectionContent::Exact(_)
                                 | SectionContent::Other(
-                                    ContentItem::InputImage { .. } | ContentItem::InputAudio { .. }
+                                    ContentItem::InputImage { .. }
                                 )
                         ) || original_tokens
                             .saturating_add(content_framing_tokens(/*item_count*/ 1))

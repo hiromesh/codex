@@ -9,7 +9,6 @@ use codex_protocol::items::HookPromptFragment;
 use codex_protocol::items::TurnItem;
 use codex_protocol::items::WebSearchItem;
 use codex_protocol::items::build_hook_prompt_message;
-use codex_protocol::models::AudioReference;
 use codex_protocol::models::ContentItem;
 use codex_protocol::models::DEFAULT_IMAGE_DETAIL;
 use codex_protocol::models::ImageReference;
@@ -227,56 +226,6 @@ fn skips_local_image_label_text() {
                 },
             ];
             assert_eq!(user.content, expected_content);
-        }
-        other => panic!("expected TurnItem::UserMessage, got {other:?}"),
-    }
-}
-
-#[test]
-fn skips_local_audio_label_text() {
-    let audio_url = "data:audio/wav;base64,abc".to_string();
-    let label = r#"<audio name=[Audio #1] path="/tmp/local.wav">"#.to_string();
-    let user_text = "Please transcribe this audio.".to_string();
-
-    let item = ResponseItem::Message {
-        status: None,
-        encrypted_content: None,
-        id: None,
-        role: "user".to_string(),
-        content: vec![
-            ContentItem::InputText { text: label },
-            ContentItem::InputAudio {
-                audio: AudioReference::Inline {
-                    audio_url: audio_url.clone(),
-                },
-            },
-            ContentItem::InputText {
-                text: "</audio>".to_string(),
-            },
-            ContentItem::InputText {
-                text: user_text.clone(),
-            },
-        ],
-        phase: None,
-        internal_chat_message_metadata_passthrough: None,
-    };
-
-    let turn_item = parse_turn_item(&item).expect("expected user message turn item");
-
-    match turn_item {
-        TurnItem::UserMessage(user) => {
-            assert_eq!(
-                user.content,
-                vec![
-                    UserInput::Audio {
-                        audio: AudioReference::Inline { audio_url }
-                    },
-                    UserInput::Text {
-                        text: user_text,
-                        text_elements: Vec::new(),
-                    },
-                ]
-            );
         }
         other => panic!("expected TurnItem::UserMessage, got {other:?}"),
     }

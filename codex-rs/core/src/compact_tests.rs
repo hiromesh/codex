@@ -684,16 +684,13 @@ fn build_compacted_history_preserves_user_message_passthrough_metadata(attribute
             {"type": "input_text", "text": "<image>"},
             {"type": "input_image", "image_url": "file://image.png"},
             {"type": "input_text", "text": "</image>"},
-            {"type": "input_text", "text": "first user message"},
-            {"type": "input_text", "text": "<audio>"},
-            {"type": "input_audio", "audio_url": "file://audio.wav"},
-            {"type": "input_text", "text": "</audio>"}
+            {"type": "input_text", "text": "first user message"}
         ],
         "internal_chat_message_metadata_passthrough": {
             "turn_id": "turn-1",
-            "content_item_kinds": ["unknown", "user.image", "unknown", "user.text", "unknown", "user.audio", "unknown"],
+            "content_item_kinds": ["unknown", "user.image", "unknown", "user.text"],
             "content_item_metadata": attributed.then(|| {
-                let mut sources = vec![ContentItemMetadata::harness(); 7];
+                let mut sources = vec![ContentItemMetadata::harness(); 4];
                 sources[3] = ContentItemMetadata::user();
                 sources
             })

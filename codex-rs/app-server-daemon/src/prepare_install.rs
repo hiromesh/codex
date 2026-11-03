@@ -248,24 +248,6 @@ async fn prepare_from_package(
     // source. Hash the final tree for reuse, since it now differs from the source.
     let digest = if winget {
         std::fs::create_dir_all(stage.path().join("bin"))?;
-        let voice_path = stage.path().join("codex-resources/voice/manifest.json");
-        if voice_path.try_exists()? {
-            let mut voice: serde_json::Value =
-                serde_json::from_slice(&std::fs::read(&voice_path)?)?;
-            let checksums = voice["sha256"]
-                .as_object_mut()
-                .context("invalid WinGet voice manifest checksums")?;
-            let checksum = checksums
-                .remove(source_entrypoint)
-                .context("WinGet voice manifest is missing the CLI checksum")?;
-            checksums.insert(entrypoint.to_string(), checksum);
-            let bytes = serde_json::to_vec_pretty(&voice)?;
-            std::fs::write(voice_path, &bytes)?;
-            staged_digests.insert(
-                PathBuf::from("codex-resources/voice/manifest.json"),
-                blake3::hash(&bytes),
-            );
-        }
         metadata["entrypoint"] = entrypoint.into();
         let bytes = serde_json::to_vec_pretty(&metadata)?;
         std::fs::write(stage.path().join("codex-package.json"), &bytes)?;

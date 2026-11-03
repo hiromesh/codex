@@ -639,9 +639,7 @@ pub(crate) fn mention_bindings_from_user_inputs(
             }
             UserInput::Text { .. }
             | UserInput::Image { .. }
-            | UserInput::LocalImage { .. }
-            | UserInput::Audio { .. }
-            | UserInput::LocalAudio { .. } => None,
+            | UserInput::LocalImage { .. } => None,
         })
         .collect();
     for item in items {
@@ -765,9 +763,7 @@ impl ChatWidget {
             match item {
                 UserInput::Text { text, .. } => message.push_str(text),
                 UserInput::Image { .. } | UserInput::LocalImage { .. } => image_count += 1,
-                UserInput::Audio { .. } // TODO: Include audio inputs in pending steer comparison.
-                | UserInput::LocalAudio { .. } // TODO: Include audio inputs in pending steer comparison.
-                | UserInput::Skill { .. }
+                UserInput::Skill { .. }
                 | UserInput::Mention { .. } => {}
             }
         }
@@ -779,12 +775,6 @@ impl ChatWidget {
     }
 
     pub(crate) fn user_message_display_from_inputs(items: &[UserInput]) -> UserMessageDisplay {
-        if items
-            .iter()
-            .any(|item| matches!(item, UserInput::Audio { .. } | UserInput::LocalAudio { .. }))
-        {
-            tracing::warn!("audio user inputs are not supported by the TUI and will be omitted");
-        }
         // TODO(kc) preserve file-backed images when the TUI can resolve or replay them.
         if items.iter().any(|item| {
             matches!(
@@ -834,9 +824,7 @@ impl ChatWidget {
                     ..
                 } => {}
                 UserInput::LocalImage { path, .. } => local_images.push(path.clone()),
-                UserInput::Audio { .. } // TODO: Include audio inputs in the user message display.
-                | UserInput::LocalAudio { .. } // TODO: Include audio inputs in the user message display.
-                | UserInput::Skill { .. }
+                UserInput::Skill { .. }
                 | UserInput::Mention { .. } => {}
             }
         }

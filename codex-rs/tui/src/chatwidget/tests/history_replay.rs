@@ -1006,7 +1006,7 @@ async fn prompt_edit_stops_streaming_without_submitting_queued_input() {
                 id: "voice-steer".to_string(),
                 client_id: None,
                 content: vec![UserInput::Text {
-                    text: "<realtime_delegation><input>voice input</input></realtime_delegation>"
+                    text: "voice input"
                         .to_string(),
                     text_elements: Vec::new(),
                 }],

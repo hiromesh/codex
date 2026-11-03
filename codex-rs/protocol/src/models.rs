@@ -14,7 +14,6 @@ use serde::ser::Serializer;
 use serde_with::serde_as;
 use ts_rs::TS;
 
-use crate::local_media::audio_mime_for_path;
 use crate::permissions::FileSystemAccessMode;
 use crate::permissions::FileSystemPath;
 use crate::permissions::FileSystemSandboxEntry;
@@ -38,7 +37,6 @@ mod executed_tool_calls;
 
 mod item_metadata;
 
-pub use crate::local_media::MAX_PROMPT_AUDIO_INPUT_BYTES;
 pub use crate::local_media::snapshot_local_user_input;
 pub use crate::permission_profile_snapshot::PermissionProfileSnapshot;
 pub use crate::permission_profile_snapshot::ProfileWorkspaceRoot;
@@ -892,10 +890,6 @@ pub enum ContentItem {
         #[ts(optional)]
         detail: Option<ImageDetail>,
     },
-    InputAudio {
-        #[serde(flatten)]
-        audio: AudioReference,
-    },
     OutputText {
         text: String,
         // Preserve provider metadata, including empty arrays, for sampled-output replay.
@@ -922,7 +916,7 @@ impl ContentItem {
     pub fn into_text(self) -> Option<String> {
         match self {
             Self::InputText { text } | Self::OutputText { text, .. } => Some(text),
-            Self::InputImage { .. } | Self::InputAudio { .. } => None,
+            Self::InputImage { .. } => None,
         }
     }
 }
@@ -932,15 +926,6 @@ impl ContentItem {
 #[ts(untagged)]
 pub enum ImageReference {
     Inline { image_url: String },
-    File { file_id: String },
-}
-
-/// Inline audio data or an uploaded file loaded by the Responses API.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, JsonSchema, TS)]
-#[serde(untagged)]
-#[ts(untagged)]
-pub enum AudioReference {
-    Inline { audio_url: String },
     File { file_id: String },
 }
 
@@ -1791,14 +1776,12 @@ fn should_serialize_reasoning_content(content: &Option<Vec<ReasoningItemContent>
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum LocalMediaKind {
-    Audio,
     Image,
 }
 
 impl LocalMediaKind {
     fn name(self) -> &'static str {
         match self {
-            Self::Audio => "audio",
             Self::Image => "image",
         }
     }
@@ -1823,11 +1806,6 @@ const IMAGE_CLOSE_TAG: &str = "</image>";
 const LOCAL_IMAGE_OPEN_TAG_PREFIX: &str = "<image name=";
 const LOCAL_IMAGE_OPEN_TAG_SUFFIX: &str = ">";
 const LOCAL_IMAGE_CLOSE_TAG: &str = IMAGE_CLOSE_TAG;
-const AUDIO_OPEN_TAG: &str = "<audio>";
-const AUDIO_CLOSE_TAG: &str = "</audio>";
-const LOCAL_AUDIO_OPEN_TAG_PREFIX: &str = "<audio name=";
-const LOCAL_AUDIO_OPEN_TAG_SUFFIX: &str = ">";
-const LOCAL_AUDIO_CLOSE_TAG: &str = AUDIO_CLOSE_TAG;
 
 pub fn image_open_tag_text() -> String {
     IMAGE_OPEN_TAG.to_string()
@@ -1864,40 +1842,6 @@ pub fn is_image_close_tag_text(text: &str) -> bool {
     text == IMAGE_CLOSE_TAG
 }
 
-pub fn audio_open_tag_text() -> String {
-    AUDIO_OPEN_TAG.to_string()
-}
-
-pub fn audio_close_tag_text() -> String {
-    AUDIO_CLOSE_TAG.to_string()
-}
-
-pub fn local_audio_label_text(label_number: usize) -> String {
-    format!("[Audio #{label_number}]")
-}
-
-pub fn local_audio_open_tag_text_with_path(label_number: usize, path: &std::path::Path) -> String {
-    let label = local_audio_label_text(label_number);
-    let path = path.display();
-    format!("{LOCAL_AUDIO_OPEN_TAG_PREFIX}{label} path=\"{path}\"{LOCAL_AUDIO_OPEN_TAG_SUFFIX}")
-}
-
-pub fn is_local_audio_open_tag_text(text: &str) -> bool {
-    text.strip_prefix(LOCAL_AUDIO_OPEN_TAG_PREFIX)
-        .is_some_and(|rest| rest.ends_with(LOCAL_AUDIO_OPEN_TAG_SUFFIX))
-}
-
-pub fn is_local_audio_close_tag_text(text: &str) -> bool {
-    is_audio_close_tag_text(text)
-}
-
-pub fn is_audio_open_tag_text(text: &str) -> bool {
-    text == AUDIO_OPEN_TAG
-}
-
-pub fn is_audio_close_tag_text(text: &str) -> bool {
-    text == AUDIO_CLOSE_TAG
-}
 
 fn invalid_image_error_placeholder(
     path: &std::path::Path,
@@ -1967,39 +1911,6 @@ pub fn local_image_content_items_with_label_number(
 pub enum LocalImagePreparation {
     Process,
     Defer,
-}
-
-fn unsupported_audio_error_placeholder(path: &std::path::Path) -> ContentItem {
-    ContentItem::InputText {
-        text: format!(
-            "Codex cannot attach audio at `{}`: unsupported audio format; use wav, mp3, m4a, webm, or ogg.",
-            path.display()
-        ),
-    }
-}
-
-fn local_audio_content_items(
-    path: &std::path::Path,
-    file_bytes: &[u8],
-    label_number: usize,
-) -> Vec<ContentItem> {
-    let Some(mime) = audio_mime_for_path(path) else {
-        return vec![unsupported_audio_error_placeholder(path)];
-    };
-
-    vec![
-        ContentItem::InputText {
-            text: local_audio_open_tag_text_with_path(label_number, path),
-        },
-        ContentItem::InputAudio {
-            audio: AudioReference::Inline {
-                audio_url: data_url_from_bytes(mime, file_bytes),
-            },
-        },
-        ContentItem::InputText {
-            text: LOCAL_AUDIO_CLOSE_TAG.to_string(),
-        },
-    ]
 }
 
 fn local_image_content_items(
@@ -2171,7 +2082,6 @@ impl ResponseInputItem {
     ) -> Self {
         user_image_content_indices.clear();
         let mut image_index = 0;
-        let mut audio_index = 0;
         let mut content = Vec::new();
         for (input_index, input) in items.into_iter().enumerate() {
             let generated = match input {
@@ -2208,23 +2118,6 @@ impl ResponseInputItem {
                             &path,
                             err,
                             LocalMediaKind::Image,
-                        )],
-                    }
-                }
-                UserInput::Audio { audio } => {
-                    audio_index += 1;
-                    vec![ContentItem::InputAudio { audio }]
-                }
-                UserInput::LocalAudio { path } => {
-                    audio_index += 1;
-                    match std::fs::read(&path) {
-                        Ok(file_bytes) => {
-                            local_audio_content_items(&path, &file_bytes, audio_index)
-                        }
-                        Err(err) => vec![local_media_error_placeholder(
-                            &path,
-                            err,
-                            LocalMediaKind::Audio,
                         )],
                     }
                 }
@@ -2271,10 +2164,6 @@ pub enum FunctionCallOutputContentItem {
         #[ts(optional)]
         detail: Option<ImageDetail>,
     },
-    // Do not rename, these are serialized and used directly in the responses API.
-    InputAudio {
-        audio_url: String,
-    },
     EncryptedContent {
         encrypted_content: String,
     },
@@ -2289,12 +2178,6 @@ impl From<ContentItem> for FunctionCallOutputContentItem {
                 Self::InputText { text }
             }
             ContentItem::InputImage { image, detail } => Self::InputImage { image, detail },
-            ContentItem::InputAudio {
-                audio: AudioReference::Inline { audio_url },
-            } => Self::InputAudio { audio_url },
-            ContentItem::InputAudio {
-                audio: AudioReference::File { file_id, .. },
-            } => Self::InputText { text: file_id },
         }
     }
 }
@@ -2304,7 +2187,7 @@ impl From<ContentItem> for FunctionCallOutputContentItem {
 ///
 /// This conversion is intentionally lossy:
 /// - only `input_text` items are included
-/// - image and audio items are ignored
+/// - image items are ignored
 ///
 /// We use this helper where callers still need a string representation (for
 /// example telemetry previews or legacy string-only output paths) while keeping
@@ -2321,7 +2204,6 @@ pub fn function_call_output_content_items_to_text(
             }
             FunctionCallOutputContentItem::InputText { .. }
             | FunctionCallOutputContentItem::InputImage { .. }
-            | FunctionCallOutputContentItem::InputAudio { .. }
             | FunctionCallOutputContentItem::EncryptedContent { .. } => None,
         })
         .collect::<Vec<_>>();
@@ -2346,9 +2228,6 @@ impl From<crate::dynamic_tools::DynamicToolCallOutputContentItem>
                     image: ImageReference::Inline { image_url },
                     detail: Some(DEFAULT_IMAGE_DETAIL),
                 }
-            }
-            crate::dynamic_tools::DynamicToolCallOutputContentItem::InputAudio { audio_url } => {
-                Self::InputAudio { audio_url }
             }
         }
     }
@@ -2546,14 +2425,6 @@ fn convert_mcp_content_to_items(
             #[serde(rename = "_meta", default)]
             meta: Option<serde_json::Value>,
         },
-        #[serde(rename = "audio")]
-        Audio {
-            data: String,
-            #[serde(rename = "mimeType", alias = "mime_type")]
-            mime_type: Option<String>,
-            #[serde(rename = "_meta", default)]
-            _meta: Option<serde_json::Value>,
-        },
         #[serde(other)]
         Unknown,
     }
@@ -2603,17 +2474,6 @@ fn convert_mcp_content_to_items(
                         })
                         .or(Some(DEFAULT_IMAGE_DETAIL)),
                 }
-            }
-            Ok(McpContent::Audio {
-                data, mime_type, ..
-            }) => {
-                let audio_url = if data.starts_with("data:") {
-                    data
-                } else {
-                    let mime_type = mime_type.unwrap_or_else(|| "application/octet-stream".into());
-                    format!("data:{mime_type};base64,{data}")
-                };
-                FunctionCallOutputContentItem::InputAudio { audio_url }
             }
             Ok(McpContent::Unknown) | Err(_) => FunctionCallOutputContentItem::InputText {
                 text: serde_json::to_string(content).unwrap_or_else(|_| "<content>".to_string()),
@@ -3282,35 +3142,6 @@ mod tests {
     }
 
     #[test]
-    fn convert_mcp_audio_content_builds_data_urls_and_preserves_existing_data_urls() {
-        let contents = vec![
-            serde_json::json!({
-                "type": "audio",
-                "data": "Zm9v",
-                "mimeType": "audio/wav",
-                "_meta": {"source": "microphone"},
-            }),
-            serde_json::json!({
-                "type": "audio",
-                "data": "data:audio/ogg;base64,YmFy",
-                "mimeType": "audio/ogg",
-            }),
-        ];
-
-        assert_eq!(
-            convert_mcp_content_to_items(&contents),
-            vec![
-                FunctionCallOutputContentItem::InputAudio {
-                    audio_url: "data:audio/wav;base64,Zm9v".to_string(),
-                },
-                FunctionCallOutputContentItem::InputAudio {
-                    audio_url: "data:audio/ogg;base64,YmFy".to_string(),
-                },
-            ]
-        );
-    }
-
-    #[test]
     fn convert_mcp_content_to_items_converts_text_without_media() {
         let contents = vec![serde_json::json!({
             "type": "text",
@@ -3357,9 +3188,6 @@ mod tests {
                     image_url: "data:image/png;base64,AAA".to_string(),
                 },
                 detail: Some(DEFAULT_IMAGE_DETAIL),
-            },
-            FunctionCallOutputContentItem::InputAudio {
-                audio_url: "data:audio/wav;base64,AAA".to_string(),
             },
             FunctionCallOutputContentItem::EncryptedContent {
                 encrypted_content: "enc_opaque".to_string(),
@@ -3584,10 +3412,6 @@ mod tests {
                 "uri": "file:///notes.txt",
                 "name": "notes",
             }),
-            serde_json::json!({
-                "type": "audio",
-                "mimeType": "audio/wav",
-            }),
         ];
         let call_tool_result = CallToolResult {
             content: content.clone(),
@@ -3597,8 +3421,6 @@ mod tests {
         };
 
         let resource_link = serde_json::to_string(&content[1]).expect("serialize resource link");
-        let malformed_audio =
-            serde_json::to_string(&content[2]).expect("serialize malformed audio");
         assert_eq!(
             call_tool_result.as_function_call_output_payload(),
             FunctionCallOutputPayload {
@@ -3608,9 +3430,6 @@ mod tests {
                     },
                     FunctionCallOutputContentItem::InputText {
                         text: resource_link,
-                    },
-                    FunctionCallOutputContentItem::InputText {
-                        text: malformed_audio,
                     },
                 ]),
                 success: Some(true),
@@ -3681,54 +3500,6 @@ mod tests {
 
         let output = v.get("output").expect("output field");
         assert!(output.is_array(), "expected array output");
-
-        Ok(())
-    }
-
-    #[test]
-    fn serializes_audio_outputs_as_array() -> Result<()> {
-        let call_tool_result = CallToolResult {
-            content: vec![
-                serde_json::json!({"type":"text","text":"caption"}),
-                serde_json::json!({"type":"audio","data":"BASE64","mimeType":"audio/wav"}),
-            ],
-            structured_content: None,
-            is_error: Some(false),
-            meta: None,
-        };
-
-        let payload = call_tool_result.into_function_call_output_payload();
-        assert_eq!(
-            payload,
-            FunctionCallOutputPayload {
-                body: FunctionCallOutputBody::ContentItems(vec![
-                    FunctionCallOutputContentItem::InputText {
-                        text: "caption".into(),
-                    },
-                    FunctionCallOutputContentItem::InputAudio {
-                        audio_url: "data:audio/wav;base64,BASE64".into(),
-                    },
-                ]),
-                success: Some(true),
-            }
-        );
-
-        let item = ResponseInputItem::FunctionCallOutput {
-            call_id: "call1".into(),
-            output: payload,
-        };
-
-        assert_eq!(
-            serde_json::to_value(item)?,
-            serde_json::json!({
-                "type": "function_call_output",
-                "call_id": "call1",
-                "output": [
-                    {"type": "input_text", "text": "caption"},
-                    {"type": "input_audio", "audio_url": "data:audio/wav;base64,BASE64"},
-                ],
-            })
-        );
 
         Ok(())
     }
@@ -4163,142 +3934,6 @@ mod tests {
     }
 
     #[test]
-    fn serializes_audio_user_input_without_tags() -> Result<()> {
-        for (audio, wire) in [
-            (
-                AudioReference::Inline {
-                    audio_url: "data:audio/wav;base64,abc".into(),
-                },
-                serde_json::json!({"type": "input_audio", "audio_url": "data:audio/wav;base64,abc"}),
-            ),
-            (
-                AudioReference::File {
-                    file_id: "file_audio".into(),
-                },
-                serde_json::json!({"type": "input_audio", "file_id": "file_audio"}),
-            ),
-        ] {
-            let input = UserInput::Audio {
-                audio: audio.clone(),
-            };
-            assert_eq!(
-                serde_json::from_value::<UserInput>(serde_json::to_value(&input)?)?,
-                input
-            );
-            let item = ResponseInputItem::from(vec![input]);
-            assert_eq!(
-                item,
-                ResponseInputItem::Message {
-                    role: "user".into(),
-                    content: vec![ContentItem::InputAudio { audio }],
-                    phase: None,
-                }
-            );
-            assert_eq!(
-                serde_json::to_value(&item)?,
-                serde_json::json!({
-                    "type": "message", "role": "user", "content": [wire],
-                })
-            );
-            assert_eq!(
-                serde_json::from_value::<ResponseInputItem>(serde_json::to_value(&item)?)?,
-                item
-            );
-        }
-        Ok(())
-    }
-
-    #[test]
-    fn serializes_local_audio_user_input_with_label_and_data_url() -> Result<()> {
-        let temp_dir = tempdir()?;
-        for (extension, mime) in [
-            ("wav", "audio/wav"),
-            ("mp3", "audio/mpeg"),
-            ("m4a", "audio/mp4"),
-            ("webm", "audio/webm"),
-            ("ogg", "audio/ogg"),
-        ] {
-            let audio_path = temp_dir.path().join(format!("sample.{extension}"));
-            std::fs::write(&audio_path, b"audio")?;
-
-            let item = ResponseInputItem::from(vec![UserInput::LocalAudio {
-                path: audio_path.clone(),
-            }]);
-
-            assert_eq!(
-                item,
-                ResponseInputItem::Message {
-                    role: "user".to_string(),
-                    content: vec![
-                        ContentItem::InputText {
-                            text: local_audio_open_tag_text_with_path(
-                                /*label_number*/ 1,
-                                &audio_path,
-                            ),
-                        },
-                        ContentItem::InputAudio {
-                            audio: AudioReference::Inline {
-                                audio_url: format!("data:{mime};base64,YXVkaW8=")
-                            },
-                        },
-                        ContentItem::InputText {
-                            text: audio_close_tag_text(),
-                        },
-                    ],
-                    phase: None,
-                }
-            );
-        }
-
-        Ok(())
-    }
-
-    #[test]
-    fn replaces_unsupported_local_audio_format_with_placeholder() -> Result<()> {
-        let temp_dir = tempdir()?;
-        let audio_path = temp_dir.path().join("sample.flac");
-        std::fs::write(&audio_path, b"audio")?;
-
-        let item = ResponseInputItem::from(vec![UserInput::LocalAudio {
-            path: audio_path.clone(),
-        }]);
-
-        assert_eq!(
-            item,
-            ResponseInputItem::Message {
-                role: "user".to_string(),
-                content: vec![ContentItem::InputText {
-                    text: format!(
-                        "Codex cannot attach audio at `{}`: unsupported audio format; use wav, mp3, m4a, webm, or ogg.",
-                        audio_path.display()
-                    ),
-                }],
-                phase: None,
-            }
-        );
-
-        Ok(())
-    }
-
-    #[test]
-    fn replaces_unreadable_local_audio_with_placeholder() {
-        let audio_path = PathBuf::from("missing.wav");
-
-        let item = ResponseInputItem::from(vec![UserInput::LocalAudio { path: audio_path }]);
-
-        let ResponseInputItem::Message { content, .. } = item else {
-            panic!("expected message response");
-        };
-        let [ContentItem::InputText { text }] = content.as_slice() else {
-            panic!("expected local audio error placeholder");
-        };
-        assert!(
-            text.starts_with("Codex could not read the local audio at `missing.wav`: "),
-            "unexpected placeholder: {text}"
-        );
-    }
-
-    #[test]
     fn image_user_input_preserves_requested_detail() -> Result<()> {
         let image_url = "data:image/png;base64,abc".to_string();
 
@@ -4602,54 +4237,6 @@ mod tests {
             }
             other => panic!("expected message response but got {other:?}"),
         }
-
-        Ok(())
-    }
-
-    #[test]
-    fn mixed_remote_and_local_audio_share_label_sequence() -> Result<()> {
-        let audio_url = "data:audio/wav;base64,abc".to_string();
-        let dir = tempdir()?;
-        let local_path = dir.path().join("local.mp3");
-        std::fs::write(&local_path, b"audio")?;
-
-        let item = ResponseInputItem::from(vec![
-            UserInput::Audio {
-                audio: AudioReference::Inline {
-                    audio_url: audio_url.clone(),
-                },
-            },
-            UserInput::LocalAudio {
-                path: local_path.clone(),
-            },
-        ]);
-
-        assert_eq!(
-            item,
-            ResponseInputItem::Message {
-                role: "user".to_string(),
-                content: vec![
-                    ContentItem::InputAudio {
-                        audio: AudioReference::Inline { audio_url }
-                    },
-                    ContentItem::InputText {
-                        text: local_audio_open_tag_text_with_path(
-                            /*label_number*/ 2,
-                            &local_path,
-                        ),
-                    },
-                    ContentItem::InputAudio {
-                        audio: AudioReference::Inline {
-                            audio_url: "data:audio/mpeg;base64,YXVkaW8=".to_string()
-                        }
-                    },
-                    ContentItem::InputText {
-                        text: audio_close_tag_text(),
-                    },
-                ],
-                phase: None,
-            }
-        );
 
         Ok(())
     }

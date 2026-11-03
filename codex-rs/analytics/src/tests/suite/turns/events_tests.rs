@@ -35,12 +35,10 @@ use codex_app_server_protocol::PatchApplyStatus;
 use codex_app_server_protocol::ServerNotification;
 use codex_app_server_protocol::SubAgentActivityKind;
 use codex_app_server_protocol::ThreadItemPayload;
-use codex_app_server_protocol::ThreadRealtimeStartedNotification;
 use codex_app_server_protocol::TurnStatus as AppServerTurnStatus;
 use codex_app_server_protocol::WebSearchItem;
 use codex_protocol::error::CodexErr;
 use codex_protocol::error::UsageLimitReachedError;
-use codex_protocol::protocol::RealtimeConversationVersion;
 use codex_protocol::protocol::ThreadSource;
 use pretty_assertions::assert_eq;
 use serde_json::json;
@@ -110,7 +108,6 @@ fn turn_event_serializes_expected_shape() {
                 "plugins~Plugin_example".to_string(),
                 "test@marketplace".to_string(),
             ]),
-            voice_session_id: None,
             root_turn_id: Some("turn-2".to_string()),
             turn_trigger: Some("user".to_string()),
             codex_turn_source: Some("composer".to_string()),
@@ -200,7 +197,6 @@ fn turn_event_serializes_expected_shape() {
                 "session_id": "session-thread-2",
                 "turn_id": "turn-2",
                 "active_plugin_ids_at_turn_start": ["plugins~Plugin_example", "test@marketplace"],
-                "voice_session_id": null,
                 "root_turn_id": "turn-2",
                 "turn_trigger": "user",
                 "codex_turn_source": "composer",
@@ -470,19 +466,6 @@ async fn turn_event_counts_completed_tool_items() {
         )
         .await;
 
-    reducer
-        .ingest(
-            AnalyticsFact::Notification(Box::new(ServerNotification::ThreadRealtimeStarted(
-                ThreadRealtimeStartedNotification {
-                    thread_id: "thread-2".to_string(),
-                    realtime_session_id: Some("work-voice-456".to_string()),
-                    version: RealtimeConversationVersion::V2,
-                },
-            ))),
-            &mut out,
-        )
-        .await;
-
     let mcp_tool_call_item = |status, duration_ms| ThreadItemPayload::McpToolCall {
         id: "mcp-1".to_string(),
         server: "server".to_string(),
@@ -690,10 +673,6 @@ async fn turn_event_counts_completed_tool_items() {
     let payload = serde_json::to_value(mcp_tool_call_event).expect("serialize MCP tool call event");
     assert_eq!(payload["event_params"]["plugin_id"], json!("sample@test"));
     assert_eq!(
-        payload["event_params"]["voice_session_id"],
-        "work-voice-456"
-    );
-    assert_eq!(
         payload["event_params"]["connector_id"],
         json!("connector-test")
     );
@@ -716,10 +695,6 @@ async fn turn_event_counts_completed_tool_items() {
         .expect("turn event should be emitted");
     let payload = serde_json::to_value(turn_event).expect("serialize turn event");
     assert_eq!(payload["event_params"]["root_turn_id"], "root-ancestor");
-    assert_eq!(
-        payload["event_params"]["voice_session_id"],
-        "work-voice-456"
-    );
     assert_eq!(payload["event_params"]["total_tool_call_count"], json!(9));
     assert_eq!(payload["event_params"]["shell_command_count"], json!(1));
     assert_eq!(payload["event_params"]["file_change_count"], json!(1));

@@ -79,7 +79,6 @@ fn turn_context_item(
         comp_hash: None,
         collaboration_mode: None,
         multi_agent_version: None,
-        realtime_active: None,
         cyber_access_program: None,
         effort: None,
         summary: Some(codex_protocol::config_types::ReasoningSummary::Auto),

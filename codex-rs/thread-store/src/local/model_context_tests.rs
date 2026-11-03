@@ -752,7 +752,6 @@ fn turn_context(root: &Path, turn_id: &str) -> RolloutItem {
         comp_hash: None,
         collaboration_mode: None,
         multi_agent_version: None,
-        realtime_active: None,
         cyber_access_program: None,
         effort: None,
         summary: Some(ReasoningSummary::Auto),

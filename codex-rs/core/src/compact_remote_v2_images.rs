@@ -21,13 +21,12 @@ pub(super) fn content_item_token_count(item: &ContentItem) -> usize {
             approx_tokens_from_byte_count_i64(estimate_image_reference_bytes(image, *detail)),
         )
         .unwrap_or(usize::MAX),
-        ContentItem::InputAudio { .. } => 0,
     }
 }
 
 /// Retain later parts of an image-containing boundary message, keeping each
 /// image and its adjacent harness labels atomic. Text keeps its existing middle
-/// truncation policy; audio remains uncharged and is preserved as before.
+/// truncation policy.
 pub(super) fn truncate_message_to_token_budget(
     mut envelope: ResponseItemEnvelope,
     max_tokens: usize,
@@ -87,7 +86,6 @@ pub(super) fn truncate_message_to_token_budget(
                     retained.push(item);
                 }
             }
-            ContentItem::InputAudio { .. } => retained.push(item),
             ContentItem::InputImage { .. } => unreachable!("images are handled atomically above"),
         }
     }

@@ -237,17 +237,6 @@ fn item_to_cells(
             client_id,
             content,
         } => {
-            if content.iter().any(|input| {
-                matches!(
-                    input,
-                    UserInput::Audio { .. } | UserInput::LocalAudio { .. }
-                )
-            }) {
-                tracing::warn!(
-                    user_message_id = id,
-                    "audio user inputs are not supported by the TUI and will be omitted"
-                );
-            }
             let item = UserMessageItem {
                 id,
                 client_id,

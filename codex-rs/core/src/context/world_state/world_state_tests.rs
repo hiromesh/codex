@@ -1,6 +1,5 @@
 use super::*;
 use codex_context_fragments::AnnotatedContent;
-use codex_protocol::models::AudioReference;
 use codex_protocol::models::ContentItem;
 use codex_protocol::models::ContentItemKind;
 use codex_protocol::models::input_text;
@@ -76,15 +75,13 @@ fn world_state_hash_normalizes_crlf_line_endings() {
 
 #[test]
 fn world_state_hash_tracks_typed_content_and_role() {
-    let hash = |role, audio_url: &str| {
+    let hash = |role, text: &str| {
         WorldStateHash::from_fragment(&WorldStateContextFragment {
             fragment: RenderedWorldStateFragment::new(
                 role,
                 ("", ""),
-                ContentItem::InputAudio {
-                    audio: AudioReference::Inline {
-                        audio_url: audio_url.to_string(),
-                    },
+                ContentItem::InputText {
+                    text: text.to_string(),
                 },
             ),
             content_kind: ContentItemKind("generic.test".to_string()),
@@ -92,14 +89,14 @@ fn world_state_hash_tracks_typed_content_and_role() {
     };
 
     assert_eq!(
-        hash("developer", "audio-one"),
-        hash("developer", "audio-one")
+        hash("developer", "text-one"),
+        hash("developer", "text-one")
     );
     assert_ne!(
-        hash("developer", "audio-one"),
-        hash("developer", "audio-two")
+        hash("developer", "text-one"),
+        hash("developer", "text-two")
     );
-    assert_ne!(hash("developer", "audio-one"), hash("user", "audio-one"));
+    assert_ne!(hash("developer", "text-one"), hash("user", "text-one"));
 }
 
 #[test]

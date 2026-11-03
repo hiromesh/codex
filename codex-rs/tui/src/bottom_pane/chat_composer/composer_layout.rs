@@ -62,7 +62,7 @@ impl ChatComposer {
             (composer, popup, footer)
         } else {
             let [composer, popup] = Layout::vertical([
-                Constraint::Min(3 + voice_rows),
+                Constraint::Min(3),
                 Constraint::Max(popup_height),
             ])
             .areas(area);

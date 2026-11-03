@@ -44,7 +44,6 @@ pub(super) fn same_source(previous: Option<&CodexAuth>, current: Option<&CodexAu
         CodexAuth::ApiKey(_)
         | CodexAuth::PersonalAccessToken(_)
         | CodexAuth::Headers(_)
-        | CodexAuth::AgentIdentity(_)
         | CodexAuth::BedrockApiKey(_)
         | CodexAuth::BedrockAccessKeys(_) => false,
     }

@@ -1060,11 +1060,6 @@ fn sanitize_mcp_tool_result_for_model_rewrites_unsupported_media_content() {
                 "mimeType": "image/png",
             }),
             serde_json::json!({
-                "type": "audio",
-                "data": "YmFy",
-                "mimeType": "audio/wav",
-            }),
-            serde_json::json!({
                 "type": "text",
                 "text": "hello",
             }),
@@ -1087,10 +1082,6 @@ fn sanitize_mcp_tool_result_for_model_rewrites_unsupported_media_content() {
                 }),
                 serde_json::json!({
                     "type": "text",
-                    "text": "<audio content omitted because you do not support audio input>",
-                }),
-                serde_json::json!({
-                    "type": "text",
                     "text": "hello",
                 }),
             ],
@@ -1110,11 +1101,6 @@ fn sanitize_mcp_tool_result_for_model_preserves_supported_media() {
                 "data": "Zm9v",
                 "mimeType": "image/png",
             }),
-            serde_json::json!({
-                "type": "audio",
-                "data": "YmFy",
-                "mimeType": "audio/wav",
-            }),
         ],
         structured_content: Some(serde_json::json!({"x": 1})),
         is_error: Some(false),
@@ -1125,7 +1111,6 @@ fn sanitize_mcp_tool_result_for_model_preserves_supported_media() {
         &[
             InputModality::Text,
             InputModality::Image,
-            InputModality::Audio,
         ],
         Ok(original.clone()),
     )

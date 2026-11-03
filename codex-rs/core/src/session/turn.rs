@@ -99,7 +99,6 @@ use codex_protocol::error::Result as CodexResult;
 use codex_protocol::items::PlanItem;
 use codex_protocol::items::TurnItem;
 use codex_protocol::items::build_hook_prompt_message;
-use codex_protocol::models::AudioReference;
 use codex_protocol::models::BaseInstructions;
 use codex_protocol::models::ContentItem;
 use codex_protocol::models::MessagePhase;
@@ -182,20 +181,6 @@ pub(crate) async fn run_turn(
     prewarmed_client_session: Option<ModelClientSession>,
     cancellation_token: CancellationToken,
 ) -> CodexResult<Option<String>> {
-    if input.iter().any(turn_input_has_uploaded_audio_file) {
-        let result = run_hooks_and_record_inputs(
-            &sess,
-            &turn_context,
-            &turn_context.capture_current_model_info(),
-            &input,
-            PersistContext::TurnStart,
-        )
-        .await;
-        return match result {
-            Err(err) => Err(err),
-            Ok(_) => Err(uploaded_audio_disabled_error()),
-        };
-    }
     let auto_compaction_enabled = sess
         .services
         .thread_extension_data
@@ -884,26 +869,9 @@ pub(crate) async fn run_hooks_and_record_inputs(
     input: &[TurnInput],
     persist_context: PersistContext,
 ) -> CodexResult<bool> {
-    let rejected_uploaded_audio = input.iter().any(turn_input_has_uploaded_audio_file);
     let mut blocked_input = false;
     let mut accepted_user_input = false;
     for input_item in input {
-        let filtered_input;
-        let input_item = match input_item {
-            TurnInput::UserInput { content, .. } if content.iter().any(is_uploaded_audio_file) => {
-                let mut filtered = input_item.clone();
-                let TurnInput::UserInput { content, .. } = &mut filtered else {
-                    unreachable!("cloned user input must remain user input");
-                };
-                content.retain(|item| !is_uploaded_audio_file(item));
-                if content.is_empty() {
-                    continue;
-                }
-                filtered_input = filtered;
-                &filtered_input
-            }
-            _ => input_item,
-        };
         let hook_outcome = inspect_pending_input(sess, turn_context, input_item).await;
         if hook_outcome.should_stop {
             blocked_input = true;
@@ -935,29 +903,7 @@ pub(crate) async fn run_hooks_and_record_inputs(
             .await;
         }
     }
-    if rejected_uploaded_audio {
-        return Err(uploaded_audio_disabled_error());
-    }
     Ok(blocked_input && !accepted_user_input)
-}
-
-fn turn_input_has_uploaded_audio_file(input: &TurnInput) -> bool {
-    matches!(input, TurnInput::UserInput { content, .. } if content.iter().any(is_uploaded_audio_file))
-}
-
-fn uploaded_audio_disabled_error() -> CodexErr {
-    CodexErr::UnsupportedOperation(
-        "Uploaded audio file inputs are not enabled in this build.".to_string(),
-    )
-}
-
-fn is_uploaded_audio_file(input: &UserInput) -> bool {
-    matches!(
-        input,
-        UserInput::Audio {
-            audio: AudioReference::File { .. }
-        }
-    )
 }
 
 fn turn_user_input(input: &[TurnInput]) -> Vec<UserInput> {

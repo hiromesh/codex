@@ -15,6 +15,7 @@ use core_test_support::responses;
 use core_test_support::streaming_sse::StreamingSseChunk;
 use core_test_support::streaming_sse::start_streaming_sse_server;
 use core_test_support::test_codex::TestCodex;
+use core_test_support::test_codex::submit_queue_barrier;
 use core_test_support::test_codex::test_codex;
 use core_test_support::wait_for_event;
 use pretty_assertions::assert_eq;
@@ -135,13 +136,7 @@ async fn mailbox_preemption_preserves_response_when_deferred(
             .await?;
     }
     // The barrier confirms that both messages were queued before finishing the item.
-    test.codex
-        .submit(Op::RealtimeConversationListVoices)
-        .await?;
-    wait_for_event(&test.codex, |event| {
-        matches!(event, EventMsg::RealtimeConversationListVoicesResponse(_))
-    })
-    .await;
+    submit_queue_barrier(&test.codex).await;
     release.send(()).expect("release response");
     wait_for_event(&test.codex, |event| {
         matches!(event, EventMsg::TurnComplete(_))
@@ -533,13 +528,7 @@ async fn start_mailbox_preemption(
             .await?;
     }
     // The barrier confirms that both messages were queued before finishing the item.
-    test.codex
-        .submit(Op::RealtimeConversationListVoices)
-        .await?;
-    wait_for_event(&test.codex, |event| {
-        matches!(event, EventMsg::RealtimeConversationListVoicesResponse(_))
-    })
-    .await;
+    submit_queue_barrier(&test.codex).await;
     release.send(()).expect("release response");
     Ok(test)
 }

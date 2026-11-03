@@ -563,7 +563,7 @@ pub fn content_items_to_text(content: &[ContentItem]) -> Option<String> {
                     pieces.push(text.as_str());
                 }
             }
-            ContentItem::InputImage { .. } | ContentItem::InputAudio { .. } => {}
+            ContentItem::InputImage { .. } => {}
         }
     }
     if pieces.is_empty() {
@@ -755,7 +755,7 @@ fn build_compacted_history_with_limit(
             };
             if !preserve_content {
                 // Select text and its annotations by the same source index.
-                // Do not clone discarded images/audio or infer their text's source.
+                // Do not clone discarded images or infer their text's source.
                 let metadata = internal_chat_message_metadata_passthrough.as_ref();
                 let mut parts: Vec<_> = crate::event_mapping::user_input_parts(content)
                     .filter_map(|(index, part)| {

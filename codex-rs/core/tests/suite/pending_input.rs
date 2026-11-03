@@ -57,6 +57,7 @@ use core_test_support::streaming_sse::StreamingSseChunk;
 use core_test_support::streaming_sse::StreamingSseServer;
 use core_test_support::streaming_sse::start_streaming_sse_server;
 use core_test_support::test_codex::TestCodex;
+use core_test_support::test_codex::submit_queue_barrier;
 use core_test_support::test_codex::test_codex;
 use core_test_support::test_codex::turn_permission_fields;
 use core_test_support::wait_for_event;
@@ -409,14 +410,7 @@ async fn enqueue_queue_only_agent_mail(codex: &CodexThread, text: &str) {
 
 async fn submit_queue_only_agent_mail(codex: &CodexThread, text: &str) {
     enqueue_queue_only_agent_mail(codex, text).await;
-    codex
-        .submit(Op::RealtimeConversationListVoices)
-        .await
-        .expect("submit list-voices barrier");
-    wait_for_event(codex, |event| {
-        matches!(event, EventMsg::RealtimeConversationListVoicesResponse(_))
-    })
-    .await;
+    submit_queue_barrier(codex).await;
 }
 
 async fn wait_for_reasoning_item_started(codex: &CodexThread) {
@@ -1530,18 +1524,6 @@ async fn injected_response_item_reopens_turn_after_final_answer() {
     submit_user_input(&codex, INITIAL_PROMPT).await;
     wait_for_reasoning_item_started(&codex).await;
 
-    let rejected = vec![
-        responses::user_message_item("rejected injection prefix"),
-        serde_json::from_value(json!({
-            "type": "message", "role": "user",
-            "content": [{"type": "input_audio", "file_id": "file_live_injection"}],
-        }))
-        .expect("raw audio message"),
-    ];
-    assert_eq!(
-        codex.inject_if_running(rejected.clone()).await,
-        Err(rejected)
-    );
     assert!(
         codex
             .inject_if_running(vec![responses::user_message_item(INJECTED_CONTEXT)])
@@ -2403,11 +2385,7 @@ async fn terminal_compaction_error_does_not_retry_pending_input(
                     start_options: Default::default(),
                 })
                 .await?;
-            codex.submit(Op::RealtimeConversationListVoices).await?;
-            wait_for_event(codex, |event| {
-                matches!(event, EventMsg::RealtimeConversationListVoicesResponse(_))
-            })
-            .await;
+            submit_queue_barrier(codex).await;
         }
     }
     release_failure.send(()).expect("release compact failure");

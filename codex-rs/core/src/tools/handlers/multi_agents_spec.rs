@@ -572,7 +572,7 @@ fn create_collab_input_items_schema() -> JsonSchema {
         (
             "type".to_string(),
             JsonSchema::string(Some(
-                "Input item type: text, image, local_image, audio, local_audio, skill, or mention."
+                "Input item type: text, image, local_image, skill, or mention."
                     .to_string(),
             )),
         ),
@@ -585,13 +585,9 @@ fn create_collab_input_items_schema() -> JsonSchema {
             JsonSchema::string(Some("Image URL when type is image.".to_string())),
         ),
         (
-            "audio_url".to_string(),
-            JsonSchema::string(Some("Audio data URL when type is audio.".to_string())),
-        ),
-        (
             "path".to_string(),
             JsonSchema::string(Some(
-                "Path when type is local_image/local_audio/skill, or structured mention target such as app://<connector-id> or plugin://<plugin-name>@<marketplace-name> when type is mention."
+                "Path when type is local_image/skill, or structured mention target such as app://<connector-id> or plugin://<plugin-name>@<marketplace-name> when type is mention."
                     .to_string(),
             )),
         ),

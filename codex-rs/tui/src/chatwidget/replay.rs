@@ -68,9 +68,7 @@ impl ChatWidget {
             }
             _ => return true,
         };
-        if resumed_turn_id != *turn_id
-            || self.is_realtime_delegated_reasoning_item(turn_id, item_id)
-        {
+        if resumed_turn_id != *turn_id {
             return false;
         }
         self.restore_active_reasoning_item(
@@ -287,20 +285,6 @@ impl ChatWidget {
                 questions,
                 ..
             } => {
-                if self.complete_realtime_delegated_agent_item(
-                    &turn_id,
-                    &ThreadItemPayload::AgentMessage {
-                        id: id.clone(),
-                        text: text.clone(),
-                        phase: phase.clone(),
-                        memory_citation: memory_citation.clone(),
-                        delivery,
-                        questions: questions.clone(),
-                    },
-                    from_replay,
-                ) {
-                    return;
-                }
                 self.on_agent_message_item_completed(
                     AgentMessageItem {
                         id,

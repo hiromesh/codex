@@ -373,12 +373,7 @@ impl ChatWidget {
         now: Instant,
     ) -> Option<String> {
         if self.terminal_title_shows_action_required_with_selections(selections) {
-            let title = self.action_required_terminal_title_text(selections, now);
-            return Some(if self.realtime_microphone_is_listening() {
-                format!("● {title}")
-            } else {
-                title
-            });
+            return Some(self.action_required_terminal_title_text(selections, now));
         }
 
         let mut previous = None;
@@ -1056,13 +1051,6 @@ impl ChatWidget {
             && self.local_settings.tui.effects.progress
             && self.terminal_title_has_active_progress())
         .then(|| self.terminal_title_spinner_frame_at(now));
-        if self.realtime_microphone_is_listening() {
-            return Some(match spinner {
-                Some(frame) => format!("● {frame}"),
-                None => "●".to_string(),
-            });
-        }
-
         spinner.map(str::to_string)
     }
 

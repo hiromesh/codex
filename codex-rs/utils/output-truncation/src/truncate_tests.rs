@@ -191,7 +191,7 @@ fn truncates_across_multiple_under_limit_texts_and_reports_omitted() {
     ];
 
     let output =
-        truncate_function_output_items_with_policy(&items, TruncationPolicy::Tokens(limit), |_| 0);
+        truncate_function_output_items_with_policy(&items, TruncationPolicy::Tokens(limit));
 
     assert_eq!(output.len(), 5);
 
@@ -243,7 +243,7 @@ fn truncate_function_output_items_with_policy_discards_empty_text() {
     ];
     for policy in [TruncationPolicy::Bytes(0), TruncationPolicy::Tokens(1)] {
         assert_eq!(
-            truncate_function_output_items_with_policy(&items, policy, |_| 0),
+            truncate_function_output_items_with_policy(&items, policy),
             Vec::new()
         );
     }
@@ -264,9 +264,6 @@ fn truncate_function_output_items_with_policy_discards_empty_text() {
             },
             detail: Some(DEFAULT_IMAGE_DETAIL),
         },
-        FunctionCallOutputContentItem::InputAudio {
-            audio_url: "audio:one".to_string(),
-        },
         FunctionCallOutputContentItem::EncryptedContent {
             encrypted_content: "enc_opaque".to_string(),
         },
@@ -274,7 +271,7 @@ fn truncate_function_output_items_with_policy_discards_empty_text() {
     items.extend(content.clone());
     for policy in [TruncationPolicy::Bytes(16), TruncationPolicy::Tokens(4)] {
         assert_eq!(
-            truncate_function_output_items_with_policy(&items, policy, |_| 1),
+            truncate_function_output_items_with_policy(&items, policy),
             content
         );
     }
@@ -285,11 +282,11 @@ fn formatted_text_output_reuses_owned_items_under_limit() {
     let items = vec![text("alpha"), text(""), text("beta")];
     let policy = TruncationPolicy::Bytes(32);
 
-    let borrowed = formatted_truncate_function_output_items_with_policy(&items, policy, |_| 0);
+    let borrowed = formatted_truncate_function_output_items_with_policy(&items, policy);
     assert_eq!(borrowed, items);
 
     let allocation = items.as_ptr();
-    let owned = formatted_truncate_function_output_items_with_policy(items, policy, |_| 0);
+    let owned = formatted_truncate_function_output_items_with_policy(items, policy);
     assert_eq!(owned, borrowed);
     assert_eq!(owned.as_ptr(), allocation);
 }
@@ -301,7 +298,6 @@ fn formatted_text_output_preserves_empty_leading_text_behavior() {
     let output = formatted_truncate_function_output_items_with_policy(
         items,
         TruncationPolicy::Bytes(0),
-        |_| 0,
     );
 
     assert_eq!(
@@ -313,10 +309,7 @@ fn formatted_text_output_preserves_empty_leading_text_behavior() {
 }
 
 #[test]
-fn formatted_mixed_output_budgets_text_and_audio_in_order() {
-    let audio = FunctionCallOutputContentItem::InputAudio {
-        audio_url: "audio:one".to_owned(),
-    };
+fn formatted_mixed_output_budgets_text_and_images_in_order() {
     let file_image = FunctionCallOutputContentItem::InputImage {
         image: ImageReference::File {
             file_id: "file_123".to_owned(),
@@ -327,7 +320,6 @@ fn formatted_mixed_output_budgets_text_and_audio_in_order() {
         text("abcd"),
         inline_image("img:one".to_owned()),
         text("efgh"),
-        audio.clone(),
         file_image.clone(),
         text("ijkl"),
         inline_image("img:two".to_owned()),
@@ -336,7 +328,6 @@ fn formatted_mixed_output_budgets_text_and_audio_in_order() {
     let output = formatted_truncate_function_output_items_with_policy(
         items,
         TruncationPolicy::Bytes(12),
-        |_| 1,
     );
 
     assert_eq!(
@@ -345,7 +336,6 @@ fn formatted_mixed_output_budgets_text_and_audio_in_order() {
             text("abcd"),
             inline_image("img:one".to_owned()),
             text("efgh"),
-            audio,
             file_image,
             inline_image("img:two".to_owned()),
             text("[omitted 1 text items ...]"),
@@ -363,69 +353,9 @@ fn formatted_mixed_output_preserves_encrypted_content() {
     let output = formatted_truncate_function_output_items_with_policy(
         items,
         TruncationPolicy::Bytes(2),
-        |_| 0,
     );
 
     assert_eq!(output, vec![text("a…6 chars truncated…h"), encrypted]);
-}
-
-#[test]
-fn truncate_function_output_items_with_policy_omits_audio_over_budget() {
-    let items = vec![
-        FunctionCallOutputContentItem::InputText {
-            text: "abcdefgh".to_string(),
-        },
-        FunctionCallOutputContentItem::EncryptedContent {
-            encrypted_content: "enc_opaque".to_string(),
-        },
-        FunctionCallOutputContentItem::InputAudio {
-            audio_url: "audio:one".to_string(),
-        },
-    ];
-
-    let output =
-        truncate_function_output_items_with_policy(&items, TruncationPolicy::Bytes(2), |_| 1);
-
-    assert_eq!(
-        output,
-        vec![
-            FunctionCallOutputContentItem::InputText {
-                text: "a…6 chars truncated…h".to_string(),
-            },
-            FunctionCallOutputContentItem::EncryptedContent {
-                encrypted_content: "enc_opaque".to_string(),
-            },
-            FunctionCallOutputContentItem::InputText {
-                text: "[omitted 1 audio items ...]".to_string(),
-            },
-        ]
-    );
-}
-
-#[test]
-fn truncate_function_output_items_with_policy_charges_audio_against_byte_budget() {
-    let audio = FunctionCallOutputContentItem::InputAudio {
-        audio_url: "audio:one".to_string(),
-    };
-    let items = vec![
-        audio.clone(),
-        FunctionCallOutputContentItem::InputText {
-            text: "abcdefgh".to_string(),
-        },
-    ];
-
-    let output =
-        truncate_function_output_items_with_policy(&items, TruncationPolicy::Bytes(5), |_| 1);
-
-    assert_eq!(
-        output,
-        vec![
-            audio,
-            FunctionCallOutputContentItem::InputText {
-                text: truncate_text("abcdefgh", TruncationPolicy::Bytes(1)),
-            },
-        ]
-    );
 }
 
 #[test]
@@ -435,7 +365,6 @@ fn formatted_text_output_merges_all_text_for_token_budget() {
     let output = formatted_truncate_function_output_items_with_policy(
         items,
         TruncationPolicy::Tokens(2),
-        |_| 0,
     );
 
     assert_eq!(
@@ -477,12 +406,11 @@ fn inline_image(image_url: String) -> FunctionCallOutputContentItem {
 
 #[test]
 fn boundary_formatters_normalize_input_and_remap_truncated_text() {
-    let audio_cost: fn(&str) -> usize = |_| 1;
     let items = [text("left-head"), text("right-tail")];
     let max_tokens = 2;
     let mut boundary = boundaries([(0, 0), (0, 2), (1, 0), (1, 8), (2, 0)]);
     let output =
-        formatted_output_at_token_boundaries(&items, max_tokens, audio_cost, &mut boundary);
+        formatted_output_at_token_boundaries(&items, max_tokens, &mut boundary);
     let [FunctionCallOutputContentItem::InputText { text: rendered }] = output.as_slice() else {
         panic!("expected one merged text item")
     };
@@ -510,8 +438,8 @@ fn boundary_formatters_normalize_input_and_remap_truncated_text() {
         ] {
             for tokens in [0, 1, 2, 256] {
                 let mut b = boundaries([(0, 1), (1, usize::MAX), (0, 8), (usize::MAX, usize::MAX)]);
-                let output = formatter(&items, tokens, audio_cost, &mut b);
-                assert_eq!(output, formatter(&items, tokens, audio_cost, &mut []));
+                let output = formatter(&items, tokens, &mut b);
+                assert_eq!(output, formatter(&items, tokens, &mut []));
                 let result = positions(b);
                 assert!(result.is_sorted());
                 assert!(
@@ -543,8 +471,8 @@ fn owned_mixed_output_moves_a_preserved_image_across_text_truncation() {
     let mut borrowed = boundaries([(0, 5), (2, 3)]);
     let mut owned = boundaries([(0, 5), (2, 3)]);
     let max_tokens = 1;
-    let expected = formatted_output_at_token_boundaries(&items, max_tokens, |_| 0, &mut borrowed);
-    let actual = formatted_output_at_token_boundaries(items, max_tokens, |_| 0, &mut owned);
+    let expected = formatted_output_at_token_boundaries(&items, max_tokens, &mut borrowed);
+    let actual = formatted_output_at_token_boundaries(items, max_tokens, &mut owned);
     assert_eq!(actual, expected);
     let projected = positions(owned);
     assert_eq!(projected, positions(borrowed));

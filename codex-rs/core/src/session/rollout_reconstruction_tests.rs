@@ -426,7 +426,6 @@ async fn record_initial_history_restores_world_state_baseline(input: BaselineTur
                 model: context_item.model.clone(),
                 comp_hash: context_item.comp_hash.clone(),
                 cyber_access_program: None,
-                realtime_active: context_item.realtime_active,
             }),
             serde_json::to_value(Some(context_item)).unwrap(),
         )
@@ -464,7 +463,6 @@ async fn record_initial_history_resumed_bare_turn_context_does_not_hydrate_previ
         comp_hash: None,
         collaboration_mode: Some(turn_context.collaboration_mode()),
         multi_agent_version: None,
-        realtime_active: Some(turn_context.realtime_active),
         cyber_access_program: None,
         effort: turn_context.reasoning_effort().cloned(),
         summary: Some(codex_protocol::config_types::ReasoningSummary::Auto),
@@ -510,7 +508,6 @@ async fn record_initial_history_resumed_hydrates_previous_turn_settings_from_lif
         comp_hash: Some("comp-hash-a".to_string()),
         collaboration_mode: Some(turn_context.collaboration_mode()),
         multi_agent_version: None,
-        realtime_active: Some(turn_context.realtime_active),
         cyber_access_program: None,
         effort: turn_context.reasoning_effort().cloned(),
         summary: Some(codex_protocol::config_types::ReasoningSummary::Auto),
@@ -573,7 +570,6 @@ async fn record_initial_history_resumed_hydrates_previous_turn_settings_from_lif
             model: previous_model.to_string(),
             comp_hash: Some("comp-hash-a".to_string()),
             cyber_access_program: None,
-            realtime_active: Some(turn_context.realtime_active),
         })
     );
 }
@@ -711,7 +707,6 @@ async fn reconstruct_history_rollback_keeps_history_and_metadata_in_sync_for_com
         json!({
             "model": turn_context.model_info().slug,
             "comp_hash": null,
-            "realtime_active": turn_context.realtime_active,
             "cyber_access_program": "daybreak_blue",
         })
     );
@@ -821,7 +816,6 @@ async fn reconstruct_history_rollback_keeps_history_and_metadata_in_sync_for_inc
         json!({
             "model": turn_context.model_info().slug,
             "comp_hash": null,
-            "realtime_active": turn_context.realtime_active,
             "cyber_access_program": "daybreak_blue",
         })
     );
@@ -969,7 +963,6 @@ async fn reconstruct_history_rollback_skips_non_user_turns_for_history_and_metad
             model: turn_context.model_info().slug.clone(),
             comp_hash: None,
             cyber_access_program: None,
-            realtime_active: Some(turn_context.realtime_active),
         })
     );
     assert_eq!(
@@ -1081,7 +1074,6 @@ async fn reconstruct_history_rollback_counts_inter_agent_assistant_turns() {
             model: turn_context.model_info().slug.clone(),
             comp_hash: None,
             cyber_access_program: None,
-            realtime_active: Some(turn_context.realtime_active),
         })
     );
     assert_eq!(
@@ -1338,7 +1330,6 @@ async fn record_initial_history_resumed_rollback_drops_incomplete_user_turn_comp
             model: turn_context.model_info().slug.clone(),
             comp_hash: None,
             cyber_access_program: None,
-            realtime_active: Some(turn_context.realtime_active),
         })
     );
     assert_eq!(
@@ -1599,7 +1590,6 @@ async fn bounded_replay_matches_full_replay_after_empty_turn_compactions(
         context.turn_id = Some(format!("wake-{window_number}"));
         context.model = format!("model-{window_number}");
         context.comp_hash = Some(format!("hash-{window_number}"));
-        context.realtime_active = Some(window_number == 2);
         let mut wake_items = completed_user_turn_rollout(
             context.clone(),
             vec![
@@ -1630,7 +1620,6 @@ async fn bounded_replay_matches_full_replay_after_empty_turn_compactions(
                             model: format!("metadata-model-{window_number}"),
                             comp_hash: Some(format!("metadata-hash-{window_number}")),
                             cyber_access_program: None,
-                            realtime_active: Some(false),
                         }),
                     }),
                 })),
@@ -1878,7 +1867,6 @@ async fn completed_turn_suffix_after_compaction_overrides_resume_metadata(
         model: newer_context.model.clone(),
         comp_hash: newer_context.comp_hash.clone(),
         cyber_access_program: None,
-        realtime_active: newer_context.realtime_active,
     };
     let mut rollout_items = vec![
         RolloutItem::Compacted(Box::new(object!({
@@ -2149,7 +2137,6 @@ async fn record_initial_history_resumed_turn_context_after_compaction_reestablis
         comp_hash: None,
         collaboration_mode: Some(turn_context.collaboration_mode()),
         multi_agent_version: None,
-        realtime_active: Some(turn_context.realtime_active),
         cyber_access_program: None,
         effort: turn_context.reasoning_effort().cloned(),
         summary: Some(codex_protocol::config_types::ReasoningSummary::Auto),
@@ -2225,7 +2212,6 @@ async fn record_initial_history_resumed_turn_context_after_compaction_reestablis
             model: previous_model.to_string(),
             comp_hash: None,
             cyber_access_program: None,
-            realtime_active: Some(turn_context.realtime_active),
         })
     );
     assert_eq!(
@@ -2247,7 +2233,6 @@ async fn record_initial_history_resumed_turn_context_after_compaction_reestablis
             comp_hash: None,
             collaboration_mode: Some(turn_context.collaboration_mode()),
             multi_agent_version: None,
-            realtime_active: Some(turn_context.realtime_active),
             cyber_access_program: None,
             effort: turn_context.reasoning_effort().cloned(),
             summary: Some(codex_protocol::config_types::ReasoningSummary::Auto),
@@ -2277,7 +2262,6 @@ async fn record_initial_history_resumed_aborted_turn_without_id_clears_active_tu
         comp_hash: None,
         collaboration_mode: Some(turn_context.collaboration_mode()),
         multi_agent_version: None,
-        realtime_active: Some(turn_context.realtime_active),
         cyber_access_program: None,
         effort: turn_context.reasoning_effort().cloned(),
         summary: Some(codex_protocol::config_types::ReasoningSummary::Auto),
@@ -2386,7 +2370,6 @@ async fn record_initial_history_resumed_aborted_turn_without_id_clears_active_tu
             model: previous_model.to_string(),
             comp_hash: None,
             cyber_access_program: None,
-            realtime_active: Some(turn_context.realtime_active),
         })
     );
     assert!(session.reference_context_item().await.is_none());
@@ -2420,7 +2403,6 @@ async fn record_initial_history_resumed_unmatched_abort_preserves_active_turn_fo
         comp_hash: None,
         collaboration_mode: Some(turn_context.collaboration_mode()),
         multi_agent_version: None,
-        realtime_active: Some(turn_context.realtime_active),
         cyber_access_program: None,
         effort: turn_context.reasoning_effort().cloned(),
         summary: Some(codex_protocol::config_types::ReasoningSummary::Auto),
@@ -2523,7 +2505,6 @@ async fn record_initial_history_resumed_unmatched_abort_preserves_active_turn_fo
             model: current_model.to_string(),
             comp_hash: None,
             cyber_access_program: None,
-            realtime_active: Some(turn_context.realtime_active),
         })
     );
     assert_eq!(
@@ -2555,7 +2536,6 @@ async fn record_initial_history_resumed_trailing_incomplete_turn_compaction_clea
         comp_hash: None,
         collaboration_mode: Some(turn_context.collaboration_mode()),
         multi_agent_version: None,
-        realtime_active: Some(turn_context.realtime_active),
         cyber_access_program: None,
         effort: turn_context.reasoning_effort().cloned(),
         summary: Some(codex_protocol::config_types::ReasoningSummary::Auto),
@@ -2653,7 +2633,6 @@ async fn record_initial_history_resumed_trailing_incomplete_turn_compaction_clea
             model: previous_model.to_string(),
             comp_hash: None,
             cyber_access_program: None,
-            realtime_active: Some(turn_context.realtime_active),
         })
     );
     assert!(session.reference_context_item().await.is_none());
@@ -2708,7 +2687,6 @@ async fn record_initial_history_resumed_trailing_incomplete_turn_preserves_turn_
             model: turn_context.model_info().slug.clone(),
             comp_hash: None,
             cyber_access_program: None,
-            realtime_active: Some(turn_context.realtime_active),
         })
     );
     assert_eq!(
@@ -2740,7 +2718,6 @@ async fn record_initial_history_resumed_replaced_incomplete_compacted_turn_clear
         comp_hash: None,
         collaboration_mode: Some(turn_context.collaboration_mode()),
         multi_agent_version: None,
-        realtime_active: Some(turn_context.realtime_active),
         cyber_access_program: None,
         effort: turn_context.reasoning_effort().cloned(),
         summary: Some(codex_protocol::config_types::ReasoningSummary::Auto),
@@ -2852,7 +2829,6 @@ async fn record_initial_history_resumed_replaced_incomplete_compacted_turn_clear
             model: previous_model.to_string(),
             comp_hash: None,
             cyber_access_program: None,
-            realtime_active: Some(turn_context.realtime_active),
         })
     );
     assert!(session.reference_context_item().await.is_none());

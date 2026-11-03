@@ -77,7 +77,6 @@ pub(crate) fn is_user_authorization_message(item: &ResponseItem) -> bool {
                                     // Media preparation can replace real user input.
                                     | ImagePreparationError::KIND
                                     | UnsupportedMedia::IMAGE_KIND
-                                    | UnsupportedMedia::AUDIO_KIND
                             )
                     })
             })

@@ -112,66 +112,6 @@ async fn submit_steer_only(
 }
 
 #[tokio::test]
-#[expect(
-    clippy::await_holding_invalid_type,
-    reason = "simulate an in-flight realtime append while checking input admission"
-)]
-async fn steering_does_not_wait_for_realtime_history() {
-    let (mut session, turn_context) = make_session_and_context().await;
-    session.realtime_history = Some(tokio::sync::Mutex::new(Default::default()));
-    let session = Arc::new(session);
-    let turn_context = Arc::new(turn_context);
-    session
-        .spawn_task(
-            Arc::clone(&turn_context),
-            Vec::new(),
-            NeverEndingTask {
-                kind: TaskKind::Regular,
-                listen_to_cancellation_token: true,
-            },
-        )
-        .await;
-
-    let history = session
-        .realtime_history
-        .as_ref()
-        .expect("realtime history")
-        .lock()
-        .await;
-    for mode in [
-        TurnInputMode::StartOrSteer,
-        TurnInputMode::Steer {
-            expected_turn_id: turn_context.sub_id.clone(),
-        },
-    ] {
-        let submission = tokio::time::timeout(
-            std::time::Duration::from_secs(5),
-            handle(
-                &session,
-                TurnInputRequest::user_input(vec![UserInput::Text {
-                    text: "steer without waiting for persistence".to_string(),
-                    text_elements: Vec::new(),
-                }]),
-                mode,
-                "steer-submission".to_string(),
-            ),
-        )
-        .await
-        .expect("steering must not wait for the realtime recorder")
-        .expect("steering should succeed");
-        assert_eq!(
-            submission,
-            TurnInputSubmission::Steered {
-                root_turn_id: turn_context.sub_id.clone(),
-                turn_id: turn_context.sub_id.clone()
-            }
-        );
-    }
-    drop(history);
-    session.abort_all_tasks(TurnAbortReason::Interrupted).await;
-}
-
-#[tokio::test]
 async fn accepted_input_applies_thread_settings() {
     let (session, turn_context, _rx) = make_session_and_context_with_rx().await;
     let config = session.get_config().await;

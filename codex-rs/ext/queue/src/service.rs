@@ -508,12 +508,10 @@ async fn prepare_queued_user_input(mut input: TurnInput) -> Result<TurnInput, Qu
         return Err(QueueServiceError::InputTooLarge { actual_chars });
     }
     client_id.get_or_insert_with(|| Uuid::now_v7().to_string());
-    if !content.iter().any(|item| {
-        matches!(
-            item,
-            UserInput::LocalImage { .. } | UserInput::LocalAudio { .. }
-        )
-    }) {
+    if !content
+        .iter()
+        .any(|item| matches!(item, UserInput::LocalImage { .. }))
+    {
         return Ok(input);
     }
 

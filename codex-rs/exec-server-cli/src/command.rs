@@ -15,7 +15,6 @@ use codex_websocket_auth::WebsocketAuthArgs;
 
 use crate::config::load_exec_server_config;
 use crate::config::load_exec_server_remote_auth_provider;
-use crate::exec_server_auth;
 use crate::exec_server_credential::ExecutorCredentialPipe;
 use crate::exec_server_telemetry;
 
@@ -78,17 +77,6 @@ pub struct ExecServerCommand {
     )]
     remote: Option<String>,
 
-    /// Transport used for the remote executor connection.
-    #[arg(
-        long = "remote-transport",
-        value_enum,
-        default_value_t = ExecServerRemoteTransport::Noise,
-        requires = "exec_server_remote",
-        requires_if("direct", "aws_sigv4"),
-        global = true
-    )]
-    remote_transport: ExecServerRemoteTransport,
-
     /// Environment id to attach to when registering remotely.
     #[arg(long = "environment-id", value_name = "ID", global = true)]
     environment_id: Option<String>,
@@ -97,55 +85,13 @@ pub struct ExecServerCommand {
     #[arg(long = "name", value_name = "NAME", global = true)]
     name: Option<String>,
 
-    /// Use Agent Identity auth from CODEX_ACCESS_TOKEN for remote registration.
-    #[arg(
-        long = "use-agent-identity-auth",
-        requires = "exec_server_remote",
-        conflicts_with = "aws_sigv4",
-        global = true
-    )]
-    use_agent_identity_auth: bool,
-
     /// Read rotating executor credentials from stdin; exit when the pipe closes.
     #[arg(
         long = "executor-credential-stdin",
         requires = "exec_server_remote",
-        conflicts_with_all = ["use_agent_identity_auth", "aws_sigv4"],
         global = true
     )]
     executor_credential_stdin: bool,
-
-    /// Sign Direct registration and WebSocket handshake requests with AWS SigV4.
-    #[arg(long = "aws-sigv4", requires = "exec_server_remote", global = true)]
-    aws_sigv4: bool,
-
-    /// AWS profile used for SigV4 authentication.
-    #[arg(
-        long = "aws-profile",
-        value_name = "PROFILE",
-        requires = "aws_sigv4",
-        global = true
-    )]
-    aws_profile: Option<String>,
-
-    /// AWS signing region. Uses the SDK region chain when omitted.
-    #[arg(
-        long = "aws-region",
-        value_name = "REGION",
-        requires = "aws_sigv4",
-        global = true
-    )]
-    aws_region: Option<String>,
-
-    /// AWS signing service.
-    #[arg(
-        long = "aws-service",
-        value_name = "SERVICE",
-        default_value = "execute-api",
-        requires = "aws_sigv4",
-        global = true
-    )]
-    aws_service: String,
 
     /// Exit when the parent-owned standard-input pipe closes.
     #[arg(
@@ -165,7 +111,6 @@ impl ExecServerCommand {
         root_config_overrides: &CliConfigOverrides,
     ) -> anyhow::Result<()> {
         let strict_config = self.strict_config;
-        self.validate_remote_transport()?;
         let enable_cloud_config = self.should_load_cloud_config();
         let websocket_auth = self.websocket_auth.try_into_settings()?;
         if websocket_auth.config.is_some() && (self.remote.is_some() || self.command.is_some()) {
@@ -197,7 +142,6 @@ impl ExecServerCommand {
             let config =
                 load_exec_server_config(root_config_overrides, strict_config, enable_cloud_config)
                     .await?;
-            let direct_transport = self.remote_transport == ExecServerRemoteTransport::Direct;
             // Configured exporters may contain account-wide credentials or client keys.
             // The scoped executor must not initialize those exporters.
             let telemetry_config = (!self.executor_credential_stdin).then_some(&config);
@@ -218,32 +162,13 @@ impl ExecServerCommand {
                     exec_server_telemetry::ParentLifetime::MonitoredStdin(parent_closed);
                 credential_provider = Some(Arc::clone(&provider));
                 provider
-            } else if self.aws_sigv4 {
-                exec_server_auth::aws_sigv4_auth_provider(
-                    codex_aws_auth::AwsAuthConfig {
-                        profile: self.aws_profile,
-                        region: self.aws_region,
-                        service: self.aws_service,
-                    },
-                    config.http_client_factory(),
-                )
-                .await?
             } else {
-                load_exec_server_remote_auth_provider(
-                    &config,
-                    &base_url,
-                    self.use_agent_identity_auth,
-                )
-                .await?
+                load_exec_server_remote_auth_provider(&config, &base_url).await?
             };
             let mut remote_config = codex_exec_server::RemoteEnvironmentConfig::new_with_transport(
                 base_url,
                 environment_id,
-                if direct_transport {
-                    codex_exec_server::RemoteEnvironmentTransport::Direct
-                } else {
-                    codex_exec_server::RemoteEnvironmentTransport::Noise
-                },
+                codex_exec_server::RemoteEnvironmentTransport::Noise,
                 auth_provider,
                 config.http_client_factory(),
             )?;
@@ -339,41 +264,8 @@ impl ExecServerCommand {
     }
 
     fn should_load_cloud_config(&self) -> bool {
-        self.remote.is_some()
-            && self.command.is_none()
-            && !self.executor_credential_stdin
-            && !self.aws_sigv4
-            && !self.use_agent_identity_auth
+        self.remote.is_some() && self.command.is_none() && !self.executor_credential_stdin
     }
-
-    fn validate_remote_transport(&self) -> anyhow::Result<()> {
-        match (self.remote_transport, self.aws_sigv4) {
-            (ExecServerRemoteTransport::Noise, true) => {
-                anyhow::bail!("--aws-sigv4 requires --remote-transport direct");
-            }
-            (ExecServerRemoteTransport::Direct, false) => {
-                anyhow::bail!("--remote-transport direct requires --aws-sigv4");
-            }
-            (ExecServerRemoteTransport::Noise, false)
-            | (ExecServerRemoteTransport::Direct, true) => {}
-        }
-        if self.remote_transport == ExecServerRemoteTransport::Direct
-            && matches!(
-                self.command.as_ref(),
-                Some(ExecServerSubcommand::Forward { .. })
-            )
-        {
-            anyhow::bail!("direct exec-server transport does not support forwarding");
-        }
-        Ok(())
-    }
-}
-
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, clap::ValueEnum)]
-enum ExecServerRemoteTransport {
-    #[default]
-    Noise,
-    Direct,
 }
 
 #[derive(Debug, clap::Subcommand)]

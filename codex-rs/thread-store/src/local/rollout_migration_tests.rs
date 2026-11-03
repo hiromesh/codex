@@ -2226,7 +2226,6 @@ async fn migration_compacts_subagent_prefix_and_does_not_project_it() {
                 comp_hash: None,
                 collaboration_mode: None,
                 multi_agent_version: None,
-                realtime_active: None,
                 cyber_access_program: None,
                 effort: None,
                 summary: Some(ReasoningSummary::Auto),

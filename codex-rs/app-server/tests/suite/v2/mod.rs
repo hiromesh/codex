@@ -124,7 +124,6 @@ mod rate_limit_reset_credits;
 mod rate_limits;
 #[path = "rate_limits_identity_tests.rs"]
 mod rate_limits_identity;
-mod realtime_conversation;
 mod recommended_plugins;
 mod remote_control;
 #[cfg(debug_assertions)]

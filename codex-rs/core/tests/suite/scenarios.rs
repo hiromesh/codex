@@ -109,9 +109,6 @@ const ONE_PIXEL_PNG_BASE64: &str = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJ
 #[path = "scenarios_dynamic_tools.rs"]
 mod dynamic_tools;
 
-#[path = "scenarios_audio_file_tests.rs"]
-mod audio_file;
-
 #[path = "scenarios_retained_tool_outputs.rs"]
 mod retained_tool_outputs;
 
@@ -498,22 +495,6 @@ async fn additional_context_tool_outputs(tool_outputs: bool) -> Result<()> {
     Ok(())
 }
 
-#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn realtime_attachment_replacement_preserves_handoff_context() -> Result<()> {
-    let requests = super::realtime_attachment::attachment_replacement_scenario().await?;
-    insta::assert_snapshot!(
-        "realtime_attachment_replacement",
-        context_snapshot::format_request_history_snapshot(
-            "A replacement fences an older pending connection and stale stops; only the selected call starts a Codex handoff.",
-            &requests,
-            &ContextSnapshotOptions::default().rewrite_known_segments(),
-        )
-    );
-    Ok(())
-}
-
-/// Expiring files change request copies while canonical history retains the original references.
-/// A shared barrier requires the three distinct file IDs to resolve concurrently on each request.
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn unavailable_images_are_rechecked_without_rewriting_history() -> Result<()> {
     skip_if_no_network!(Ok(()));

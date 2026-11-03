@@ -75,7 +75,6 @@ codex-terminal-detection = { workspace = true }
 codex-thread-store = { workspace = true }
 codex-tools = { workspace = true }
 codex-utils-absolute-path = { workspace = true }
-codex-utils-audio = { workspace = true }
 codex-utils-cache = { workspace = true }
 codex-utils-critical-path = { workspace = true }
 codex-utils-git-discovery = { workspace = true }

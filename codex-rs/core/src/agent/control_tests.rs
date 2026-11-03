@@ -373,7 +373,7 @@ fn has_subagent_notification<'a>(
             ContentItem::InputText { text } | ContentItem::OutputText { text, .. } => {
                 SubagentNotification::matches_text(text)
             }
-            ContentItem::InputImage { .. } | ContentItem::InputAudio { .. } => false,
+            ContentItem::InputImage { .. } => false,
         })
     })
 }
@@ -391,7 +391,7 @@ fn history_contains_text<'a>(
             ContentItem::InputText { text } | ContentItem::OutputText { text, .. } => {
                 text.contains(needle)
             }
-            ContentItem::InputImage { .. } | ContentItem::InputAudio { .. } => false,
+            ContentItem::InputImage { .. } => false,
         })
     })
 }
@@ -438,8 +438,7 @@ fn history_contains_assistant_inter_agent_communication<'a>(
                     == Some(expected)
             }
             ContentItem::InputText { .. }
-            | ContentItem::InputImage { .. }
-            | ContentItem::InputAudio { .. } => false,
+            | ContentItem::InputImage { .. } => false,
         })
     })
 }
@@ -2713,7 +2712,6 @@ async fn spawn_agent_fork_sanitizes_inherited_compaction_metadata() {
             model: "parent-model".into(),
             comp_hash: None,
             cyber_access_program: None,
-            realtime_active: None,
         }),
     };
     let parent_usage = TokenUsage {
@@ -3865,7 +3863,6 @@ async fn spawn_agent_full_fork_legacy_compaction_rebuilds_child_instructions_onc
                         model: "parent-model".into(),
                         comp_hash: None,
                         cyber_access_program: None,
-                        realtime_active: None,
                     }),
                 }),
             })),

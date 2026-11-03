@@ -11,12 +11,8 @@ use codex_protocol::models::ReasoningItemContent;
 use codex_protocol::models::ReasoningItemReasoningSummary;
 use codex_protocol::models::ResponseItem;
 use codex_protocol::models::WebSearchAction;
-use codex_protocol::models::is_audio_close_tag_text;
-use codex_protocol::models::is_audio_open_tag_text;
 use codex_protocol::models::is_image_close_tag_text;
 use codex_protocol::models::is_image_open_tag_text;
-use codex_protocol::models::is_local_audio_close_tag_text;
-use codex_protocol::models::is_local_audio_open_tag_text;
 use codex_protocol::models::is_local_image_close_tag_text;
 use codex_protocol::models::is_local_image_open_tag_text;
 use codex_protocol::protocol::APPS_INSTRUCTIONS_OPEN_TAG;
@@ -107,17 +103,9 @@ pub(crate) fn user_input_parts(
                     || (*idx > 0
                         && (is_local_image_close_tag_text(text) || is_image_close_tag_text(text))
                         && matches!(message.get(idx - 1), Some(ContentItem::InputImage { .. })));
-                let is_audio_label = ((is_local_audio_open_tag_text(text)
-                    || is_audio_open_tag_text(text))
-                    && matches!(message.get(idx + 1), Some(ContentItem::InputAudio { .. })))
-                    || (*idx > 0
-                        && (is_local_audio_close_tag_text(text) || is_audio_close_tag_text(text))
-                        && matches!(message.get(idx - 1), Some(ContentItem::InputAudio { .. })));
-                !is_image_label && !is_audio_label
+                !is_image_label
             }
-            ContentItem::InputImage { .. }
-            | ContentItem::InputAudio { .. }
-            | ContentItem::OutputText { .. } => true,
+            ContentItem::InputImage { .. } | ContentItem::OutputText { .. } => true,
         })
 }
 
@@ -141,11 +129,6 @@ fn parse_user_message(message: &[ContentItem]) -> Option<UserMessageItem> {
                 content.push(UserInput::Image {
                     image: image.clone(),
                     detail: *detail,
-                });
-            }
-            ContentItem::InputAudio { audio } => {
-                content.push(UserInput::Audio {
-                    audio: audio.clone(),
                 });
             }
             ContentItem::OutputText { text, .. } => {

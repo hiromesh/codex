@@ -113,7 +113,6 @@ pub(super) struct AgentsOverviewRow {
     pub(super) group: AgentsOverviewGroup,
     pub(super) is_current: bool,
     pub(super) unread: bool,
-    pub(super) has_voice: bool,
 }
 
 fn display_title(thread: &Thread) -> &str {

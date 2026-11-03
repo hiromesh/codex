@@ -83,7 +83,6 @@ impl App {
                     | AppEvent::ConfirmDaemonUpdate(_)
                     | AppEvent::RunDaemonUpdate(_)
                     | AppEvent::InsertHistoryCell(_)
-                    | AppEvent::CommitRealtimeTranscriptHistory
                     | AppEvent::ResetTranscriptForThreadSwitch
                     | AppEvent::ResetTranscriptForThreadSwitchPreservingScreen
                     | AppEvent::FinishPromptRevert { .. }
@@ -908,11 +907,6 @@ impl App {
                 tui.clear_pending_history_lines();
                 tui.defer_thread_switch_clear();
                 self.pending_thread_switch_resets -= 1;
-            }
-            AppEvent::CommitRealtimeTranscriptHistory => {
-                for cell in self.chat_widget.take_realtime_transcript_history() {
-                    self.insert_history_cell(tui, cell);
-                }
             }
             AppEvent::FollowTranscript => {
                 self.transcript_view.jump_to_latest();
@@ -2416,28 +2410,6 @@ impl App {
                 }
                 self.chat_widget.on_plugin_mentions_loaded(plugins);
             }
-            AppEvent::OpenRealtimeSettings => self.chat_widget.open_realtime_settings(),
-            AppEvent::OpenRealtimeSoundDevices => self.chat_widget.open_realtime_sound_devices(),
-            AppEvent::OpenRealtimeVoices => self.open_realtime_voices(app_server).await,
-            AppEvent::OpenRealtimeDevicePicker { kind } => self.list_realtime_devices(kind),
-            AppEvent::OpenRealtimeInputChannels { device } => self.chat_widget.open_realtime_input_channels(device),
-            AppEvent::RealtimeDevicesListed { origin, kind, result } => {
-                if origin == self.active_thread_id {
-                    match result {
-                        Ok(devices) => self.chat_widget.open_realtime_device_picker(kind, devices),
-                        Err(error) => self.chat_widget.add_error_message(error),
-                    }
-                }
-            }
-            AppEvent::PersistRealtimeDevice { kind, name } => {
-                self.persist_realtime_device(kind, name).await;
-            }
-            AppEvent::PersistRealtimeInputChannel { channel } => {
-                self.persist_realtime_input_channel(channel).await;
-            }
-            AppEvent::PersistRealtimeVoiceSelection { voice } => {
-                self.persist_realtime_voice(app_server, voice).await;
-            }
             AppEvent::PersistServiceTierSelection { service_tier } => {
                 self.refresh_status_line();
                 self.config.service_tier = service_tier.clone();
@@ -3584,7 +3556,6 @@ impl App {
                 })
             }
             ExitMode::Immediate => {
-                self.stop_realtime_conversation(app_server).await;
                 self.pending_shutdown_exit_thread_id = None;
                 AppRunControl::Exit(ExitReason::UserRequested)
             }

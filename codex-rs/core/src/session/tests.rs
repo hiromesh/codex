@@ -27,7 +27,6 @@ use crate::environment_selection::TurnEnvironmentState;
 use crate::function_tool::FunctionCallError;
 use crate::hook_mcp_executor::CoreHookMcpExecutor;
 use crate::plugins::plugins_manager_for_config;
-use crate::realtime_conversation::RealtimeConversationSnapshot;
 use crate::session::step_context::StepContext;
 use crate::shell::default_user_shell;
 use crate::shell_snapshot::ShellSnapshot;
@@ -168,7 +167,6 @@ use codex_protocol::models::InternalChatMessageMetadataPassthrough;
 use codex_protocol::models::ResponseItem;
 use codex_protocol::protocol::AskForApproval;
 use codex_protocol::protocol::CodexErrorInfo;
-use codex_protocol::protocol::ConversationAudioParams;
 use codex_protocol::protocol::CreditsSnapshot;
 use codex_protocol::protocol::GranularApprovalConfig;
 use codex_protocol::protocol::HistoryPosition;
@@ -177,10 +175,6 @@ use codex_protocol::protocol::MultiAgentVersion;
 use codex_protocol::protocol::NetworkApprovalProtocol;
 use codex_protocol::protocol::RateLimitSnapshot;
 use codex_protocol::protocol::RateLimitWindow;
-use codex_protocol::protocol::RealtimeAudioFrame;
-use codex_protocol::protocol::RealtimeConversationListVoicesResponseEvent;
-use codex_protocol::protocol::RealtimeVoice;
-use codex_protocol::protocol::RealtimeVoicesList;
 use codex_protocol::protocol::SessionMeta;
 use codex_protocol::protocol::SessionMetaLine;
 use codex_protocol::protocol::ThreadSettingsOverrides;
@@ -296,10 +290,6 @@ impl StepContext {
             ),
             settings: Arc::new(settings),
             session_telemetry: turn.session_telemetry.clone(),
-            realtime: RealtimeConversationSnapshot {
-                active: turn.realtime_active,
-                mode_instructions: None,
-            },
             turn: Arc::clone(&turn),
             inherited_environments: environments.clone(),
             environments,
@@ -4241,7 +4231,7 @@ async fn start_new_context_window_persists_checkpoint_state(clear_tools: bool) {
         | RolloutItem::RetainedContext(_)
         | RolloutItem::SecurityRiskScore(_)
         | RolloutItem::TokenUsageRecord(_)
-        | RolloutItem::RealtimeItem(_)
+        | RolloutItem::Ignored(_)
         | RolloutItem::EventMsg(_) => None,
     });
     let mut expected_history = live_history.annotated_items().to_vec();
@@ -4342,7 +4332,7 @@ async fn record_initial_history_assigns_and_persists_id_for_forked_response_item
         | RolloutItem::RetainedContext(_)
         | RolloutItem::SecurityRiskScore(_)
         | RolloutItem::TokenUsageRecord(_)
-        | RolloutItem::RealtimeItem(_)
+        | RolloutItem::Ignored(_)
         | RolloutItem::EventMsg(_) => None,
     });
     let persisted_item = persisted_item.expect("forked response item should be persisted");
@@ -4507,7 +4497,6 @@ async fn record_initial_history_forked_hydrates_previous_turn_settings() {
         comp_hash: None,
         collaboration_mode: Some(turn_context.collaboration_mode()),
         multi_agent_version: None,
-        realtime_active: Some(turn_context.realtime_active),
         cyber_access_program: None,
         effort: turn_context.reasoning_effort().cloned(),
         summary: Some(codex_protocol::config_types::ReasoningSummary::Auto),
@@ -4564,7 +4553,6 @@ async fn record_initial_history_forked_hydrates_previous_turn_settings() {
             model: previous_model.to_string(),
             comp_hash: None,
             cyber_access_program: None,
-            realtime_active: Some(turn_context.realtime_active),
         })
     );
     assert_eq!(raw_history_items(&history), Vec::<ResponseItem>::new());
@@ -6338,7 +6326,6 @@ async fn compaction_persists_resume_metadata_and_companion_records() {
         model: "previous-model".to_string(),
         comp_hash: Some("comp-hash".to_string()),
         cyber_access_program: None,
-        realtime_active: Some(true),
     };
     session
         .set_previous_turn_settings(Some(previous_turn_settings.clone()))
@@ -7108,8 +7095,6 @@ pub(crate) async fn make_session_and_context() -> (Session, TurnContext) {
         mcp_prewarm_tx: async_channel::bounded(1).0,
         mcp_prewarm_shutdown: CancellationToken::new(),
         mcp_prewarm_task: std::sync::Mutex::new(None),
-        conversation: Arc::new(RealtimeConversationManager::new()),
-        realtime_history: None,
         active_turn: Mutex::new(None),
         async_hook_results,
         input_queue: super::input_queue::InputQueue::new(),
@@ -8321,36 +8306,6 @@ fn submission_dispatch_span_prefers_submission_trace_context() {
         TraceId::from_hex("00000000000000000000000000000055").expect("trace id")
     );
 }
-
-#[test]
-fn submission_dispatch_span_uses_debug_for_realtime_audio() {
-    let _trace_test_context = install_test_tracing("codex-core-tests");
-
-    let dispatch_span = submission_dispatch_span(&Submission {
-        turn_extension_init: None,
-        id: "sub-1".into(),
-        op: Op::RealtimeConversationAudio(ConversationAudioParams {
-            frame: RealtimeAudioFrame {
-                data: "ZmFrZQ==".into(),
-                sample_rate: 16_000,
-                num_channels: 1,
-                samples_per_channel: Some(160),
-                item_id: None,
-            },
-        }),
-        parent_turn_id: None,
-        root_turn_id: None,
-        residency_guard: None,
-        message_delivery: None,
-        trace: None,
-    });
-
-    assert_eq!(
-        dispatch_span.metadata().expect("span metadata").level(),
-        &tracing::Level::DEBUG
-    );
-}
-
 #[tokio::test]
 async fn turn_environments_set_primary_environment() {
     let (session, _turn_context, _rx) = make_session_and_context_with_rx().await;
@@ -9400,8 +9355,6 @@ where
         mcp_prewarm_tx: async_channel::bounded(1).0,
         mcp_prewarm_shutdown: CancellationToken::new(),
         mcp_prewarm_task: std::sync::Mutex::new(None),
-        conversation: Arc::new(RealtimeConversationManager::new()),
-        realtime_history: None,
         active_turn: Mutex::new(None),
         async_hook_results,
         input_queue: super::input_queue::InputQueue::new(),
@@ -10477,56 +10430,6 @@ async fn record_context_update_items(
     let history = session.clone_history().await;
     history.raw_items().skip(previous_len).cloned().collect()
 }
-
-#[tokio::test]
-async fn record_context_updates_emits_realtime_start_when_session_becomes_live() {
-    let (session, previous_context) = make_session_and_context().await;
-    let previous_context = Arc::new(previous_context);
-    let mut current_context = previous_context
-        .with_model(
-            previous_context.model_info().slug.clone(),
-            &session.services.models_manager,
-        )
-        .await;
-    current_context.realtime_active = true;
-
-    let update_items =
-        record_context_update_items(&session, previous_context, current_context).await;
-
-    let developer_texts = developer_input_texts(&update_items);
-    assert!(
-        developer_texts
-            .iter()
-            .any(|text| text.contains("<realtime_conversation>")),
-        "expected a realtime start update, got {developer_texts:?}"
-    );
-}
-
-#[tokio::test]
-async fn record_context_updates_emits_realtime_end_when_session_stops_being_live() {
-    let (session, mut previous_context) = make_session_and_context().await;
-    previous_context.realtime_active = true;
-    let mut current_context = previous_context
-        .with_model(
-            previous_context.model_info().slug.clone(),
-            &session.services.models_manager,
-        )
-        .await;
-    current_context.realtime_active = false;
-
-    let update_items =
-        record_context_update_items(&session, Arc::new(previous_context), current_context).await;
-
-    let developer_texts = developer_input_texts(&update_items);
-    assert!(
-        developer_texts
-            .iter()
-            .any(|text| text.contains("<realtime_conversation>")),
-        "expected a realtime end update, got {developer_texts:?}"
-    );
-}
-
-#[tokio::test]
 async fn build_initial_context_reuses_in_flight_recommendation_prewarm() {
     use wiremock::Mock;
     use wiremock::ResponseTemplate;
@@ -10611,23 +10514,6 @@ async fn build_initial_context_reuses_in_flight_recommendation_prewarm() {
     );
     server.verify().await;
 }
-
-#[tokio::test]
-async fn build_initial_context_describes_active_realtime_state() {
-    let (session, mut turn_context) = make_session_and_context().await;
-    turn_context.realtime_active = true;
-    let turn_context = Arc::new(turn_context);
-
-    let initial_context = build_initial_context(&session, &turn_context).await;
-    let developer_texts = developer_input_texts(&initial_context);
-    assert!(
-        developer_texts
-            .iter()
-            .any(|text| text.contains("<realtime_conversation>")),
-        "expected initial context to describe active realtime state, got {developer_texts:?}"
-    );
-}
-
 async fn make_multi_agent_v2_usage_hint_test_session(
     enable_multi_agent_v2: bool,
 ) -> (Arc<Session>, Arc<TurnContext>) {
@@ -10944,32 +10830,6 @@ async fn build_initial_context_omits_multi_agent_v2_usage_hints_when_hint_is_emp
         "did not expect multi-agent v2 usage hint developer messages, got {developer_messages:?}"
     );
 }
-
-#[tokio::test]
-async fn build_initial_context_restates_realtime_start_when_reference_context_is_missing() {
-    let (session, mut turn_context) = make_session_and_context().await;
-    turn_context.realtime_active = true;
-    let previous_turn_settings = PreviousTurnSettings {
-        model: turn_context.model_info().slug.clone(),
-        comp_hash: None,
-        cyber_access_program: None,
-        realtime_active: Some(true),
-    };
-
-    session
-        .set_previous_turn_settings(Some(previous_turn_settings))
-        .await;
-    let turn_context = Arc::new(turn_context);
-    let initial_context = build_initial_context(&session, &turn_context).await;
-    let developer_texts = developer_input_texts(&initial_context);
-    assert!(
-        developer_texts
-            .iter()
-            .any(|text| text.contains("<realtime_conversation>")),
-        "expected initial context to restate active realtime when the reference context is missing, got {developer_texts:?}"
-    );
-}
-
 fn file_system_policy_with_unreadable_glob(turn_context: &TurnContext) -> FileSystemSandboxPolicy {
     #[allow(deprecated)]
     let mut policy = FileSystemSandboxPolicy::from_legacy_sandbox_policy_for_cwd(
@@ -11326,7 +11186,6 @@ async fn build_initial_context_uses_retained_step_after_model_change() {
             model: "base-model".to_string(),
             comp_hash: None,
             cyber_access_program: None,
-            realtime_active: None,
         }))
         .await;
     session
@@ -11430,7 +11289,6 @@ async fn build_initial_context_prepends_model_switch_message() {
         model: "previous-regular-model".to_string(),
         comp_hash: None,
         cyber_access_program: None,
-        realtime_active: None,
     };
 
     session
@@ -11485,7 +11343,6 @@ async fn record_context_updates_and_set_reference_context_item_persists_full_rei
             model: previous_context.model_info().slug.clone(),
             comp_hash: None,
             cyber_access_program: None,
-            realtime_active: Some(previous_context.realtime_active),
         }))
         .await;
     let turn_context = Arc::new(turn_context);
@@ -11552,53 +11409,6 @@ async fn run_user_shell_command_does_not_set_reference_context_item() {
         "standalone shell tasks should not mutate previous context"
     );
 }
-
-#[tokio::test]
-async fn realtime_conversation_list_voices_emits_builtin_list() {
-    let (session, _turn_context, rx) = make_session_and_context_with_rx().await;
-
-    handlers::realtime_conversation_list_voices(&session, "sub-id".to_string()).await;
-
-    let event = rx.recv().await.expect("event");
-    let voices = match event.msg {
-        EventMsg::RealtimeConversationListVoicesResponse(
-            RealtimeConversationListVoicesResponseEvent { voices },
-        ) => voices,
-        msg => panic!("expected list voices response, got {msg:?}"),
-    };
-    assert_eq!(
-        voices,
-        RealtimeVoicesList {
-            v1: vec![
-                RealtimeVoice::Juniper,
-                RealtimeVoice::Maple,
-                RealtimeVoice::Spruce,
-                RealtimeVoice::Ember,
-                RealtimeVoice::Vale,
-                RealtimeVoice::Breeze,
-                RealtimeVoice::Arbor,
-                RealtimeVoice::Sol,
-                RealtimeVoice::Cove,
-            ],
-            v2: vec![
-                RealtimeVoice::Alloy,
-                RealtimeVoice::Ash,
-                RealtimeVoice::Ballad,
-                RealtimeVoice::Coral,
-                RealtimeVoice::Echo,
-                RealtimeVoice::Sage,
-                RealtimeVoice::Shimmer,
-                RealtimeVoice::Verse,
-                RealtimeVoice::Marin,
-                RealtimeVoice::Cedar,
-            ],
-            v3: RealtimeVoicesList::builtin().v3,
-            default_v1: RealtimeVoice::Cove,
-            default_v2: RealtimeVoice::Marin,
-        },
-    );
-}
-
 #[derive(Clone, Copy)]
 struct CompletingTask;
 
@@ -12066,7 +11876,6 @@ async fn interrupting_compaction_fallback_retains_last_known_step_context() {
             model: "gpt-5.4".to_string(),
             comp_hash: Some("old".to_string()),
             cyber_access_program: None,
-            realtime_active: Some(turn.realtime_active),
         }))
         .await;
     session

@@ -45,7 +45,6 @@ pub fn login_with_bedrock_access_keys(
         openai_api_key: None,
         tokens: None,
         last_refresh: None,
-        agent_identity: None,
         personal_access_token: None,
         bedrock_api_key: None,
         bedrock_access_keys: Some(BedrockAccessKeysAuth {

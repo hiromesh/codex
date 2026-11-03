@@ -299,10 +299,6 @@ pub enum Feature {
     ///
     /// Requirements-only gate: this should be set from requirements, not user config.
     InAppChat,
-    /// Allow in-app dictation in desktop apps.
-    ///
-    /// Requirements-only gate: this should be set from requirements, not user config.
-    InAppDictation,
     /// Allow desktop apps to run local automations.
     ///
     /// Requirements-only gate: this should be set from requirements, not user config.
@@ -338,7 +334,7 @@ pub enum Feature {
     ExternalMigration,
     /// Enable extension-backed image generation.
     ImageGeneration,
-    /// Omit inline image and audio content from app-server item notifications.
+    /// Omit inline image content from app-server item notifications.
     OmitAppServerNotificationMedia,
     /// Tell the model when a prompt image was resized and include its dimensions.
     ImageResizeNotice,
@@ -1637,12 +1633,6 @@ pub const FEATURES: &[FeatureSpec] = &[
     FeatureSpec {
         id: Feature::InAppChat,
         key: "in_app_chat",
-        stage: Stage::Stable,
-        default_enabled: true,
-    },
-    FeatureSpec {
-        id: Feature::InAppDictation,
-        key: "in_app_dictation",
         stage: Stage::Stable,
         default_enabled: true,
     },

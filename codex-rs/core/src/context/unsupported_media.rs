@@ -11,16 +11,10 @@ pub(crate) struct UnsupportedMedia {
 
 impl UnsupportedMedia {
     pub(crate) const IMAGE_KIND: &str = "images.unsupported";
-    pub(crate) const AUDIO_KIND: &str = "audio.unsupported";
 
     pub(crate) const IMAGE: Self = Self {
         text: "image content omitted because you do not support image input",
         content_kind: Self::IMAGE_KIND,
-    };
-
-    pub(crate) const AUDIO: Self = Self {
-        text: "audio content omitted because you do not support audio input",
-        content_kind: Self::AUDIO_KIND,
     };
 }
 

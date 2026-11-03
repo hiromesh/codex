@@ -883,7 +883,6 @@ async fn run_memory_phase_one_model_request_test(
                 {"type":"input_image", "image_url":format!("data:image/png;base64,{}", "A".repeat(12_000))},
                 {"type":"input_text", "text":"Keep the migration read-only."},
                 {"type":"input_image", "image_url":format!("data:image/png;base64,{}", "B".repeat(12_000))},
-                {"type":"input_audio", "audio_url":format!("data:audio/wav;base64,{}", "C".repeat(12_000))},
             ]}),
             json!({"type":"message", "role":"user", "content":[
                 {"type":"input_text", "text":"human correction in the middle"},
@@ -1595,7 +1594,6 @@ async fn memories_startup_phase1_v2_preserves_human_evidence_and_redacts_storage
         "assistant final evidence",
         "last human constraint",
         "[image omitted]",
-        "[audio omitted]",
         "[... response items omitted ...]",
         "[human user]",
         "[other agent]",

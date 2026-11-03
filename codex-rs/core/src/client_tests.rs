@@ -2208,26 +2208,6 @@ async fn websocket_handshake_includes_attestation_for_chatgpt_codex_responses(
     );
     assert_eq!(headers["thread-id"], responses_metadata.thread_id);
 }
-
-#[tokio::test]
-async fn existing_call_sideband_headers_include_attestation() {
-    let (model_client, attestation_calls) =
-        model_client_with_counting_attestation(/*include_attestation*/ true);
-
-    let headers = model_client
-        .realtime_sideband_headers(http::HeaderMap::new())
-        .await
-        .expect("existing call sideband headers should build");
-
-    assert_eq!(
-        headers
-            .get(crate::attestation::X_OAI_ATTESTATION_HEADER)
-            .and_then(|value| value.to_str().ok()),
-        Some("v1.header-1"),
-    );
-    assert_eq!(attestation_calls.load(Ordering::Relaxed), 1);
-}
-
 #[tokio::test]
 async fn non_chatgpt_codex_endpoints_omit_attestation_generation() {
     let (model_client, attestation_calls) =
@@ -2241,10 +2221,6 @@ async fn non_chatgpt_codex_endpoints_omit_attestation_generation() {
     if let Some(header_value) = model_client.generate_attestation_header_for().await {
         compaction_headers.insert(crate::attestation::X_OAI_ATTESTATION_HEADER, header_value);
     }
-    let mut realtime_headers = http::HeaderMap::new();
-    if let Some(header_value) = model_client.generate_attestation_header_for().await {
-        realtime_headers.insert(crate::attestation::X_OAI_ATTESTATION_HEADER, header_value);
-    }
 
     assert_eq!(
         response_headers.get(crate::attestation::X_OAI_ATTESTATION_HEADER),
@@ -2252,10 +2228,6 @@ async fn non_chatgpt_codex_endpoints_omit_attestation_generation() {
     );
     assert_eq!(
         compaction_headers.get(crate::attestation::X_OAI_ATTESTATION_HEADER),
-        None,
-    );
-    assert_eq!(
-        realtime_headers.get(crate::attestation::X_OAI_ATTESTATION_HEADER),
         None,
     );
     assert_eq!(attestation_calls.load(Ordering::Relaxed), 0);

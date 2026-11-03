@@ -4,8 +4,8 @@ use codex_app_server_protocol::ConfigWarningNotification;
 use codex_app_server_protocol::RequestId;
 use codex_app_server_protocol::ServerNotification;
 use codex_app_server_protocol::ServerNotificationEnvelope;
-use codex_app_server_protocol::ThreadRealtimeStartedNotification;
-use codex_protocol::protocol::RealtimeConversationVersion;
+use codex_app_server_protocol::ThreadReadState;
+use codex_app_server_protocol::ThreadReadStateChangedNotification;
 use codex_utils_absolute_path::AbsolutePathBuf;
 use pretty_assertions::assert_eq;
 use serde_json::json;
@@ -16,11 +16,13 @@ fn absolute_path(path: &str) -> AbsolutePathBuf {
     AbsolutePathBuf::from_absolute_path(path).expect("absolute path")
 }
 
-fn thread_realtime_started_notification() -> ServerNotification {
-    ServerNotification::ThreadRealtimeStarted(ThreadRealtimeStartedNotification {
+fn experimental_notification() -> ServerNotification {
+    ServerNotification::ThreadReadStateChanged(ThreadReadStateChangedNotification {
         thread_id: "thread-1".to_string(),
-        realtime_session_id: None,
-        version: RealtimeConversationVersion::V1,
+        read_state: ThreadReadState {
+            first_unread: None,
+            revision: "revision-1".to_string(),
+        },
     })
 }
 
@@ -182,7 +184,7 @@ async fn experimental_notifications_are_dropped_without_capability() {
         &mut connections,
         OutgoingEnvelope::ToConnection {
             connection_id,
-            message: app_server_notification(thread_realtime_started_notification()),
+            message: app_server_notification(experimental_notification()),
             write_complete_tx: None,
         },
     )
@@ -252,7 +254,7 @@ async fn experimental_notifications_are_preserved_with_capability() {
         &mut connections,
         OutgoingEnvelope::ToConnection {
             connection_id,
-            message: app_server_notification(thread_realtime_started_notification()),
+            message: app_server_notification(experimental_notification()),
             write_complete_tx: None,
         },
     )
@@ -265,7 +267,7 @@ async fn experimental_notifications_are_preserved_with_capability() {
     assert!(matches!(
         message.message,
         OutgoingMessage::AppServerNotification(ServerNotificationEnvelope {
-            notification: ServerNotification::ThreadRealtimeStarted(_),
+            notification: ServerNotification::ThreadReadStateChanged(_),
             ..
         })
     ));
@@ -420,7 +422,7 @@ async fn command_execution_request_approval_keeps_additional_permissions_with_ca
 #[tokio::test]
 async fn broadcast_only_reaches_eligible_connections() {
     for eligible_count in 0..=2 {
-        let notification = thread_realtime_started_notification();
+        let notification = experimental_notification();
         let method = notification.to_string();
         let message = app_server_notification(notification);
         let expected = serde_json::to_value(&message).expect("serialize notification");

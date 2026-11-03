@@ -1,4 +1,3 @@
-use codex_protocol::models::AudioReference;
 use std::path::Path;
 use std::sync::Arc;
 use std::sync::Mutex;
@@ -216,10 +215,10 @@ fn structured_user_input(text: &str) -> TurnInput {
     }
 }
 
-fn user_input_with_media(text: &str, image: UserInput, audio: UserInput) -> TurnInput {
+fn user_input_with_media(text: &str, image: UserInput) -> TurnInput {
     let mut input = structured_user_input(text);
     if let TurnInput::UserInput { content, .. } = &mut input {
-        content.extend([image, audio]);
+        content.push(image);
     }
     input
 }
@@ -833,17 +832,12 @@ async fn local_attachments_are_snapshotted_before_enqueue_and_update() -> anyhow
     );
     let thread_id = ThreadId::new();
     let image_path = home.path().join("queued.png");
-    let audio_path = home.path().join("queued.mp3");
     std::fs::write(&image_path, TINY_PNG_BYTES)?;
-    std::fs::write(&audio_path, b"audio")?;
     let queued_input = user_input_with_media(
         "queued attachments",
         UserInput::LocalImage {
             path: image_path.clone(),
             detail: Some(ImageDetail::Original),
-        },
-        UserInput::LocalAudio {
-            path: audio_path.clone(),
         },
     );
     let expected_queued_input = user_input_with_media(
@@ -854,16 +848,10 @@ async fn local_attachments_are_snapshotted_before_enqueue_and_update() -> anyhow
             },
             detail: Some(ImageDetail::Original),
         },
-        UserInput::Audio {
-            audio: AudioReference::Inline {
-                audio_url: "data:audio/mpeg;base64,YXVkaW8=".to_string(),
-            },
-        },
     );
 
     let queued = service.enqueue(thread_id, queued_input).await?;
     std::fs::remove_file(&image_path)?;
-    std::fs::remove_file(&audio_path)?;
 
     assert_eq!(expected_queued_input, queued.input);
     assert_eq!(vec![queued.clone()], service.list(thread_id).await?);
@@ -877,17 +865,12 @@ async fn local_attachments_are_snapshotted_before_enqueue_and_update() -> anyhow
     assert_eq!(expected_queued_input, persisted_queued_input);
 
     let edited_image_path = home.path().join("edited.png");
-    let edited_audio_path = home.path().join("edited.m4a");
     std::fs::write(&edited_image_path, TINY_PNG_BYTES)?;
-    std::fs::write(&edited_audio_path, b"edited audio")?;
     let edited_input = user_input_with_media(
         "edited attachments",
         UserInput::LocalImage {
             path: edited_image_path.clone(),
             detail: Some(ImageDetail::High),
-        },
-        UserInput::LocalAudio {
-            path: edited_audio_path.clone(),
         },
     );
     let expected_edited_input = user_input_with_media(
@@ -898,11 +881,6 @@ async fn local_attachments_are_snapshotted_before_enqueue_and_update() -> anyhow
             },
             detail: Some(ImageDetail::High),
         },
-        UserInput::Audio {
-            audio: AudioReference::Inline {
-                audio_url: "data:audio/mp4;base64,ZWRpdGVkIGF1ZGlv".to_string(),
-            },
-        },
     );
 
     let edited = service
@@ -910,7 +888,6 @@ async fn local_attachments_are_snapshotted_before_enqueue_and_update() -> anyhow
         .await?
         .context("snapshotted queued attachments were not updated")?;
     std::fs::remove_file(&edited_image_path)?;
-    std::fs::remove_file(&edited_audio_path)?;
 
     assert_eq!(expected_edited_input, edited.input);
     assert_eq!(vec![edited.clone()], service.list(thread_id).await?);
@@ -938,11 +915,6 @@ async fn invalid_local_attachments_do_not_mutate_queue() -> anyhow::Result<()> {
         UserInput::LocalImage {
             path: missing_path,
             detail: Some(ImageDetail::Original),
-        },
-        UserInput::Audio {
-            audio: AudioReference::Inline {
-                audio_url: "data:audio/mpeg;base64,YXVkaW8=".to_string(),
-            },
         },
     );
 

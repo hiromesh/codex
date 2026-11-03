@@ -18,6 +18,7 @@ use core_test_support::context_snapshot::SnapshotEntry;
 use core_test_support::responses;
 use core_test_support::streaming_sse::StreamingSseChunk;
 use core_test_support::streaming_sse::start_streaming_sse_server;
+use core_test_support::test_codex::submit_queue_barrier;
 use core_test_support::test_codex::test_codex;
 use core_test_support::wait_for_event;
 use pretty_assertions::assert_eq;
@@ -145,11 +146,7 @@ async fn agent_followup_preserves_native_boundaries(
             start_options: Default::default(),
         })
         .await?;
-    child.submit(Op::RealtimeConversationListVoices).await?;
-    wait_for_event(&child, |event| {
-        matches!(event, EventMsg::RealtimeConversationListVoicesResponse(_))
-    })
-    .await;
+    submit_queue_barrier(&child).await;
     let message = |text: &str| {
         TurnInputRequest::new(TurnInput::InterAgentCommunication(
             InterAgentCommunication::new(

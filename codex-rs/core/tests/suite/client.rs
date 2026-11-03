@@ -37,7 +37,6 @@ use codex_protocol::config_types::ReasoningSummary;
 use codex_protocol::config_types::Settings;
 use codex_protocol::config_types::Verbosity;
 use codex_protocol::error::CodexErr;
-use codex_protocol::models::AudioReference;
 use codex_protocol::models::ContentItem;
 use codex_protocol::models::DEFAULT_IMAGE_DETAIL;
 use codex_protocol::models::FunctionCallOutputContentItem;
@@ -52,7 +51,6 @@ use codex_protocol::models::ReasoningItemContent;
 use codex_protocol::models::ReasoningItemReasoningSummary;
 use codex_protocol::models::ResponseItem;
 use codex_protocol::models::WebSearchAction;
-use codex_protocol::openai_models::InputModality;
 use codex_protocol::openai_models::ReasoningEffort;
 use codex_protocol::protocol::EventMsg;
 use codex_protocol::protocol::Op;
@@ -506,112 +504,6 @@ async fn non_openai_responses_requests_include_item_ids_without_passthrough_meta
         );
     }
 }
-
-#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn sends_audio_urls_to_responses() {
-    skip_if_no_network!();
-
-    let server = MockServer::start().await;
-    let response_mock = mount_sse_once(
-        &server,
-        sse(vec![ev_response_created("resp1"), ev_completed("resp1")]),
-    )
-    .await;
-    let codex = test_codex()
-        .with_model_info_override("gpt-5.5", |model_info| {
-            model_info.input_modalities.push(InputModality::Audio);
-        })
-        .build(&server)
-        .await
-        .unwrap()
-        .codex;
-    let audio_url = "data:audio/wav;base64,AAAA";
-
-    codex
-        .start_or_steer_turn(TurnInputRequest::user_input(vec![UserInput::Audio {
-            audio: AudioReference::Inline {
-                audio_url: audio_url.to_string(),
-            },
-        }]))
-        .await
-        .unwrap();
-    wait_for_event(&codex, |event| matches!(event, EventMsg::TurnComplete(_))).await;
-
-    let request = response_mock.single_request();
-    assert!(request.has_content_kinds(&["user.audio"]));
-    let user_message = request
-        .input()
-        .into_iter()
-        .rev()
-        .find(|item| item.get("role").and_then(serde_json::Value::as_str) == Some("user"))
-        .expect("request should include a user message");
-    assert_eq!(
-        user_message["content"],
-        json!([{
-            "type": "input_audio",
-            "audio_url": audio_url,
-        }])
-    );
-}
-
-#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn sends_local_audio_to_responses() -> anyhow::Result<()> {
-    skip_if_no_network!(Ok(()));
-
-    let server = MockServer::start().await;
-    let response_mock = mount_sse_once(
-        &server,
-        sse(vec![ev_response_created("resp1"), ev_completed("resp1")]),
-    )
-    .await;
-    let codex = test_codex()
-        .with_model_info_override("gpt-5.5", |model_info| {
-            model_info.input_modalities.push(InputModality::Audio);
-        })
-        .build(&server)
-        .await?
-        .codex;
-    let temp_dir = tempfile::tempdir()?;
-    let audio_path = temp_dir.path().join("recording.wav");
-    std::fs::write(&audio_path, b"audio")?;
-
-    codex
-        .start_or_steer_turn(TurnInputRequest::user_input(vec![UserInput::LocalAudio {
-            path: audio_path.clone(),
-        }]))
-        .await?;
-    wait_for_event(&codex, |event| matches!(event, EventMsg::TurnComplete(_))).await;
-
-    let request = response_mock.single_request();
-    assert!(request.has_content_kinds(&["user.text", "user.audio", "user.text"]));
-    let user_message = request
-        .input()
-        .into_iter()
-        .rev()
-        .find(|item| item.get("role").and_then(serde_json::Value::as_str) == Some("user"))
-        .expect("request should include a user message");
-    let audio_path = audio_path.display();
-    assert_eq!(
-        user_message["content"],
-        json!([
-            {
-                "type": "input_text",
-                "text": format!(r#"<audio name=[Audio #1] path="{audio_path}">"#),
-            },
-            {
-                "type": "input_audio",
-                "audio_url": "data:audio/wav;base64,YXVkaW8=",
-            },
-            {
-                "type": "input_text",
-                "text": "</audio>",
-            },
-        ])
-    );
-
-    Ok(())
-}
-
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn response_item_ids_persist_across_resume_and_preserve_server_ids() -> anyhow::Result<()> {
     let server = MockServer::start().await;

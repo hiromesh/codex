@@ -38,9 +38,7 @@ pub(crate) fn collect_explicit_skill_mentions(
             }
             UserInput::Text { .. }
             | UserInput::Image { .. }
-            | UserInput::LocalImage { .. }
-            | UserInput::Audio { .. }
-            | UserInput::LocalAudio { .. } => {}
+            | UserInput::LocalImage { .. } => {}
             UserInput::Mention { .. } => {}
             _ => {}
         }

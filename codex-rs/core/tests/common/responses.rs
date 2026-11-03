@@ -301,22 +301,6 @@ impl ResponsesRequest {
             .collect()
     }
 
-    /// Returns all `input_audio` `audio_url` spans from `message` inputs for the provided role.
-    pub fn message_input_audio_urls(&self, role: &str) -> Vec<String> {
-        self.inputs_of_type("message")
-            .into_iter()
-            .filter(|item| item.get("role").and_then(Value::as_str) == Some(role))
-            .filter_map(|item| item.get("content").and_then(Value::as_array).cloned())
-            .flatten()
-            .filter(|span| span.get("type").and_then(Value::as_str) == Some("input_audio"))
-            .filter_map(|span| {
-                span.get("audio_url")
-                    .and_then(Value::as_str)
-                    .map(str::to_owned)
-            })
-            .collect()
-    }
-
     pub fn input(&self) -> Vec<Value> {
         self.body_json()["input"]
             .as_array()
@@ -1411,7 +1395,7 @@ pub async fn start_websocket_server_with_headers(
                     }
 
                     eprintln!(
-                        "[ws test server +{}ms] connection={} sending batch_size={} event_types={:?} audio_data={:?}",
+                        "[ws test server +{}ms] connection={} sending batch_size={} event_types={:?} delta={:?}",
                         start.elapsed().as_millis(),
                         connection_index,
                         request_events.len(),

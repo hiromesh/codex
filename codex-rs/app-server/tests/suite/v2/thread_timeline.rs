@@ -7,7 +7,6 @@ use codex_app_server_protocol::SortDirection;
 use codex_app_server_protocol::ThreadItemPayload;
 use codex_app_server_protocol::ThreadItemsListParams;
 use codex_app_server_protocol::ThreadItemsListResponse;
-use codex_app_server_protocol::ThreadRealtimeItemContent;
 use codex_app_server_protocol::ThreadTimelineEntry;
 use codex_app_server_protocol::ThreadTimelineListParams;
 use codex_app_server_protocol::ThreadTimelineListResponse;
@@ -22,9 +21,6 @@ use codex_protocol::protocol::ThreadHistoryMode;
 use codex_protocol::protocol::ThreadMemoryMode;
 use codex_protocol::protocol::TurnCompleteEvent;
 use codex_protocol::protocol::TurnStartedEvent;
-use codex_protocol::realtime::RealtimeItem;
-use codex_protocol::realtime::RealtimeItemContent;
-use codex_protocol::realtime::RealtimeTranscriptRole;
 use codex_protocol::user_input::UserInput;
 use codex_rollout::RolloutItem;
 use codex_thread_store::AppendThreadItemsParams;
@@ -93,11 +89,6 @@ async fn timeline_pages_mix_items_and_resolve_the_opening_realtime_session() -> 
         .append_items(AppendThreadItemsParams {
             thread_id,
             items: vec![
-                RolloutItem::RealtimeItem(RealtimeItem {
-                    id: "voice-1:started".to_string(),
-                    realtime_session_id: "voice-1".to_string(),
-                    content: RealtimeItemContent::RealtimeSessionStarted,
-                }),
                 RolloutItem::EventMsg(EventMsg::TurnStarted(TurnStartedEvent {
                     turn_attribution: None,
                     turn_id: "turn-1".to_string(),
@@ -121,14 +112,6 @@ async fn timeline_pages_mix_items_and_resolve_the_opening_realtime_session() -> 
                     started_at_ms: Some(0),
                     completed_at_ms: 1,
                 })),
-                RolloutItem::RealtimeItem(RealtimeItem {
-                    id: "voice-1:transcript-1".to_string(),
-                    realtime_session_id: "voice-1".to_string(),
-                    content: RealtimeItemContent::TranscriptSegment {
-                        role: RealtimeTranscriptRole::Assistant,
-                        text: "Checking staging".to_string(),
-                    },
-                }),
                 RolloutItem::EventMsg(EventMsg::TurnComplete(TurnCompleteEvent {
                     root_turn_id: None,
                     turn_id: "turn-1".to_string(),
@@ -162,6 +145,11 @@ async fn timeline_pages_mix_items_and_resolve_the_opening_realtime_session() -> 
     assert_eq!(page.data.len(), 3);
     assert!(matches!(
         &page.data[0],
+        ThreadTimelineEntry::TurnStarted { turn_id, started_at: Some(10), .. }
+            if turn_id == "turn-1"
+    ));
+    assert!(matches!(
+        &page.data[1],
         ThreadTimelineEntry::Item { turn_id, item, .. }
             if turn_id == "turn-1"
                 && matches!(&item.payload, ThreadItemPayload::UserMessage { .. })
@@ -169,50 +157,11 @@ async fn timeline_pages_mix_items_and_resolve_the_opening_realtime_session() -> 
                 && item.completed_at_ms == Some(1)
     ));
     assert!(matches!(
-        &page.data[1],
-        ThreadTimelineEntry::Realtime { item, .. }
-            if matches!(
-                &item.content,
-                ThreadRealtimeItemContent::TranscriptSegment { text, .. }
-                    if text == "Checking staging"
-            )
-    ));
-    assert_eq!(
-        page.active_realtime_session_at_page_start.as_deref(),
-        Some("voice-1")
-    );
-    assert!(matches!(
         &page.data[2],
         ThreadTimelineEntry::TurnCompleted { turn_id, duration_ms: Some(2000), .. }
             if turn_id == "turn-1"
     ));
-
-    let older: ThreadTimelineListResponse = app_server
-        .request(|request_id| ClientRequest::ThreadTimelineList {
-            request_id,
-            params: ThreadTimelineListParams {
-                thread_id: thread_id.to_string(),
-                cursor: page.next_cursor,
-                limit: Some(2),
-            },
-        })
-        .await?;
-    assert_eq!(older.data.len(), 2);
-    assert!(matches!(
-        &older.data[0],
-        ThreadTimelineEntry::Realtime { item, .. }
-            if matches!(
-                item.content,
-                ThreadRealtimeItemContent::RealtimeSessionStarted
-            )
-    ));
-    assert!(matches!(
-        &older.data[1],
-        ThreadTimelineEntry::TurnStarted { turn_id, started_at: Some(10), .. }
-            if turn_id == "turn-1"
-    ));
-    assert_eq!(older.active_realtime_session_at_page_start, None);
-    assert_eq!(older.next_cursor, None);
+    assert_eq!(page.next_cursor, None);
 
     let ordinary: ThreadItemsListResponse = app_server
         .request(|request_id| ClientRequest::ThreadItemsList {

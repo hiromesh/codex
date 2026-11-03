@@ -360,9 +360,6 @@ impl ServerHandler for DynamicToolMcpHandler {
                 DynamicToolCallOutputContentItem::InputImage { image_url } => {
                     ContentBlock::text(image_url)
                 }
-                DynamicToolCallOutputContentItem::InputAudio { audio_url } => {
-                    ContentBlock::text(audio_url)
-                }
             })
             .collect();
         Ok(if response.success {

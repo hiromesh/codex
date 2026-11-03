@@ -1,16 +1,10 @@
 const PERSONAL_ACCESS_TOKEN_PREFIX: &str = "at-";
 
-pub(super) enum CodexAccessToken<'a> {
-    PersonalAccessToken(&'a str),
-    AgentIdentityJwt(&'a str),
-}
-
-pub(super) fn classify_codex_access_token(access_token: &str) -> CodexAccessToken<'_> {
-    if access_token.starts_with(PERSONAL_ACCESS_TOKEN_PREFIX) {
-        CodexAccessToken::PersonalAccessToken(access_token)
-    } else {
-        CodexAccessToken::AgentIdentityJwt(access_token)
-    }
+/// Returns the personal access token when the value uses the supported prefix.
+pub(super) fn classify_codex_access_token(access_token: &str) -> Option<&str> {
+    access_token
+        .starts_with(PERSONAL_ACCESS_TOKEN_PREFIX)
+        .then_some(access_token)
 }
 
 #[cfg(test)]

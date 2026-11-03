@@ -121,9 +121,6 @@ impl DynamicToolCallData {
                             DynamicToolCallOutputContentItem::InputImage { .. } => {
                                 "<image content>".to_owned()
                             }
-                            DynamicToolCallOutputContentItem::InputAudio { .. } => {
-                                "<audio content>".to_owned()
-                            }
                         })
                         .collect()
                 }),

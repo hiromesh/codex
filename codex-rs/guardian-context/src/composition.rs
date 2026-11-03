@@ -12,7 +12,6 @@
 use codex_context_fragments::ContextualUserFragment;
 use codex_history::CodexHarnessMetadata;
 use codex_history::ResponseItemEnvelope;
-use codex_protocol::models::AudioReference;
 use codex_protocol::models::ContentItem;
 use codex_protocol::models::ImageReference;
 use codex_protocol::models::ResponseItem;
@@ -118,15 +117,9 @@ impl SectionContent {
                     image: ImageReference::Inline { image_url },
                     ..
                 } => image_url.len(),
-                ContentItem::InputAudio {
-                    audio: AudioReference::Inline { audio_url },
-                } => audio_url.len(),
                 ContentItem::InputImage {
                     image: ImageReference::File { .. },
                     ..
-                }
-                | ContentItem::InputAudio {
-                    audio: AudioReference::File { .. },
                 } => 0,
             },
         }
@@ -576,7 +569,7 @@ impl ComposedContext {
                         continue;
                     }
                     ContentItem::InputImage { image, detail } => UserInput::Image { image, detail },
-                    ContentItem::InputAudio { .. } | ContentItem::OutputText { .. } => {
+                    ContentItem::OutputText { .. } => {
                         return Err(SectionError::UnsupportedDelivery {
                             section: section.id,
                         });

@@ -1,5 +1,4 @@
 mod access_token;
-mod agent_identity;
 mod api_key;
 mod auth_headers;
 mod bedrock_access_keys;
@@ -11,7 +10,6 @@ mod personal_access_token;
 mod source;
 mod storage;
 mod util;
-mod workload_identity;
 
 mod external_bearer;
 mod manager;
@@ -28,4 +26,3 @@ pub use change_state::RequestAuthChange;
 pub use error::RefreshTokenFailedError;
 pub use error::RefreshTokenFailedReason;
 pub use manager::*;
-pub use workload_identity::is_workload_identity_selected;

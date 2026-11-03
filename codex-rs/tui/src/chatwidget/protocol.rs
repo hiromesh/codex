@@ -95,11 +95,6 @@ impl ChatWidget {
                     self.on_modal_or_popup_closed();
                 }
                 self.safety_recourse = None;
-                if from_replay {
-                    self.restore_realtime_transcripts_before_turn(&notification.turn.id);
-                } else {
-                    self.anchor_realtime_transcripts_before_turn(&notification.turn.id);
-                }
                 if replay_kind.is_none() {
                     self.clear_misalignment_for_new_turn(
                         &notification.turn.id,
@@ -118,7 +113,6 @@ impl ChatWidget {
                 }
             }
             ServerNotification::TurnCompleted(notification) => {
-                self.restore_realtime_transcripts_before_turn(&notification.turn.id);
                 self.handle_turn_completed_notification(notification, replay_kind);
             }
             ServerNotification::ItemStarted(notification) => {
@@ -128,51 +122,27 @@ impl ChatWidget {
                 self.handle_item_completed_notification(notification, replay_kind);
             }
             ServerNotification::AgentMessageDelta(notification) => {
-                self.restore_realtime_transcripts_before_turn(&notification.turn_id);
-                if !self.is_realtime_delegated_reasoning_turn(&notification.turn_id)
-                    && (from_replay
-                        || !self.is_realtime_delegated_agent_item(
-                            &notification.turn_id,
-                            &notification.item_id,
-                        ))
-                {
-                    self.transcript.active_streamed_agent_message =
-                        Some((notification.turn_id, notification.item_id));
-                    self.on_agent_message_delta(notification.delta);
-                }
+                self.transcript.active_streamed_agent_message =
+                    Some((notification.turn_id, notification.item_id));
+                self.on_agent_message_delta(notification.delta);
             }
             ServerNotification::PlanDelta(notification) => {
-                self.restore_realtime_transcripts_before_turn(&notification.turn_id);
                 self.on_plan_delta(notification.delta);
             }
             ServerNotification::ReasoningSummaryTextDelta(notification) => {
-                if !self.is_realtime_delegated_reasoning_item(
-                    &notification.turn_id,
-                    &notification.item_id,
-                ) && self.status_state.reasoning_item_id.as_deref()
-                    == Some(&notification.item_id)
-                {
+                if self.status_state.reasoning_item_id.as_deref() == Some(&notification.item_id) {
                     self.on_agent_reasoning_delta(notification.delta);
                 }
             }
             ServerNotification::ReasoningTextDelta(notification) => {
                 if self.config.show_raw_agent_reasoning
-                    && !self.is_realtime_delegated_reasoning_item(
-                        &notification.turn_id,
-                        &notification.item_id,
-                    )
                     && self.status_state.reasoning_item_id.as_deref() == Some(&notification.item_id)
                 {
                     self.on_agent_reasoning_delta(notification.delta);
                 }
             }
             ServerNotification::ReasoningSummaryPartAdded(notification) => {
-                if !self.is_realtime_delegated_reasoning_item(
-                    &notification.turn_id,
-                    &notification.item_id,
-                ) && self.status_state.reasoning_item_id.as_deref()
-                    == Some(&notification.item_id)
-                {
+                if self.status_state.reasoning_item_id.as_deref() == Some(&notification.item_id) {
                     self.on_reasoning_section_break();
                 }
             }
@@ -342,16 +312,6 @@ impl ChatWidget {
                     self.on_shutdown_complete();
                 }
             }
-            ServerNotification::ThreadRealtimeSdp(notification) => {
-                if !from_replay {
-                    self.on_realtime_conversation_sdp(notification.sdp);
-                }
-            }
-            ServerNotification::ThreadRealtimeStarted(_) => {
-                if !from_replay {
-                    self.on_realtime_conversation_started();
-                }
-            }
             ServerNotification::ServerRequestResolved(_)
             | ServerNotification::AccountUpdated(_)
             | ServerNotification::GatewayOAuthChanged(_)
@@ -384,11 +344,6 @@ impl ChatWidget {
             | ServerNotification::FsChanged(_)
             | ServerNotification::FuzzyFileSearchSessionUpdated(_)
             | ServerNotification::FuzzyFileSearchSessionCompleted(_)
-            | ServerNotification::ThreadRealtimeItemAdded(_)
-            | ServerNotification::ThreadRealtimeItemStarted(_)
-            | ServerNotification::ThreadRealtimeItemTranscriptDelta(_)
-            | ServerNotification::ThreadRealtimeItemCompleted(_)
-            | ServerNotification::ThreadRealtimeOutputAudioDelta(_)
             | ServerNotification::AccountLoginCompleted(_)
             | ServerNotification::ProjectChanged(_)
             | ServerNotification::ThreadProjectUpdated(_) => {}
@@ -459,11 +414,6 @@ impl ChatWidget {
                         replay_kind
                             .map_or(ThreadItemRenderSource::Live, ThreadItemRenderSource::Replay),
                     );
-                }
-                if replay_kind.is_none()
-                    && let Some((item, _, _)) = &last_agent_message
-                {
-                    self.speak_completed_realtime_delegation(&notification.turn.id, item);
                 }
                 if replay_kind.is_none() {
                     question_drafts = self.take_question_drafts();
@@ -540,9 +490,6 @@ impl ChatWidget {
             self.bottom_pane.append_question_drafts(&drafts);
             self.refresh_pending_input_preview();
             self.request_redraw();
-        }
-        if replay_kind.is_none() {
-            self.finish_realtime_turn(&notification.turn.id);
         }
         self.thread_usage.replaying_turn_completion = was_replaying_turn_completion;
     }

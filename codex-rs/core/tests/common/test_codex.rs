@@ -20,6 +20,8 @@ use codex_analytics::AnalyticsEventsClient;
 use codex_attachment_store::AttachmentStore;
 use codex_config::CloudConfigBundleLoader;
 use codex_core::CodexThread;
+use codex_protocol::protocol::Op;
+use tokio::sync::oneshot;
 pub use codex_core::StartThreadOptions;
 use codex_core::ThreadManager;
 use codex_core::TimeProvider;
@@ -60,7 +62,6 @@ use codex_protocol::protocol::AskForApproval;
 use codex_protocol::protocol::EnvironmentConfig;
 use codex_protocol::protocol::EnvironmentConfigState;
 use codex_protocol::protocol::EventMsg;
-use codex_protocol::protocol::RealtimeConversationVersion as RealtimeWsVersion;
 use codex_protocol::protocol::SandboxPolicy;
 use codex_protocol::protocol::SessionConfiguredEvent;
 use codex_protocol::protocol::SessionSource;
@@ -378,6 +379,22 @@ impl TestAuth {
     }
 }
 
+/// Waits until every submission queued before this call has been processed.
+///
+/// The nonexistent turn id makes the interrupt a pure queue barrier: it cannot
+/// cancel a live turn, and it emits no event.
+pub async fn submit_queue_barrier(codex: &CodexThread) {
+    let (reply, reply_rx) = oneshot::channel();
+    codex
+        .submit(Op::InterruptIfNoPendingInput {
+            turn_id: "queue-barrier".to_string(),
+            reply,
+        })
+        .await
+        .expect("submit queue barrier");
+    reply_rx.await.expect("queue barrier reply");
+}
+
 pub struct TestCodexBuilder {
     apps_tools_cache: codex_core::CodexAppsToolsCache,
     config_mutators: Vec<Box<ConfigMutator>>,
@@ -668,8 +685,6 @@ impl TestCodexBuilder {
         };
         self.config_mutators.push(Box::new(move |config| {
             config.model_provider.supports_websockets = true;
-            config.experimental_realtime_ws_model = Some("realtime-test-model".to_string());
-            config.realtime.version = RealtimeWsVersion::V1;
         }));
         let test_env = TestEnv::local().await?;
         Box::pin(self.build_with_home_and_base_url(

@@ -23,11 +23,6 @@ use codex_config::config_toml::AutoReviewToml;
 use codex_config::config_toml::ConfigToml;
 use codex_config::config_toml::ExperimentalRequestUserInput;
 use codex_config::config_toml::ProjectConfig;
-use codex_config::config_toml::RealtimeConfig;
-use codex_config::config_toml::RealtimeToml;
-use codex_config::config_toml::RealtimeTransport;
-use codex_config::config_toml::RealtimeWsMode;
-use codex_config::config_toml::RealtimeWsVersion;
 use codex_config::config_toml::ToolsToml;
 use codex_config::loader::project_trust_key;
 use codex_config::permissions_toml::FilesystemPermissionToml;
@@ -99,7 +94,6 @@ use codex_protocol::permissions::FileSystemSpecialPath;
 use codex_protocol::permissions::NetworkSandboxPolicy;
 use codex_protocol::protocol::MultiAgentVersion;
 use codex_protocol::protocol::NetworkAccess;
-use codex_protocol::protocol::RealtimeVoice;
 use codex_protocol::protocol::SandboxPolicy;
 use codex_protocol_test_support::ContentItemTestExt;
 use codex_utils_path_uri::LegacyAppPathString;
@@ -11398,28 +11392,6 @@ in_app_chat = false
 }
 
 #[tokio::test]
-async fn in_app_dictation_feature_requirements_are_valid() -> std::io::Result<()> {
-    let codex_home = TempDir::new()?;
-
-    let config = ConfigBuilder::without_managed_config_for_tests()
-        .codex_home(codex_home.path().to_path_buf())
-        .cloud_config_bundle(
-            CloudConfigBundleFixture::loader_with_enterprise_requirement(
-                r#"
-[features]
-in_app_dictation = false
-"#,
-            ),
-        )
-        .build()
-        .await?;
-
-    assert!(!config.features.enabled(Feature::InAppDictation));
-
-    Ok(())
-}
-
-#[tokio::test]
 async fn in_app_local_automation_feature_requirements_are_valid() -> std::io::Result<()> {
     let codex_home = TempDir::new()?;
 
@@ -11484,7 +11456,6 @@ shell_tool = false
 
 #[test_case::test_case(Feature::Personality; "personality")]
 #[test_case::test_case(Feature::Worktrees; "worktrees")]
-#[test_case::test_case(Feature::RealtimeConversation; "realtime conversation")]
 #[test_case::test_case(Feature::ShellZshFork; "shell zsh fork")]
 #[test_case::test_case(Feature::UnifiedExecZshFork; "unified exec zsh fork")]
 fn retired_feature_requirements_do_not_pin_configured_values(
@@ -11536,7 +11507,7 @@ fn retired_feature_requirements_do_not_pin_configured_values(
                 usize::from(feature != Feature::Personality),
             ),
         );
-        if matches!(feature, Feature::Worktrees | Feature::RealtimeConversation) {
+        if matches!(feature, Feature::Worktrees) {
             assert!(
                 warnings[0].contains(&format!("Ignoring removed `features` requirement `{key}`"))
             );
@@ -12711,261 +12682,6 @@ disabled_tools = [
             ToolSuggestDisabledTool::plugin("project_plugin"),
         ]
     );
-    Ok(())
-}
-
-#[tokio::test]
-async fn experimental_realtime_start_instructions_load_from_config_toml() -> std::io::Result<()> {
-    let cfg: ConfigToml = toml::from_str(
-        r#"
-experimental_realtime_start_instructions = "start instructions from config"
-"#,
-    )
-    .expect("TOML deserialization should succeed");
-
-    assert_eq!(
-        cfg.experimental_realtime_start_instructions.as_deref(),
-        Some("start instructions from config")
-    );
-
-    let codex_home = TempDir::new()?;
-    let config = Config::load_from_base_config_with_overrides(
-        cfg,
-        ConfigOverrides::default(),
-        codex_home.abs(),
-    )
-    .await?;
-
-    assert_eq!(
-        config.experimental_realtime_start_instructions.as_deref(),
-        Some("start instructions from config")
-    );
-    Ok(())
-}
-
-#[tokio::test]
-async fn experimental_realtime_ws_base_url_loads_from_config_toml() -> std::io::Result<()> {
-    let cfg: ConfigToml = toml::from_str(
-        r#"experimental_realtime_ws_base_url = "http://127.0.0.1:8011"
-experimental_realtime_webrtc_call_base_url = "http://127.0.0.1:8082/v1"
-"#,
-    )
-    .expect("TOML deserialization should succeed");
-
-    assert_eq!(
-        cfg.experimental_realtime_ws_base_url.as_deref(),
-        Some("http://127.0.0.1:8011")
-    );
-    assert_eq!(
-        cfg.experimental_realtime_webrtc_call_base_url.as_deref(),
-        Some("http://127.0.0.1:8082/v1")
-    );
-    let codex_home = TempDir::new()?;
-    let config = Config::load_from_base_config_with_overrides(
-        cfg,
-        ConfigOverrides::default(),
-        codex_home.abs(),
-    )
-    .await?;
-
-    assert_eq!(
-        config.experimental_realtime_ws_base_url.as_deref(),
-        Some("http://127.0.0.1:8011")
-    );
-    assert_eq!(
-        config.experimental_realtime_webrtc_call_base_url.as_deref(),
-        Some("http://127.0.0.1:8082/v1")
-    );
-    Ok(())
-}
-
-#[tokio::test]
-async fn experimental_realtime_ws_backend_prompt_loads_from_config_toml() -> std::io::Result<()> {
-    let cfg: ConfigToml = toml::from_str(
-        r#"
-experimental_realtime_ws_backend_prompt = "prompt from config"
-"#,
-    )
-    .expect("TOML deserialization should succeed");
-
-    assert_eq!(
-        cfg.experimental_realtime_ws_backend_prompt.as_deref(),
-        Some("prompt from config")
-    );
-
-    let codex_home = TempDir::new()?;
-    let config = Config::load_from_base_config_with_overrides(
-        cfg,
-        ConfigOverrides::default(),
-        codex_home.abs(),
-    )
-    .await?;
-
-    assert_eq!(
-        config.experimental_realtime_ws_backend_prompt.as_deref(),
-        Some("prompt from config")
-    );
-    Ok(())
-}
-
-#[tokio::test]
-async fn experimental_realtime_ws_startup_context_loads_from_config_toml() -> std::io::Result<()> {
-    let cfg: ConfigToml = toml::from_str(
-        r#"
-experimental_realtime_ws_startup_context = "startup context from config"
-"#,
-    )
-    .expect("TOML deserialization should succeed");
-
-    assert_eq!(
-        cfg.experimental_realtime_ws_startup_context.as_deref(),
-        Some("startup context from config")
-    );
-
-    let codex_home = TempDir::new()?;
-    let config = Config::load_from_base_config_with_overrides(
-        cfg,
-        ConfigOverrides::default(),
-        codex_home.abs(),
-    )
-    .await?;
-
-    assert_eq!(
-        config.experimental_realtime_ws_startup_context.as_deref(),
-        Some("startup context from config")
-    );
-    Ok(())
-}
-
-#[tokio::test]
-async fn experimental_realtime_ws_model_loads_from_config_toml() -> std::io::Result<()> {
-    let cfg: ConfigToml = toml::from_str(
-        r#"
-experimental_realtime_ws_model = "realtime-test-model"
-"#,
-    )
-    .expect("TOML deserialization should succeed");
-
-    assert_eq!(
-        cfg.experimental_realtime_ws_model.as_deref(),
-        Some("realtime-test-model")
-    );
-
-    let codex_home = TempDir::new()?;
-    let config = Config::load_from_base_config_with_overrides(
-        cfg,
-        ConfigOverrides::default(),
-        codex_home.abs(),
-    )
-    .await?;
-
-    assert_eq!(
-        config.experimental_realtime_ws_model.as_deref(),
-        Some("realtime-test-model")
-    );
-    Ok(())
-}
-
-#[tokio::test]
-async fn realtime_config_partial_table_uses_realtime_defaults() -> std::io::Result<()> {
-    let cfg: ConfigToml = toml::from_str(
-        r#"
-[realtime]
-voice = "marin"
-"#,
-    )
-    .expect("TOML deserialization should succeed");
-
-    let codex_home = TempDir::new()?;
-    let config = Config::load_from_base_config_with_overrides(
-        cfg,
-        ConfigOverrides::default(),
-        codex_home.abs(),
-    )
-    .await?;
-
-    assert_eq!(
-        config.realtime,
-        RealtimeConfig {
-            voice: Some(RealtimeVoice::Marin),
-            ..RealtimeConfig::default()
-        }
-    );
-    Ok(())
-}
-
-#[tokio::test]
-async fn realtime_loads_from_config_toml() -> std::io::Result<()> {
-    let cfg: ConfigToml = toml::from_str(
-        r#"
-[realtime]
-version = "v2"
-type = "transcription"
-transport = "webrtc"
-voice = "cedar"
-"#,
-    )
-    .expect("TOML deserialization should succeed");
-
-    assert_eq!(
-        cfg.realtime,
-        Some(RealtimeToml {
-            version: Some(RealtimeWsVersion::V2),
-            session_type: Some(RealtimeWsMode::Transcription),
-            transport: Some(RealtimeTransport::WebRtc),
-            voice: Some(RealtimeVoice::Cedar),
-        })
-    );
-
-    let codex_home = TempDir::new()?;
-    let config = Config::load_from_base_config_with_overrides(
-        cfg,
-        ConfigOverrides::default(),
-        codex_home.abs(),
-    )
-    .await?;
-
-    assert_eq!(
-        config.realtime,
-        RealtimeConfig {
-            version: RealtimeWsVersion::V2,
-            session_type: RealtimeWsMode::Transcription,
-            transport: RealtimeTransport::WebRtc,
-            voice: Some(RealtimeVoice::Cedar),
-        }
-    );
-    Ok(())
-}
-
-#[tokio::test]
-async fn realtime_audio_loads_from_config_toml() -> std::io::Result<()> {
-    for selection in ["1", "[1, 2]"] {
-        let cfg: ConfigToml = toml::from_str(&format!(
-            "[audio]\nmicrophone = \"USB Mic\"\nmicrophone_channel = {selection}\nspeaker = \"Desk Speakers\"\n"
-        )).expect("TOML deserialization should succeed");
-        let expected_audio = cfg.audio.as_ref().unwrap().clone();
-        let codex_home = TempDir::new()?;
-        let config = Config::load_from_base_config_with_overrides(
-            cfg,
-            ConfigOverrides::default(),
-            codex_home.abs(),
-        )
-        .await?;
-        assert_eq!(
-            config.realtime_audio,
-            codex_config::config_toml::RealtimeAudioConfig {
-                microphone: Some("USB Mic".into()),
-                speaker: Some("Desk Speakers".into()),
-                microphone_channel: expected_audio.microphone_channel,
-            }
-        );
-    }
-    for invalid in ["0", "[1, 0]"] {
-        assert!(
-            toml::from_str::<ConfigToml>(&format!("[audio]\nmicrophone_channel = {invalid}"))
-                .is_err()
-        );
-    }
     Ok(())
 }
 

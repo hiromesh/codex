@@ -43,7 +43,6 @@ fn resume_history(
         comp_hash: None,
         collaboration_mode: None,
         multi_agent_version: None,
-        realtime_active: None,
         cyber_access_program: None,
         effort: config.model_reasoning_effort.clone(),
         summary: Some(

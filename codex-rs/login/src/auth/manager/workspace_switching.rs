@@ -7,6 +7,8 @@ use codex_http_client::RouteAwareClientPool;
 use serde_json::json;
 use std::io;
 
+const DEFAULT_CHATGPT_BASE_URL: &str = "https://chatgpt.com/backend-api";
+
 #[derive(Deserialize)]
 struct WorkspaceTokenResponse {
     access_token: String,
@@ -216,7 +218,6 @@ impl AuthManager {
         tokens.access_token = access_token;
         tokens.account_id = Some(workspace_id.to_owned());
         // The exchange does not renew the session or issue refresh/ID tokens.
-        updated.agent_identity = None;
         replace_if_current(auth.storage().as_ref(), &snapshot, &updated)?;
         self.reload().await;
         Ok(WorkspaceSwitch {
@@ -278,7 +279,7 @@ impl AuthManager {
         let base_url = self
             .chatgpt_base_url
             .as_deref()
-            .unwrap_or(ChatGptEnvironment::default().chatgpt_base_url())
+            .unwrap_or(DEFAULT_CHATGPT_BASE_URL)
             .trim_end_matches('/');
         let endpoint = format!("{base_url}/accounts/switch-workspace-token");
         let client = RouteAwareClientPool::with_chatgpt_cloudflare_cookies_without_redirects_or_request_logging(

@@ -1153,7 +1153,6 @@ mod tests {
                 comp_hash: None,
                 collaboration_mode: None,
                 multi_agent_version: None,
-                realtime_active: None,
                 cyber_access_program: None,
                 effort: None,
                 summary: Some(ReasoningSummary::Auto),

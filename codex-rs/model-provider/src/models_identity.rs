@@ -65,9 +65,7 @@ pub(crate) fn identity(
             } else {
                 matches!(
                     auth,
-                    CodexAuth::Chatgpt(_)
-                        | CodexAuth::ChatgptAuthTokens(_)
-                        | CodexAuth::AgentIdentity(_)
+                    CodexAuth::Chatgpt(_) | CodexAuth::ChatgptAuthTokens(_)
                 ) && (auth.get_chatgpt_user_id().is_some() || auth.get_account_email().is_some())
             }
     });
