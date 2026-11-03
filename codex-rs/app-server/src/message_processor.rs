@@ -1026,8 +1026,7 @@ impl MessageProcessor {
             | ClientRequest::ReviewStart { .. }
             | ClientRequest::ThreadCompactStart { .. }
             | ClientRequest::ThreadShellCommand { .. }
-            | ClientRequest::ThreadQueueStart { .. }
-            | ClientRequest::ThreadRealtimeStart { .. } => {
+            | ClientRequest::ThreadQueueStart { .. } => {
                 (Some(self.turn_admission.admit()?), true)
             }
             _ => (None, false),
@@ -1727,37 +1726,8 @@ impl MessageProcessor {
                     .turn_interrupt(&request_id, params)
                     .await
             }
-            ClientRequest::ThreadRealtimeStart { params, .. } => {
-                let sideband_base_url = None;
-                self.turn_processor
-                    .thread_realtime_start(&request_id, params, sideband_base_url)
-                    .await
-            }
-            ClientRequest::ThreadRealtimeAppendAudio { params, .. } => {
-                self.turn_processor
-                    .thread_realtime_append_audio(&request_id, params)
-                    .await
-            }
-            ClientRequest::ThreadRealtimeAppendText { params, .. } => {
-                self.turn_processor
-                    .thread_realtime_append_text(&request_id, params)
-                    .await
-            }
-            ClientRequest::ThreadRealtimeAppendSpeech { params, .. } => {
-                self.turn_processor
-                    .thread_realtime_append_speech(&request_id, params)
-                    .await
-            }
-            ClientRequest::ThreadRealtimeStop { params, .. } => {
-                self.turn_processor
-                    .thread_realtime_stop(&request_id, params)
-                    .await
-            }
             ClientRequest::ThreadTimelineList { params, .. } => {
                 self.thread_processor.thread_timeline_list(params).await
-            }
-            ClientRequest::ThreadRealtimeListVoices { params: _, .. } => {
-                self.turn_processor.thread_realtime_list_voices().await
             }
             ClientRequest::ReviewStart { params, .. } => {
                 // Keep review setup from inflating the shared request dispatcher's stack frame.

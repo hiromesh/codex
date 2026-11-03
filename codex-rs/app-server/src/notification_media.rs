@@ -125,17 +125,6 @@ pub(crate) fn without_notification_media(notification: ServerNotification) -> Se
         | ServerNotification::ConfigWarning(_)
         | ServerNotification::FuzzyFileSearchSessionUpdated(_)
         | ServerNotification::FuzzyFileSearchSessionCompleted(_)
-        | ServerNotification::ThreadRealtimeStarted(_)
-        | ServerNotification::ThreadRealtimeItemAdded(_)
-        | ServerNotification::ThreadRealtimeItemStarted(_)
-        | ServerNotification::ThreadRealtimeItemTranscriptDelta(_)
-        | ServerNotification::ThreadRealtimeItemCompleted(_)
-        | ServerNotification::ThreadRealtimeTranscriptDelta(_)
-        | ServerNotification::ThreadRealtimeTranscriptDone(_)
-        | ServerNotification::ThreadRealtimeOutputAudioDelta(_)
-        | ServerNotification::ThreadRealtimeSdp(_)
-        | ServerNotification::ThreadRealtimeError(_)
-        | ServerNotification::ThreadRealtimeClosed(_)
         | ServerNotification::AccountLoginCompleted(_)
         | ServerNotification::GatewayOAuthChanged(_) => notification,
     }

@@ -84,7 +84,7 @@ pub(crate) struct SessionState {
     pub(crate) mcp_dependency_prompted: HashSet<String>,
     pub(crate) additional_context: AdditionalContextStore,
     /// Settings used by the latest regular user turn, used for turn-to-turn
-    /// model/realtime handling on subsequent regular turns (including full-context
+    /// model handling on subsequent regular turns (including full-context
     /// reinjection after resume or `/compact`).
     previous_turn_settings: Option<PreviousTurnSettings>,
     /// Latest task admitted in this runtime, retained across completion and history edits.

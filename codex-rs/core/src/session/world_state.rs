@@ -19,7 +19,6 @@ use crate::context::world_state::MultiAgentUsageHintState;
 use crate::context::world_state::PermissionsState;
 use crate::context::world_state::PersistentModeState;
 use crate::context::world_state::PluginsInstructionsState;
-use crate::context::world_state::RealtimeState;
 use crate::context::world_state::ToolsState;
 use crate::context::world_state::TopLevelToolsState;
 use crate::context::world_state::WorldState;
@@ -208,22 +207,6 @@ impl Session {
             .and_then(|config| config.guidance_message.as_deref())
             .filter(|_| token_budget_enabled);
         world_state.add_section(ContextWindowGuidanceState::new(guidance));
-        let realtime = &step_context.realtime;
-        world_state.add_section(RealtimeState::new(
-            realtime.active,
-            realtime
-                .mode_instructions
-                .as_ref()
-                .and_then(|instructions| instructions.start.as_deref())
-                .or(turn_context
-                    .config
-                    .experimental_realtime_start_instructions
-                    .as_deref()),
-            realtime
-                .mode_instructions
-                .as_ref()
-                .and_then(|instructions| instructions.end.as_deref()),
-        ));
         world_state.add_section(AgentsMdState::new(step_context.loaded_agents_md.as_deref()));
         let exec_policy = self
             .services

@@ -252,7 +252,7 @@ impl ContextManager {
                 | RolloutItem::RetainedContext(_)
                 | RolloutItem::SecurityRiskScore(_)
                 | RolloutItem::TokenUsageRecord(_)
-                | RolloutItem::RealtimeItem(_)
+                | RolloutItem::Ignored(_)
                 | RolloutItem::Compacted(_)
                 | RolloutItem::EventMsg(_) => None,
             })
@@ -372,7 +372,6 @@ impl ContextManager {
                             model: ctx.model.clone(),
                             cyber_access_program: ctx.cyber_access_program,
                             comp_hash: ctx.comp_hash.clone(),
-                            realtime_active: ctx.realtime_active,
                         });
                         if matches!(
                             active_segment.reference_context_item,
@@ -442,7 +441,7 @@ impl ContextManager {
                 RolloutItem::EventMsg(_)
                 | RolloutItem::DynamicToolsUpdated { .. }
                 | RolloutItem::SessionMeta(_)
-                | RolloutItem::RealtimeItem(_)
+                | RolloutItem::Ignored(_)
                 | RolloutItem::RetainedContext(_)
                 | RolloutItem::SecurityRiskScore(_)
                 | RolloutItem::TokenUsageRecord(_)
@@ -551,7 +550,7 @@ impl ContextManager {
                 }
                 RolloutItem::EventMsg(_)
                 | RolloutItem::TurnContext(_)
-                | RolloutItem::RealtimeItem(_)
+                | RolloutItem::Ignored(_)
                 | RolloutItem::WorldState(_)
                 | RolloutItem::SecurityRiskScore(_)
                 | RolloutItem::TokenUsageRecord(_)
@@ -595,7 +594,7 @@ impl ContextManager {
                 | RolloutItem::InterAgentCommunication(_)
                 | RolloutItem::InterAgentCommunicationMetadata { .. }
                 | RolloutItem::TurnContext(_)
-                | RolloutItem::RealtimeItem(_)
+                | RolloutItem::Ignored(_)
                 | RolloutItem::TokenUsageRecord(_)
                 | RolloutItem::RetainedContext(_)
                 | RolloutItem::SecurityRiskScore(_)

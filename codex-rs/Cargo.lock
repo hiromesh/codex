@@ -4565,7 +4565,6 @@ dependencies = [
  "codex-plugin",
  "codex-protocol",
  "codex-protocol-test-support",
- "codex-realtime-webrtc",
  "codex-rollout",
  "codex-sandboxing",
  "codex-shell-command",

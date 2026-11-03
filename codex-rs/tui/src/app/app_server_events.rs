@@ -503,13 +503,7 @@ impl App {
                         }
                     }
                 }
-                let background_voice = self.background_voice.as_ref().is_some_and(|owner| {
-                    owner.thread_id() == Some(thread_id) && owner.realtime_conversation_is_running()
-                });
-                if self.primary_thread_id.is_none()
-                    && !self.pending_startup_thread_start
-                    && !background_voice
-                {
+                if self.primary_thread_id.is_none() && !self.pending_startup_thread_start {
                     return;
                 }
                 let untracked_thread =
@@ -521,7 +515,7 @@ impl App {
                 {
                     return;
                 }
-                let result = if self.primary_thread_id.is_none() && !background_voice {
+                let result = if self.primary_thread_id.is_none() {
                     self.enqueue_primary_thread_notification(notification).await
                 } else {
                     self.enqueue_thread_notification(thread_id, notification)
@@ -667,11 +661,6 @@ impl App {
             return;
         }
 
-        let background_voice = self.background_voice.as_ref().is_some_and(|owner| {
-            owner.realtime_conversation_is_running()
-                && owner.thread_id().is_some()
-                && owner.thread_id() == thread_id
-        });
         if thread_id.is_some_and(|thread_id| self.abandoned_side_threads.contains(&thread_id)) {
             self.reject_unsupported_app_server_request(
                 super::app_server_requests::UnsupportedAppServerRequest {
@@ -685,7 +674,6 @@ impl App {
         }
         if thread_id.is_some()
             && self.primary_thread_id.is_none()
-            && !background_voice
             && self.pending_startup_thread_start
         {
             if let Some(unsupported) = self
@@ -733,7 +721,6 @@ impl App {
             && self.primary_thread_id != Some(thread_id)
             && self.active_thread_id != Some(thread_id)
             && !unsupported_request
-            && !background_voice
             && let Some(requests) = self.agents_overview.dispatched_requests.get_mut(&thread_id)
         {
             requests.push(buffered_request);
@@ -741,7 +728,6 @@ impl App {
         }
         if thread_id.is_some()
             && self.primary_thread_id.is_none()
-            && !background_voice
             && !self.pending_startup_thread_start
             && !unsupported_request
         {
@@ -804,7 +790,7 @@ impl App {
             return;
         };
 
-        let result = if self.primary_thread_id.is_none() && !background_voice {
+        let result = if self.primary_thread_id.is_none() {
             self.enqueue_primary_thread_request(buffered_request.request)
                 .await
         } else {

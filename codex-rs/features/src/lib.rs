@@ -303,11 +303,6 @@ pub enum Feature {
     ///
     /// Requirements-only gate: this should be set from requirements, not user config.
     InAppDictation,
-    /// Allow in-app Voice in desktop apps.
-    ///
-    /// Requirements-only gate: this should be set from requirements, not user config.
-    /// Permission does not establish Voice availability or provider support.
-    InAppVoice,
     /// Allow desktop apps to run local automations.
     ///
     /// Requirements-only gate: this should be set from requirements, not user config.
@@ -428,8 +423,6 @@ pub enum Feature {
     UltrafastMode,
     /// Enable explicitly requested model changes for later step captures.
     StepModelSwitching,
-    /// Removed compatibility flag. TUI voice availability follows platform support.
-    RealtimeConversation,
     /// Prevent idle system sleep while a turn is actively running.
     PreventIdleSleep,
     /// Removed compatibility key, still advertised to the Responses API.
@@ -671,7 +664,7 @@ impl Features {
                     self.record_legacy_usage_force("features.transcript_v2", Feature::TranscriptV2);
                     continue;
                 }
-                "tui_app_server" | "worktrees" | "realtime_conversation" => {
+                "tui_app_server" | "worktrees" => {
                     continue;
                 }
                 "undo" => {
@@ -1654,12 +1647,6 @@ pub const FEATURES: &[FeatureSpec] = &[
         default_enabled: true,
     },
     FeatureSpec {
-        id: Feature::InAppVoice,
-        key: "in_app_voice",
-        stage: Stage::Stable,
-        default_enabled: true,
-    },
-    FeatureSpec {
         id: Feature::InAppLocalAutomation,
         key: "in_app_local_automation",
         stage: Stage::Stable,
@@ -1994,12 +1981,6 @@ pub const FEATURES: &[FeatureSpec] = &[
         key: "step_model_switching",
         stage: Stage::UnderDevelopment,
         default_enabled: false,
-    },
-    FeatureSpec {
-        id: Feature::RealtimeConversation,
-        key: "realtime_conversation",
-        stage: Stage::Removed,
-        default_enabled: true,
     },
     FeatureSpec {
         id: Feature::RemoteControl,

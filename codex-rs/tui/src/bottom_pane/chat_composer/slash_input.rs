@@ -178,7 +178,6 @@ impl<'a> SlashInput<'a> {
                 service_tier_commands_enabled: self.command_flags.service_tier_commands_enabled,
                 daybreak_command_description: self.command_flags.daybreak_command_description,
                 goal_command_enabled: self.command_flags.goal_command_enabled,
-                voice_command_enabled: self.command_flags.voice_command_enabled,
                 worktrees_enabled: self.command_flags.worktrees_enabled,
                 side_conversation_active: self.command_flags.side_conversation_active,
             },
@@ -216,7 +215,6 @@ impl ChatComposer {
             service_tier_commands_enabled: self.service_tier_commands_enabled,
             daybreak_command_description: self.popups.daybreak_command_description,
             goal_command_enabled: self.goal_command_enabled,
-            voice_command_enabled: self.voice_command_enabled,
             worktrees_enabled: self.worktrees_enabled,
             side_conversation_active: self.side_conversation_active,
         }

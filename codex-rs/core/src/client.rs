@@ -49,8 +49,6 @@ use codex_api::MemorySummarizeOutput as ApiMemorySummarizeOutput;
 use codex_api::Provider as ApiProvider;
 use codex_api::RESPONSES_PATH;
 use codex_api::RawMemory as ApiRawMemory;
-use codex_api::RealtimeCallClient as ApiRealtimeCallClient;
-use codex_api::RealtimeSessionConfig as ApiRealtimeSessionConfig;
 use codex_api::Reasoning;
 use codex_api::ReasoningContext;
 use codex_api::RequestTelemetry;
@@ -179,7 +177,6 @@ const WS_REQUEST_HEADER_RESPONSES_LITE_CLIENT_METADATA_KEY: &str =
 const RESPONSES_WEBSOCKETS_V2_BETA_HEADER_VALUE: &str = "responses_websockets=2026-02-06";
 const X_OPENAI_INTERNAL_CODEX_RESPONSES_LITE_HEADER: &str =
     "x-openai-internal-codex-responses-lite";
-const REALTIME_CALLS_ENDPOINT: &str = "/realtime/calls";
 const MEMORIES_SUMMARIZE_ENDPOINT: &str = "/memories/trace_summarize";
 #[cfg(test)]
 pub(crate) const WEBSOCKET_CONNECT_TIMEOUT: Duration =
@@ -540,30 +537,11 @@ enum WebsocketStreamOutcome {
     FallbackToHttp,
 }
 
-/// Result of opening a WebRTC Realtime call.
-///
-/// The SDP answer goes back to the client. The call id and auth headers stay on the server so the
-/// ordinary Realtime WebSocket machinery can join the same in-progress call as a sideband
-/// controller.
-pub(crate) struct RealtimeWebrtcCallStart {
-    pub(crate) sdp: String,
-    pub(crate) call_id: String,
-    pub(crate) sideband_headers: ApiHeaderMap,
-}
-
 /// Reuses the API-auth material that created the WebRTC call for the sideband WebSocket join.
 ///
 /// API-key sessions send that API bearer. ChatGPT-auth sessions send their bearer plus account id;
 /// transceiver is responsible for accepting that same call-create identity on the direct
 /// `api.openai.com` sideband path.
-fn sideband_websocket_auth_headers(
-    api_auth: &dyn AuthProvider,
-) -> std::result::Result<ApiHeaderMap, ApiError> {
-    let mut headers = ApiHeaderMap::new();
-    api_auth.add_auth_headers(&mut headers)?;
-    Ok(headers)
-}
-
 impl ModelClient {
     #[allow(clippy::too_many_arguments)]
     /// Creates a new session-scoped `ModelClient`.
@@ -784,55 +762,6 @@ impl ModelClient {
 
         self.store_cached_websocket_session(WebsocketSession::default());
         activated
-    }
-
-    pub(crate) async fn create_realtime_call_with_headers(
-        &self,
-        sdp: String,
-        session_config: ApiRealtimeSessionConfig,
-        mut extra_headers: ApiHeaderMap,
-        api_provider_override: Option<ApiProvider>,
-    ) -> Result<RealtimeWebrtcCallStart> {
-        // Create the media call over HTTP first, then retain matching auth so realtime can attach
-        // the server-side control WebSocket to the call id from that HTTP response.
-        let mut client_setup = self.realtime_client_setup().await?;
-        if let Some(header_value) = self.generate_attestation_header_for().await {
-            extra_headers.insert(X_OAI_ATTESTATION_HEADER, header_value);
-        }
-        let mut sideband_headers = extra_headers.clone();
-        sideband_headers.extend(
-            sideband_websocket_auth_headers(client_setup.api_auth.as_ref())
-                .map_err(|error| self.state.provider.map_api_error(error))?,
-        );
-        if let Some(api_provider) = api_provider_override {
-            client_setup.api_provider = api_provider;
-        }
-        let transport = client_setup.build_api_transport(REALTIME_CALLS_ENDPOINT)?;
-        let response =
-            ApiRealtimeCallClient::new(transport, client_setup.api_provider, client_setup.api_auth)
-                .create_with_session_and_headers(sdp, session_config, extra_headers)
-                .await
-                .map_err(|error| self.state.provider.map_api_error(error))?;
-        Ok(RealtimeWebrtcCallStart {
-            sdp: response.sdp,
-            call_id: response.call_id,
-            sideband_headers,
-        })
-    }
-
-    pub(crate) async fn realtime_sideband_headers(
-        &self,
-        mut extra_headers: ApiHeaderMap,
-    ) -> Result<ApiHeaderMap> {
-        let client_setup = self.realtime_client_setup().await?;
-        if let Some(header_value) = self.generate_attestation_header_for().await {
-            extra_headers.insert(X_OAI_ATTESTATION_HEADER, header_value);
-        }
-        extra_headers.extend(
-            sideband_websocket_auth_headers(client_setup.api_auth.as_ref())
-                .map_err(|error| self.state.provider.map_api_error(error))?,
-        );
-        Ok(extra_headers)
     }
 
     /// Builds memory summaries for each provided normalized raw memory.
@@ -1180,12 +1109,6 @@ impl ModelClient {
     /// lockstep when auth/provider resolution changes.
     async fn current_client_setup(&self, routing: ClientRouting) -> Result<CurrentClientSetup> {
         self.provider_client_setup(routing, &self.state.provider)
-            .await
-    }
-
-    // Realtime keeps provider auth; runtime authentication is not supported for this path.
-    async fn realtime_client_setup(&self) -> Result<CurrentClientSetup> {
-        self.provider_client_setup(ClientRouting::ConfiguredProvider, &self.state.provider)
             .await
     }
 

@@ -298,7 +298,6 @@ pub struct TurnContext {
     pub(crate) sub_id: String,
     pub(crate) trace_id: Option<String>,
     /// Call state at turn creation; model requests use the `StepContext` snapshot.
-    pub(crate) realtime_active: bool,
     /// Turn-scoped configuration. Read step-specific settings such as service tier and
     /// approvals reviewer from the corresponding `StepContext` instead.
     pub config: Arc<Config>,
@@ -392,7 +391,6 @@ impl TurnContext {
         Self {
             sub_id,
             trace_id: current_span_trace_id(),
-            realtime_active: self.realtime_active,
             configured_token_budget: config.token_budget.clone(),
             use_model_token_budget_defaults: config.features.enabled(Feature::TokenBudget)
                 && !has_explicit_settings(&config),
@@ -802,7 +800,6 @@ impl TurnContext {
         Self {
             sub_id: self.sub_id.clone(),
             trace_id: self.trace_id.clone(),
-            realtime_active: self.realtime_active,
             config: Arc::new(config),
             configured_token_budget: self.configured_token_budget.clone(),
             use_model_token_budget_defaults: self.use_model_token_budget_defaults,
@@ -884,7 +881,6 @@ impl TurnContext {
             comp_hash: self.model_info().comp_hash.clone(),
             collaboration_mode: Some(self.collaboration_mode()),
             multi_agent_version: Some(self.multi_agent_version),
-            realtime_active: Some(self.realtime_active),
             cyber_access_program: self.cyber_access_program,
             effort: self.reasoning_effort().cloned(),
             summary: Some(ReasoningSummaryConfig::None),
@@ -1070,7 +1066,6 @@ impl Session {
         TurnContext {
             sub_id,
             trace_id: current_span_trace_id(),
-            realtime_active: false,
             config: per_turn_config,
             configured_token_budget,
             use_model_token_budget_defaults,
@@ -1332,7 +1327,6 @@ impl Session {
                 })
                 .collect(),
         );
-        turn_context.realtime_active = self.conversation.running_state().await.is_some();
 
         turn_context.final_output_json_schema = options.final_output_json_schema;
         turn_context.cyber_access_program =

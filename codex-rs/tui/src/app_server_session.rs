@@ -14,7 +14,6 @@ pub(crate) mod provider_selection;
 #[path = "app_server_session/provider_selection_tests.rs"]
 mod provider_selection_tests;
 mod read_state;
-mod realtime;
 mod rollout_history;
 pub(crate) use read_state::unread_revision;
 mod startup_launch;

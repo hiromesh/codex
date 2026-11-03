@@ -66,23 +66,8 @@ use codex_features::Feature;
 use codex_plugin::PluginCapabilitySummary;
 use codex_protocol::config_types::CollaborationModeMask;
 use codex_protocol::models::ActivePermissionProfile;
-use codex_realtime_webrtc::StartedRealtimeWebrtcSession;
 
 use crate::history_cell::HistoryCell;
-
-#[derive(Debug)]
-pub(crate) struct RealtimeWebrtcStartupFailure {
-    pub message: String,
-    pub cause: codex_realtime_webrtc::ConnectionError,
-}
-
-/// Global voice controls always apply to the one call's owner.
-#[derive(Clone, Copy, Debug)]
-pub(crate) enum VoiceControl {
-    Toggle,
-    Stop,
-    Mute,
-}
 
 /// Confirmed server lifecycle operations available from the agents dashboard.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -1181,19 +1166,6 @@ pub(crate) enum AppEvent {
         turn_id: String,
     },
 
-    /// Move visible completed voice captions into history in one app event.
-    CommitRealtimeTranscriptHistory,
-
-    VoiceControl {
-        thread_id: Option<ThreadId>,
-        control: VoiceControl,
-    },
-    RealtimeConversationStateChanged,
-    BackgroundVoiceError {
-        thread_id: ThreadId,
-        message: String,
-    },
-
     /// Finish buffering initial resume replay after all replay events have been queued.
     EndInitialHistoryReplayBuffer,
 
@@ -1254,25 +1226,6 @@ pub(crate) enum AppEvent {
         action: AstraModelPickerAction,
     },
 
-    /// Result of creating a TUI-owned WebRTC offer for an active thread.
-    RealtimeWebrtcOfferCreated {
-        thread_id: ThreadId,
-        attempt_id: u64,
-        result: Result<StartedRealtimeWebrtcSession, RealtimeWebrtcStartupFailure>,
-    },
-
-    /// Result of establishing the WebRTC connection for an active voice attempt.
-    RealtimeWebrtcConnected {
-        thread_id: ThreadId,
-        attempt_id: u64,
-        result: Result<(), codex_realtime_webrtc::ConnectionError>,
-    },
-
-    /// Stop voice on its original thread after its chat widget is replaced.
-    StopRealtimeConversation {
-        thread_id: ThreadId,
-    },
-
     /// Finish a settings selection after its preceding update events have been applied.
     SettingsSelectionClosed,
     /// Run after any nested settings events emitted while handling the close event.
@@ -1311,34 +1264,6 @@ pub(crate) enum AppEvent {
 
     /// Show the cyber auto-review notice after the model selection confirmation.
     CyberModelAutoReviewNotice,
-
-    /// Read the owning server preference before showing the voice picker.
-    OpenRealtimeSettings,
-    OpenRealtimeSoundDevices,
-    OpenRealtimeVoices,
-    OpenRealtimeDevicePicker {
-        kind: codex_realtime_webrtc::AudioDeviceKind,
-    },
-    OpenRealtimeInputChannels {
-        device: codex_realtime_webrtc::AudioDevice,
-    },
-    RealtimeDevicesListed {
-        origin: Option<ThreadId>,
-        kind: codex_realtime_webrtc::AudioDeviceKind,
-        result: Result<Vec<codex_realtime_webrtc::AudioDevice>, String>,
-    },
-    PersistRealtimeDevice {
-        kind: codex_realtime_webrtc::AudioDeviceKind,
-        name: Option<String>,
-    },
-    PersistRealtimeInputChannel {
-        channel: Option<codex_config::config_toml::MicrophoneChannels>,
-    },
-
-    /// Save the voice for subsequent conversations through the app server.
-    PersistRealtimeVoiceSelection {
-        voice: codex_protocol::protocol::RealtimeVoice,
-    },
 
     /// Persist the selected service tier to the appropriate config.
     PersistServiceTierSelection {

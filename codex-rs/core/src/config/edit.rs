@@ -907,42 +907,6 @@ impl ConfigEditsBuilder {
         self
     }
 
-    pub fn set_realtime_microphone(mut self, microphone: Option<&str>) -> Self {
-        let segments = vec!["audio".to_string(), "microphone".to_string()];
-        match microphone {
-            Some(microphone) => self.edits.push(ConfigEdit::SetPath {
-                segments,
-                value: value(microphone),
-            }),
-            None => self.edits.push(ConfigEdit::ClearPath { segments }),
-        }
-        self
-    }
-
-    pub fn set_realtime_speaker(mut self, speaker: Option<&str>) -> Self {
-        let segments = vec!["audio".to_string(), "speaker".to_string()];
-        match speaker {
-            Some(speaker) => self.edits.push(ConfigEdit::SetPath {
-                segments,
-                value: value(speaker),
-            }),
-            None => self.edits.push(ConfigEdit::ClearPath { segments }),
-        }
-        self
-    }
-
-    pub fn set_realtime_voice(mut self, voice: Option<&str>) -> Self {
-        let segments = vec!["realtime".to_string(), "voice".to_string()];
-        match voice {
-            Some(voice) => self.edits.push(ConfigEdit::SetPath {
-                segments,
-                value: value(voice),
-            }),
-            None => self.edits.push(ConfigEdit::ClearPath { segments }),
-        }
-        self
-    }
-
     pub fn set_session_picker_view(mut self, mode: SessionPickerViewMode) -> Self {
         self.edits.push(ConfigEdit::SetPath {
             segments: vec!["tui".to_string(), "session_picker_view".to_string()],

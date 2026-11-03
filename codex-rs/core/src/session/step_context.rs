@@ -5,7 +5,6 @@ use std::sync::Arc;
 use crate::agents_md::LoadedAgentsMd;
 use crate::config::TokenBudgetConfig;
 use crate::environment_selection::TurnEnvironmentSnapshot;
-use crate::realtime_conversation::RealtimeConversationSnapshot;
 use crate::session::step_settings::ResolvedStepSettings;
 use crate::session::turn_context::TurnContext;
 use crate::session::turn_context::TurnEnvironment;
@@ -25,8 +24,6 @@ pub(crate) struct StepContext {
     pub(crate) turn: Arc<TurnContext>,
     /// Preempts this request and yields its code-mode observations when user input arrives.
     pub(crate) preempt: Option<CancellationToken>,
-    /// Realtime call activity and instructions captured for this sampling request.
-    pub(crate) realtime: RealtimeConversationSnapshot,
     /// One immutable settings version captured before request preparation.
     pub(crate) settings: Arc<ResolvedStepSettings>,
     /// Frozen turn preferences resolved against this step's captured model.
@@ -80,7 +77,6 @@ impl StepContext {
     /// Persist the context captured for this request, even after a live update.
     pub(crate) fn to_turn_context_item(&self) -> TurnContextItem {
         let mut item = self.turn.to_turn_context_item();
-        item.realtime_active = Some(self.realtime.active);
         item
     }
 

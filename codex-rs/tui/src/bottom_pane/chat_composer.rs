@@ -374,7 +374,6 @@ use super::skill_popup::MentionItem;
 use super::skill_popup::SkillPopup;
 use super::slash_commands::ServiceTierCommand;
 use super::slash_commands::SlashCommandItem;
-use super::voice_strip::VoiceStrip;
 use crate::bottom_pane::footer_content::FooterContent;
 use crate::history_cell::sanitize_user_text;
 use crate::key_hint::KeyBindingListExt;
@@ -638,7 +637,6 @@ pub(crate) struct ChatComposer {
     effort_tier: Option<EffortTier>,
     effort_animation_style: Option<IgnitionStyle>,
     effort_ignition: Option<EffortIgnition>,
-    voice_strip: Option<VoiceStrip>,
     effort_status_line_transition: Option<EffortStatusLineTransition>,
     effort_observed: bool,
     luna_reserve_active: bool,
@@ -665,7 +663,6 @@ pub(crate) struct ChatComposer {
     service_tier_commands: Vec<ServiceTierCommand>,
     mentions_v2_enabled: bool,
     goal_command_enabled: bool,
-    voice_command_enabled: bool,
     worktrees_enabled: bool,
     side_conversation_active: bool,
     history_search: Option<HistorySearchSession>,
@@ -815,7 +812,6 @@ impl ChatComposer {
                     .primary_hint(KeymapContext::Chat, "decrease_reasoning_effort"),
                 reasoning_up_key: default_keymap
                     .primary_hint(KeymapContext::Chat, "increase_reasoning_effort"),
-                toggle_voice_key: default_keymap.primary_hint(KeymapContext::Chat, "toggle_voice"),
             }),
             has_focus: has_input_focus,
             frame_requester: None,
@@ -823,7 +819,6 @@ impl ChatComposer {
             effort_tier: None,
             effort_animation_style: None,
             effort_ignition: None,
-            voice_strip: None,
             effort_status_line_transition: None,
             effort_observed: false,
             luna_reserve_active: false,
@@ -846,7 +841,6 @@ impl ChatComposer {
             service_tier_commands: Vec::new(),
             mentions_v2_enabled: false,
             goal_command_enabled: false,
-            voice_command_enabled: false,
             worktrees_enabled: false,
             side_conversation_active: false,
             history_search: None,
@@ -1060,10 +1054,6 @@ impl ChatComposer {
         self.update_slash_command_catalog(|composer| composer.goal_command_enabled = enabled);
     }
 
-    pub fn set_voice_command_enabled(&mut self, enabled: bool) {
-        self.update_slash_command_catalog(|composer| composer.voice_command_enabled = enabled);
-    }
-
     fn update_slash_command_catalog(&mut self, update: impl FnOnce(&mut Self)) {
         update(self);
         self.sync_popups();
@@ -1117,7 +1107,6 @@ impl ChatComposer {
             keymap.primary_hint(KeymapContext::Chat, "decrease_reasoning_effort");
         self.footer.reasoning_up_key =
             keymap.primary_hint(KeymapContext::Chat, "increase_reasoning_effort");
-        self.footer.toggle_voice_key = keymap.primary_hint(KeymapContext::Chat, "toggle_voice");
     }
 
     /// Return the contexts whose handlers can consume the next composer key.
@@ -5073,7 +5062,6 @@ impl ChatComposer {
             }
         }
         drop(state);
-        self.render_voice_strip(composer_rect, buf);
         self.render_sparkle(
             composer_rect,
             textarea_rect,
@@ -9617,45 +9605,6 @@ mod tests {
                 description: "Fastest inference with increased plan usage".to_string(),
             })
         );
-    }
-
-    #[test]
-    fn dynamic_slash_command_becomes_editable_and_is_not_exported() {
-        let (mut composer, _rx) = new_test_composer();
-        composer.set_voice_command_enabled(/*enabled*/ true);
-        type_chars_humanlike(&mut composer, &['/', 'v', 'o', 'i', 'c', 'e', ' ']);
-        assert_eq!(composer.draft.textarea.text_elements().len(), 1);
-
-        composer.set_voice_command_enabled(/*enabled*/ false);
-
-        assert_eq!(composer.current_text(), "/voice ");
-        assert!(composer.draft.textarea.text_elements().is_empty());
-        assert!(composer.text_elements().is_empty());
-    }
-
-    fn flush_after_paste_burst(composer: &mut ChatComposer) -> bool {
-        std::thread::sleep(PasteBurst::recommended_active_flush_delay());
-        composer.flush_paste_burst_if_due()
-    }
-
-    // Test helper: simulate human typing with a brief delay and flush the paste-burst buffer
-    pub(super) fn type_chars_humanlike(composer: &mut ChatComposer, chars: &[char]) {
-        use crossterm::event::KeyCode;
-        use crossterm::event::KeyEvent;
-        use crossterm::event::KeyEventKind;
-        use crossterm::event::KeyModifiers;
-        for &ch in chars {
-            let _ = composer.handle_key_event(KeyEvent::new(KeyCode::Char(ch), KeyModifiers::NONE));
-            std::thread::sleep(ChatComposer::recommended_paste_flush_delay());
-            let _ = composer.flush_paste_burst_if_due();
-            if ch == ' ' {
-                let _ = composer.handle_key_event(KeyEvent::new_with_kind(
-                    KeyCode::Char(' '),
-                    KeyModifiers::NONE,
-                    KeyEventKind::Release,
-                ));
-            }
-        }
     }
 
     #[test]

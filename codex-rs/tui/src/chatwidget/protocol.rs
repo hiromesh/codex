@@ -352,26 +352,6 @@ impl ChatWidget {
                     self.on_realtime_conversation_started();
                 }
             }
-            ServerNotification::ThreadRealtimeTranscriptDelta(notification) => {
-                if !from_replay {
-                    self.on_realtime_transcript_delta(notification.role, notification.delta);
-                }
-            }
-            ServerNotification::ThreadRealtimeTranscriptDone(notification) => {
-                if !from_replay {
-                    self.on_realtime_transcript_done(notification.role, notification.text);
-                }
-            }
-            ServerNotification::ThreadRealtimeError(notification) => {
-                if !from_replay {
-                    self.on_realtime_error(notification.message, RealtimeFailureCause::Backend);
-                }
-            }
-            ServerNotification::ThreadRealtimeClosed(notification) => {
-                if !from_replay {
-                    self.on_realtime_conversation_closed(notification.reason);
-                }
-            }
             ServerNotification::ServerRequestResolved(_)
             | ServerNotification::AccountUpdated(_)
             | ServerNotification::GatewayOAuthChanged(_)
@@ -459,10 +439,7 @@ impl ChatWidget {
                                 text,
                                 phase: Some(MessagePhase::FinalAnswer) | None,
                                 ..
-                            } if !self
-                                .is_realtime_delegated_reasoning_turn(&notification.turn.id)
-                                || !realtime::is_private_realtime_agent_item(item) =>
-                            {
+                            } => {
                                 Some((item.clone(), id.clone(), text.clone()))
                             }
                             _ => None,
@@ -575,33 +552,9 @@ impl ChatWidget {
         notification: ItemStartedNotification,
         replay_kind: Option<ReplayKind>,
     ) {
-        self.restore_realtime_transcripts_before_turn(&notification.turn_id);
         match notification.item.payload {
-            ThreadItemPayload::UserMessage { content, .. } if replay_kind.is_none() => {
-                self.note_realtime_user_item_started(&notification.turn_id, &content);
-            }
-            ThreadItemPayload::UserMessage { content, .. }
-                if realtime::realtime_delegation_input(&content).is_some() =>
-            {
-                self.remember_realtime_delegated_reasoning_turn(&notification.turn_id);
-            }
-            ThreadItemPayload::AgentMessage { id, .. } if replay_kind.is_none() => {
-                self.is_realtime_delegated_agent_item(&notification.turn_id, &id);
-            }
             ThreadItemPayload::Reasoning { id, .. } => {
-                if replay_kind.is_none()
-                    && !self.is_realtime_delegated_reasoning_turn(&notification.turn_id)
-                {
-                    // A later voice handoff can steer this turn without making an
-                    // already-started typed reasoning item private.
-                    self.realtime_conversation
-                        .agent_items
-                        .entry((notification.turn_id.clone(), id.clone()))
-                        .or_insert(realtime::RealtimeAgentItemOrigin::Typed);
-                }
-                if !matches!(replay_kind, Some(ReplayKind::ResumeInitialMessages))
-                    && !self.is_realtime_delegated_reasoning_item(&notification.turn_id, &id)
-                {
+                if !matches!(replay_kind, Some(ReplayKind::ResumeInitialMessages)) {
                     self.on_reasoning_item_started(id);
                 }
             }
@@ -667,18 +620,6 @@ impl ChatWidget {
         notification: ItemCompletedNotification,
         replay_kind: Option<ReplayKind>,
     ) {
-        self.restore_realtime_transcripts_before_turn(&notification.turn_id);
-        if replay_kind.is_none()
-            && self.is_realtime_delegated_reasoning_turn(&notification.turn_id)
-            && realtime::is_private_realtime_agent_item(&notification.item.payload)
-            && !matches!(&notification.item.payload, ThreadItemPayload::AgentMessage { id, .. } | ThreadItemPayload::Reasoning { id, .. }
-            if matches!(
-                self.realtime_conversation.agent_items.get(&(notification.turn_id.clone(), id.clone())),
-                Some(realtime::RealtimeAgentItemOrigin::Typed)
-            ))
-        {
-            return;
-        }
         // Buffered live notifications can introduce questions; historical turn replay cannot.
         if replay_kind == Some(ReplayKind::ThreadSnapshot)
             && let ThreadItemPayload::AgentMessage {

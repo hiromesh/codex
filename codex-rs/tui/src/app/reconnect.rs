@@ -219,11 +219,6 @@ impl App {
             return false;
         }
         if !self.reconnect.offline {
-            if let Some(owner) = self.background_voice.as_mut() {
-                owner.record_realtime_disconnect_failure();
-                owner.reset_realtime_conversation();
-            }
-            self.retire_background_voice();
             self.reconnect.offline = true;
             self.account_email_request_id = None;
             // Cached blank sessions are usable only while this connection owns a subscription.

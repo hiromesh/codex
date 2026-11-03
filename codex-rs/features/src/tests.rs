@@ -649,7 +649,6 @@ fn retired_worktree_and_voice_config_overrides_are_ignored() {
     for enabled in [false, true] {
         let features_toml = FeaturesToml::from(BTreeMap::from([
             ("worktrees".to_string(), enabled),
-            ("realtime_conversation".to_string(), enabled),
         ]));
         let features = Features::from_sources(
             FeatureConfigSource {

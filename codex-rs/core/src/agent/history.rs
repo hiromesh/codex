@@ -72,7 +72,7 @@ fn keep_forked_rollout_item(item: &RolloutItem, preserve_context_baselines: bool
             | ResponseItem::ContextCompaction { .. }
             | ResponseItem::Other => false,
         },
-        RolloutItem::RealtimeItem(_)
+        RolloutItem::Ignored(_)
         | RolloutItem::InterAgentCommunication(_)
         | RolloutItem::InterAgentCommunicationMetadata { .. }
         | RolloutItem::RetainedContext(_)
@@ -419,7 +419,7 @@ pub(super) async fn prepare_forked_history(
                 }
                 true
             }
-            RolloutItem::RealtimeItem(_) => false,
+            RolloutItem::Ignored(_) => false,
             RolloutItem::DynamicToolsUpdated { .. }
             | RolloutItem::EventMsg(_)
             | RolloutItem::SessionMeta(_)

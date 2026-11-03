@@ -863,8 +863,6 @@ impl App {
                 self.active_thread_id = None;
                 self.recap.reset_for_new_thread(Instant::now());
                 self.recap.seed_from_turns(&retained_turns, Instant::now());
-                self.retain_realtime_replay_state_before_replace();
-                self.forget_realtime_replay_thread(thread_id);
                 self.chat_widget.reset_after_prompt_revert(reverted.thread.path, &retained_turns);
                 self.ensure_thread_channel(thread_id).store.lock().await
                     .set_session(session, retained_turns);
@@ -1143,23 +1141,6 @@ impl App {
                         .apply_reserve_fallback_to_pending_turn(&mut op);
                 }
                 let is_user_turn = matches!(&op, AppCommand::UserTurn { .. });
-                let is_realtime_stop = matches!(&op, AppCommand::RealtimeConversationStop { .. });
-                let realtime_stop_thread_id = match &op {
-                    AppCommand::RealtimeConversationStop { thread_id } => Some(*thread_id),
-                    _ => None,
-                };
-                let realtime_speech_delivery_id = match &op {
-                    AppCommand::RealtimeConversationSpeech { delivery_id, .. } => {
-                        Some(*delivery_id)
-                    }
-                    _ => None,
-                };
-                let is_realtime_conversation = matches!(
-                    &op,
-                    AppCommand::RealtimeConversationStart { .. }
-                        | AppCommand::RealtimeConversationStop { .. }
-                        | AppCommand::RealtimeConversationSpeech { .. }
-                );
                 if is_user_turn {
                     let screen_size = tui.terminal.last_known_screen_size;
                     self.handle_draw_pre_render(tui, screen_size)?;
@@ -1170,59 +1151,17 @@ impl App {
                     self.chat_widget.pre_draw_tick();
                     self.render_chat_widget_frame(tui, screen_size)?;
                 }
-                let parked_voice = match &op {
-                    AppCommand::RealtimeConversationStart { thread_id, .. }
-                    | AppCommand::RealtimeConversationStop { thread_id }
-                    | AppCommand::RealtimeConversationSpeech { thread_id, .. } => self
-                        .background_voice
-                        .as_ref()
-                        .is_some_and(|owner| owner.thread_id() == Some(*thread_id)),
-                    _ => false,
-                };
-                let visible_thread = self.active_thread_id;
-                if parked_voice
-                    && let Some(owner) = self.background_voice.as_mut()
-                {
-                    std::mem::swap(&mut self.chat_widget, owner);
-                    self.active_thread_id = self.chat_widget.thread_id();
-                }
                 self.chat_widget.prepare_local_op_submission(&op);
                 let result = self.submit_active_thread_op(app_server, op).await;
-                if result.is_err()
-                    && let Some(delivery_id) = realtime_speech_delivery_id
-                {
-                    self.chat_widget.restore_undelivered_realtime_speech(delivery_id);
-                }
-                if parked_voice
-                    && let Some(owner) = self.background_voice.as_mut()
-                {
-                    std::mem::swap(&mut self.chat_widget, owner);
-                    self.active_thread_id = visible_thread;
-                }
                 if let Err(err) = result {
-                    if is_realtime_stop {
-                        let chat_widget = match self.background_voice.as_deref_mut() {
-                            Some(owner) if parked_voice => owner,
-                            _ => &mut self.chat_widget,
-                        };
-                        if chat_widget.thread_id() == realtime_stop_thread_id {
-                            chat_widget.record_realtime_failure(
-                                crate::chatwidget::RealtimeFailureCause::AppServerRequest,
-                            );
-                        }
-                    }
                     if self.recover_transport_error(&err) {
                         return Ok(AppRunControl::Continue);
                     }
-                    let chat_widget = match self.background_voice.as_deref_mut() {
-                        Some(owner) if parked_voice => owner,
-                        _ => &mut self.chat_widget,
-                    };
                     let unsupported_permissions = err
                         .downcast_ref::<UnsupportedLegacyPermissionProfile>()
                         .is_some();
                     if unsupported_permissions {
-                        chat_widget
+                        self.chat_widget
                             .set_queue_autosend_suppressed(/*suppressed*/ true);
                     }
                     let handled = is_user_turn
@@ -1231,23 +1170,10 @@ impl App {
                             Some(TypedRequestError::Server { method, .. })
                                 if method == "turn/start"
                         ) || unsupported_permissions)
-                        && chat_widget
+                        && self
+                            .chat_widget
                             .handle_turn_start_rejection(format!("Failed to start turn: {err:#}"));
-                    if is_realtime_conversation {
-                        let message = format!("Voice conversation failed: {err:#}");
-                        if is_realtime_stop {
-                            if chat_widget.thread_id() == realtime_stop_thread_id {
-                                chat_widget.reset_realtime_conversation();
-                                chat_widget.add_realtime_error(message);
-                            }
-                        } else {
-                            chat_widget.on_realtime_error(
-                                message,
-                                crate::chatwidget::RealtimeFailureCause::AppServerRequest,
-                            );
-                        }
-                        tracing::error!(error = ?err, "realtime conversation request failed");
-                    } else if handled {
+                    if handled {
                         tracing::error!(error = ?err, "failed to start turn through app server");
                     } else {
                         return Err(err);
@@ -2199,60 +2125,6 @@ impl App {
                 }
             }
             AppEvent::AstraSelectedFromModelPicker { .. } => unreachable!("picker event unwrapped"),
-            AppEvent::BackgroundVoiceError { thread_id, message } => {
-                if self.chat_widget.thread_id() == Some(thread_id) {
-                    self.chat_widget.add_error_message(message);
-                } else {
-                    self.background_voice_error = Some((thread_id, message));
-                }
-            }
-            AppEvent::RealtimeConversationStateChanged => {
-                self.repaint_agents_overview();
-            }
-            AppEvent::VoiceControl { thread_id, control } => {
-                if thread_id == self.chat_widget.thread_id() || self.voice_owner_thread_id().is_some() {
-                    self.control_voice(control);
-                }
-            }
-            AppEvent::RealtimeWebrtcOfferCreated {
-                thread_id,
-                attempt_id,
-                result,
-            } => {
-                if let Some(owner) = self.voice_widget_for_thread(thread_id) {
-                    owner.on_realtime_webrtc_offer_created(thread_id, attempt_id, result);
-                } else if let Ok(offer) = result {
-                    offer.handle.close();
-                }
-            }
-            AppEvent::RealtimeWebrtcConnected {
-                thread_id,
-                attempt_id,
-                result,
-            } => {
-                if let Some(owner) = self.voice_widget_for_thread(thread_id) {
-                    owner.on_realtime_webrtc_connected(attempt_id, result);
-                }
-            }
-            AppEvent::StopRealtimeConversation { thread_id } => {
-                match tokio::time::timeout(
-                    SHUTDOWN_FIRST_EXIT_TIMEOUT,
-                    app_server.thread_realtime_stop(thread_id),
-                )
-                .await
-                {
-                    Ok(Ok(())) => {}
-                    Ok(Err(error)) => tracing::warn!(
-                        %thread_id,
-                        %error,
-                        "failed to stop voice conversation after switching threads"
-                    ),
-                    Err(_) => tracing::warn!(
-                        %thread_id,
-                        "timed out stopping voice conversation after switching threads"
-                    ),
-                }
-            }
             AppEvent::SettingsSelectionClosed => {
                 if self.chat_widget.no_modal_or_popup_active() {
                     self.chat_widget
@@ -3688,9 +3560,7 @@ impl App {
                 {
                     tracing::warn!("timed out waiting for side-conversation shutdown");
                 }
-                if self.pending_shutdown_exit_thread_id.is_some()
-                    || self.voice_owner_thread_id().is_some()
-                {
+                if self.pending_shutdown_exit_thread_id.is_some() {
                     // This is a UI escape-hatch budget, not a protocol
                     // deadline. A healthy local thread/unsubscribe round trip
                     // should finish comfortably inside two seconds, while a
@@ -3772,12 +3642,7 @@ impl App {
             return Ok(AppRunControl::Continue);
         }
 
-        let result = async {
-            self.stop_voice_for_removed_thread(app_server, thread_id)
-                .await?;
-            app_server.thread_archive(thread_id).await
-        }
-        .await;
+        let result = app_server.thread_archive(thread_id).await;
         Ok(match result {
             Ok(()) => {
                 self.track_agents_overview_notification(&ServerNotification::ThreadArchived(
@@ -3822,12 +3687,7 @@ impl App {
             return Ok(AppRunControl::Continue);
         }
 
-        let result = async {
-            self.stop_voice_for_removed_thread(app_server, thread_id)
-                .await?;
-            app_server.thread_delete(thread_id).await
-        }
-        .await;
+        let result = app_server.thread_delete(thread_id).await;
         Ok(match result {
             Ok(()) => {
                 self.track_agents_overview_notification(&ServerNotification::ThreadDeleted(
