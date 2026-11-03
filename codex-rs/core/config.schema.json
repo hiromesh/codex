@@ -697,9 +697,6 @@
         },
         "macos": {
           "$ref": "#/definitions/ComputerUseMacosConfigToml"
-        },
-        "windows": {
-          "$ref": "#/definitions/ComputerUseWindowsConfigToml"
         }
       },
       "type": "object"
@@ -714,47 +711,6 @@
           "type": "object"
         }
       },
-      "type": "object"
-    },
-    "ComputerUseWindowsConfigToml": {
-      "additionalProperties": false,
-      "properties": {
-        "aumids": {
-          "additionalProperties": {
-            "$ref": "#/definitions/AllowDenyRequirementToml"
-          },
-          "type": "object"
-        },
-        "exes": {
-          "items": {
-            "$ref": "#/definitions/ComputerUseWindowsExeConfigToml"
-          },
-          "type": "array"
-        }
-      },
-      "type": "object"
-    },
-    "ComputerUseWindowsExeConfigToml": {
-      "additionalProperties": false,
-      "properties": {
-        "access": {
-          "$ref": "#/definitions/AllowDenyRequirementToml"
-        },
-        "binary_name": {
-          "type": "string"
-        },
-        "product_name": {
-          "type": "string"
-        },
-        "publisher_name": {
-          "type": "string"
-        }
-      },
-      "required": [
-        "access",
-        "product_name",
-        "publisher_name"
-      ],
       "type": "object"
     },
     "ConfigProfile": {
@@ -923,12 +879,6 @@
             "deferred_tool_world_state": {
               "type": "boolean"
             },
-            "elevated_windows_sandbox": {
-              "type": "boolean"
-            },
-            "enable_experimental_windows_sandbox": {
-              "type": "boolean"
-            },
             "enable_fanout": {
               "type": "boolean"
             },
@@ -951,9 +901,6 @@
               "type": "boolean"
             },
             "experimental_use_unified_exec_tool": {
-              "type": "boolean"
-            },
-            "experimental_windows_sandbox": {
               "type": "boolean"
             },
             "external_agent_memory_import": {
@@ -1149,9 +1096,6 @@
               "type": "boolean"
             },
             "prediction_preserve_parent_tools": {
-              "type": "boolean"
-            },
-            "prefer_mxc": {
               "type": "boolean"
             },
             "prevent_idle_sleep": {
@@ -1382,9 +1326,6 @@
             "web_search_request": {
               "type": "boolean"
             },
-            "windows_sandbox_service": {
-              "type": "boolean"
-            },
             "workspace_dependencies": {
               "type": "boolean"
             },
@@ -1482,14 +1423,6 @@
         },
         "web_search": {
           "$ref": "#/definitions/WebSearchMode"
-        },
-        "windows": {
-          "allOf": [
-            {
-              "$ref": "#/definitions/WindowsToml"
-            }
-          ],
-          "default": null
         }
       },
       "type": "object"
@@ -7218,27 +7151,6 @@
       },
       "type": "object"
     },
-    "WindowsSandboxModeToml": {
-      "enum": [
-        "elevated",
-        "unelevated",
-        "mxc"
-      ],
-      "type": "string"
-    },
-    "WindowsToml": {
-      "additionalProperties": false,
-      "properties": {
-        "allow_mxc": {
-          "description": "False blocks both explicit MXC configuration and automatic selection.",
-          "type": "boolean"
-        },
-        "sandbox": {
-          "$ref": "#/definitions/WindowsSandboxModeToml"
-        }
-      },
-      "type": "object"
-    },
     "WireApi": {
       "description": "Wire protocol that the provider speaks.",
       "oneOf": [
@@ -7574,12 +7486,6 @@
         "deferred_tool_world_state": {
           "type": "boolean"
         },
-        "elevated_windows_sandbox": {
-          "type": "boolean"
-        },
-        "enable_experimental_windows_sandbox": {
-          "type": "boolean"
-        },
         "enable_fanout": {
           "type": "boolean"
         },
@@ -7602,9 +7508,6 @@
           "type": "boolean"
         },
         "experimental_use_unified_exec_tool": {
-          "type": "boolean"
-        },
-        "experimental_windows_sandbox": {
           "type": "boolean"
         },
         "external_agent_memory_import": {
@@ -7800,9 +7703,6 @@
           "type": "boolean"
         },
         "prediction_preserve_parent_tools": {
-          "type": "boolean"
-        },
-        "prefer_mxc": {
           "type": "boolean"
         },
         "prevent_idle_sleep": {
@@ -8031,9 +7931,6 @@
           "type": "boolean"
         },
         "web_search_request": {
-          "type": "boolean"
-        },
-        "windows_sandbox_service": {
           "type": "boolean"
         },
         "workspace_dependencies": {
@@ -8521,15 +8418,6 @@
         }
       ],
       "description": "Controls the web search tool mode: disabled, cached, indexed, or live."
-    },
-    "windows": {
-      "allOf": [
-        {
-          "$ref": "#/definitions/WindowsToml"
-        }
-      ],
-      "default": null,
-      "description": "Windows-specific configuration."
     }
   },
   "title": "ConfigToml",

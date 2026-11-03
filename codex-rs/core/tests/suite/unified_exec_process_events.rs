@@ -317,10 +317,6 @@ async fn serve_exec_with_pushed_events(
                         request["params"]["sandbox"]["workspaceRoots"],
                         json!(["file:///C:/workspace", "file:///D:/other-workspace"])
                     );
-                    assert_eq!(
-                        request["params"]["sandbox"]["windowsSandboxLevel"],
-                        "restricted-token"
-                    );
                 }
                 send_exec_server_json(
                     &mut websocket,
@@ -1538,10 +1534,6 @@ timeout = 900
             "file:///C:/workspace/secret.txt"
         );
         assert_eq!(
-            write_request["params"]["sandbox"]["windowsSandboxLevel"],
-            "restricted-token"
-        );
-        assert_eq!(
             write_request["params"]["sandbox"]["workspaceRoots"],
             json!(["file:///C:/workspace", "file:///D:/other-workspace"])
         );
@@ -1701,19 +1693,6 @@ timeout = 900
             params["sandbox"]["workspaceRoots"],
             json!(["file:///C:/workspace", "file:///D:/other-workspace"])
         );
-        if matches!(scenario, PushedExecScenario::ElevatedPowerShell) {
-            assert_eq!(params["sandbox"]["windowsSandboxLevel"], "elevated");
-            assert!(
-                params["argv"]
-                    .as_array()
-                    .is_some_and(|argv| argv.iter().any(|arg| arg == "-NoProfile")),
-                "elevated remote PowerShell must not load a user profile"
-            );
-        } else if deny_read {
-            assert_eq!(params["sandbox"]["windowsSandboxLevel"], "elevated");
-        } else {
-            assert_eq!(params["sandbox"]["windowsSandboxLevel"], "restricted-token");
-        }
     }
     if deny_read {
         let params = &exec_server_result.process_start["params"];

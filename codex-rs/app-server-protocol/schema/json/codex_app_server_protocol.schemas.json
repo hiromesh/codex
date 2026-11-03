@@ -2152,53 +2152,6 @@
             },
             "method": {
               "enum": [
-                "windowsSandbox/setupStart"
-              ],
-              "title": "WindowsSandbox/setupStartRequestMethod",
-              "type": "string"
-            },
-            "params": {
-              "$ref": "#/definitions/v2/WindowsSandboxSetupStartParams"
-            }
-          },
-          "required": [
-            "id",
-            "method",
-            "params"
-          ],
-          "title": "WindowsSandbox/setupStartRequest",
-          "type": "object"
-        },
-        {
-          "properties": {
-            "id": {
-              "$ref": "#/definitions/v2/RequestId"
-            },
-            "method": {
-              "enum": [
-                "windowsSandbox/readiness"
-              ],
-              "title": "WindowsSandbox/readinessRequestMethod",
-              "type": "string"
-            },
-            "params": {
-              "type": "null"
-            }
-          },
-          "required": [
-            "id",
-            "method"
-          ],
-          "title": "WindowsSandbox/readinessRequest",
-          "type": "object"
-        },
-        {
-          "properties": {
-            "id": {
-              "$ref": "#/definitions/v2/RequestId"
-            },
-            "method": {
-              "enum": [
                 "account/login/start"
               ],
               "title": "Account/login/startRequestMethod",
@@ -6353,47 +6306,6 @@
           "type": "object"
         },
         {
-          "description": "Notifies the user of world-writable directories on Windows, which cannot be protected by the sandbox.",
-          "properties": {
-            "method": {
-              "enum": [
-                "windows/worldWritableWarning"
-              ],
-              "title": "Windows/worldWritableWarningNotificationMethod",
-              "type": "string"
-            },
-            "params": {
-              "$ref": "#/definitions/v2/WindowsWorldWritableWarningNotification"
-            }
-          },
-          "required": [
-            "method",
-            "params"
-          ],
-          "title": "Windows/worldWritableWarningNotification",
-          "type": "object"
-        },
-        {
-          "properties": {
-            "method": {
-              "enum": [
-                "windowsSandbox/setupCompleted"
-              ],
-              "title": "WindowsSandbox/setupCompletedNotificationMethod",
-              "type": "string"
-            },
-            "params": {
-              "$ref": "#/definitions/v2/WindowsSandboxSetupCompletedNotification"
-            }
-          },
-          "required": [
-            "method",
-            "params"
-          ],
-          "title": "WindowsSandbox/setupCompletedNotification",
-          "type": "object"
-        },
-        {
           "properties": {
             "method": {
               "enum": [
@@ -9483,16 +9395,6 @@
                 "type": "null"
               }
             ]
-          },
-          "windows": {
-            "anyOf": [
-              {
-                "$ref": "#/definitions/v2/ComputerUseWindowsConfig"
-              },
-              {
-                "type": "null"
-              }
-            ]
           }
         },
         "type": "object"
@@ -9557,112 +9459,6 @@
               {
                 "type": "null"
               }
-            ]
-          },
-          "windows": {
-            "anyOf": [
-              {
-                "$ref": "#/definitions/v2/ComputerUseWindowsRequirements"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          }
-        },
-        "type": "object"
-      },
-      "ComputerUseWindowsConfig": {
-        "properties": {
-          "aumids": {
-            "additionalProperties": {
-              "$ref": "#/definitions/v2/AllowDenyRequirement"
-            },
-            "type": [
-              "object",
-              "null"
-            ]
-          },
-          "exes": {
-            "items": {
-              "$ref": "#/definitions/v2/ComputerUseWindowsExeConfig"
-            },
-            "type": [
-              "array",
-              "null"
-            ]
-          }
-        },
-        "type": "object"
-      },
-      "ComputerUseWindowsExeConfig": {
-        "properties": {
-          "access": {
-            "$ref": "#/definitions/v2/AllowDenyRequirement"
-          },
-          "binary_name": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "product_name": {
-            "type": "string"
-          },
-          "publisher_name": {
-            "type": "string"
-          }
-        },
-        "required": [
-          "access",
-          "product_name",
-          "publisher_name"
-        ],
-        "type": "object"
-      },
-      "ComputerUseWindowsExeRequirement": {
-        "properties": {
-          "access": {
-            "$ref": "#/definitions/v2/AllowDenyRequirement"
-          },
-          "binaryName": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "productName": {
-            "type": "string"
-          },
-          "publisherName": {
-            "type": "string"
-          }
-        },
-        "required": [
-          "access",
-          "productName",
-          "publisherName"
-        ],
-        "type": "object"
-      },
-      "ComputerUseWindowsRequirements": {
-        "properties": {
-          "aumids": {
-            "additionalProperties": {
-              "$ref": "#/definitions/v2/AllowDenyRequirement"
-            },
-            "type": [
-              "object",
-              "null"
-            ]
-          },
-          "exes": {
-            "items": {
-              "$ref": "#/definitions/v2/ComputerUseWindowsExeRequirement"
-            },
-            "type": [
-              "array",
-              "null"
             ]
           }
         },
@@ -10316,15 +10112,6 @@
           "allowedWebSearchModes": {
             "items": {
               "$ref": "#/definitions/v2/WebSearchMode"
-            },
-            "type": [
-              "array",
-              "null"
-            ]
-          },
-          "allowedWindowsSandboxImplementations": {
-            "items": {
-              "$ref": "#/definitions/v2/WindowsSandboxImplementation"
             },
             "type": [
               "array",
@@ -27887,127 +27674,6 @@
             ]
           }
         },
-        "type": "object"
-      },
-      "WindowsSandboxImplementation": {
-        "enum": [
-          "elevated",
-          "unelevated",
-          "mxc"
-        ],
-        "type": "string"
-      },
-      "WindowsSandboxReadiness": {
-        "enum": [
-          "ready",
-          "notConfigured",
-          "updateRequired"
-        ],
-        "type": "string"
-      },
-      "WindowsSandboxReadinessResponse": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
-        "properties": {
-          "status": {
-            "$ref": "#/definitions/v2/WindowsSandboxReadiness"
-          }
-        },
-        "required": [
-          "status"
-        ],
-        "title": "WindowsSandboxReadinessResponse",
-        "type": "object"
-      },
-      "WindowsSandboxSetupCompletedNotification": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
-        "properties": {
-          "error": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "mode": {
-            "$ref": "#/definitions/v2/WindowsSandboxSetupMode"
-          },
-          "success": {
-            "type": "boolean"
-          }
-        },
-        "required": [
-          "mode",
-          "success"
-        ],
-        "title": "WindowsSandboxSetupCompletedNotification",
-        "type": "object"
-      },
-      "WindowsSandboxSetupMode": {
-        "enum": [
-          "elevated",
-          "unelevated"
-        ],
-        "type": "string"
-      },
-      "WindowsSandboxSetupStartParams": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
-        "properties": {
-          "cwd": {
-            "anyOf": [
-              {
-                "$ref": "#/definitions/v2/AbsolutePathBuf"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "mode": {
-            "$ref": "#/definitions/v2/WindowsSandboxSetupMode"
-          }
-        },
-        "required": [
-          "mode"
-        ],
-        "title": "WindowsSandboxSetupStartParams",
-        "type": "object"
-      },
-      "WindowsSandboxSetupStartResponse": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
-        "properties": {
-          "started": {
-            "type": "boolean"
-          }
-        },
-        "required": [
-          "started"
-        ],
-        "title": "WindowsSandboxSetupStartResponse",
-        "type": "object"
-      },
-      "WindowsWorldWritableWarningNotification": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
-        "properties": {
-          "extraCount": {
-            "format": "uint",
-            "minimum": 0.0,
-            "type": "integer"
-          },
-          "failedScan": {
-            "type": "boolean"
-          },
-          "samplePaths": {
-            "items": {
-              "type": "string"
-            },
-            "type": "array"
-          }
-        },
-        "required": [
-          "extraCount",
-          "failedScan",
-          "samplePaths"
-        ],
-        "title": "WindowsWorldWritableWarningNotification",
         "type": "object"
       },
       "WorkspaceMessage": {

@@ -26,8 +26,6 @@ use tokio_tungstenite::tungstenite::handshake::client::Request;
 use tokio_tungstenite::tungstenite::handshake::client::Response;
 use tokio_tungstenite::tungstenite::protocol::WebSocketConfig;
 use tokio_tungstenite::tungstenite::proxy::ProxyConfig;
-#[cfg(windows)]
-use tokio_tungstenite::tungstenite::proxy::ProxyScheme;
 
 use crate::AsyncIo;
 use crate::ConnectionInner;

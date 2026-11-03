@@ -295,24 +295,6 @@ impl RouteAwareClientPool {
         }
     }
 
-    /// Builds the first transport now so fixed-destination callers still receive setup errors.
-    #[cfg(windows)]
-    pub(crate) fn with_builder_and_initial_route(
-        http_client_factory: HttpClientFactory,
-        route_class: ClientRouteClass,
-        client_builder: HttpClientBuilder,
-        route: OutboundProxyRoute,
-    ) -> Result<Self, BuildRouteAwareHttpClientError> {
-        let mut pool = Self::with_builder(http_client_factory, route_class, client_builder);
-        let client = pool.client_builder_for_route().build_for_resolved_route(
-            &pool.http_client_factory,
-            pool.route_class,
-            &route,
-        )?;
-        pool.clients = Arc::new(Mutex::new(HashMap::from([(route, client)])));
-        Ok(pool)
-    }
-
     /// Starts a new account-scoped operation while sharing the existing connection cache.
     /// Capture this before resolving credentials or reading account-specific content.
     pub fn for_current_account(&self) -> Self {

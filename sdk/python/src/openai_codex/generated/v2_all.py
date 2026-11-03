@@ -798,32 +798,16 @@ class ComputerUseMacosRequirements(BaseModel):
     bundle_ids: Annotated[dict[str, Any] | None, Field(alias="bundleIds")] = None
 
 
-class ComputerUseWindowsExeConfig(BaseModel):
+class ComputerUseRequirements(BaseModel):
     model_config = ConfigDict(
         populate_by_name=True,
     )
-    access: AllowDenyRequirement
-    binary_name: str | None = None
-    product_name: str
-    publisher_name: str
-
-
-class ComputerUseWindowsExeRequirement(BaseModel):
-    model_config = ConfigDict(
-        populate_by_name=True,
+    allow_locked_computer_use: Annotated[bool | None, Field(alias="allowLockedComputerUse")] = None
+    allow_persistent_approval: Annotated[bool | None, Field(alias="allowPersistentApproval")] = None
+    default_app_access: Annotated[AllowDenyRequirement | None, Field(alias="defaultAppAccess")] = (
+        None
     )
-    access: AllowDenyRequirement
-    binary_name: Annotated[str | None, Field(alias="binaryName")] = None
-    product_name: Annotated[str, Field(alias="productName")]
-    publisher_name: Annotated[str, Field(alias="publisherName")]
-
-
-class ComputerUseWindowsRequirements(BaseModel):
-    model_config = ConfigDict(
-        populate_by_name=True,
-    )
-    aumids: dict[str, Any] | None = None
-    exes: list[ComputerUseWindowsExeRequirement] | None = None
+    macos: ComputerUseMacosRequirements | None = None
 
 
 class PackagedDefaultsConfigLayerSource(BaseModel):
@@ -7025,54 +7009,6 @@ class WebSearchToolConfig(BaseModel):
     location: WebSearchLocation | None = None
 
 
-class WindowsSandboxImplementation(Enum):
-    elevated = "elevated"
-    unelevated = "unelevated"
-    mxc = "mxc"
-
-
-class WindowsSandboxReadiness(Enum):
-    ready = "ready"
-    not_configured = "notConfigured"
-    update_required = "updateRequired"
-
-
-class WindowsSandboxReadinessResponse(BaseModel):
-    model_config = ConfigDict(
-        populate_by_name=True,
-    )
-    status: WindowsSandboxReadiness
-
-
-class WindowsSandboxSetupMode(Enum):
-    elevated = "elevated"
-    unelevated = "unelevated"
-
-
-class WindowsSandboxSetupStartParams(BaseModel):
-    model_config = ConfigDict(
-        populate_by_name=True,
-    )
-    cwd: AbsolutePathBuf | None = None
-    mode: WindowsSandboxSetupMode
-
-
-class WindowsSandboxSetupStartResponse(BaseModel):
-    model_config = ConfigDict(
-        populate_by_name=True,
-    )
-    started: bool
-
-
-class WindowsWorldWritableWarningNotification(BaseModel):
-    model_config = ConfigDict(
-        populate_by_name=True,
-    )
-    extra_count: Annotated[int, Field(alias="extraCount", ge=0)]
-    failed_scan: Annotated[bool, Field(alias="failedScan")]
-    sample_paths: Annotated[list[str], Field(alias="samplePaths")]
-
-
 class WorkspaceMessageType(Enum):
     headline = "headline"
     announcement = "announcement"
@@ -7980,28 +7916,6 @@ class McpServerToolCallRequest(BaseModel):
     params: McpServerToolCallParams
 
 
-class WindowsSandboxSetupStartRequest(BaseModel):
-    model_config = ConfigDict(
-        populate_by_name=True,
-    )
-    id: RequestId
-    method: Annotated[
-        Literal["windowsSandbox/setupStart"], Field(title="WindowsSandbox/setupStartRequestMethod")
-    ]
-    params: WindowsSandboxSetupStartParams
-
-
-class WindowsSandboxReadinessRequest(BaseModel):
-    model_config = ConfigDict(
-        populate_by_name=True,
-    )
-    id: RequestId
-    method: Annotated[
-        Literal["windowsSandbox/readiness"], Field(title="WindowsSandbox/readinessRequestMethod")
-    ]
-    params: Annotated[None, Field(None)] = None
-
-
 class AccountLoginCancelRequest(BaseModel):
     model_config = ConfigDict(
         populate_by_name=True,
@@ -8380,25 +8294,12 @@ class CommandExecResizeParams(BaseModel):
     size: Annotated[CommandExecTerminalSize, Field(description="New PTY size in character cells.")]
 
 
-class ComputerUseRequirements(BaseModel):
+class ComputerUseConfig(BaseModel):
     model_config = ConfigDict(
         populate_by_name=True,
     )
-    allow_locked_computer_use: Annotated[bool | None, Field(alias="allowLockedComputerUse")] = None
-    allow_persistent_approval: Annotated[bool | None, Field(alias="allowPersistentApproval")] = None
-    default_app_access: Annotated[AllowDenyRequirement | None, Field(alias="defaultAppAccess")] = (
-        None
-    )
-    macos: ComputerUseMacosRequirements | None = None
-    windows: ComputerUseWindowsRequirements | None = None
-
-
-class ComputerUseWindowsConfig(BaseModel):
-    model_config = ConfigDict(
-        populate_by_name=True,
-    )
-    aumids: dict[str, Any] | None = None
-    exes: list[ComputerUseWindowsExeConfig] | None = None
+    default_app_access: AllowDenyRequirement | None = None
+    macos: ComputerUseMacosConfig | None = None
 
 
 class ConfigEdit(BaseModel):
@@ -10317,24 +10218,6 @@ class ThreadRealtimeClosedServerNotification(BaseModel):
     params: ThreadRealtimeClosedNotification
 
 
-class WindowsWorldWritableWarningServerNotification(BaseModel):
-    model_config = ConfigDict(
-        populate_by_name=True,
-    )
-    emitted_at_ms: Annotated[
-        int | None,
-        Field(
-            alias="emittedAtMs",
-            description="Unix timestamp (in milliseconds) when app-server emitted this notification.",
-        ),
-    ] = None
-    method: Annotated[
-        Literal["windows/worldWritableWarning"],
-        Field(title="Windows/worldWritableWarningNotificationMethod"),
-    ]
-    params: WindowsWorldWritableWarningNotification
-
-
 class AccountLoginCompletedServerNotification(BaseModel):
     model_config = ConfigDict(
         populate_by_name=True,
@@ -11212,15 +11095,6 @@ class TurnSteerParams(BaseModel):
     thread_id: Annotated[str, Field(alias="threadId")]
 
 
-class WindowsSandboxSetupCompletedNotification(BaseModel):
-    model_config = ConfigDict(
-        populate_by_name=True,
-    )
-    error: str | None = None
-    mode: WindowsSandboxSetupMode
-    success: bool
-
-
 class WorkspaceMessage(BaseModel):
     model_config = ConfigDict(
         populate_by_name=True,
@@ -11477,15 +11351,6 @@ class ConfigValueWriteRequest(BaseModel):
     id: RequestId
     method: Annotated[Literal["config/value/write"], Field(title="Config/value/writeRequestMethod")]
     params: ConfigValueWriteParams
-
-
-class ComputerUseConfig(BaseModel):
-    model_config = ConfigDict(
-        populate_by_name=True,
-    )
-    default_app_access: AllowDenyRequirement | None = None
-    macos: ComputerUseMacosConfig | None = None
-    windows: ComputerUseWindowsConfig | None = None
 
 
 class Config(BaseModel):
@@ -12206,24 +12071,6 @@ class ThreadRealtimeItemCompletedServerNotification(BaseModel):
     params: ThreadRealtimeItemCompletedNotification
 
 
-class WindowsSandboxSetupCompletedServerNotification(BaseModel):
-    model_config = ConfigDict(
-        populate_by_name=True,
-    )
-    emitted_at_ms: Annotated[
-        int | None,
-        Field(
-            alias="emittedAtMs",
-            description="Unix timestamp (in milliseconds) when app-server emitted this notification.",
-        ),
-    ] = None
-    method: Annotated[
-        Literal["windowsSandbox/setupCompleted"],
-        Field(title="WindowsSandbox/setupCompletedNotificationMethod"),
-    ]
-    params: WindowsSandboxSetupCompletedNotification
-
-
 class SubAgentSessionSource(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
@@ -12554,10 +12401,6 @@ class ConfigRequirements(BaseModel):
     ] = None
     allowed_web_search_modes: Annotated[
         list[WebSearchMode] | None, Field(alias="allowedWebSearchModes")
-    ] = None
-    allowed_windows_sandbox_implementations: Annotated[
-        list[WindowsSandboxImplementation] | None,
-        Field(alias="allowedWindowsSandboxImplementations"),
     ] = None
     auto_review: Annotated[AutoReviewRequirements | None, Field(alias="autoReview")] = None
     browser_use: Annotated[BrowserUseRequirements | None, Field(alias="browserUse")] = None
@@ -13497,8 +13340,6 @@ class ClientRequest(
         | McpServerStatusListRequest
         | McpServerResourceReadRequest
         | McpServerToolCallRequest
-        | WindowsSandboxSetupStartRequest
-        | WindowsSandboxReadinessRequest
         | AccountLoginStartRequest
         | AccountLoginCancelRequest
         | AccountLogoutRequest
@@ -13607,8 +13448,6 @@ class ClientRequest(
         | McpServerStatusListRequest
         | McpServerResourceReadRequest
         | McpServerToolCallRequest
-        | WindowsSandboxSetupStartRequest
-        | WindowsSandboxReadinessRequest
         | AccountLoginStartRequest
         | AccountLoginCancelRequest
         | AccountLogoutRequest
@@ -13892,8 +13731,6 @@ class ServerNotification(
         | ThreadRealtimeSdpServerNotification
         | ThreadRealtimeErrorServerNotification
         | ThreadRealtimeClosedServerNotification
-        | WindowsWorldWritableWarningServerNotification
-        | WindowsSandboxSetupCompletedServerNotification
         | AccountLoginCompletedServerNotification
     ]
 ):
@@ -13981,8 +13818,6 @@ class ServerNotification(
         | ThreadRealtimeSdpServerNotification
         | ThreadRealtimeErrorServerNotification
         | ThreadRealtimeClosedServerNotification
-        | WindowsWorldWritableWarningServerNotification
-        | WindowsSandboxSetupCompletedServerNotification
         | AccountLoginCompletedServerNotification,
         Field(
             description="Notification sent from the server to the client.",

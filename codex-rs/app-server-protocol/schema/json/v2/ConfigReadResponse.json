@@ -391,16 +391,6 @@
               "type": "null"
             }
           ]
-        },
-        "windows": {
-          "anyOf": [
-            {
-              "$ref": "#/definitions/ComputerUseWindowsConfig"
-            },
-            {
-              "type": "null"
-            }
-          ]
         }
       },
       "type": "object"
@@ -417,54 +407,6 @@
           ]
         }
       },
-      "type": "object"
-    },
-    "ComputerUseWindowsConfig": {
-      "properties": {
-        "aumids": {
-          "additionalProperties": {
-            "$ref": "#/definitions/AllowDenyRequirement"
-          },
-          "type": [
-            "object",
-            "null"
-          ]
-        },
-        "exes": {
-          "items": {
-            "$ref": "#/definitions/ComputerUseWindowsExeConfig"
-          },
-          "type": [
-            "array",
-            "null"
-          ]
-        }
-      },
-      "type": "object"
-    },
-    "ComputerUseWindowsExeConfig": {
-      "properties": {
-        "access": {
-          "$ref": "#/definitions/AllowDenyRequirement"
-        },
-        "binary_name": {
-          "type": [
-            "string",
-            "null"
-          ]
-        },
-        "product_name": {
-          "type": "string"
-        },
-        "publisher_name": {
-          "type": "string"
-        }
-      },
-      "required": [
-        "access",
-        "product_name",
-        "publisher_name"
-      ],
       "type": "object"
     },
     "Config": {

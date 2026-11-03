@@ -1851,7 +1851,6 @@ mod tests {
 
         let serialized = serde_json::to_value(&sandbox).expect("serialize sandbox");
 
-        assert_eq!(serialized["windowsSandboxLevel"], "mxc");
         assert_eq!(serialized["cwd"], serde_json::json!(cwd.to_string()));
         assert_eq!(
             serialized["userHomeDir"],
@@ -1883,16 +1882,6 @@ mod tests {
             serde_json::from_value::<FileSystemSandboxContext>(serialized)
                 .expect("deserialize sandbox"),
             sandbox
-        );
-        let preserve = FileSystemSandboxContext {
-            ..sandbox
-        };
-        let serialized = serde_json::to_value(&preserve).expect("serialize preserve mode");
-        assert_eq!(serialized["windowsSandboxProxySettingsMode"], "preserve");
-        assert_eq!(
-            serde_json::from_value::<FileSystemSandboxContext>(serialized)
-                .expect("deserialize preserve mode"),
-            preserve
         );
     }
 
@@ -2027,21 +2016,17 @@ mod tests {
                 open_wire["sandbox"].get("cwd"),
                 open_wire["sandbox"].get("workspaceRoots"),
                 open_wire["sandbox"].get("policyContext"),
-                open_wire["sandbox"].get("windowsSandboxLevel"),
                 capability_wire["sandbox"].get("cwd"),
                 capability_wire["sandbox"].get("workspaceRoots"),
                 capability_wire["sandbox"].get("policyContext"),
-                capability_wire["sandbox"].get("windowsSandboxLevel"),
             ),
             (
                 None,
                 None,
                 Some(&serde_json::json!({"cwd": cwd, "workspaceRoots": [cwd]})),
-                Some(&serde_json::json!("mxc")),
                 Some(&serde_json::json!(cwd)),
                 Some(&serde_json::json!([cwd])),
                 None,
-                Some(&serde_json::json!("mxc")),
             )
         );
         assert_eq!(
