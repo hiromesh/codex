@@ -35,7 +35,6 @@ use core_test_support::responses::namespace_child_tool;
 use core_test_support::responses::sse;
 use core_test_support::responses::start_mock_server;
 use core_test_support::skip_if_no_network;
-use core_test_support::skip_if_wine_exec;
 use core_test_support::stdio_server_bin;
 use core_test_support::test_codex::test_codex;
 use core_test_support::wait_for_event;
@@ -355,10 +354,6 @@ async fn permission_request_hook_denies_mcp_tool_without_user_or_guardian_review
 }
 
 async fn run_mcp_permission_request_hook_test(outcome: PermissionRequestHookOutcome) -> Result<()> {
-    skip_if_wine_exec!(
-        Ok(()),
-        "requires a Windows test_stdio_server in the Wine-exec environment"
-    );
     skip_if_no_network!(Ok(()));
 
     let server = start_mock_server().await;

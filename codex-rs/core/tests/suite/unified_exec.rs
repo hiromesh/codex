@@ -47,11 +47,8 @@ use core_test_support::responses::ev_response_created;
 use core_test_support::responses::mount_sse_sequence;
 use core_test_support::responses::sse;
 use core_test_support::responses::start_mock_server;
-use core_test_support::skip_if_host_windows;
 use core_test_support::skip_if_no_network;
 use core_test_support::skip_if_sandbox;
-use core_test_support::skip_if_target_windows;
-use core_test_support::skip_if_wine_exec;
 use core_test_support::test_codex::TestCodex;
 use core_test_support::test_codex::TestCodexHarness;
 use core_test_support::test_codex::test_codex;
@@ -346,10 +343,6 @@ async fn exec_command_hides_and_rejects_tty_when_disabled() -> Result<()> {
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn exec_command_runs_without_tty_when_tty_disabled() -> Result<()> {
     skip_if_no_network!(Ok(()));
-    skip_if_wine_exec!(
-        Ok(()),
-        "basic PowerShell execution through Wine is unavailable"
-    );
 
     let builder = test_codex().with_model("gpt-5.4").with_cloud_config_bundle(
         CloudConfigBundleFixture::loader_with_enterprise_requirement(
@@ -389,10 +382,6 @@ async fn exec_command_runs_without_tty_when_tty_disabled() -> Result<()> {
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn exec_command_does_not_expose_configured_noise_auth_token() -> Result<()> {
     skip_if_no_network!(Ok(()));
-    skip_if_wine_exec!(
-        Ok(()),
-        "basic PowerShell execution through Wine is unavailable"
-    );
 
     let builder = test_codex().with_model("gpt-5.4").with_config(|config| {
         config.permissions.shell_environment_policy.r#set.insert(
@@ -408,9 +397,6 @@ async fn exec_command_does_not_expose_configured_noise_auth_token() -> Result<()
     let command = match core_test_support::test_target_os() {
         core_test_support::TestTargetOs::Linux | core_test_support::TestTargetOs::MacOs => {
             "if [ -n \"${CODEX_EXEC_SERVER_NOISE_AUTH_TOKEN:-}\" ] || [ -n \"${codex_exec_server_noise_auth_token:-}\" ]; then echo leaked; else echo unset; fi"
-        }
-        core_test_support::TestTargetOs::Windows => {
-            "if ($env:CODEX_EXEC_SERVER_NOISE_AUTH_TOKEN) { Write-Output leaked } else { Write-Output unset }"
         }
     };
     let call_id = "exec-command-noise-auth-token";
@@ -442,7 +428,6 @@ async fn exec_command_does_not_expose_configured_noise_auth_token() -> Result<()
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn exec_command_exports_originating_call_metadata_across_later_input() -> Result<()> {
-    skip_if_target_windows!(Ok(()), "uses POSIX shell and TTY fixtures");
     skip_if_no_network!(Ok(()));
     skip_if_sandbox!(Ok(()));
 
@@ -517,10 +502,6 @@ async fn exec_command_exports_originating_call_metadata_across_later_input() -> 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn exec_command_uses_installed_environment_shell_policy_with_explicit_overrides() -> Result<()>
 {
-    skip_if_wine_exec!(
-        Ok(()),
-        "basic PowerShell execution through Wine exec is not passing yet"
-    );
     skip_if_no_network!(Ok(()));
 
     let builder = test_codex().with_model("gpt-5.4").with_config(|config| {
@@ -583,9 +564,6 @@ async fn exec_command_uses_installed_environment_shell_policy_with_explicit_over
         core_test_support::TestTargetOs::Linux | core_test_support::TestTargetOs::MacOs => {
             r#"printf '%s:%s:%s:%s' "$KEEP" "${DROP:-missing}" "${OWNER_ONLY:-missing}" "$CODEX_VERSION""#
         }
-        core_test_support::TestTargetOs::Windows => {
-            r#"if (Test-Path Env:DROP) { $drop = $env:DROP } else { $drop = 'missing' }; if (Test-Path Env:OWNER_ONLY) { $owner = $env:OWNER_ONLY } else { $owner = 'missing' }; Write-Output "${env:KEEP}:${drop}:${owner}:${env:CODEX_VERSION}""#
-        }
     };
     let arguments = json!({
         "cmd": command,
@@ -626,7 +604,6 @@ async fn exec_command_uses_installed_environment_shell_policy_with_explicit_over
 async fn unified_exec_intercepts_apply_patch_exec_command() -> Result<()> {
     skip_if_no_network!(Ok(()));
     skip_if_sandbox!(Ok(()));
-    skip_if_host_windows!(Ok(()));
 
     let builder = test_codex();
     let harness = TestCodexHarness::with_builder(builder).await?;
@@ -825,10 +802,6 @@ async fn unified_exec_rejects_justification_without_sandbox_permissions() -> Res
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn unified_exec_emits_exec_command_begin_event() -> Result<()> {
     // TODO(anp): Remove after unified-exec fixtures use target-native commands.
-    skip_if_target_windows!(
-        Ok(()),
-        "uses a POSIX command and does not assert successful execution"
-    );
     skip_if_no_network!(Ok(()));
     skip_if_sandbox!(Ok(()));
 
@@ -882,10 +855,6 @@ async fn unified_exec_emits_exec_command_begin_event() -> Result<()> {
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn unified_exec_resolves_relative_workdir() -> Result<()> {
     // TODO(anp): Remove after workdir helpers use target-native paths.
-    skip_if_target_windows!(
-        Ok(()),
-        "does not assert successful native-Windows workdir execution"
-    );
     skip_if_no_network!(Ok(()));
     skip_if_sandbox!(Ok(()));
 
@@ -948,10 +917,8 @@ async fn unified_exec_resolves_relative_workdir() -> Result<()> {
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn unified_exec_respects_workdir_override() -> Result<()> {
     // TODO(anp): Remove after workdir helpers use target-native paths and commands.
-    skip_if_target_windows!(Ok(()), "uses a POSIX pwd command and workdir path");
     skip_if_no_network!(Ok(()));
     skip_if_sandbox!(Ok(()));
-    skip_if_host_windows!(Ok(()));
 
     let server = start_mock_server().await;
 
@@ -1009,7 +976,6 @@ async fn unified_exec_respects_workdir_override() -> Result<()> {
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn unified_exec_emits_exec_command_end_event() -> Result<()> {
     // TODO(anp): Remove after unified-exec fixtures use target-native commands.
-    skip_if_target_windows!(Ok(()), "uses a POSIX-only command fixture");
     skip_if_no_network!(Ok(()));
     skip_if_sandbox!(Ok(()));
 
@@ -1077,7 +1043,6 @@ async fn unified_exec_emits_exec_command_end_event() -> Result<()> {
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn unified_exec_emits_output_delta_for_exec_command() -> Result<()> {
     // TODO(anp): Remove after unified-exec fixtures use target-native commands.
-    skip_if_target_windows!(Ok(()), "uses a POSIX-only command fixture");
     skip_if_no_network!(Ok(()));
     skip_if_sandbox!(Ok(()));
 
@@ -1185,7 +1150,6 @@ async fn unified_exec_emits_output_delta_for_exec_command() -> Result<()> {
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn unified_exec_full_lifecycle_with_background_end_event() -> Result<()> {
     // TODO(anp): Remove after unified-exec fixtures use target-native commands.
-    skip_if_target_windows!(Ok(()), "uses a POSIX-only command fixture");
     skip_if_no_network!(Ok(()));
     skip_if_sandbox!(Ok(()));
 
@@ -1274,7 +1238,6 @@ async fn unified_exec_full_lifecycle_with_background_end_event() -> Result<()> {
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn unified_exec_network_denial_emits_failed_background_end_event() -> Result<()> {
     // TODO(anp): Remove after network-denial fixtures use target-native commands.
-    skip_if_target_windows!(Ok(()), "uses the POSIX/Python network-denial fixture");
     skip_if_no_network!(Ok(()));
     skip_if_sandbox!(Ok(()));
 
@@ -1318,7 +1281,6 @@ async fn unified_exec_network_denial_emits_failed_background_end_event() -> Resu
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn unified_exec_short_lived_network_denial_emits_failed_end_event() -> Result<()> {
     // TODO(anp): Remove after network-denial fixtures use target-native commands.
-    skip_if_target_windows!(Ok(()), "uses the POSIX/Python network-denial fixture");
     skip_if_no_network!(Ok(()));
     skip_if_sandbox!(Ok(()));
 
@@ -1471,7 +1433,6 @@ async fn unified_exec_emits_terminal_interaction_for_write_stdin(
     stdin_approval: bool,
 ) -> Result<()> {
     // TODO(anp): Remove after unified-exec interactive fixtures support Windows/ConPTY.
-    skip_if_target_windows!(Ok(()), "uses POSIX interactive-process and EOF semantics");
     skip_if_no_network!(Ok(()));
     skip_if_sandbox!(Ok(()));
 
@@ -1604,7 +1565,6 @@ async fn unified_exec_emits_terminal_interaction_for_write_stdin(
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn unified_exec_terminal_interaction_captures_delayed_output() -> Result<()> {
     // TODO(anp): Remove after interactive fixtures use target-native commands.
-    skip_if_target_windows!(Ok(()), "uses a POSIX read/printf fixture");
     skip_if_no_network!(Ok(()));
     skip_if_sandbox!(Ok(()));
 
@@ -1778,10 +1738,8 @@ async fn unified_exec_terminal_interaction_captures_delayed_output() -> Result<(
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn unified_exec_emits_one_begin_and_one_end_event() -> Result<()> {
     // TODO(anp): Remove after unified-exec fixtures use target-native commands.
-    skip_if_target_windows!(Ok(()), "uses bash and a POSIX sleep command");
     skip_if_no_network!(Ok(()));
     skip_if_sandbox!(Ok(()));
-    skip_if_host_windows!(Ok(()));
 
     let server = start_mock_server().await;
 
@@ -1897,7 +1855,6 @@ async fn unified_exec_emits_one_begin_and_one_end_event() -> Result<()> {
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn exec_command_reports_chunk_and_exit_metadata() -> Result<()> {
     // TODO(anp): Remove after unified-exec fixtures use target-native commands.
-    skip_if_target_windows!(Ok(()), "uses a POSIX-only command fixture");
     skip_if_no_network!(Ok(()));
     skip_if_sandbox!(Ok(()));
 
@@ -1986,7 +1943,6 @@ async fn exec_command_reports_chunk_and_exit_metadata() -> Result<()> {
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn exec_command_clamps_model_requested_max_output_tokens_to_policy() -> Result<()> {
     // TODO(anp): Remove after unified-exec fixtures use target-native commands.
-    skip_if_target_windows!(Ok(()), "uses a POSIX-only command fixture");
     skip_if_no_network!(Ok(()));
     skip_if_sandbox!(Ok(()));
 
@@ -2045,7 +2001,6 @@ async fn exec_command_clamps_model_requested_max_output_tokens_to_policy() -> Re
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn write_stdin_clamps_model_requested_max_output_tokens_to_policy() -> Result<()> {
     // TODO(anp): Remove after unified-exec interactive fixtures support Windows/ConPTY.
-    skip_if_target_windows!(Ok(()), "uses POSIX read/while and Unix TTY semantics");
     skip_if_no_network!(Ok(()));
     skip_if_sandbox!(Ok(()));
 
@@ -2131,7 +2086,6 @@ async fn write_stdin_clamps_model_requested_max_output_tokens_to_policy() -> Res
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn unified_exec_defaults_to_pipe() -> Result<()> {
     // TODO(anp): Remove after unified-exec interactive fixtures support Windows/ConPTY.
-    skip_if_target_windows!(Ok(()), "requires Python/Unix PTY support in the target");
     skip_if_no_network!(Ok(()));
     skip_if_sandbox!(Ok(()));
 
@@ -2196,7 +2150,6 @@ async fn unified_exec_defaults_to_pipe() -> Result<()> {
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn unified_exec_can_enable_tty() -> Result<()> {
     // TODO(anp): Remove after unified-exec interactive fixtures support Windows/ConPTY.
-    skip_if_target_windows!(Ok(()), "requires Python/Unix PTY support in the target");
     skip_if_no_network!(Ok(()));
     skip_if_sandbox!(Ok(()));
 
@@ -2258,7 +2211,6 @@ async fn unified_exec_can_enable_tty() -> Result<()> {
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn unified_exec_respects_early_exit_notifications() -> Result<()> {
     // TODO(anp): Remove after unified-exec fixtures use target-native commands.
-    skip_if_target_windows!(Ok(()), "uses a POSIX-only command fixture");
     skip_if_no_network!(Ok(()));
     skip_if_sandbox!(Ok(()));
 
@@ -2337,7 +2289,6 @@ async fn unified_exec_respects_early_exit_notifications() -> Result<()> {
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn write_stdin_returns_exit_metadata_and_clears_session() -> Result<()> {
     // TODO(anp): Remove after unified-exec interactive fixtures support Windows/ConPTY.
-    skip_if_target_windows!(Ok(()), "uses POSIX interactive-process and EOF semantics");
     skip_if_no_network!(Ok(()));
     skip_if_sandbox!(Ok(()));
 
@@ -2512,7 +2463,6 @@ async fn write_stdin_returns_exit_metadata_and_clears_session() -> Result<()> {
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn write_stdin_ctrl_c_interrupts_non_tty_session() -> Result<()> {
     // TODO(anp): Add a target-Windows test for explicit interrupt handling.
-    skip_if_target_windows!(Ok(()), "asserts Unix SIGINT and trap semantics");
     assert_write_stdin_ctrl_c_interrupts_non_tty_session(
         "trap",
         "trap 'echo INT-TRAP; exit 42' INT; echo READY; while true; do sleep 30; done",
@@ -2525,7 +2475,6 @@ async fn write_stdin_ctrl_c_interrupts_non_tty_session() -> Result<()> {
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn write_stdin_ctrl_c_default_interrupt_reports_130_for_non_tty_session() -> Result<()> {
     // TODO(anp): Add a target-Windows test for Ctrl+C termination and exit reporting.
-    skip_if_target_windows!(Ok(()), "asserts Unix SIGINT and exit-code semantics");
     assert_write_stdin_ctrl_c_interrupts_non_tty_session(
         "default",
         "echo READY; exec sleep 30",
@@ -2684,102 +2633,8 @@ async fn assert_write_stdin_ctrl_c_interrupts_non_tty_session(
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn write_stdin_ctrl_c_terminates_non_tty_session_on_windows() -> Result<()> {
-    if core_test_support::test_target_os() != core_test_support::TestTargetOs::Windows {
-        return Ok(());
-    }
-    skip_if_wine_exec!(
-        Ok(()),
-        "Wine exits Windows non-TTY shell processes immediately"
-    );
-    skip_if_sandbox!(Ok(()));
-
-    let server = start_mock_server().await;
-
-    let mut builder = test_codex();
-    let test = builder.build_with_auto_env(&server).await?;
-
-    let start_call_id = "uexec-windows-interrupt-start";
-    let interrupt_call_id = "uexec-windows-interrupt";
-
-    let start_args = serde_json::json!({
-        "cmd": "Start-Sleep -Seconds 30",
-        "yield_time_ms": 250,
-        "tty": false,
-    });
-    let interrupt_args = serde_json::json!({
-        "chars": "\u{3}",
-        "session_id": 1000,
-        "yield_time_ms": 1000,
-    });
-
-    let responses = vec![
-        sse(vec![
-            ev_response_created("resp-1"),
-            ev_function_call(
-                start_call_id,
-                "exec_command",
-                &serde_json::to_string(&start_args)?,
-            ),
-            ev_completed("resp-1"),
-        ]),
-        sse(vec![
-            ev_response_created("resp-2"),
-            ev_function_call(
-                interrupt_call_id,
-                "write_stdin",
-                &serde_json::to_string(&interrupt_args)?,
-            ),
-            ev_completed("resp-2"),
-        ]),
-        sse(vec![
-            ev_response_created("resp-3"),
-            ev_assistant_message("msg-1", "done"),
-            ev_completed("resp-3"),
-        ]),
-    ];
-    let request_log = mount_sse_sequence(&server, responses).await;
-
-    submit_unified_exec_turn(
-        &test,
-        "interrupt non-tty unified exec on Windows",
-        PermissionProfile::Disabled,
-    )
-    .await?;
-
-    wait_for_event_with_timeout(
-        &test.codex,
-        |event| matches!(event, EventMsg::TurnComplete(_)),
-        Duration::from_secs(20),
-    )
-    .await;
-
-    let start_output = request_log
-        .function_call_output_text(start_call_id)
-        .expect("missing start output for exec_command");
-    let start_output = parse_unified_exec_output(&start_output)?;
-    assert_eq!(
-        start_output.process_id.as_deref(),
-        Some("1000"),
-        "exec_command should leave a running non-TTY session"
-    );
-    let interrupt_output = request_log
-        .function_call_output_text(interrupt_call_id)
-        .expect("missing interrupt output for write_stdin");
-    let interrupt_output = parse_unified_exec_output(&interrupt_output)?;
-    assert!(
-        interrupt_output.process_id.is_none(),
-        "interrupted process should be cleared from the session map"
-    );
-    assert_eq!(interrupt_output.exit_code, Some(1));
-
-    Ok(())
-}
-
-#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn unified_exec_emits_end_event_when_session_dies_via_stdin() -> Result<()> {
     // TODO(anp): Remove after unified-exec interactive fixtures support Windows/ConPTY.
-    skip_if_target_windows!(Ok(()), "uses POSIX interactive-process and EOF semantics");
     skip_if_no_network!(Ok(()));
     skip_if_sandbox!(Ok(()));
 
@@ -2867,7 +2722,6 @@ async fn unified_exec_emits_end_event_when_session_dies_via_stdin() -> Result<()
 async fn unified_exec_keeps_long_running_session_after_turn_end() -> Result<()> {
     skip_if_no_network!(Ok(()));
     skip_if_sandbox!(Ok(()));
-    skip_if_host_windows!(Ok(()));
 
     let server = start_mock_server().await;
 
@@ -2968,7 +2822,6 @@ async fn unified_exec_keeps_long_running_session_after_turn_end() -> Result<()> 
 async fn unified_exec_interrupt_preserves_long_running_session() -> Result<()> {
     skip_if_no_network!(Ok(()));
     skip_if_sandbox!(Ok(()));
-    skip_if_host_windows!(Ok(()));
 
     let server = start_mock_server().await;
 
@@ -3056,7 +2909,6 @@ async fn unified_exec_interrupt_preserves_long_running_session() -> Result<()> {
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn unified_exec_reuses_session_via_stdin() -> Result<()> {
     // TODO(anp): Remove after unified-exec interactive fixtures support Windows/ConPTY.
-    skip_if_target_windows!(Ok(()), "uses POSIX interactive-process and EOF semantics");
     skip_if_no_network!(Ok(()));
     skip_if_sandbox!(Ok(()));
 
@@ -3150,7 +3002,6 @@ async fn unified_exec_reuses_session_via_stdin() -> Result<()> {
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn unified_exec_streams_after_lagged_output() -> Result<()> {
     // TODO(anp): Remove after output fixtures use target-native commands.
-    skip_if_target_windows!(Ok(()), "requires Python/Unix PTY support in the target");
     skip_if_no_network!(Ok(()));
     skip_if_sandbox!(Ok(()));
 
@@ -3261,7 +3112,6 @@ PY
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn unified_exec_timeout_and_followup_poll() -> Result<()> {
     // TODO(anp): Remove after unified-exec fixtures use target-native commands.
-    skip_if_target_windows!(Ok(()), "uses a POSIX-only command fixture");
     skip_if_no_network!(Ok(()));
     skip_if_sandbox!(Ok(()));
 
@@ -3343,7 +3193,6 @@ async fn unified_exec_timeout_and_followup_poll() -> Result<()> {
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn managed_unified_exec_disable_runs_commands_without_retained_authority() -> Result<()> {
-    skip_if_target_windows!(Ok(()), "uses a POSIX-only command fixture");
     skip_if_no_network!(Ok(()));
     skip_if_sandbox!(Ok(()));
 
@@ -3410,7 +3259,6 @@ shell_tool = true
 async fn managed_one_shot_command_is_terminated_when_the_turn_is_interrupted() -> Result<()> {
     skip_if_no_network!(Ok(()));
     skip_if_sandbox!(Ok(()));
-    skip_if_target_windows!(Ok(()), "uses a POSIX command and process checks");
 
     let server = start_mock_server().await;
     let mut builder = test_codex().with_cloud_config_bundle(
@@ -3472,10 +3320,6 @@ shell_tool = true
 #[cfg(not(target_arch = "arm"))]
 async fn unified_exec_formats_large_output_summary() -> Result<()> {
     // TODO(anp): Remove after output fixtures use target-native commands.
-    skip_if_target_windows!(
-        Ok(()),
-        "requires Python and POSIX heredoc support in the target"
-    );
     skip_if_no_network!(Ok(()));
     skip_if_sandbox!(Ok(()));
 
@@ -3568,7 +3412,6 @@ PY
 async fn unified_exec_runs_under_sandbox() -> Result<()> {
     skip_if_no_network!(Ok(()));
     skip_if_sandbox!(Ok(()));
-    skip_if_host_windows!(Ok(()));
 
     let server = start_mock_server().await;
 
@@ -3916,10 +3759,6 @@ async fn unified_exec_python_prompt_under_seatbelt() -> Result<()> {
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn unified_exec_runs_on_all_platforms() -> Result<()> {
     // TODO(anp): Remove after PowerShell execution passes through Wine exec.
-    skip_if_wine_exec!(
-        Ok(()),
-        "basic PowerShell execution through Wine exec is not passing yet"
-    );
     skip_if_no_network!(Ok(()));
     skip_if_sandbox!(Ok(()));
 
@@ -3980,7 +3819,6 @@ async fn unified_exec_runs_on_all_platforms() -> Result<()> {
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn write_stdin_calls_run_in_parallel_across_sessions() -> Result<()> {
     skip_if_no_network!(Ok(()));
-    skip_if_target_windows!(Ok(()), "uses bash and POSIX file rendezvous commands");
 
     let server = start_mock_server().await;
     let mut builder = test_codex().with_model("gpt-5.4");

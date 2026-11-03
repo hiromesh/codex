@@ -25,7 +25,6 @@ use codex_utils_path_uri::PathUri;
 use core_test_support::apps_test_server::AppsTestServer;
 use core_test_support::responses;
 use core_test_support::skip_if_no_network;
-use core_test_support::skip_if_target_windows;
 use core_test_support::test_codex::local_selections;
 use core_test_support::test_codex::test_codex;
 use core_test_support::test_codex::turn_permission_fields;
@@ -198,7 +197,6 @@ async fn local_mcp_startup_and_refresh_use_configured_http_client() -> Result<()
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn skill_mcp_dependency_oauth_uses_configured_http_client() -> Result<()> {
-    skip_if_target_windows!(Ok(()), "requires native cross-OS skill paths");
     skip_if_no_network!(Ok(()));
 
     if std::env::var_os(PROXY_TEST_SUBPROCESS_ENV_VAR).is_none() {

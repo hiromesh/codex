@@ -48,7 +48,6 @@ use codex_utils_absolute_path::AbsolutePathBuf;
 use core_test_support::responses;
 use core_test_support::skip_if_no_network;
 use core_test_support::skip_if_sandbox;
-use core_test_support::skip_if_target_windows;
 use core_test_support::test_codex::test_codex;
 use core_test_support::test_codex::turn_permission_fields;
 use core_test_support::wait_for_event;
@@ -529,10 +528,6 @@ async fn extension_tool_rebinds_granted_permissions_on_each_turn(
 ) -> Result<()> {
     skip_if_no_network!(Ok(()));
     skip_if_sandbox!(Ok(()));
-    skip_if_target_windows!(
-        Ok(()),
-        "restricted reads require the elevated Windows sandbox backend, unavailable in this fixture"
-    );
 
     let server = responses::start_mock_server().await;
     Mock::given(method("POST"))

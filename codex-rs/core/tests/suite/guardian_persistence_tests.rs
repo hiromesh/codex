@@ -164,7 +164,6 @@ impl ThreadStore for GatedReviewerStore {
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn guardian_saves_each_completed_review_before_releasing_its_action() -> anyhow::Result<()> {
     core_test_support::skip_if_no_network!(Ok(()));
-    core_test_support::skip_if_wine_exec!(Ok(()), "uses the Unix command approval harness");
     let server = responses::start_mock_server().await;
     let (saves, mut pending_saves) = mpsc::unbounded_channel();
     let store = Arc::new(GatedReviewerStore {

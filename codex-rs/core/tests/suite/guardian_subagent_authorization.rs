@@ -46,7 +46,6 @@ use core_test_support::responses::sse;
 use core_test_support::responses::sse_response;
 use core_test_support::responses::start_mock_server;
 use core_test_support::skip_if_no_network;
-use core_test_support::skip_if_wine_exec;
 use core_test_support::streaming_sse::StreamingSseChunk;
 use core_test_support::streaming_sse::start_streaming_sse_server;
 use core_test_support::test_codex::TestCodex;
@@ -207,10 +206,6 @@ async fn guardian_subagent_review_preserves_late_root_user_authorization(
     messaging_tool: MessagingTool,
 ) -> Result<()> {
     skip_if_no_network!(Ok(()));
-    skip_if_wine_exec!(
-        Ok(()),
-        "Guardian approval actions require host-native paths"
-    );
     run_guardian_subagent_review(root_answer, root_context, messaging_outcome, messaging_tool).await
 }
 

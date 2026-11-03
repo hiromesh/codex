@@ -23,7 +23,6 @@ use core_test_support::TestTargetOs;
 use core_test_support::hooks::trust_discovered_hooks;
 use core_test_support::responses;
 use core_test_support::skip_if_no_network;
-use core_test_support::skip_if_wine_exec;
 use core_test_support::test_codex::TestCodex;
 use core_test_support::test_codex::TestCodexHarness;
 use core_test_support::test_codex::test_codex;
@@ -127,11 +126,9 @@ async fn command_start_receives_rewritten_command_and_executor_workdir(
     mode: CommandCallMode,
 ) -> Result<()> {
     skip_if_no_network!(Ok(()));
-    skip_if_wine_exec!(Ok(()), "command hooks require a host-native executor");
 
     let rewritten_command = match test_target_os() {
         TestTargetOs::Linux | TestTargetOs::MacOs => "cat prepared.txt",
-        TestTargetOs::Windows => "Get-Content -Raw prepared.txt",
     };
     let hook_output = json!({
         "hookSpecificOutput": {
@@ -249,10 +246,6 @@ async fn interrupting_command_preparation_does_not_start_the_command(
     mode: CommandCallMode,
 ) -> Result<()> {
     skip_if_no_network!(Ok(()));
-    skip_if_wine_exec!(
-        Ok(()),
-        "basic PowerShell execution through Wine is not passing yet"
-    );
 
     let (entered_tx, entered_rx) = oneshot::channel();
     let (completed_tx, completed_rx) = oneshot::channel();
@@ -270,7 +263,6 @@ async fn interrupting_command_preparation_does_not_start_the_command(
     let (test, server) = (harness.test(), harness.server());
     let command = match test_target_os() {
         TestTargetOs::Linux | TestTargetOs::MacOs => "printf executed > must-not-run.txt",
-        TestTargetOs::Windows => "Set-Content must-not-run.txt executed",
     };
     responses::mount_sse_once(
         server,

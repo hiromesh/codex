@@ -228,7 +228,6 @@ async fn command_hooks_keep_execution_cwd(workdir: Option<&str>, mode: &'static 
 
     skip_if_no_network!(Ok(()));
     if mode == "stdin" {
-        core_test_support::skip_if_target_windows!(Ok(()), "uses a POSIX read/tty fixture");
     }
     let later_turn = matches!(mode, "delayed" | "stdin");
     let server = start_mock_server().await;
@@ -322,9 +321,6 @@ elif event == 'PreToolUse' and {mode:?} == 'rewrite':
         "read -r line; cat cwd-marker.txt"
     } else if mode == "delayed" {
         match test_target_os() {
-            TestTargetOs::Windows => {
-                "while (!(Test-Path release.txt)) { Start-Sleep -Milliseconds 50 }; Get-Content cwd-marker.txt"
-            }
             TestTargetOs::Linux | TestTargetOs::MacOs => {
                 "while [ ! -f release.txt ]; do sleep 0.05; done; cat cwd-marker.txt"
             }

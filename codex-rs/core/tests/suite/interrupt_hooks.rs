@@ -22,7 +22,6 @@ use core_test_support::responses::mount_sse_once;
 use core_test_support::responses::sse;
 use core_test_support::responses::start_mock_server;
 use core_test_support::skip_if_no_network;
-use core_test_support::skip_if_wine_exec;
 use core_test_support::test_codex::TestCodex;
 use core_test_support::test_codex::test_codex;
 use core_test_support::wait_for_event_match;
@@ -136,10 +135,6 @@ async fn start_interruptible_turn(test: &TestCodex, server: &MockServer) -> Resu
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn interrupt_hook_runs_before_turn_aborted_and_records_payload() -> Result<()> {
     skip_if_no_network!(Ok(()));
-    skip_if_wine_exec!(
-        Ok(()),
-        "command hooks currently require a host-native working directory"
-    );
 
     let server = start_mock_server().await;
     let test = build_test(&server, Some("watch the tide")).await?;
@@ -226,10 +221,6 @@ async fn interrupt_hook_runs_before_turn_aborted_and_records_payload() -> Result
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn timed_out_interrupt_hook_fails_before_turn_aborted() -> Result<()> {
     skip_if_no_network!(Ok(()));
-    skip_if_wine_exec!(
-        Ok(()),
-        "command hooks currently require a host-native working directory"
-    );
 
     let server = start_mock_server().await;
     let test = build_test(&server, /*system_message*/ None).await?;
@@ -281,10 +272,6 @@ async fn timed_out_interrupt_hook_fails_before_turn_aborted() -> Result<()> {
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn async_interrupt_hook_runs_without_delaying_turn_aborted() -> Result<()> {
     skip_if_no_network!(Ok(()));
-    skip_if_wine_exec!(
-        Ok(()),
-        "command hooks currently require a host-native working directory"
-    );
 
     let server = start_mock_server().await;
     let test = test_codex()
@@ -355,10 +342,6 @@ async fn async_interrupt_hook_runs_without_delaying_turn_aborted() -> Result<()>
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn self_aborted_turn_runs_interrupt_hook_before_turn_aborted() -> Result<()> {
     skip_if_no_network!(Ok(()));
-    skip_if_wine_exec!(
-        Ok(()),
-        "command hooks currently require a host-native working directory"
-    );
 
     let server = start_mock_server().await;
     let test = test_codex()

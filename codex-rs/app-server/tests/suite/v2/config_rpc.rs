@@ -20,10 +20,6 @@ use codex_app_server_protocol::ComputerUseConfig;
 use codex_app_server_protocol::ComputerUseMacosConfig;
 use codex_app_server_protocol::ComputerUseMacosRequirements;
 use codex_app_server_protocol::ComputerUseRequirements;
-use codex_app_server_protocol::ComputerUseWindowsConfig;
-use codex_app_server_protocol::ComputerUseWindowsExeConfig;
-use codex_app_server_protocol::ComputerUseWindowsExeRequirement;
-use codex_app_server_protocol::ComputerUseWindowsRequirements;
 use codex_app_server_protocol::ConfigBatchWriteParams;
 use codex_app_server_protocol::ConfigEdit;
 use codex_app_server_protocol::ConfigLayerSource;
@@ -360,15 +356,6 @@ default_app_access = "deny"
 
 [computer_use.macos.bundle_ids]
 "com.apple.Safari" = "allow"
-
-[computer_use.windows.aumids]
-"Microsoft.Paint_8wekyb3d8bbwe!App" = "allow"
-
-[[computer_use.windows.exes]]
-publisher_name = "CN=Google LLC"
-product_name = "Google Chrome"
-binary_name = "chrome.exe"
-access = "deny"
 "#,
     )?;
     let mut mcp = TestAppServer::builder()
@@ -432,18 +419,6 @@ access = "deny"
                     "com.apple.Safari".to_string(),
                     AllowDenyRequirement::Allow,
                 )])),
-            }),
-            windows: Some(ComputerUseWindowsRequirements {
-                aumids: Some(BTreeMap::from([(
-                    "Microsoft.Paint_8wekyb3d8bbwe!App".to_string(),
-                    AllowDenyRequirement::Allow,
-                )])),
-                exes: Some(vec![ComputerUseWindowsExeRequirement {
-                    publisher_name: "CN=Google LLC".to_string(),
-                    product_name: "Google Chrome".to_string(),
-                    binary_name: Some("chrome.exe".to_string()),
-                    access: AllowDenyRequirement::Deny,
-                }]),
             }),
         })
     );
@@ -996,15 +971,6 @@ default_app_access = "deny"
 
 [computer_use.macos.bundle_ids]
 "com.apple.Safari" = "allow"
-
-[computer_use.windows.aumids]
-"Microsoft.Paint_8wekyb3d8bbwe!App" = "deny"
-
-[[computer_use.windows.exes]]
-publisher_name = "CN=Google LLC"
-product_name = "Google Chrome"
-binary_name = "chrome.exe"
-access = "allow"
 "#,
     )?;
     std::fs::write(
@@ -1041,14 +1007,6 @@ full_cdp_access = "deny"
 [computer_use.macos.bundle_ids]
 "com.apple.TextEdit" = "allow"
 "com.apple.Safari" = "deny"
-
-[computer_use.windows.aumids]
-"Microsoft.WindowsCalculator_8wekyb3d8bbwe!App" = "allow"
-
-[[computer_use.windows.exes]]
-publisher_name = "CN=Microsoft Corporation"
-product_name = "Microsoft Visual Studio Code"
-access = "deny"
 "#,
     )?;
     set_project_trust_level(codex_home.path(), workspace.path(), TrustLevel::Trusted)?;
@@ -1106,24 +1064,6 @@ access = "deny"
                     ),
                 ])),
             }),
-            windows: Some(ComputerUseWindowsConfig {
-                aumids: Some(BTreeMap::from([
-                    (
-                        "Microsoft.Paint_8wekyb3d8bbwe!App".to_string(),
-                        AllowDenyRequirement::Deny,
-                    ),
-                    (
-                        "Microsoft.WindowsCalculator_8wekyb3d8bbwe!App".to_string(),
-                        AllowDenyRequirement::Allow,
-                    ),
-                ])),
-                exes: Some(vec![ComputerUseWindowsExeConfig {
-                    publisher_name: "CN=Microsoft Corporation".to_string(),
-                    product_name: "Microsoft Visual Studio Code".to_string(),
-                    binary_name: None,
-                    access: AllowDenyRequirement::Deny,
-                }]),
-            }),
         })
     );
     assert_eq!(
@@ -1157,7 +1097,7 @@ access = "deny"
     );
     assert_eq!(
         origins
-            .get("computer_use.windows.exes.0.access")
+            .get("computer_use.macos.bundle_ids.\"com.apple.TextEdit\"")
             .expect("project computer use origin")
             .name,
         ConfigLayerSource::Project {
@@ -1199,7 +1139,6 @@ access = "deny"
             allow_persistent_approval: None,
             default_app_access: Some(AllowDenyRequirement::Allow),
             macos: None,
-            windows: None,
         })
     );
 
@@ -2532,15 +2471,6 @@ access = "deny"
 
 [computer_use.macos.bundle_ids]
 "com.example.Stale" = "deny"
-
-[computer_use.windows.aumids]
-"Stale.App_123!App" = "allow"
-
-[[computer_use.windows.exes]]
-publisher_name = "CN=Stale"
-product_name = "Stale App"
-binary_name = "stale.exe"
-access = "deny"
 "#,
     )?;
 
@@ -2599,34 +2529,6 @@ access = "deny"
                     value: json!(null),
                     merge_strategy: MergeStrategy::Replace,
                 },
-                ConfigEdit {
-                    key_path: "computer_use.windows.aumids.\"Microsoft.Paint_8wekyb3d8bbwe!App\""
-                        .to_string(),
-                    value: json!("deny"),
-                    merge_strategy: MergeStrategy::Replace,
-                },
-                ConfigEdit {
-                    key_path: "computer_use.windows.aumids.\"Stale.App_123!App\"".to_string(),
-                    value: json!(null),
-                    merge_strategy: MergeStrategy::Replace,
-                },
-                ConfigEdit {
-                    key_path: "computer_use.windows.exes".to_string(),
-                    value: json!([
-                        {
-                            "publisher_name": "CN=Google LLC",
-                            "product_name": "Google Chrome",
-                            "binary_name": "chrome.exe",
-                            "access": "allow",
-                        },
-                        {
-                            "publisher_name": "CN=Microsoft Corporation",
-                            "product_name": "Microsoft Visual Studio Code",
-                            "access": "deny",
-                        },
-                    ]),
-                    merge_strategy: MergeStrategy::Replace,
-                },
             ],
             expected_version: None,
             reload_user_config: false,
@@ -2667,20 +2569,6 @@ default_app_access = "deny"
 
 [computer_use.macos.bundle_ids]
 "com.apple.Safari" = "allow"
-
-[computer_use.windows.aumids]
-"Microsoft.Paint_8wekyb3d8bbwe!App" = "deny"
-
-[[computer_use.windows.exes]]
-publisher_name = "CN=Google LLC"
-product_name = "Google Chrome"
-binary_name = "chrome.exe"
-access = "allow"
-
-[[computer_use.windows.exes]]
-publisher_name = "CN=Microsoft Corporation"
-product_name = "Microsoft Visual Studio Code"
-access = "deny"
 "#,
     )?;
     assert_eq!(persisted, expected_persisted);
@@ -2723,26 +2611,6 @@ access = "deny"
                     "com.apple.Safari".to_string(),
                     AllowDenyRequirement::Allow,
                 )])),
-            }),
-            windows: Some(ComputerUseWindowsConfig {
-                aumids: Some(BTreeMap::from([(
-                    "Microsoft.Paint_8wekyb3d8bbwe!App".to_string(),
-                    AllowDenyRequirement::Deny,
-                )])),
-                exes: Some(vec![
-                    ComputerUseWindowsExeConfig {
-                        publisher_name: "CN=Google LLC".to_string(),
-                        product_name: "Google Chrome".to_string(),
-                        binary_name: Some("chrome.exe".to_string()),
-                        access: AllowDenyRequirement::Allow,
-                    },
-                    ComputerUseWindowsExeConfig {
-                        publisher_name: "CN=Microsoft Corporation".to_string(),
-                        product_name: "Microsoft Visual Studio Code".to_string(),
-                        binary_name: None,
-                        access: AllowDenyRequirement::Deny,
-                    },
-                ]),
             }),
         })
     );

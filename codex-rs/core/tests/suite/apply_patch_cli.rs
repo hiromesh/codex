@@ -52,7 +52,6 @@ use codex_utils_path_uri::PathUri;
 use core_test_support::PathBufExt;
 use core_test_support::TestTargetOs;
 use core_test_support::assert_regex_match;
-use core_test_support::is_wine_exec_test_environment;
 use core_test_support::responses::ev_assistant_message;
 use core_test_support::responses::ev_completed;
 use core_test_support::responses::ev_exec_command_call_with_args;
@@ -65,8 +64,6 @@ use core_test_support::responses::start_mock_server;
 use core_test_support::skip_if_no_network;
 use core_test_support::skip_if_no_remote_env;
 use core_test_support::skip_if_remote;
-use core_test_support::skip_if_target_windows;
-use core_test_support::skip_if_wine_exec;
 use core_test_support::test_codex::TestCodexBuilder;
 use core_test_support::test_codex::TestCodexHarness;
 use core_test_support::test_codex::executor_path_uri;
@@ -241,68 +238,6 @@ pub async fn mount_apply_patch(
     .await;
 }
 
-#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn mxc_config_routes_command_and_patch_to_the_windows_executor() -> Result<()> {
-    if !is_wine_exec_test_environment() {
-        return Ok(());
-    }
-
-    let harness = apply_patch_harness_with(|builder| {
-        builder.with_pre_build_hook(|home| {
-            fs::write(home.join("config.toml"), "[windows]\nsandbox = \"mxc\"\n")
-                .expect("write MXC config");
-        })
-    })
-    .await?;
-    let exec_response = mount_function_call_agent_response(
-        harness.server(),
-        "mxc-exec",
-        &json!({"cmd": "Write-Output should-not-run"}).to_string(),
-        "exec_command",
-    )
-    .await;
-    harness
-        .submit_with_permission_profile(
-            "exercise MXC command routing",
-            PermissionProfile::workspace_write(),
-        )
-        .await?;
-    mount_apply_patch(
-        &harness,
-        "mxc-patch",
-        "*** Begin Patch\n*** Add File: should-not-exist.txt\n+blocked\n*** End Patch",
-        "done",
-    )
-    .await;
-    harness
-        .submit_with_permission_profile(
-            "exercise MXC patch routing",
-            PermissionProfile::workspace_write(),
-        )
-        .await?;
-
-    let exec_output = harness.function_call_stdout("mxc-exec").await;
-    assert!(
-        exec_output.contains("native MXC is unavailable"),
-        "expected MXC unavailability error, got: {exec_output:?}"
-    );
-    let patch_output = harness.apply_patch_output("mxc-patch").await;
-    assert!(
-        patch_output.contains("Failed to write file"),
-        "expected apply_patch failure, got: {patch_output:?}"
-    );
-    let metadata: serde_json::Value = serde_json::from_str(
-        &exec_response
-            .function_call
-            .single_request()
-            .header("x-codex-turn-metadata")
-            .expect("turn metadata header"),
-    )?;
-    assert_eq!(metadata["sandbox"], "windows_mxc");
-
-    Ok(())
-}
-
 async fn mount_apply_patch_model_output(
     harness: &TestCodexHarness,
     call_id: &str,
@@ -393,7 +328,6 @@ async fn apply_patch_preserves_crlf_by_default() -> Result<()> {
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn apply_patch_shell_heredoc_preserves_crlf_by_default() -> Result<()> {
-    skip_if_wine_exec!(Ok(()), "uses a POSIX shell heredoc");
     assert_apply_patch_crlf_update(CrLfApplyPatchModelOutput::ExecCommandViaHeredoc).await
 }
 
@@ -850,7 +784,6 @@ async fn apply_patch_cli_delete_directory_reports_verification_error() -> Result
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn apply_patch_cli_rejects_path_traversal_outside_workspace() -> Result<()> {
     // TODO(anp): Remove after apply_patch path handling supports target-native Windows paths.
-    skip_if_wine_exec!(Ok(()), "asserts POSIX path traversal behavior");
     skip_if_no_network!(Ok(()));
 
     let harness = apply_patch_harness().await?;
@@ -953,10 +886,6 @@ async fn intercepted_apply_patch_verification_uses_local_sandbox() -> Result<()>
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn intercepted_apply_patch_updates_absolute_target_after_turn_cwd_is_removed() -> Result<()> {
     skip_if_no_network!(Ok(()));
-    skip_if_target_windows!(
-        Ok(()),
-        "the default Windows restricted-token test backend cannot enforce denied reads"
-    );
 
     let harness = apply_patch_harness_with(|builder| builder.with_model("gpt-5.5")).await?;
     let test = harness.test();
@@ -1420,7 +1349,6 @@ async fn apply_patch_cli_preserves_existing_hard_link_outside_workspace() -> Res
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn apply_patch_cli_rejects_move_path_traversal_outside_workspace() -> Result<()> {
     // TODO(anp): Remove after apply-patch fixtures use target-native paths.
-    skip_if_target_windows!(Ok(()), "asserts POSIX workspace traversal behavior");
     skip_if_no_network!(Ok(()));
 
     let harness = apply_patch_harness().await?;
@@ -1486,7 +1414,6 @@ async fn apply_patch_cli_verification_failure_has_no_side_effects() -> Result<()
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn apply_patch_exec_command_heredoc_with_cd_updates_relative_workdir() -> Result<()> {
     // TODO(anp): Remove after apply_patch shell fixtures use target-native commands.
-    skip_if_wine_exec!(Ok(()), "uses a POSIX shell heredoc and cd command");
     skip_if_no_network!(Ok(()));
 
     let harness = apply_patch_harness_with(|builder| builder.with_model("gpt-5.5")).await?;
@@ -1529,7 +1456,7 @@ async fn apply_patch_cli_can_use_exec_command_output_as_patch_input() -> Result<
     );
 
     let harness =
-        apply_patch_harness_with(|builder| builder.with_model("gpt-5.5").with_windows_cmd_shell())
+        apply_patch_harness_with(|builder| builder.with_model("gpt-5.5"))
             .await?;
 
     let source_contents = "line1\nnaïve café\nline3\n";
@@ -1770,7 +1697,6 @@ async fn apply_patch_custom_tool_streaming_emits_updated_changes() -> Result<()>
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn apply_patch_exec_command_heredoc_with_cd_emits_turn_diff() -> Result<()> {
     // TODO(anp): Remove after apply_patch shell fixtures use target-native commands.
-    skip_if_wine_exec!(Ok(()), "uses a POSIX shell heredoc and cd command");
     skip_if_no_network!(Ok(()));
 
     let harness = apply_patch_harness_with(|builder| builder.with_model("gpt-5.5")).await?;
@@ -1834,7 +1760,6 @@ async fn apply_patch_exec_command_heredoc_with_cd_emits_turn_diff() -> Result<()
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn apply_patch_turn_diff_paths_stay_repo_relative_when_session_cwd_is_nested() -> Result<()> {
     // TODO(anp): Remove after apply_patch diff fixtures use target-native paths.
-    skip_if_wine_exec!(Ok(()), "asserts POSIX repository paths");
     skip_if_no_network!(Ok(()));
 
     let harness = apply_patch_harness_with(|builder| {
@@ -1926,7 +1851,6 @@ async fn apply_patch_turn_diff_skips_git_root_when_feature_is_enabled(
     cwd_relative_turn_diffs: bool,
     expected_path: &str,
 ) -> Result<()> {
-    skip_if_wine_exec!(Ok(()), "asserts POSIX repository paths");
     skip_if_no_network!(Ok(()));
 
     let harness = apply_patch_harness_with(|builder| {
@@ -2021,7 +1945,6 @@ async fn apply_patch_turn_diff_skips_git_root_when_feature_is_enabled(
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn apply_patch_exec_command_failure_propagates_error_and_skips_diff() -> Result<()> {
     // TODO(anp): Remove after apply_patch shell fixtures use target-native commands.
-    skip_if_wine_exec!(Ok(()), "uses a POSIX shell heredoc");
     skip_if_no_network!(Ok(()));
 
     let harness = apply_patch_harness_with(|builder| builder.with_model("gpt-5.5")).await?;
@@ -2080,7 +2003,6 @@ async fn apply_patch_exec_command_failure_propagates_error_and_skips_diff() -> R
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn apply_patch_shell_accepts_lenient_heredoc_wrapped_patch() -> Result<()> {
     // TODO(anp): Remove after apply_patch shell fixtures use target-native commands.
-    skip_if_wine_exec!(Ok(()), "uses a POSIX shell heredoc");
     skip_if_no_network!(Ok(()));
 
     let harness = apply_patch_harness().await?;
@@ -2229,7 +2151,6 @@ async fn apply_patch_turn_diff_emits_portable_paths_for_remote_cwd() -> Result<(
     let file_uri = cwd.join(file)?;
     let expected_relative_path = match test_target_os() {
         TestTargetOs::Linux | TestTargetOs::MacOs => "nested/foreign.txt",
-        TestTargetOs::Windows => r"nested\foreign.txt",
     };
     assert_eq!(
         file_uri.relative_path_from(cwd).as_deref(),
@@ -2258,10 +2179,6 @@ index 0000000000000000000000000000000000000000..ce013625030ba8dba906f756967f9e9c
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn apply_patch_turn_diff_tracks_local_and_remote_environment_paths() -> Result<()> {
     // TODO(anp): Remove after shared-cwd helpers use target-native paths.
-    skip_if_target_windows!(
-        Ok(()),
-        "requires a cwd valid in local POSIX and remote Windows environments"
-    );
     skip_if_no_network!(Ok(()));
     skip_if_no_remote_env!(Ok(()));
 

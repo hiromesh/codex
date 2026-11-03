@@ -35,7 +35,6 @@ use core_test_support::responses::sse;
 use core_test_support::responses::start_mock_server;
 use core_test_support::skip_if_no_network;
 use core_test_support::skip_if_remote;
-use core_test_support::skip_if_wine_exec;
 use core_test_support::test_codex::local_requests;
 use core_test_support::test_codex::test_codex;
 use core_test_support::test_codex::turn_permission_fields;
@@ -96,10 +95,6 @@ async fn write_repo_skill(
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn user_turn_includes_skill_instructions() -> Result<()> {
-    skip_if_wine_exec!(
-        Ok(()),
-        "skill paths require matching host and executor path conventions"
-    );
     skip_if_no_network!(Ok(()));
 
     let server = start_mock_server().await;
@@ -199,10 +194,6 @@ async fn user_turn_includes_skill_instructions() -> Result<()> {
 
 #[tokio::test(flavor = "current_thread")]
 async fn history_injection_skips_skill_discovery_after_initial_context() -> Result<()> {
-    skip_if_wine_exec!(
-        Ok(()),
-        "skill paths require matching host and executor path conventions"
-    );
     skip_if_no_network!(Ok(()));
 
     const SKILL_BODY: &str = "Instructions from the real demo skill.";
@@ -427,10 +418,6 @@ async fn user_turn_selects_symlinked_skill_by_advertised_discovery_path() -> Res
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn idle_user_turn_includes_skill_instructions_in_the_first_request() -> Result<()> {
-    skip_if_wine_exec!(
-        Ok(()),
-        "skill paths require matching host and executor path conventions"
-    );
     skip_if_no_network!(Ok(()));
 
     let server = start_mock_server().await;

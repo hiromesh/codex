@@ -30,7 +30,6 @@ use core_test_support::responses::mount_sse_sequence;
 use core_test_support::responses::sse;
 use core_test_support::responses::start_mock_server;
 use core_test_support::skip_if_no_network;
-use core_test_support::skip_if_wine_exec;
 use core_test_support::test_codex::test_codex;
 use core_test_support::wait_for_event;
 use pretty_assertions::assert_eq;
@@ -255,7 +254,6 @@ default_tools_approval_mode = "prompt"
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn codex_delegate_rejects_skill_mcp_dependency_installation_without_prompting() {
-    skip_if_wine_exec!("skill paths require matching host and executor path conventions");
     skip_if_no_network!();
 
     let server = start_mock_server().await;
@@ -344,7 +342,6 @@ async fn codex_delegate_rejects_skill_mcp_dependency_installation_without_prompt
 #[cfg_attr(windows, ignore = "no exec_command on Windows")]
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn guardian_delegate_rejects_escalation_requests_without_prompting() {
-    skip_if_wine_exec!("Guardian approval actions require host-native paths");
     skip_if_no_network!();
 
     let server = start_mock_server().await;

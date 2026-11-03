@@ -34,7 +34,6 @@ use core_test_support::responses::namespace_child_tool;
 use core_test_support::responses::sse;
 use core_test_support::responses::start_mock_server;
 use core_test_support::skip_if_sandbox;
-use core_test_support::skip_if_target_windows;
 use core_test_support::test_codex::TestCodex;
 use core_test_support::test_codex::executor_path_uri;
 use pretty_assertions::assert_eq;
@@ -329,10 +328,6 @@ async fn codex_apps_file_params_pass_uploaded_file_to_post_tool_use_hook() -> Re
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn codex_apps_file_params_retry_stream_under_restricted_read_policy() -> Result<()> {
-    skip_if_target_windows!(
-        Ok(()),
-        "Windows restricted-token sandbox cannot enforce deny-read policies"
-    );
     skip_if_sandbox!(Ok(()));
 
     let server = start_mock_server().await;
@@ -386,10 +381,6 @@ async fn codex_apps_file_params_retry_stream_under_restricted_read_policy() -> R
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn codex_apps_file_params_reject_denied_file_before_upload() -> Result<()> {
-    skip_if_target_windows!(
-        Ok(()),
-        "Windows restricted-token sandbox cannot enforce deny-read policies"
-    );
     skip_if_sandbox!(Ok(()));
 
     let server = start_mock_server().await;

@@ -43,8 +43,6 @@ use core_test_support::responses::sse_response;
 use core_test_support::responses::start_mock_server;
 use core_test_support::skip_if_no_network;
 use core_test_support::skip_if_sandbox;
-use core_test_support::skip_if_target_windows;
-use core_test_support::skip_if_wine_exec;
 use core_test_support::test_codex::TestCodex;
 use core_test_support::test_codex::TestCodexHarness;
 use core_test_support::test_codex::local_requests;
@@ -478,10 +476,6 @@ async fn request_permissions_tool_is_auto_denied_when_granular_request_permissio
 async fn request_permissions_auto_review_applies_guardian_decision(outcome: &str) -> Result<()> {
     skip_if_no_network!(Ok(()));
     skip_if_sandbox!(Ok(()));
-    skip_if_wine_exec!(
-        Ok(()),
-        "request_permissions requires a cwd native to the Codex host"
-    );
 
     let server = start_mock_server().await;
     let approval_policy = AskForApproval::OnRequest;
@@ -594,10 +588,6 @@ async fn request_permissions_auto_review_applies_guardian_decision(outcome: &str
 async fn interrupted_request_permissions_auto_review_aborts_guardian_review() -> Result<()> {
     skip_if_no_network!(Ok(()));
     skip_if_sandbox!(Ok(()));
-    skip_if_wine_exec!(
-        Ok(()),
-        "request_permissions requires a cwd native to the Codex host"
-    );
 
     let server = start_mock_server().await;
     let approval_policy = AskForApproval::OnRequest;
@@ -2036,10 +2026,6 @@ async fn denied_child_permissions_require_fresh_approval(
 ) -> Result<()> {
     skip_if_no_network!(Ok(()));
     skip_if_sandbox!(Ok(()));
-    skip_if_target_windows!(
-        Ok(()),
-        "this regression exercises POSIX split-policy enforcement; a disabled Windows sandbox can independently prompt for the command"
-    );
     let harness =
         TestCodexHarness::with_auto_env_builder(test_codex().with_config(move |config| {
             config.permissions.approval_policy = Constrained::allow_any(AskForApproval::OnRequest);

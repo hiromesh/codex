@@ -16,7 +16,6 @@ use codex_protocol::user_input::UserInput;
 use core_test_support::responses::*;
 use core_test_support::skip_if_no_network;
 use core_test_support::skip_if_sandbox;
-use core_test_support::skip_if_wine_exec;
 use core_test_support::streaming_sse::StreamingSseChunk;
 use core_test_support::streaming_sse::start_streaming_sse_server;
 use core_test_support::test_codex::test_codex;
@@ -49,10 +48,6 @@ enum Change {
 async fn guardian_refreshes_subagent_authorization(change: Change) -> Result<()> {
     skip_if_no_network!(Ok(()));
     skip_if_sandbox!(Ok(()));
-    skip_if_wine_exec!(
-        Ok(()),
-        "Guardian approval actions require host-native paths"
-    );
 
     let (attempts, updates, expected_status) = match change {
         Change::None => (1, 0, GuardianAssessmentStatus::Approved),

@@ -66,7 +66,6 @@ use core_test_support::responses::namespace_child_tool;
 use core_test_support::responses::sse;
 use core_test_support::responses::start_mock_server;
 use core_test_support::skip_if_no_network;
-use core_test_support::skip_if_wine_exec;
 use core_test_support::test_codex::test_codex;
 use core_test_support::wait_for_event;
 use core_test_support::wait_for_mcp_server;
@@ -1277,10 +1276,6 @@ async fn tool_search_returns_deferred_dynamic_tool_and_routes_follow_up_call() -
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn tool_search_indexes_only_enabled_non_app_mcp_tools() -> Result<()> {
-    skip_if_wine_exec!(
-        Ok(()),
-        "requires a Windows test_stdio_server in the Wine-exec environment"
-    );
     skip_if_no_network!(Ok(()));
 
     let server = start_mock_server().await;
@@ -1414,10 +1409,6 @@ async fn tool_search_indexes_only_enabled_non_app_mcp_tools() -> Result<()> {
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn tool_search_surfaced_mcp_tool_errors_are_returned_to_model() -> Result<()> {
-    skip_if_wine_exec!(
-        Ok(()),
-        "requires a Windows test_stdio_server in the Wine-exec environment"
-    );
     skip_if_no_network!(Ok(()));
 
     let server = start_mock_server().await;
@@ -1571,10 +1562,6 @@ async fn tool_search_surfaced_mcp_tool_errors_are_returned_to_model() -> Result<
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn tool_search_uses_non_app_mcp_server_instructions_as_namespace_description() -> Result<()> {
-    skip_if_wine_exec!(
-        Ok(()),
-        "requires a Windows test_stdio_server in the Wine-exec environment"
-    );
     skip_if_no_network!(Ok(()));
 
     let server = start_mock_server().await;

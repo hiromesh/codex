@@ -25,7 +25,6 @@ use codex_app_server_protocol::TurnStartParams;
 use codex_app_server_protocol::TurnStartResponse;
 use codex_app_server_protocol::UserInput as V2UserInput;
 use codex_config::types::AuthCredentialsStoreMode;
-use codex_features::Feature;
 use codex_utils_absolute_path::AbsolutePathBuf;
 use core_test_support::responses;
 use core_test_support::skip_if_remote;
@@ -1134,7 +1133,7 @@ async fn mount_image_edit_response(server: &MockServer) {
 }
 
 fn create_config_toml(codex_home: &Path, server_uri: &str) -> std::io::Result<()> {
-    let mut config = MockResponsesConfig::new(server_uri)
+    let config = MockResponsesConfig::new(server_uri)
         .with_model_provider("openai-custom")
         .with_provider_name("OpenAI")
         .with_provider_base_url(&format!("{server_uri}/api/codex"))

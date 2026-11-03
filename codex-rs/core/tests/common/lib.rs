@@ -41,8 +41,6 @@ pub(crate) use test_environment::TestEnvironment;
 pub use test_environment::TestTargetOs;
 pub use test_environment::is_remote_test_environment;
 #[doc(hidden)]
-pub use test_environment::is_wine_exec_test_environment;
-#[doc(hidden)]
 pub use test_environment::test_docker_container_name;
 pub(crate) use test_environment::test_environment;
 pub use test_environment::test_target_os;
@@ -88,39 +86,13 @@ pub fn assert_regex_match<'s>(pattern: &str, actual: &'s str) -> regex_lite::Cap
         .expect("regex did not match actual value")
 }
 
-pub fn test_path_buf_with_windows(unix_path: &str, windows_path: Option<&str>) -> PathBuf {
-    if false {
-        if let Some(windows) = windows_path {
-            PathBuf::from(windows)
-        } else {
-            let mut path = PathBuf::from(r"C:\");
-            path.extend(
-                unix_path
-                    .trim_start_matches('/')
-                    .split('/')
-                    .filter(|segment| !segment.is_empty()),
-            );
-            path
-        }
-    } else {
-        PathBuf::from(unix_path)
-    }
-}
-
 pub fn test_path_buf(unix_path: &str) -> PathBuf {
-    test_path_buf_with_windows(unix_path, /*windows_path*/ None)
-}
-
-pub fn test_absolute_path_with_windows(
-    unix_path: &str,
-    windows_path: Option<&str>,
-) -> AbsolutePathBuf {
-    AbsolutePathBuf::from_absolute_path(test_path_buf_with_windows(unix_path, windows_path))
-        .expect("test path should be absolute")
+    PathBuf::from(unix_path)
 }
 
 pub fn test_absolute_path(unix_path: &str) -> AbsolutePathBuf {
-    test_absolute_path_with_windows(unix_path, /*windows_path*/ None)
+    AbsolutePathBuf::from_absolute_path(test_path_buf(unix_path))
+        .expect("test path should be absolute")
 }
 
 #[cfg(unix)]
@@ -140,7 +112,7 @@ impl TempDirExt for TempDir {
 }
 
 pub fn test_tmp_path() -> AbsolutePathBuf {
-    test_absolute_path_with_windows("/tmp", Some(r"C:\Users\codex\AppData\Local\Temp"))
+    test_absolute_path("/tmp")
 }
 
 pub fn test_tmp_path_buf() -> PathBuf {
@@ -675,44 +647,6 @@ macro_rules! skip_if_no_remote_env {
 }
 
 #[macro_export]
-macro_rules! skip_if_wine_exec {
-    ($reason:expr $(,)?) => {{
-        $crate::skip_if_test_condition!(
-            $crate::is_wine_exec_test_environment(),
-            "the Wine-exec test environment",
-            $reason,
-        );
-    }};
-    ($return_value:expr, $reason:expr $(,)?) => {{
-        $crate::skip_if_test_condition!(
-            $return_value,
-            $crate::is_wine_exec_test_environment(),
-            "the Wine-exec test environment",
-            $reason,
-        );
-    }};
-}
-
-#[macro_export]
-macro_rules! skip_if_target_windows {
-    ($reason:expr $(,)?) => {{
-        $crate::skip_if_test_condition!(
-            $crate::test_target_os() == $crate::TestTargetOs::Windows,
-            "a Windows target environment",
-            $reason,
-        );
-    }};
-    ($return_value:expr, $reason:expr $(,)?) => {{
-        $crate::skip_if_test_condition!(
-            $return_value,
-            $crate::test_target_os() == $crate::TestTargetOs::Windows,
-            "a Windows target environment",
-            $reason,
-        );
-    }};
-}
-
-#[macro_export]
 macro_rules! codex_linux_sandbox_exe_or_skip {
     () => {{
         #[cfg(target_os = "linux")]
@@ -748,12 +682,3 @@ macro_rules! codex_linux_sandbox_exe_or_skip {
     }};
 }
 
-#[macro_export]
-macro_rules! skip_if_host_windows {
-    ($return_value:expr $(,)?) => {{
-        if false {
-            println!("Skipping test because it cannot execute on Windows.");
-            return $return_value;
-        }
-    }};
-}

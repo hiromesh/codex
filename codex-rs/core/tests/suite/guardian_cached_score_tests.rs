@@ -36,7 +36,6 @@ use core_test_support::responses::ev_function_call;
 use core_test_support::responses::ev_response_created;
 use core_test_support::responses::sse;
 use core_test_support::skip_if_no_network;
-use core_test_support::skip_if_target_windows;
 use core_test_support::streaming_sse::StreamingSseChunk;
 use core_test_support::streaming_sse::start_streaming_sse_server;
 use core_test_support::test_codex::test_codex;
@@ -392,7 +391,6 @@ async fn serving_assessment_replaces_async_scoring(
     expected_reviews: u64,
 ) -> Result<()> {
     skip_if_no_network!(Ok(()));
-    skip_if_target_windows!(Ok(()), "exec_command requires a POSIX executor");
     core_test_support::skip_if_test_condition!(
         Ok(()),
         false

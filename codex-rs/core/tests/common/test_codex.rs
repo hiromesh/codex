@@ -171,18 +171,8 @@ pub fn environment_config_for_selection(
     }
 }
 
-/// Converts the host-shaped /C:/... cwd projection used by Wine tests back
-/// into the selected executor's Windows URI.
 pub fn executor_path_uri(path: impl AsRef<Path>) -> Result<PathUri> {
     let path = path.as_ref();
-    if matches!(test_environment(), TestEnvironment::WineExec)
-        && let Some(path) = path.to_str()
-        && matches!(path.as_bytes(), [b'/', drive, b':', b'/' | b'\\', ..] if drive.is_ascii_alphabetic())
-    {
-        return LegacyAppPathString::from_string(path[1..].to_string())
-            .to_path_uri(PathConvention::Windows)
-            .map_err(Into::into);
-    }
     Ok(PathUri::from_host_native_path(path)?)
 }
 
@@ -280,7 +270,7 @@ impl Drop for TestEnv {
 
 pub async fn test_env() -> Result<TestEnv> {
     match test_environment() {
-        remote_env @ (TestEnvironment::Docker { .. } | TestEnvironment::WineExec) => {
+        remote_env @ TestEnvironment::Docker { .. } => {
             let websocket_url = remote_exec_server_url()?;
             let environment =
                 codex_exec_server::Environment::create_for_tests(Some(websocket_url.clone()))?;
@@ -306,20 +296,7 @@ pub async fn test_env() -> Result<TestEnv> {
                 workspace_roots: vec![cwd_uri.clone()],
                 config: EnvironmentConfigState::FromThread,
             };
-            let cwd = if remote_env == TestEnvironment::WineExec {
-                // TODO(anp): Convert `Config::cwd` to `LegacyAppPathString` and remove this
-                // compatibility projection.
-                // `Config::cwd` still requires `AbsolutePathBuf`. Preserve the test harness's
-                // Linux-absolute `/C:/...` compatibility spelling so converting it back to a
-                // `PathUri` recovers the remote Windows convention. Production conversions stay
-                // strict: `PathUri::to_abs_path` intentionally rejects foreign paths.
-                let path = cwd_uri.to_url().to_file_path().map_err(|()| {
-                    anyhow!("remote test cwd URI cannot be projected onto the host: {cwd_uri}")
-                })?;
-                AbsolutePathBuf::try_from(path)?
-            } else {
-                cwd_uri.to_abs_path()?
-            };
+            let cwd = cwd_uri.to_abs_path()?;
             Ok(TestEnv {
                 environment,
                 exec_server_url: Some(websocket_url),
@@ -594,14 +571,6 @@ impl TestCodexBuilder {
         self
     }
 
-    pub fn with_windows_cmd_shell(self) -> Self {
-        if false {
-            self.with_user_shell(get_shell_by_model_provided_path(&PathBuf::from("cmd.exe")))
-        } else {
-            self
-        }
-    }
-
     pub async fn build(&mut self, server: &wiremock::MockServer) -> anyhow::Result<TestCodex> {
         let home = match self.home.clone() {
             Some(home) => home,
@@ -619,8 +588,8 @@ impl TestCodexBuilder {
     /// Builds a test runtime using the execution environment selected by the test process.
     ///
     /// With no remote test configuration, or with `CODEX_TEST_ENVIRONMENT=local`, this uses a
-    /// temporary local environment just like [`Self::build`]. `CODEX_TEST_ENVIRONMENT=docker` or
-    /// `CODEX_TEST_ENVIRONMENT=wine-exec` selects the remote exec server configured by
+    /// temporary local environment just like [`Self::build`]. `CODEX_TEST_ENVIRONMENT=docker`
+    /// selects the remote exec server configured by
     /// `CODEX_TEST_REMOTE_EXEC_SERVER_URL`; the legacy `CODEX_TEST_REMOTE_ENV` Docker-container
     /// configuration does the same. Only the automatically selected environment is registered.
     /// Use [`Self::build_with_remote_and_local_env`] when a remote test also needs the local

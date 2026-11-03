@@ -34,7 +34,6 @@ use core_test_support::apps_test_server::recorded_apps_tool_call_by_call_id;
 use core_test_support::hooks::trust_discovered_hooks;
 use core_test_support::responses;
 use core_test_support::skip_if_no_network;
-use core_test_support::skip_if_wine_exec;
 use core_test_support::test_codex::test_codex;
 use core_test_support::test_codex::test_env;
 use core_test_support::wait_for_event;
@@ -482,7 +481,6 @@ async fn mcp_result_processing_precedes_completion(
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn tool_start_receives_frozen_host_plugin_root() -> Result<()> {
     skip_if_no_network!(Ok(()));
-    skip_if_wine_exec!(Ok(()), "requires a native test_stdio_server");
 
     let server = responses::start_mock_server().await;
     let codex_home = Arc::new(tempfile::tempdir()?);
@@ -548,7 +546,6 @@ async fn tool_start_receives_frozen_host_plugin_root() -> Result<()> {
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn tool_start_receives_rewritten_payload_and_post_hook_history() -> Result<()> {
     skip_if_no_network!(Ok(()));
-    skip_if_wine_exec!(Ok(()), "command hooks require a host-native executor");
 
     let server = responses::start_mock_server().await;
     let call_id = "rewritten-plan-call";
@@ -628,7 +625,6 @@ async fn tool_start_receives_rewritten_payload_and_post_hook_history() -> Result
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn tool_start_is_not_called_when_pre_tool_hook_prevents_execution() -> Result<()> {
     skip_if_no_network!(Ok(()));
-    skip_if_wine_exec!(Ok(()), "command hooks require a host-native executor");
 
     for (tool_name, matcher, arguments, hook_output) in [
         (

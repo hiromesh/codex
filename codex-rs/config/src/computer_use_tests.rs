@@ -11,15 +11,6 @@ default_app_access = "deny"
 
 [computer_use.macos.bundle_ids]
 "com.apple.Safari" = "allow"
-
-[computer_use.windows.aumids]
-"Microsoft.Paint_8wekyb3d8bbwe!App" = "deny"
-
-[[computer_use.windows.exes]]
-publisher_name = "CN=Google LLC"
-product_name = "Google Chrome"
-binary_name = "chrome.exe"
-access = "allow"
 "#,
     )
     .expect("computer use config should deserialize");
@@ -31,18 +22,6 @@ access = "allow"
                 "com.apple.Safari".to_string(),
                 AllowDenyRequirementToml::Allow,
             )])),
-        }),
-        windows: Some(ComputerUseWindowsConfigToml {
-            aumids: Some(BTreeMap::from([(
-                "Microsoft.Paint_8wekyb3d8bbwe!App".to_string(),
-                AllowDenyRequirementToml::Deny,
-            )])),
-            exes: Some(vec![ComputerUseWindowsExeConfigToml {
-                publisher_name: "CN=Google LLC".to_string(),
-                product_name: "Google Chrome".to_string(),
-                binary_name: Some("chrome.exe".to_string()),
-                access: AllowDenyRequirementToml::Allow,
-            }]),
         }),
     };
     assert_eq!(config.computer_use, Some(expected.clone()));

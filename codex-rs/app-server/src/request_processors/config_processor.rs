@@ -19,8 +19,6 @@ use codex_app_server_protocol::CliAuthCredentialsStoreMode;
 use codex_app_server_protocol::ClientResponsePayload;
 use codex_app_server_protocol::ComputerUseMacosRequirements;
 use codex_app_server_protocol::ComputerUseRequirements;
-use codex_app_server_protocol::ComputerUseWindowsExeRequirement;
-use codex_app_server_protocol::ComputerUseWindowsRequirements;
 use codex_app_server_protocol::ConfigBatchWriteParams;
 use codex_app_server_protocol::ConfigReadParams;
 use codex_app_server_protocol::ConfigReadResponse;
@@ -624,28 +622,6 @@ fn map_computer_use_requirements_to_api(
                         .collect()
                 }),
             }),
-        windows: computer_use
-            .windows
-            .map(|windows| ComputerUseWindowsRequirements {
-                aumids: windows.aumids.map(|aumids| {
-                    aumids
-                        .into_iter()
-                        .map(|(aumid, requirement)| {
-                            (aumid, map_allow_deny_requirement_to_api(requirement))
-                        })
-                        .collect()
-                }),
-                exes: windows.exes.map(|exes| {
-                    exes.into_iter()
-                        .map(|exe| ComputerUseWindowsExeRequirement {
-                            publisher_name: exe.publisher_name,
-                            product_name: exe.product_name,
-                            binary_name: exe.binary_name,
-                            access: map_allow_deny_requirement_to_api(exe.access),
-                        })
-                        .collect()
-                }),
-            }),
     }
 }
 
@@ -934,8 +910,6 @@ mod tests {
     use codex_app_server_protocol::BrowserUseRequirements;
     use codex_app_server_protocol::ComputerUseMacosRequirements;
     use codex_app_server_protocol::ComputerUseRequirements;
-    use codex_app_server_protocol::ComputerUseWindowsExeRequirement;
-    use codex_app_server_protocol::ComputerUseWindowsRequirements;
     use codex_app_server_protocol::FeedbackRequirements;
         use codex_config::AllowDenyRequirementToml;
     use codex_config::AutoReviewRequirementsToml;
@@ -945,8 +919,6 @@ mod tests {
     use codex_config::CloudConfigBundleLoader;
     use codex_config::ComputerUseMacosRequirementsToml;
     use codex_config::ComputerUseRequirementsToml;
-    use codex_config::ComputerUseWindowsExeRequirementToml;
-    use codex_config::ComputerUseWindowsRequirementsToml;
     use codex_config::ConfigRequirementsToml;
     use codex_config::LoaderOverrides;
     use codex_config::ModelsRequirementsToml;
@@ -1183,18 +1155,6 @@ client_id = "mcp-client"
                         AllowDenyRequirementToml::Allow,
                     )])),
                 }),
-                windows: Some(ComputerUseWindowsRequirementsToml {
-                    aumids: Some(BTreeMap::from([(
-                        "Microsoft.Paint_8wekyb3d8bbwe!App".to_string(),
-                        AllowDenyRequirementToml::Allow,
-                    )])),
-                    exes: Some(vec![ComputerUseWindowsExeRequirementToml {
-                        publisher_name: "CN=Google LLC".to_string(),
-                        product_name: "Google Chrome".to_string(),
-                        binary_name: Some("chrome.exe".to_string()),
-                        access: AllowDenyRequirementToml::Deny,
-                    }]),
-                }),
             }),
             ..ConfigRequirementsToml::default()
         });
@@ -1247,18 +1207,6 @@ client_id = "mcp-client"
                         "com.apple.Safari".to_string(),
                         AllowDenyRequirement::Allow,
                     )])),
-                }),
-                windows: Some(ComputerUseWindowsRequirements {
-                    aumids: Some(BTreeMap::from([(
-                        "Microsoft.Paint_8wekyb3d8bbwe!App".to_string(),
-                        AllowDenyRequirement::Allow,
-                    )])),
-                    exes: Some(vec![ComputerUseWindowsExeRequirement {
-                        publisher_name: "CN=Google LLC".to_string(),
-                        product_name: "Google Chrome".to_string(),
-                        binary_name: Some("chrome.exe".to_string()),
-                        access: AllowDenyRequirement::Deny,
-                    }]),
                 }),
             })
         );

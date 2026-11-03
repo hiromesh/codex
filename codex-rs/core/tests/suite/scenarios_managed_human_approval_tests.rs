@@ -21,7 +21,6 @@ use tokio_util::sync::CancellationToken;
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn managed_checkpoint_requires_fresh_human_decisions() -> Result<()> {
     skip_if_no_network!(Ok(()));
-    skip_if_wine_exec!(Ok(()), "command approval requires host-native paths");
     let server = start_mock_server().await;
     let builder = test_codex();
     let builder = builder.with_pre_build_hook(|home| {

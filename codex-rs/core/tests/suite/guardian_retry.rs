@@ -14,7 +14,6 @@ use codex_protocol::protocol::Op;
 use codex_protocol::protocol::SandboxPolicy;
 use core_test_support::responses::*;
 use core_test_support::skip_if_no_network;
-use core_test_support::skip_if_wine_exec;
 use core_test_support::streaming_sse::StreamingSseChunk;
 use core_test_support::streaming_sse::start_streaming_sse_server;
 use core_test_support::test_codex::test_codex;
@@ -41,10 +40,6 @@ async fn interrupted_guardian_review_preserves_evidence_once(
     timeout_ms: Option<u32>,
 ) -> Result<()> {
     skip_if_no_network!(Ok(()));
-    skip_if_wine_exec!(
-        Ok(()),
-        "Guardian approval actions require host-native paths"
-    );
     let command = |id: &str| {
         sse(vec![
             ev_function_call(
@@ -242,10 +237,6 @@ async fn interrupted_guardian_review_preserves_evidence_once(
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn guardian_retry_executes_only_after_a_completed_approval() -> Result<()> {
     skip_if_no_network!(Ok(()));
-    skip_if_wine_exec!(
-        Ok(()),
-        "Guardian approval actions require host-native paths"
-    );
     let server = start_mock_server().await;
     let mut builder = test_codex().with_config(|config| {
         config.permissions.approval_policy = Constrained::allow_any(AskForApproval::OnRequest);
@@ -372,10 +363,6 @@ async fn guardian_retry_executes_only_after_a_completed_approval() -> Result<()>
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn guardian_stale_approval_replaces_review_and_preserves_earlier_context() -> Result<()> {
     skip_if_no_network!(Ok(()));
-    skip_if_wine_exec!(
-        Ok(()),
-        "Guardian approval actions require host-native paths"
-    );
     let verdict = |id, rationale| {
         sse(vec![
             ev_assistant_message(

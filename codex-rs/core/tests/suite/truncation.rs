@@ -25,7 +25,6 @@ use core_test_support::responses::mount_sse_once;
 use core_test_support::responses::sse;
 use core_test_support::responses::start_mock_server;
 use core_test_support::skip_if_no_network;
-use core_test_support::skip_if_wine_exec;
 use core_test_support::stdio_server_bin;
 use core_test_support::test_codex::TestCodex;
 use core_test_support::test_codex::TestCodexBuilder;
@@ -824,7 +823,6 @@ async fn mcp_tool_output_limit_preserves_output_that_fits(
     message_bytes: usize,
 ) -> Result<()> {
     skip_if_no_network!(Ok(()));
-    skip_if_wine_exec!(Ok(()), "requires a Windows test_stdio_server binary");
 
     let server = start_mock_server().await;
     let builder = test_codex().with_config(|config| config.tool_output_token_limit = Some(50));
@@ -838,7 +836,6 @@ async fn mcp_tool_output_limit_preserves_output_that_fits(
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn mcp_tool_output_limit_truncates_oversized_output() -> Result<()> {
     skip_if_no_network!(Ok(()));
-    skip_if_wine_exec!(Ok(()), "requires a Windows test_stdio_server binary");
 
     let server = start_mock_server().await;
     let builder = test_codex().with_config(|config| config.tool_output_token_limit = Some(50));
@@ -859,7 +856,6 @@ async fn mcp_tool_output_limit_truncates_oversized_output() -> Result<()> {
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn mcp_tool_output_limit_applies_to_hook_feedback() -> Result<()> {
     skip_if_no_network!(Ok(()));
-    skip_if_wine_exec!(Ok(()), "requires a Windows test_stdio_server binary");
 
     let server = start_mock_server().await;
     let builder = test_codex()
@@ -893,7 +889,6 @@ async fn mcp_tool_output_limit_applies_to_hook_feedback() -> Result<()> {
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn mcp_tool_output_limit_survives_resume(output_token_limit: Option<usize>) -> Result<()> {
     skip_if_no_network!(Ok(()));
-    skip_if_wine_exec!(Ok(()), "requires a Windows test_stdio_server binary");
 
     let server = start_mock_server().await;
     let builder = test_codex().with_config(|config| config.tool_output_token_limit = Some(50_000));

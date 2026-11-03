@@ -186,7 +186,6 @@ unified_exec_zsh_fork = true
         core_test_support::TestTargetOs::Linux | core_test_support::TestTargetOs::MacOs => {
             "/bin/sh"
         }
-        core_test_support::TestTargetOs::Windows => "powershell",
     };
     let arguments = serde_json::json!({
         "cmd": "echo migrated-shell",

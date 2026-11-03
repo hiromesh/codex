@@ -2451,8 +2451,6 @@ mod tests {
     use crate::BrowserUseAccessApprovalLifetimeToml;
     use crate::BrowserUseOriginPolicyToml;
     use crate::ComputerUseMacosRequirementsToml;
-    use crate::ComputerUseWindowsExeRequirementToml;
-    use crate::ComputerUseWindowsRequirementsToml;
     use crate::McpServerCommandMatcher;
     use crate::McpServerIdentity;
     use crate::McpServerValueMatcher;
@@ -2948,15 +2946,6 @@ tracestate = { managed = { tenant = "enterprise", region = "us" }, other = { kee
 
                 [computer_use.macos.bundle_ids]
                 "com.apple.Safari" = "allow"
-
-                [computer_use.windows.aumids]
-                "Microsoft.Paint_8wekyb3d8bbwe!App" = "allow"
-
-                [[computer_use.windows.exes]]
-                publisher_name = "CN=Google LLC, O=Google LLC, L=Mountain View, S=California, C=US"
-                product_name = "Google Chrome"
-                binary_name = "chrome.exe"
-                access = "deny"
             "#,
         )?;
 
@@ -3005,20 +2994,6 @@ tracestate = { managed = { tenant = "enterprise", region = "us" }, other = { kee
                         "com.apple.Safari".to_string(),
                         AllowDenyRequirementToml::Allow,
                     )])),
-                }),
-                windows: Some(ComputerUseWindowsRequirementsToml {
-                    aumids: Some(BTreeMap::from([(
-                        "Microsoft.Paint_8wekyb3d8bbwe!App".to_string(),
-                        AllowDenyRequirementToml::Allow,
-                    )])),
-                    exes: Some(vec![ComputerUseWindowsExeRequirementToml {
-                        publisher_name:
-                            "CN=Google LLC, O=Google LLC, L=Mountain View, S=California, C=US"
-                                .to_string(),
-                        product_name: "Google Chrome".to_string(),
-                        binary_name: Some("chrome.exe".to_string()),
-                        access: AllowDenyRequirementToml::Deny,
-                    }]),
                 }),
             })
         );
@@ -3108,14 +3083,6 @@ tracestate = { managed = { tenant = "enterprise", region = "us" }, other = { kee
             (
                 "macOS bundle identifier",
                 "[computer_use.macos.bundle_ids]\n\"com.example.App\" = \"deny\"",
-            ),
-            (
-                "Windows AUMID",
-                "[computer_use.windows.aumids]\n\"Example.App_123!Main\" = \"deny\"",
-            ),
-            (
-                "Windows executable",
-                "[[computer_use.windows.exes]]\npublisher_name = \"CN=Example Corp\"\nproduct_name = \"Example App\"\naccess = \"deny\"",
             ),
         ] {
             let requirements: ConfigRequirementsToml = from_str(requirements_toml)?;
@@ -3211,7 +3178,6 @@ tracestate = { managed = { tenant = "enterprise", region = "us" }, other = { kee
             allow_persistent_approval: Some(false),
             default_app_access: None,
             macos: None,
-            windows: None,
         };
         let auto_review = AutoReviewRequirementsToml {
             required_on_models: Some(vec!["managed-model".to_string()]),

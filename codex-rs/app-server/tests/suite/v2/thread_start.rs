@@ -1537,15 +1537,13 @@ model_reasoning_effort = "high"
         .with_codex_home(codex_home.path())
         .build_initialized()
         .await?;
-    let config_before = std::fs::read_to_string(codex_home.path().join("config.toml"))?;
 
-    let first_response = mcp
-        .start_thread(ThreadStartParams {
-            cwd: Some(workspace.path().display().to_string()),
-            sandbox: Some(SandboxMode::WorkspaceWrite),
-            ..Default::default()
-        })
-        .await?;
+    mcp.start_thread(ThreadStartParams {
+        cwd: Some(workspace.path().display().to_string()),
+        sandbox: Some(SandboxMode::WorkspaceWrite),
+        ..Default::default()
+    })
+    .await?;
 
     let ThreadStartResponse {
         approval_policy,
@@ -1668,15 +1666,13 @@ async fn thread_start_with_nested_git_cwd_respects_effective_permissions_for_pro
         .with_codex_home(codex_home.path())
         .build_initialized()
         .await?;
-    let config_before = std::fs::read_to_string(codex_home.path().join("config.toml"))?;
 
-    let ThreadStartResponse { sandbox, .. } = mcp
-        .start_thread(ThreadStartParams {
-            cwd: Some(nested.display().to_string()),
-            sandbox: Some(SandboxMode::WorkspaceWrite),
-            ..Default::default()
-        })
-        .await?;
+    mcp.start_thread(ThreadStartParams {
+        cwd: Some(nested.display().to_string()),
+        sandbox: Some(SandboxMode::WorkspaceWrite),
+        ..Default::default()
+    })
+    .await?;
 
     let config_toml = std::fs::read_to_string(codex_home.path().join("config.toml"))?;
     let nested_abs = nested.abs();

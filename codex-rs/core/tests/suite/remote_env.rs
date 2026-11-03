@@ -109,7 +109,6 @@ use core_test_support::responses::sse;
 use core_test_support::responses::start_mock_server;
 use core_test_support::skip_if_no_network;
 use core_test_support::skip_if_no_remote_env;
-use core_test_support::skip_if_target_windows;
 use core_test_support::startup::expect_startup;
 use core_test_support::submit_thread_settings;
 use core_test_support::test_codex::TestCodex;
@@ -377,13 +376,6 @@ async fn remote_test_env_exposes_target_shell_and_exec_guidance_to_model() -> Re
         .iter()
         .find(|tool| tool["name"] == "exec_command")
         .context("exec_command should be available")?;
-    let has_windows_guidance = exec_command["description"]
-        .as_str()
-        .is_some_and(|description| description.contains("Windows safety rules:"));
-    assert_eq!(
-        has_windows_guidance,
-        matches!(test_target_os(), TestTargetOs::Windows)
-    );
     let environment_context = request
         .message_input_texts("user")
         .into_iter()
@@ -393,7 +385,6 @@ async fn remote_test_env_exposes_target_shell_and_exec_guidance_to_model() -> Re
     // target-native spelling instead of the Linux orchestrator's `/C:/...` representation.
     let expected_shell = match test_target_os() {
         TestTargetOs::Linux => "<shell>bash</shell>",
-        TestTargetOs::Windows => "<shell>powershell</shell>",
         TestTargetOs::MacOs => unreachable!("remote test targets do not run macOS"),
     };
     assert_eq!(
@@ -417,10 +408,6 @@ async fn approved_remote_shell_runs_in_remote_cwd() -> Result<()> {
         TestTargetOs::Linux => (
             "bash",
             r#"case "$PWD" in /tmp/codex-core-test-cwd-*) ;; *) echo "unexpected cwd: $PWD" >&2; exit 1 ;; esac"#,
-        ),
-        TestTargetOs::Windows => (
-            "powershell",
-            r#"$cwd = (Get-Location).Path; if ($cwd -notlike 'C:\codex-core-test-cwd-*') { Write-Error "unexpected cwd: $cwd"; exit 1 }"#,
         ),
         TestTargetOs::MacOs => unreachable!("remote test targets do not run macOS"),
     };
@@ -511,10 +498,6 @@ async fn environment_permissions_follow_configuration_ownership() -> Result<()> 
     const OWNER_CONFIG_CALL_ID: &str = "owner-config-permissions";
     const FILE_NAME: &str = "attachment-read-only-marker.txt";
 
-    skip_if_target_windows!(
-        Ok(()),
-        "Windows sandbox enforcement is covered by the platform-specific suite"
-    );
 
     let server = start_mock_server().await;
     let mut builder = test_codex().with_config(|config| {
@@ -545,12 +528,6 @@ async fn environment_permissions_follow_configuration_ownership() -> Result<()> 
             "zsh",
             format!(
                 "if printf blocked > {FILE_NAME}; then echo WRITE_SUCCEEDED; else echo WRITE_DENIED; fi"
-            ),
-        ),
-        TestTargetOs::Windows => (
-            "powershell",
-            format!(
-                "try {{ Set-Content -Path '{FILE_NAME}' -Value blocked -ErrorAction Stop; Write-Output WRITE_SUCCEEDED }} catch {{ Write-Output WRITE_DENIED }}"
             ),
         ),
     };
@@ -3187,10 +3164,6 @@ async fn deferred_executor_guardian_uses_newly_ready_step_environment(
     const DENIAL_RATIONALE: &str = "The remote environment policy denies this action.";
 
     if tool == "mcp_elicitation" {
-        core_test_support::skip_if_wine_exec!(
-            Ok(()),
-            "the MCP fixture requires a host Python interpreter"
-        );
     }
     let listener = TcpListener::bind("127.0.0.1:0").await?;
     let server = start_mock_server().await;
@@ -3745,7 +3718,6 @@ async fn exec_command_routing_output(
 async fn exec_command_routes_to_selected_remote_environment() -> Result<()> {
     skip_if_no_network!(Ok(()));
     // TODO(anp): Remove after remote path fixtures use target-native paths.
-    skip_if_target_windows!(Ok(()), "requires the Docker-backed POSIX executor");
     skip_if_no_remote_env!(Ok(()));
 
     let server = start_mock_server().await;
@@ -3827,10 +3799,6 @@ async fn exec_command_routes_to_selected_remote_environment() -> Result<()> {
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn remote_exec_materializes_target_roots_before_sandbox_selection() -> Result<()> {
     skip_if_no_network!(Ok(()));
-    skip_if_target_windows!(
-        Ok(()),
-        "sandboxed process launch is not supported by the exec-server Windows backend"
-    );
     skip_if_no_remote_env!(Ok(()));
 
     const SECRET: &str = "target-root-secret";
@@ -3989,7 +3957,6 @@ async fn remote_exec_materializes_target_roots_before_sandbox_selection() -> Res
 async fn remote_request_permissions_grant_unblocks_later_remote_exec() -> Result<()> {
     skip_if_no_network!(Ok(()));
     // TODO(anp): Remove after remote path fixtures use target-native paths.
-    skip_if_target_windows!(Ok(()), "requires the Docker-backed POSIX executor");
     skip_if_no_remote_env!(Ok(()));
 
     let server = start_mock_server().await;
@@ -4206,7 +4173,6 @@ async fn remote_request_permissions_grant_unblocks_later_remote_exec() -> Result
 async fn apply_patch_freeform_routes_to_selected_remote_environment() -> Result<()> {
     skip_if_no_network!(Ok(()));
     // TODO(anp): Remove after remote path fixtures use target-native paths.
-    skip_if_target_windows!(Ok(()), "requires the Docker-backed POSIX executor");
     skip_if_no_remote_env!(Ok(()));
 
     let server = start_mock_server().await;
@@ -4300,7 +4266,6 @@ async fn apply_patch_freeform_routes_to_selected_remote_environment() -> Result<
 async fn apply_patch_approvals_are_remembered_per_environment() -> Result<()> {
     skip_if_no_network!(Ok(()));
     // TODO(anp): Remove after remote path fixtures use target-native paths.
-    skip_if_target_windows!(Ok(()), "requires the Docker-backed POSIX executor");
     skip_if_no_remote_env!(Ok(()));
 
     let server = start_mock_server().await;
@@ -4498,7 +4463,6 @@ async fn apply_patch_intercepted_exec_command_routes_to_selected_remote_environm
 {
     skip_if_no_network!(Ok(()));
     // TODO(anp): Remove after remote path fixtures use target-native paths.
-    skip_if_target_windows!(Ok(()), "requires the Docker-backed POSIX executor");
     skip_if_no_remote_env!(Ok(()));
 
     let server = start_mock_server().await;
@@ -4600,7 +4564,6 @@ async fn apply_patch_intercepted_exec_command_routes_to_selected_remote_environm
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn remote_test_env_sandboxed_read_allows_readable_root() -> Result<()> {
     // TODO(anp): Remove after remote sandbox fixtures use target-native paths.
-    skip_if_target_windows!(Ok(()), "requires the Docker-backed POSIX executor");
     skip_if_no_network!(Ok(()));
     skip_if_no_remote_env!(Ok(()));
 
@@ -4653,7 +4616,6 @@ async fn remote_test_env_sandboxed_read_allows_readable_root() -> Result<()> {
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn remote_test_env_sandboxed_read_rejects_symlink_parent_dotdot_escape() -> Result<()> {
-    skip_if_target_windows!(Ok(()), "tests POSIX symlink and parent traversal semantics");
     skip_if_no_network!(Ok(()));
     skip_if_no_remote_env!(Ok(()));
 
@@ -4690,7 +4652,6 @@ async fn remote_test_env_sandboxed_read_rejects_symlink_parent_dotdot_escape() -
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn remote_test_env_remove_removes_symlink_not_target() -> Result<()> {
-    skip_if_target_windows!(Ok(()), "tests POSIX symlink removal semantics");
     skip_if_no_network!(Ok(()));
     skip_if_no_remote_env!(Ok(()));
 
@@ -4766,7 +4727,6 @@ async fn remote_test_env_remove_removes_symlink_not_target() -> Result<()> {
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn remote_test_env_copy_preserves_symlink_source() -> Result<()> {
-    skip_if_target_windows!(Ok(()), "tests POSIX symlink copy semantics");
     skip_if_no_network!(Ok(()));
     skip_if_no_remote_env!(Ok(()));
 

@@ -5499,7 +5499,7 @@ impl ThreadRequestProcessor {
         };
         let history_cwd = Some(source_thread.cwd.clone());
 
-        let mut cli_overrides = cli_overrides.unwrap_or_default();
+        let cli_overrides = cli_overrides.unwrap_or_default();
         let request_overrides = if cli_overrides.is_empty() {
             None
         } else {

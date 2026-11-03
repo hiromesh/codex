@@ -216,7 +216,6 @@ async fn critical_path_follows_runtime_admission(
 
 #[tokio::test]
 async fn standalone_user_shell_omits_uncaptured_path() -> anyhow::Result<()> {
-    core_test_support::skip_if_target_windows!(Ok(()), "Unix shell workload");
     let server = responses::start_mock_server().await;
     let test = test_codex()
         .with_config(|config| {

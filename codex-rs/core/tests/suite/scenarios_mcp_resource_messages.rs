@@ -5,7 +5,6 @@ use super::super::rmcp_client::remote_aware_stdio_server_bin;
 use anyhow::Result;
 use core_test_support::responses;
 use core_test_support::skip_if_no_network;
-use core_test_support::skip_if_wine_exec;
 use core_test_support::test_codex::test_codex;
 use core_test_support::wait_for_mcp_server;
 use pretty_assertions::assert_eq;
@@ -15,7 +14,6 @@ use std::collections::HashMap;
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn mcp_resource_messages() -> Result<()> {
     skip_if_no_network!(Ok(()));
-    skip_if_wine_exec!(Ok(()), "requires a Windows test_stdio_server binary");
     let server = responses::start_mock_server().await;
     let command = remote_aware_stdio_server_bin()?;
     let calls = [

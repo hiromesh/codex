@@ -89,7 +89,6 @@ use core_test_support::responses::mount_sse_sequence;
 use core_test_support::responses::sse;
 use core_test_support::responses::start_mock_server;
 use core_test_support::skip_if_no_network;
-use core_test_support::skip_if_wine_exec;
 use core_test_support::stdio_server_bin;
 use core_test_support::streaming_sse::StreamingSseChunk;
 use core_test_support::streaming_sse::start_streaming_sse_server;
@@ -684,7 +683,6 @@ async fn unavailable_images_are_rechecked_without_rewriting_history() -> Result<
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn mcp_tool_discovery_in_same_turn() -> Result<()> {
     skip_if_no_network!(Ok(()));
-    skip_if_wine_exec!(Ok(()), "requires a Windows test_stdio_server binary");
     let requests = super::rmcp_client::mcp_tool_discovery_scenario(
         /*invalidation*/ None, /*enabled*/ true,
     )
@@ -2171,7 +2169,6 @@ async fn astra_continues_after_a_stream_is_interrupted() -> Result<()> {
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn subagent_browser_auth_resolves_user_prompt() -> Result<()> {
     skip_if_no_network!(Ok(()));
-    skip_if_wine_exec!(Ok(()), "the MCP fixture requires a host Python interpreter");
     use super::mcp_subagent_elicitation::Caller;
     use super::mcp_subagent_elicitation::RequestKind;
     use super::mcp_subagent_elicitation::mcp_server_elicitation_scenario;
@@ -2395,10 +2392,6 @@ async fn catalog_permission_paths_follow_selected_model(
 ) -> Result<()> {
     skip_if_no_network!(Ok(()));
     if matches!(scenario, PermissionPathScenario::DeniedReads) {
-        core_test_support::skip_if_target_windows!(
-            Ok(()),
-            "Windows restricted-token sandbox cannot enforce deny-read policies"
-        );
     }
     let requests =
         super::permissions_messages::catalog_permission_paths_model_change_requests(scenario)

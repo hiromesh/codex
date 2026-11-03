@@ -923,9 +923,6 @@ default_app_access = "allow"
 
 [computer_use.macos.bundle_ids]
 "com.apple.Safari" = "deny"
-
-[computer_use.windows.aumids]
-"Microsoft.Paint_8wekyb3d8bbwe!App" = "allow"
 "#,
         ),
         layer(
@@ -951,12 +948,6 @@ allow_persistent_approval = false
 
 [computer_use.macos.bundle_ids]
 "com.apple.Safari" = "allow"
-
-[[computer_use.windows.exes]]
-publisher_name = "CN=Google LLC"
-product_name = "Google Chrome"
-binary_name = "chrome.exe"
-access = "deny"
 "#,
         ),
     ])
@@ -990,15 +981,6 @@ default_app_access = "allow"
 
 [computer_use.macos.bundle_ids]
 "com.apple.Safari" = "allow"
-
-[computer_use.windows.aumids]
-"Microsoft.Paint_8wekyb3d8bbwe!App" = "allow"
-
-[[computer_use.windows.exes]]
-publisher_name = "CN=Google LLC"
-product_name = "Google Chrome"
-binary_name = "chrome.exe"
-access = "deny"
 "#
         )
     );

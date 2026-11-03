@@ -14,7 +14,6 @@ use pretty_assertions::assert_eq;
 async fn shared_mcp_keeps_tools_and_model_requested_input_per_chat() -> Result<()> {
     skip_if_no_network!(Ok(()));
     core_test_support::skip_if_remote!(Ok(()), "the shared stdio fixture runs on the host");
-    skip_if_wine_exec!(Ok(()), "requires a Windows test_stdio_server binary");
 
     let first_server = start_mock_server().await;
     let second_server = start_mock_server().await;

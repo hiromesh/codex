@@ -6,10 +6,6 @@ use super::*;
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 async fn guardian_handoff_delegation_request_history(native_history: bool) -> Result<()> {
     skip_if_no_network!(Ok(()));
-    skip_if_wine_exec!(
-        Ok(()),
-        "Guardian approval actions require host-native paths"
-    );
     let requests = tokio::time::timeout(
         Duration::from_secs(/*secs*/ 30),
         super::super::guardian_subagent_authorization::root_handoff::handoff_scenario(

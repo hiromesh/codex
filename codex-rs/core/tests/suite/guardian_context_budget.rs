@@ -30,7 +30,6 @@ use core_test_support::responses::ev_function_call;
 use core_test_support::responses::ev_response_created;
 use core_test_support::responses::sse;
 use core_test_support::skip_if_no_network;
-use core_test_support::skip_if_wine_exec;
 use core_test_support::test_codex::test_codex;
 use core_test_support::wait_for_event;
 use pretty_assertions::assert_eq;
@@ -41,10 +40,6 @@ use test_case::test_case;
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn independent_review_preserves_oversized_instruction_order() -> Result<()> {
     skip_if_no_network!(Ok(()));
-    skip_if_wine_exec!(
-        Ok(()),
-        "Guardian approval actions require host-native paths"
-    );
     let server = responses::start_mock_server().await;
     let mut extensions = ExtensionRegistryBuilder::new();
     extensions.thread_lifecycle_contributor(Arc::new(ThreadIdle));
@@ -233,10 +228,6 @@ async fn review_respects_complete_context_budget(
     reviewer_response: ReviewerResponse,
 ) -> Result<()> {
     skip_if_no_network!(Ok(()));
-    skip_if_wine_exec!(
-        Ok(()),
-        "Guardian approval actions require host-native paths"
-    );
     let server = responses::start_mock_server().await;
     let mut builder = test_codex()
         .with_cloud_config_bundle(
@@ -615,10 +606,6 @@ async fn oversized_action_preserves_review_policy_and_next_review(
     review: OversizedActionReview,
 ) -> Result<()> {
     skip_if_no_network!(Ok(()));
-    skip_if_wine_exec!(
-        Ok(()),
-        "Guardian approval actions require host-native paths"
-    );
     let server = responses::start_mock_server().await;
     let mut builder = test_codex()
         .with_model_info_override("gpt-5.5", |model| {

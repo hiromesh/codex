@@ -47,7 +47,6 @@ use core_test_support::responses::sse_response;
 use core_test_support::responses::start_mock_server;
 use core_test_support::skip_if_no_network;
 use core_test_support::skip_if_remote;
-use core_test_support::skip_if_wine_exec;
 use core_test_support::submit_thread_settings;
 use core_test_support::test_codex::TestCodex;
 use core_test_support::test_codex::TestCodexBuilder;
@@ -137,7 +136,6 @@ async fn pre_tool_use_preserves_request_permissions_environment(
 async fn mcp_resource_hooks_follow_server_ownership(
     hook_environment: HookEnvironment,
 ) -> Result<()> {
-    skip_if_wine_exec!(Ok(()), "requires a Windows test_stdio_server binary");
     let server = start_mock_server().await;
     let command = remote_aware_stdio_server_bin()?;
     let test = test_codex()
@@ -252,7 +250,6 @@ async fn environments_with_pre_tool_use_hook(
     hook_output["hookEventName"] = json!("PreToolUse");
     let output = json!({"hookSpecificOutput": hook_output});
     let command = match test_target_os() {
-        TestTargetOs::Windows => format!("ForEach-Object {{ '{output}' }}"),
         TestTargetOs::Linux | TestTargetOs::MacOs => format!("printf '%s' '{output}'"),
     };
     let mut config = environment_config_for_selection(&test.config, owner);

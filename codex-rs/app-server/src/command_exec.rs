@@ -24,8 +24,6 @@ use codex_core::exec::ExecExpirationOutcome;
 use codex_core::exec::IO_DRAIN_TIMEOUT_MS;
 use codex_core::sandboxing::ExecRequest;
 use codex_protocol::exec_output::bytes_to_string_smart;
-use codex_sandboxing::SandboxType;
-use codex_utils_pty::DEFAULT_OUTPUT_BYTES_CAP;
 use codex_utils_pty::ProcessHandle;
 use codex_utils_pty::SpawnedProcess;
 use codex_utils_pty::TerminalSize;
@@ -349,14 +347,13 @@ impl CommandExecManager {
         };
 
         for control in controls {
-            if let CommandExecSession::Active { control_tx } = control {
-                let _ = control_tx
-                    .send(CommandControlRequest {
-                        control: CommandControl::Terminate,
-                        response_tx: None,
-                    })
-                    .await;
-            }
+            let CommandExecSession::Active { control_tx } = control;
+            let _ = control_tx
+                .send(CommandControlRequest {
+                    control: CommandControl::Terminate,
+                    response_tx: None,
+                })
+                .await;
         }
     }
 
@@ -632,7 +629,9 @@ mod tests {
 
     use crate::error_code::INVALID_REQUEST_ERROR_CODE;
     use codex_protocol::models::PermissionProfile;
+    use codex_sandboxing::SandboxType;
     use codex_utils_absolute_path::AbsolutePathBuf;
+    use codex_utils_pty::DEFAULT_OUTPUT_BYTES_CAP;
     use pretty_assertions::assert_eq;
     use tokio::time::Duration;
     use tokio::time::timeout;

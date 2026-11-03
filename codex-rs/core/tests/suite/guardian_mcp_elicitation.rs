@@ -24,7 +24,6 @@ use codex_protocol::user_input::UserInput;
 use core_test_support::apps_test_server::apps_enabled_builder;
 use core_test_support::responses;
 use core_test_support::skip_if_no_network;
-use core_test_support::skip_if_wine_exec;
 use core_test_support::test_codex::local_requests;
 use core_test_support::test_codex::test_codex;
 use core_test_support::wait_for_event;
@@ -121,7 +120,6 @@ for line in sys.stdin:
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn interrupt_aborts_server_initiated_mcp_guardian_review() -> Result<()> {
     skip_if_no_network!(Ok(()));
-    skip_if_wine_exec!(Ok(()), "the MCP fixture requires a host Python interpreter");
 
     let server = responses::start_mock_server().await;
     let mcp_servers = serde_json::from_value(json!({
@@ -240,7 +238,6 @@ async fn server_initiated_mcp_elicitation_can_require_synchronous_auto_review(
     strict_auto_review: bool,
 ) -> Result<()> {
     skip_if_no_network!(Ok(()));
-    skip_if_wine_exec!(Ok(()), "the MCP fixture requires a host Python interpreter");
 
     const RATIONALE: &str = "The server-side action is not authorized.";
     const REJECTION_INSTRUCTIONS: &str = "Do not retry the rejected action.";
@@ -438,7 +435,6 @@ async fn node_elicitations_attribute_independent_reviews_without_changing_action
     call_id_source: CallIdSource,
 ) -> Result<()> {
     skip_if_no_network!(Ok(()));
-    skip_if_wine_exec!(Ok(()), "the MCP fixture requires a host Python interpreter");
 
     let browser = server_name == "codex_apps";
     let actions = [
@@ -742,7 +738,6 @@ async fn strict_browser_nested_review_requires_live_browser_identity(
     call_id: Option<&str>,
 ) -> Result<()> {
     skip_if_no_network!(Ok(()));
-    skip_if_wine_exec!(Ok(()), "the MCP fixture requires a host Python interpreter");
 
     let server = responses::start_mock_server().await;
     let mut meta = json!({
@@ -831,7 +826,6 @@ async fn strict_browser_nested_review_requires_live_browser_identity(
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn user_review_preserves_unsupported_guardian_elicitations(mode: &str) -> Result<()> {
     skip_if_no_network!(Ok(()));
-    skip_if_wine_exec!(Ok(()), "the MCP fixture requires a host Python interpreter");
     let server = responses::start_mock_server().await;
     let form_schema = json!({
         "type": "object", "properties": {"name": {"type": "string"}}, "required": ["name"]

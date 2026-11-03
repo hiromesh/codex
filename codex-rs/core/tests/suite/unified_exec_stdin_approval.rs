@@ -35,7 +35,6 @@ use core_test_support::responses::sse;
 use core_test_support::skip_if_no_network;
 use core_test_support::skip_if_remote;
 use core_test_support::skip_if_sandbox;
-use core_test_support::skip_if_target_windows;
 use core_test_support::test_codex::TestCodexBuilder;
 use core_test_support::test_codex::TestCodexHarness;
 use core_test_support::test_codex::test_codex;
@@ -76,7 +75,6 @@ async fn harness(builder: TestCodexBuilder) -> Result<TestCodexHarness> {
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn stdin_reviews_retained_grants_after_turn_permissions_expire() -> Result<()> {
-    skip_if_target_windows!(Ok(()), "uses a POSIX interactive shell");
     skip_if_no_network!(Ok(()));
     skip_if_sandbox!(Ok(()));
     let harness = harness(test_codex()).await?;
@@ -203,7 +201,6 @@ async fn stdin_reviews_retained_grants_after_turn_permissions_expire() -> Result
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn stdin_reviews_escalated_terminal_with_denied_reads_before_delivering_input() -> Result<()>
 {
-    skip_if_target_windows!(Ok(()), "uses a POSIX interactive shell");
     skip_if_no_network!(Ok(()));
     skip_if_sandbox!(Ok(()));
     let harness = TestCodexHarness::with_auto_env_builder(test_codex().with_config(|config| {
@@ -318,7 +315,6 @@ async fn stdin_reviews_escalated_terminal_with_denied_reads_before_delivering_in
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn strict_stdin_review_reaches_guardian_with_sandbox_prompts_disabled() -> Result<()> {
-    skip_if_target_windows!(Ok(()), "uses a POSIX interactive shell");
     skip_if_no_network!(Ok(()));
     skip_if_sandbox!(Ok(()));
     #[derive(Default)]
@@ -480,7 +476,6 @@ async fn stdin_reviews_current_grants_with_sandbox_prompts_disabled(
     grant_change: GrantChange,
     later_policy: LaterApprovalPolicy,
 ) -> Result<()> {
-    skip_if_target_windows!(Ok(()), "uses a POSIX interactive shell");
     skip_if_no_network!(Ok(()));
     skip_if_sandbox!(Ok(()));
     if matches!(grant_change, GrantChange::SymlinkWriteExpires) {

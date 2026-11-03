@@ -26,7 +26,6 @@ use codex_protocol_test_support::ContentItemTestExt;
 use core_test_support::responses;
 use core_test_support::skip_if_no_network;
 use core_test_support::skip_if_sandbox;
-use core_test_support::skip_if_wine_exec;
 use core_test_support::streaming_sse::StreamingSseChunk;
 use core_test_support::streaming_sse::start_streaming_sse_server;
 use core_test_support::test_codex::local_requests;
@@ -62,10 +61,6 @@ async fn guardian_revalidates_owning_session_before_allow(
 ) -> Result<()> {
     skip_if_no_network!(Ok(()));
     skip_if_sandbox!(Ok(()));
-    skip_if_wine_exec!(
-        Ok(()),
-        "Guardian approval actions require host-native paths"
-    );
 
     let (parent_completion_tx, parent_completion_rx) = oneshot::channel();
     let (review_completion_tx, review_completion_rx) = oneshot::channel();

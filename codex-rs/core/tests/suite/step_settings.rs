@@ -2451,7 +2451,6 @@ async fn request_preference_activation_keeps_admitted_model_metadata() -> Result
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn captured_step_controls_exec_completion_and_write_stdin_output() -> Result<()> {
-    core_test_support::skip_if_target_windows!(Ok(()), "uses POSIX read and printf");
     skip_if_no_network!(Ok(()));
     let server = start_mock_server().await;
     let output = "abcdefghij".repeat(100);
@@ -2858,7 +2857,6 @@ async fn captured_step_settings_and_history_reach_extension_executor(
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn captured_step_controls_mcp_resource_output() -> Result<()> {
     skip_if_no_network!(Ok(()));
-    core_test_support::skip_if_wine_exec!(Ok(()), "requires a Windows test_stdio_server binary");
     let parameters = |model: &str| {
         json!({
             "type": "object",

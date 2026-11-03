@@ -16,7 +16,6 @@ use codex_protocol::user_input::UserInput;
 use core_test_support::responses;
 use core_test_support::responses::ResponsesRequest;
 use core_test_support::skip_if_no_network;
-use core_test_support::skip_if_wine_exec;
 use core_test_support::test_codex::test_codex;
 use core_test_support::wait_for_event;
 use core_test_support::wait_for_mcp_server;
@@ -93,7 +92,6 @@ async fn mcp_server_elicitations_follow_approval_policy(
     request_kind: RequestKind,
 ) -> Result<()> {
     skip_if_no_network!(Ok(()));
-    skip_if_wine_exec!(Ok(()), "the MCP fixture requires a host Python interpreter");
     mcp_server_elicitation_scenario(caller, request_kind).await?;
     Ok(())
 }

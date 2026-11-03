@@ -59,7 +59,6 @@ use core_test_support::skip_if_no_network;
 use core_test_support::skip_if_remote;
 #[cfg(unix)]
 use core_test_support::skip_if_sandbox;
-use core_test_support::skip_if_target_windows;
 use core_test_support::stdio_server_bin;
 use core_test_support::submit_thread_settings;
 use core_test_support::test_codex::TestCodex;
@@ -468,7 +467,6 @@ async fn shared_analytics_client_preserves_session_products() -> Result<()> {
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn persisted_remote_plugin_command_attribution_flows_through_turn_context() -> Result<()> {
-    skip_if_target_windows!(Ok(()), "executes a POSIX shell script");
     skip_if_no_network!(Ok(()));
     skip_if_remote!(
         Ok(()),
@@ -2343,7 +2341,6 @@ enum ImplicitPluginSkillInvocation {
 async fn implicit_plugin_skill_invocation_tracks_remote_plugin_id(
     invocation: ImplicitPluginSkillInvocation,
 ) -> Result<()> {
-    skip_if_target_windows!(Ok(()), "executes POSIX cat and bash commands");
     skip_if_remote!(Ok(()), "shell commands use host plugin-cache paths");
     skip_if_no_network!(Ok(()));
     let server = start_mock_server().await;

@@ -13,7 +13,6 @@ use codex_protocol::protocol::ThreadSettingsOverrides;
 use codex_protocol::sandbox::SandboxType;
 use codex_utils_absolute_path::AbsolutePathBuf;
 use core_test_support::responses::start_mock_server;
-use core_test_support::skip_if_target_windows;
 use core_test_support::submit_thread_settings;
 use core_test_support::test_codex::test_codex;
 use pretty_assertions::assert_eq;
@@ -156,10 +155,6 @@ async fn refreshed_cloud_bundle_updates_later_sessions() -> Result<()> {
 
 #[tokio::test]
 async fn managed_deny_read_requirements_follow_thread_permission_updates() -> Result<()> {
-    skip_if_target_windows!(
-        Ok(()),
-        "Windows restricted-token sandbox cannot enforce deny-read policies"
-    );
 
     let server = start_mock_server().await;
     let home = Arc::new(TempDir::new()?);
