@@ -129,14 +129,12 @@ pub(super) async fn run_main_inner(
     }
     let embedded_network_policy =
         codex_app_server_client::EmbeddedNetworkPolicy::load(&launch_loader_overrides).await;
-    let workload_identity_selected = is_workload_identity_selected();
 
     if !std::io::stdin().is_terminal() || !std::io::stdout().is_terminal() {
         let validation_target = app_server_target_for_launch(
             explicit_remote_endpoint.clone(),
             explicit_local_daemon_socket.clone(),
             /*can_reuse_implicit_local_daemon*/ false,
-            workload_identity_selected,
             std::env::var_os(codex_exec_server::CODEX_EXEC_SERVER_URL_ENV_VAR).as_deref(),
         )?;
         let validation_environment_manager =
@@ -163,17 +161,7 @@ pub(super) async fn run_main_inner(
             CloudConfigBundleLoader::default(),
         )
         .await;
-        let validation_cloud_config_bundle = if workload_identity_selected {
-            cloud_config_bundle_for_app_server_target(
-                &validation_target,
-                &validation_bootstrap,
-                &codex_home,
-                &embedded_network_policy,
-            )
-            .await?
-        } else {
-            CloudConfigBundleLoader::default()
-        };
+        let validation_cloud_config_bundle = CloudConfigBundleLoader::default();
         load_config_or_exit(
             cli_kv_overrides.clone(),
             ConfigOverrides {
@@ -216,8 +204,7 @@ pub(super) async fn run_main_inner(
             cli.bypass_hook_trust,
         )
         .is_none();
-    let search_only_config_override = !workload_identity_selected
-        && cli.web_search
+    let search_only_config_override = cli.web_search
         && startup_preflight::has_only_search_config_override(&cli_kv_overrides)
         && loader_overrides_are_default(&launch_loader_overrides)
         && !strict_config
@@ -252,7 +239,6 @@ pub(super) async fn run_main_inner(
         explicit_remote_endpoint.clone(),
         explicit_local_daemon_socket.clone(),
         reuse_implicit_local_daemon,
-        workload_identity_selected,
         std::env::var_os(codex_exec_server::CODEX_EXEC_SERVER_URL_ENV_VAR).as_deref(),
     )?;
     let prepared_environment_manager =
@@ -358,7 +344,6 @@ pub(super) async fn run_main_inner(
         explicit_remote_endpoint,
         default_daemon,
         reuse_implicit_local_daemon,
-        workload_identity_selected,
         std::env::var_os(codex_exec_server::CODEX_EXEC_SERVER_URL_ENV_VAR).as_deref(),
     )?;
     let remote_cwd_override = cli
@@ -509,19 +494,15 @@ pub(super) async fn run_main_inner(
         config.cwd.as_path(),
     );
 
-    let mut cloud_config_bundle = if workload_identity_selected {
-        cloud_config_bundle
-    } else {
-        startup_draft
-            .run_until(managed_config_bundle_loader_for_storage(
-                embedded_network_policy.bind_bootstrap_auth(
-                    app_server_target.auth_config_for_cloud_loader(config.auth_config()),
-                ),
-                config.config_layer_stack.requirements_toml(),
-                /*enable_codex_api_key_env*/ false,
-            ))
-            .await??
-    };
+    let mut cloud_config_bundle = startup_draft
+        .run_until(managed_config_bundle_loader_for_storage(
+            embedded_network_policy.bind_bootstrap_auth(
+                app_server_target.auth_config_for_cloud_loader(config.auth_config()),
+            ),
+            config.config_layer_stack.requirements_toml(),
+            /*enable_codex_api_key_env*/ false,
+        ))
+        .await??;
     let managed_worktree = if cli.shared.worktree {
         let (destination, bundle, worktree) = startup_draft
             .run_until(worktree_startup::prepare(
@@ -772,7 +753,6 @@ pub(super) async fn run_main_inner(
                 Some("--oss") => "oss",
                 Some("--strict-config") => "strict_config",
                 Some("--dangerously-bypass-hook-trust") => "bypass_hook_trust",
-                Some("workload identity") => "workload_identity",
                 Some("executor selection (CODEX_EXEC_SERVER_URL)") => "exec_server_url",
                 Some("custom configuration loader") => "custom_config_loader",
                 Some(
@@ -845,7 +825,7 @@ pub(super) async fn run_main_inner(
         }
     }
 
-    if !app_server_target.uses_remote_workspace() && !workload_identity_selected {
+    if !app_server_target.uses_remote_workspace() {
         #[allow(clippy::print_stderr)]
         if let Err(err) = startup_draft
             .run_until(enforce_login_restrictions(&config.auth_config()))

@@ -20,7 +20,6 @@ clap = { workspace = true, features = ["derive", "env"] }
 codex-api = { workspace = true }
 codex-app-server = { workspace = true }
 codex-arg0 = { workspace = true }
-codex-aws-auth = { workspace = true }
 codex-build-info = { workspace = true }
 codex-cloud-config = { workspace = true }
 codex-config = { workspace = true }

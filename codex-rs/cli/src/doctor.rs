@@ -1260,10 +1260,6 @@ fn auth_check(config: &Config) -> DoctorCheck {
             details.push(format!("stored auth mode: {}", stored_auth_mode(&auth)));
             details.push(format!("stored API key: {}", auth.openai_api_key.is_some()));
             details.push(format!("stored ChatGPT tokens: {}", auth.tokens.is_some()));
-            details.push(format!(
-                "stored agent identity: {}",
-                auth.agent_identity.is_some()
-            ));
             let auth_issues = stored_auth_issues(&auth, env_var_present);
             details.extend(
                 auth_issues
@@ -1459,13 +1455,7 @@ fn stored_auth_issues(
             issues.push("header auth cannot be loaded from auth storage");
         }
         AuthMode::AgentIdentity => {
-            if auth
-                .agent_identity
-                .as_ref()
-                .is_none_or(|agent_identity| !agent_identity.has_auth_material())
-            {
-                issues.push("agent identity auth is missing an agent identity token");
-            }
+            issues.push("agent identity auth is no longer supported");
         }
         AuthMode::PersonalAccessToken => {
             if auth

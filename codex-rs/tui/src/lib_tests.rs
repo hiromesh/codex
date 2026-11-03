@@ -830,7 +830,6 @@ fn app_server_target_for_launch_uses_local_daemon_for_default_socket() -> color_
             explicit.then_some(endpoint.clone()),
             Some(socket_path.clone()),
             /*can_reuse_implicit_local_daemon*/ !explicit,
-            /*workload_identity_selected*/ false,
             /*exec_server_url*/ None,
         )?;
         assert_eq!(
@@ -855,8 +854,7 @@ fn app_server_target_for_launch_preserves_executor_selection() -> color_eyre::Re
                 /*explicit_remote_endpoint*/ None,
                 Some(socket_path.clone()),
                 /*can_reuse_implicit_local_daemon*/ true,
-                /*workload_identity_selected*/ false,
-                Some(std::ffi::OsStr::new(executor)),
+                    Some(std::ffi::OsStr::new(executor)),
             )?,
             AppServerTarget::Embedded,
         );
@@ -873,7 +871,6 @@ fn app_server_target_for_launch_prefers_explicit_remote_endpoint() -> color_eyre
         Some(explicit_endpoint.clone()),
         Some(AbsolutePathBuf::relative_to_current_dir("default.sock")?),
         /*can_reuse_implicit_local_daemon*/ false,
-        /*workload_identity_selected*/ false,
         Some(std::ffi::OsStr::new("none")),
     )?;
 
@@ -896,43 +893,10 @@ fn app_server_target_for_launch_skips_local_daemon_when_launch_config_is_not_rep
         /*explicit_remote_endpoint*/ None,
         Some(socket_path),
         /*can_reuse_implicit_local_daemon*/ false,
-        /*workload_identity_selected*/ false,
         /*exec_server_url*/ None,
     )?;
 
     assert_eq!(target, AppServerTarget::Embedded);
-    Ok(())
-}
-
-#[test]
-fn workload_identity_requires_an_embedded_app_server() -> color_eyre::Result<()> {
-    let default_socket = AbsolutePathBuf::relative_to_current_dir("default.sock")?;
-    assert_eq!(
-        app_server_target_for_launch(
-            /*explicit_remote_endpoint*/ None,
-            Some(default_socket),
-            /*can_reuse_implicit_local_daemon*/ true,
-            /*workload_identity_selected*/ true,
-            /*exec_server_url*/ None,
-        )?,
-        AppServerTarget::Embedded
-    );
-
-    let explicit_endpoint = RemoteAppServerEndpoint::UnixSocket {
-        socket_path: AbsolutePathBuf::relative_to_current_dir("explicit.sock")?,
-    };
-    let error = app_server_target_for_launch(
-        Some(explicit_endpoint),
-        /*default_daemon_socket*/ None,
-        /*can_reuse_implicit_local_daemon*/ false,
-        /*workload_identity_selected*/ true,
-        /*exec_server_url*/ None,
-    )
-    .expect_err("remote hosts must own workload identity");
-    assert_eq!(
-        error.to_string(),
-        "workload identity must be configured on the remote app-server host"
-    );
     Ok(())
 }
 

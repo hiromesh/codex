@@ -37,7 +37,6 @@ axum = { workspace = true, default-features = false, features = [
 codex-analytics = { workspace = true }
 codex-app-server-daemon = { workspace = true }
 codex-arg0 = { workspace = true }
-codex-aws-auth = { workspace = true }
 codex-cloud-config = { workspace = true }
 codex-config = { workspace = true }
 codex-network-proxy = { workspace = true }
@@ -64,11 +63,9 @@ codex-shell-command = { workspace = true }
 codex-skills = { workspace = true }
 codex-skills-extension = { workspace = true }
 codex-utils-cli = { workspace = true }
-codex-user-verification = { workspace = true }
 codex-utils-pty = { workspace = true }
 codex-backend-client = { workspace = true }
 codex-file-search = { workspace = true }
-codex-chatgpt = { workspace = true }
 codex-login = { workspace = true }
 codex-image-generation-extension = { workspace = true }
 codex-memories-extension = { workspace = true }

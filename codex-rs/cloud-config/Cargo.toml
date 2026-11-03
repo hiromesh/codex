@@ -29,7 +29,6 @@ tracing = { workspace = true }
 
 [dev-dependencies]
 wiremock = { workspace = true }
-codex-agent-identity = { workspace = true }
 codex-core = { workspace = true }
 pretty_assertions = { workspace = true }
 tokio = { workspace = true, features = ["macros", "rt", "test-util", "time"] }
