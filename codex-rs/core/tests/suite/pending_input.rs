@@ -1141,7 +1141,7 @@ async fn any_new_input_interrupts_sleep(input: WaitInput) {
     wait_for_sleep_item_completed(&codex, FIRST_SLEEP_CALL_ID, SLEEP_DURATION_MS).await;
     wait_for_sleep_item_started(&codex, SECOND_SLEEP_CALL_ID, SLEEP_DURATION_MS).await;
 
-    // The list-voices barrier can consume the sleep completion that we need to observe next.
+    // The queue barrier can consume the sleep completion that we need to observe next.
     enqueue_queue_only_agent_mail(&codex, "new mailbox input").await;
     wait_for_sleep_item_completed(&codex, SECOND_SLEEP_CALL_ID, SLEEP_DURATION_MS).await;
     wait_for_turn_complete(&codex).await;

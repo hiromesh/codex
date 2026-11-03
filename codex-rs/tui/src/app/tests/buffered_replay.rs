@@ -79,7 +79,7 @@ async fn refreshed_active_reasoning_accepts_later_deltas_and_complete_summary() 
                         id: "user-follow-up".into(),
                         client_id: None,
                         content: vec![AppServerUserInput::Text {
-                            text: "spoken follow-up".into(),
+                            text: "queued follow-up".into(),
                             text_elements: Vec::new(),
                         }],
                     }, /*started_at_ms*/ 0)));

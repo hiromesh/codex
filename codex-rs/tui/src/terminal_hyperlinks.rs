@@ -107,7 +107,7 @@ impl TerminalHyperlink {
 
     pub(crate) fn retarget_to_trusted_file(&mut self, destination: &Url) {
         // General Markdown never promotes file URLs. Only generated visualization links use this
-        // path; spoken workspace artifacts require a separately validated capability.
+        // path; linking workspace artifacts requires a separately validated capability.
         debug_assert_eq!(destination.scheme(), "file");
         self.destination = destination.to_string();
         self.destination_kind = DestinationKind::TrustedFile;

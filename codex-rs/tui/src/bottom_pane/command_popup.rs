@@ -538,3 +538,143 @@ mod tests {
 
         insta::assert_snapshot!("command_popup_app", format!("{buf:?}"));
     }
+
+    #[test]
+    fn prefix_filter_limits_matches_for_ac() {
+        let mut popup = CommandPopup::new(CommandPopupFlags::default(), Vec::new());
+        popup.on_composer_text_change("/ac".to_string());
+
+        let cmds: Vec<String> = popup
+            .filtered_items()
+            .into_iter()
+            .map(|item| match item {
+                CommandItem::Builtin(cmd) => cmd.command().to_string(),
+                CommandItem::ServiceTier(command) => command.name,
+            })
+            .collect();
+        assert!(
+            !cmds.iter().any(|cmd| cmd == "compact"),
+            "expected prefix search for '/ac' to exclude 'compact', got {cmds:?}"
+        );
+    }
+
+    #[test]
+    fn changing_filter_resets_selection_after_scrolling() {
+        let mut popup = CommandPopup::new(CommandPopupFlags::default(), Vec::new());
+        popup.on_composer_text_change("/".to_string());
+
+        for _ in 0..MAX_POPUP_ROWS {
+            popup.move_down();
+        }
+        assert!(popup.state.scroll_top > 0);
+
+        popup.on_composer_text_change("/st".to_string());
+
+        assert_eq!(
+            popup.selected_item(),
+            Some(CommandItem::Builtin(SlashCommand::Status))
+        );
+        assert_eq!(popup.state.scroll_top, 0);
+        let width = 72;
+        let area = Rect::new(
+            /*x*/ 0,
+            /*y*/ 0,
+            width,
+            popup.calculate_required_height(width),
+        );
+        let mut buf = Buffer::empty(area);
+        popup.render_ref(area, &mut buf);
+        insta::assert_snapshot!(
+            "command_popup_filter_reset_after_scroll",
+            format!("{buf:?}")
+        );
+    }
+
+    #[test]
+    fn quit_hidden_in_empty_filter_but_shown_for_prefix() {
+        let mut popup = CommandPopup::new(CommandPopupFlags::default(), Vec::new());
+        popup.on_composer_text_change("/".to_string());
+        let items = popup.filtered_items();
+        assert!(!items.contains(&CommandItem::Builtin(SlashCommand::Quit)));
+
+        popup.on_composer_text_change("/qu".to_string());
+        let items = popup.filtered_items();
+        assert!(items.contains(&CommandItem::Builtin(SlashCommand::Quit)));
+    }
+
+    #[test]
+    fn btw_hidden_in_empty_filter_but_shown_for_prefix() {
+        let mut popup = CommandPopup::new(CommandPopupFlags::default(), Vec::new());
+        popup.on_composer_text_change("/".to_string());
+        let items = popup.filtered_items();
+        assert!(!items.contains(&CommandItem::Builtin(SlashCommand::Btw)));
+
+        popup.on_composer_text_change("/bt".to_string());
+        let items = popup.filtered_items();
+        assert!(items.contains(&CommandItem::Builtin(SlashCommand::Btw)));
+    }
+
+    #[test]
+    fn plan_command_hidden_when_collaboration_modes_disabled() {
+        let mut popup = CommandPopup::new(CommandPopupFlags::default(), Vec::new());
+        popup.on_composer_text_change("/".to_string());
+
+        let cmds: Vec<String> = popup
+            .filtered_items()
+            .into_iter()
+            .map(|item| match item {
+                CommandItem::Builtin(cmd) => cmd.command().to_string(),
+                CommandItem::ServiceTier(command) => command.name,
+            })
+            .collect();
+        assert!(
+            !cmds.iter().any(|cmd| cmd == "plan"),
+            "expected '/plan' to be hidden when collaboration modes are disabled, got {cmds:?}"
+        );
+    }
+
+    #[test]
+    fn plan_command_visible_when_collaboration_modes_enabled() {
+        let mut popup = CommandPopup::new(
+            CommandPopupFlags {
+                collaboration_modes_enabled: true,
+                connectors_enabled: false,
+                plugins_command_enabled: false,
+                token_activity_command_enabled: false,
+                service_tier_commands_enabled: false,
+                daybreak_command_description: None,
+                goal_command_enabled: false,
+                worktrees_enabled: true,
+                side_conversation_active: false,
+            },
+            Vec::new(),
+        );
+        popup.on_composer_text_change("/plan".to_string());
+
+        match popup.selected_item() {
+            Some(CommandItem::Builtin(cmd)) => assert_eq!(cmd.command(), "plan"),
+            Some(CommandItem::ServiceTier(command)) => {
+                panic!("expected plan command, got service tier {command:?}")
+            }
+            other => panic!("expected plan to be selected for exact match, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn debug_commands_are_hidden_from_popup() {
+        let popup = CommandPopup::new(CommandPopupFlags::default(), Vec::new());
+        let cmds: Vec<String> = popup
+            .filtered_items()
+            .into_iter()
+            .map(|item| match item {
+                CommandItem::Builtin(cmd) => cmd.command().to_string(),
+                CommandItem::ServiceTier(command) => command.name,
+            })
+            .collect();
+
+        assert!(
+            !cmds.iter().any(|name| name.starts_with("debug")),
+            "expected no /debug* command in popup menu, got {cmds:?}"
+        );
+    }
+}

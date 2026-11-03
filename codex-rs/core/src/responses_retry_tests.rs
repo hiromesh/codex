@@ -44,9 +44,3 @@ async fn sampling_retry_logs_stream_error_context() {
         "sampling_error=stream disconnected before completion: websocket closed by server before response.completed"
     ));
 }
-
-/// Time spent reporting a retry must count toward the server's original deadline.
-#[expect(
-    clippy::await_holding_invalid_type,
-    reason = "test holds the event-delivery lock to delay notification while virtual time advances"
-)]

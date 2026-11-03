@@ -18,7 +18,6 @@ use crate::responses_metadata::MCP_ATTRIBUTION_CLIENT_METADATA_KEY;
 use crate::test_support::TestCodexResponsesRequestKind;
 use crate::test_support::responses_metadata as test_responses_metadata;
 use base64::Engine;
-use codex_api::AgentIdentityTelemetry;
 use codex_api::ApiError;
 use codex_api::ResponseEvent;
 use codex_api::TransportError;
@@ -27,7 +26,6 @@ use codex_http_client::HttpClientFactory;
 use codex_http_client::OutboundProxyPolicy;
 use codex_login::AuthManager;
 use codex_login::CodexAuth;
-use codex_login::auth::AgentIdentityAuthPolicy;
 use codex_model_provider::BearerAuthProvider;
 use codex_model_provider::ModelProvider;
 use codex_model_provider::ModelProviderFuture;
@@ -118,7 +116,6 @@ fn test_model_client_with_thread_id(
     let provider = create_oss_provider_with_base_url("https://example.com/v1", WireApi::Responses);
     ModelClient::new(
         /*auth_manager*/ None,
-        AgentIdentityAuthPolicy::JwtOnly,
         thread_id,
         provider,
         session_source,
@@ -2035,7 +2032,6 @@ fn auth_request_telemetry_context_tracks_attached_auth_and_retry_phase() {
     let auth_context = AuthRequestTelemetryContext::new(
         Some(AuthMode::Chatgpt),
         &BearerAuthProvider::for_test(Some("access-token"), Some("workspace-123")),
-        /*agent_identity_telemetry*/ None,
         PendingUnauthorizedRetry::from_recovery(UnauthorizedRecoveryExecution {
             mode: "managed",
             phase: "refresh_token",
@@ -2049,28 +2045,6 @@ fn auth_request_telemetry_context_tracks_attached_auth_and_retry_phase() {
     assert!(auth_context.retry_after_unauthorized);
     assert_eq!(auth_context.recovery_mode, Some("managed"));
     assert_eq!(auth_context.recovery_phase, Some("refresh_token"));
-}
-
-#[test]
-fn auth_request_telemetry_context_tracks_agent_identity_ids() {
-    let auth_context = AuthRequestTelemetryContext::new(
-        Some(AuthMode::Chatgpt),
-        &BearerAuthProvider::for_test(/*token*/ None, /*account_id*/ None),
-        Some(AgentIdentityTelemetry {
-            agent_id: "agent-runtime-context".to_string(),
-            task_id: "task-run-context".to_string(),
-        }),
-        PendingUnauthorizedRetry::default(),
-    )
-    .unwrap();
-
-    assert_eq!(
-        auth_context.agent_identity_telemetry(),
-        Some(&AgentIdentityTelemetry {
-            agent_id: "agent-runtime-context".to_string(),
-            task_id: "task-run-context".to_string(),
-        })
-    );
 }
 
 fn model_client_with_counting_attestation(
@@ -2110,7 +2084,6 @@ fn model_client_with_counting_attestation(
     };
     let model_client = ModelClient::new(
         auth_manager,
-        AgentIdentityAuthPolicy::JwtOnly,
         ThreadId::new(),
         provider,
         SessionSource::Exec,

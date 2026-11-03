@@ -39,7 +39,6 @@ use crate::CodexResponsesHeaders;
 use crate::PromptCacheKey;
 use crate::tools::ExecutedToolCalls;
 use async_channel::Sender;
-use codex_api::AgentIdentityTelemetry;
 use codex_api::ApiError;
 use codex_api::AuthProvider;
 use codex_api::Compression;
@@ -137,10 +136,8 @@ use crate::responses_metadata::subagent_header_value;
 use crate::util::emit_feedback_auth_recovery_tags;
 use codex_feedback::FeedbackRequestTags;
 use codex_feedback::emit_feedback_request_tags_with_auth_env;
-use codex_login::auth::AgentIdentityAuthPolicy;
 use codex_login::auth_env_telemetry::AuthEnvTelemetry;
 use codex_login::auth_env_telemetry::collect_auth_env_telemetry;
-use codex_model_provider::AgentIdentitySessionFallback;
 use codex_model_provider::ProviderAuthScope;
 use codex_model_provider::ProviderUnauthorizedRecovery;
 use codex_model_provider::ResponsesConnectionKey;
@@ -218,7 +215,6 @@ struct ModelClientState {
     include_attestation: bool,
     attestation_provider: Option<Arc<dyn AttestationProvider>>,
     disable_websockets: AtomicBool,
-    agent_identity_session_fallback: AgentIdentitySessionFallback,
     cached_websocket_session: StdMutex<WebsocketSession>,
     /// Last full tool list used for sampling, retained across turns and connection resets.
     last_inference_tools: StdMutex<Option<Arc<[ToolSpec]>>>,
@@ -241,7 +237,6 @@ struct CurrentClientSetup {
     http_client_factory: HttpClientFactory,
     redirect_policy: ClientRedirectPolicy,
     api_auth: SharedAuthProvider,
-    agent_identity_telemetry: Option<AgentIdentityTelemetry>,
     runtime_id: Option<String>,
 }
 
@@ -292,7 +287,6 @@ impl RequestRouteTelemetry {
 #[derive(Debug, Clone)]
 pub struct ModelClient {
     state: Arc<ModelClientState>,
-    agent_identity_policy: AgentIdentityAuthPolicy,
     prompt_cache_key_policy: PromptCacheKey,
     session_id_override: Option<String>,
     codex_responses_headers: Option<Arc<CodexResponsesHeaders>>,
@@ -552,7 +546,6 @@ impl ModelClient {
     /// observes the resolved outbound proxy policy.
     pub fn new(
         auth_manager: Option<Arc<AuthManager>>,
-        agent_identity_policy: AgentIdentityAuthPolicy,
         thread_id: ThreadId,
         provider_info: ModelProviderInfo,
         session_source: SessionSource,
@@ -607,11 +600,9 @@ impl ModelClient {
                 include_attestation,
                 attestation_provider,
                 disable_websockets: AtomicBool::new(false),
-                agent_identity_session_fallback: AgentIdentitySessionFallback::default(),
                 cached_websocket_session: StdMutex::new(WebsocketSession::default()),
                 last_inference_tools: StdMutex::new(None),
             }),
-            agent_identity_policy,
             prompt_cache_key_policy: PromptCacheKey::default(),
             session_id_override: None,
             codex_responses_headers: None,
@@ -790,7 +781,6 @@ impl ModelClient {
             AuthRequestTelemetryContext::new(
                 client_setup.auth.as_ref().map(CodexAuth::auth_mode),
                 client_setup.api_auth.as_ref(),
-                client_setup.agent_identity_telemetry.clone(),
                 PendingUnauthorizedRetry::default(),
             )
             .map_err(|error| self.state.provider.map_api_error(error))?,
@@ -1136,14 +1126,7 @@ impl ModelClient {
                     ),
                 };
                 let resolved_auth = provider
-                    .api_auth_for_scope(ProviderAuthScope {
-                        agent_identity_policy: self.agent_identity_policy,
-                        session_source: self.state.session_source.clone(),
-                        agent_identity_session_fallback: self
-                            .state
-                            .agent_identity_session_fallback
-                            .clone(),
-                    })
+                    .api_auth_for_scope(ProviderAuthScope::default())
                     .await?;
                 Ok(CurrentClientSetup {
                     auth,
@@ -1153,7 +1136,6 @@ impl ModelClient {
                     http_client_factory: self.http_client_factory.clone(),
                     redirect_policy,
                     api_auth: resolved_auth.auth,
-                    agent_identity_telemetry: resolved_auth.agent_identity_telemetry,
                     runtime_id: None,
                 })
             },
@@ -1316,7 +1298,7 @@ impl ModelClient {
             response_debug.cf_ray.as_deref(),
             response_debug.auth_error.as_deref(),
             response_debug.auth_error_code.as_deref(),
-            auth_context.agent_identity_telemetry(),
+            None,
         );
         emit_feedback_request_tags_with_auth_env(
             &FeedbackRequestTags {
@@ -1551,7 +1533,6 @@ impl ModelClientSession {
             let auth_context = AuthRequestTelemetryContext::new(
                 client_setup.auth.as_ref().map(CodexAuth::auth_mode),
                 client_setup.api_auth.as_ref(),
-                client_setup.agent_identity_telemetry.clone(),
                 pending_retry,
             )
             .map_err(|error| provider.map_api_error(error))?;
@@ -1783,7 +1764,6 @@ impl ResponsesHttpExecutor<'_> {
             let request_auth_context = AuthRequestTelemetryContext::new(
                 client_setup.auth.as_ref().map(CodexAuth::auth_mode),
                 client_setup.api_auth.as_ref(),
-                client_setup.agent_identity_telemetry.clone(),
                 pending_retry,
             )
             .map_err(|error| self.client.state.provider.map_api_error(error))?;
@@ -1975,7 +1955,6 @@ impl ModelClientSession {
             let request_auth_context = AuthRequestTelemetryContext::new(
                 client_setup.auth.as_ref().map(CodexAuth::auth_mode),
                 client_setup.api_auth.as_ref(),
-                client_setup.agent_identity_telemetry.clone(),
                 pending_retry,
             )
             .map_err(|error| self.client.state.provider.map_api_error(error))?;
@@ -2713,7 +2692,6 @@ struct AuthRequestTelemetryContext {
     auth_mode: Option<&'static str>,
     auth_header_attached: bool,
     auth_header_name: Option<&'static str>,
-    agent_identity_telemetry: Option<AgentIdentityTelemetry>,
     retry_after_unauthorized: bool,
     recovery_mode: Option<&'static str>,
     recovery_phase: Option<&'static str>,
@@ -2723,7 +2701,6 @@ impl AuthRequestTelemetryContext {
     fn new(
         auth_mode: Option<AuthMode>,
         api_auth: &dyn AuthProvider,
-        agent_identity_telemetry: Option<AgentIdentityTelemetry>,
         retry: PendingUnauthorizedRetry,
     ) -> std::result::Result<Self, ApiError> {
         let auth_telemetry = auth_header_telemetry(api_auth)?;
@@ -2740,15 +2717,10 @@ impl AuthRequestTelemetryContext {
             }),
             auth_header_attached: auth_telemetry.attached,
             auth_header_name: auth_telemetry.name,
-            agent_identity_telemetry,
             retry_after_unauthorized: retry.retry_after_unauthorized,
             recovery_mode: retry.recovery_mode,
             recovery_phase: retry.recovery_phase,
         })
-    }
-
-    fn agent_identity_telemetry(&self) -> Option<&AgentIdentityTelemetry> {
-        self.agent_identity_telemetry.as_ref()
     }
 }
 
@@ -3008,7 +2980,7 @@ impl RequestTelemetry for ApiTelemetry {
             debug.cf_ray.as_deref(),
             debug.auth_error.as_deref(),
             debug.auth_error_code.as_deref(),
-            self.auth_context.agent_identity_telemetry(),
+            None,
         );
         emit_feedback_request_tags_with_auth_env(
             &FeedbackRequestTags {
@@ -3063,7 +3035,7 @@ impl WebsocketTelemetry for ApiTelemetry {
             duration,
             error_message.as_deref(),
             connection_reused,
-            self.auth_context.agent_identity_telemetry(),
+            None,
         );
         emit_feedback_request_tags_with_auth_env(
             &FeedbackRequestTags {

@@ -645,7 +645,7 @@ shell_snapshot_v2 = true
 }
 
 #[test]
-fn retired_worktree_and_voice_config_overrides_are_ignored() {
+fn retired_worktree_config_overrides_are_ignored() {
     for enabled in [false, true] {
         let features_toml = FeaturesToml::from(BTreeMap::from([
             ("worktrees".to_string(), enabled),

@@ -911,7 +911,7 @@ mod tests {
                     client_id: None,
                     content: vec![UserInput::Text {
                     text:
-                        "spoken follow-up"
+                        "queued follow-up"
                             .into(),
                     text_elements: Vec::new(),
                 }],
