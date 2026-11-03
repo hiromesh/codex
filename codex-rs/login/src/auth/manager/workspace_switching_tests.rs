@@ -45,7 +45,6 @@ async fn session(server: &MockServer) -> anyhow::Result<(TempDir, AuthManager, A
             oauth_provenance: None,
         }),
         last_refresh: Some(Utc::now()),
-        agent_identity: None,
         personal_access_token: None,
         bedrock_api_key: None,
         bedrock_access_keys: None,
@@ -128,69 +127,6 @@ async fn workspace_switch_preserves_login_and_survives_reload() -> anyhow::Resul
             > before.owner_generation
     );
     manager.switch_workspace("login-1", "business").await?;
-    Ok(())
-}
-
-#[tokio::test]
-#[serial(codex_auth_env)]
-async fn workspace_switch_rejects_stale_agent_identity_and_rolls_back_conditionally()
--> anyhow::Result<()> {
-    let server = MockServer::start().await;
-    let (_home, manager, snapshot) = session(&server).await?;
-    let original_auth = manager.auth_cached().unwrap();
-    Mock::given(method("POST"))
-        .respond_with(
-            ResponseTemplate::new(/*s*/ 200)
-                .set_body_json(json!({"access_token": token("business", "user-1", "business")})),
-        )
-        .mount(&server)
-        .await;
-    Mock::given(method("POST"))
-        .and(body_json(json!({"workspace_id": "personal"})))
-        .respond_with(
-            ResponseTemplate::new(200)
-                .set_body_json(json!({"access_token": token("personal", "user-1", "plus")})),
-        )
-        .with_priority(1)
-        .expect(1)
-        .mount(&server)
-        .await;
-    let switched = manager.switch_workspace("login-1", "business").await?;
-    let selected = manager.auth_cached().unwrap().get_current_auth_json();
-    let error = original_auth
-        .persist_managed_chatgpt_agent_identity_record(AgentIdentityAuthRecord {
-            agent_runtime_id: "runtime-personal".into(),
-            agent_private_key: "private-key-personal".into(),
-            account_id: "personal".into(),
-            chatgpt_user_id: "user-1".into(),
-            email: None,
-            plan_type: AccountPlanType::Plus,
-            chatgpt_account_is_fedramp: false,
-            task_id: None,
-        })
-        .unwrap_err();
-    assert!(error.to_string().contains("Account changed"));
-    manager.reload().await;
-    assert_eq!(
-        manager.auth_cached().unwrap().get_current_auth_json(),
-        selected
-    );
-    manager.rollback_workspace_switch(switched).await?;
-    assert_eq!(
-        manager.auth_cached().unwrap().get_current_auth_json(),
-        Some(snapshot)
-    );
-    let switched = manager.switch_workspace("login-1", "business").await?;
-    manager.logout().await?;
-    assert_eq!(
-        manager
-            .rollback_workspace_switch(switched)
-            .await
-            .unwrap_err()
-            .kind(),
-        io::ErrorKind::Interrupted
-    );
-    assert!(manager.auth_cached().is_none());
     Ok(())
 }
 

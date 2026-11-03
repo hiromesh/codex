@@ -1079,14 +1079,6 @@ async fn thread_read_loaded_include_turns_reads_store_history_without_rollout_pa
                 text: "history from store".to_string(),
                 text_elements: Vec::new(),
             },
-            UserInput::Audio {
-                audio: codex_app_server_protocol::AudioReference::Inline {
-                    url: "https://example.com/recording.mp3".to_string()
-                }
-            },
-            UserInput::LocalAudio {
-                path: "recording.wav".into(),
-            },
         ]
     );
 
@@ -2672,8 +2664,6 @@ fn turn_user_texts(turns: &[codex_app_server_protocol::Turn]) -> Vec<&str> {
                 UserInput::Text { text, .. } => Some(text.as_str()),
                 UserInput::Image { .. }
                 | UserInput::LocalImage { .. }
-                | UserInput::Audio { .. }
-                | UserInput::LocalAudio { .. }
                 | UserInput::Skill { .. }
                 | UserInput::Mention { .. } => None,
             },
@@ -2762,8 +2752,6 @@ fn store_history_items() -> Vec<RolloutItem> {
             message: "history from store".to_string(),
             images: None,
             local_images: Vec::new(),
-            audio: Some(vec!["https://example.com/recording.mp3".to_string()]),
-            local_audio: vec!["recording.wav".into()],
             text_elements: Vec::new(),
             ..Default::default()
         },

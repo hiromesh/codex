@@ -79,7 +79,6 @@ async fn auth_refresh_read_failure_is_transient_and_preserves_network_permit() {
         openai_api_key: None,
         tokens: Some(initial.get_token_data().unwrap()),
         last_refresh: Some(chrono::Utc::now()),
-        agent_identity: None,
         personal_access_token: None,
         bedrock_api_key: None,
         bedrock_access_keys: None,
@@ -112,12 +111,13 @@ async fn auth_refresh_read_failure_is_transient_and_preserves_network_permit() {
 
     let payload = base64::engine::general_purpose::URL_SAFE_NO_PAD
         .encode(json!({"iat": "private-credential-value"}).to_string());
-    let jwt_auth = json!({"agent_identity": format!("header.{payload}.signature")}).to_string();
-    // Cover interrupted writes and credential values rejected by outer JSON or nested JWT parsing.
+    let nested_secret = json!({"tokens": {"access_token": format!("header.{payload}.signature")}})
+        .to_string();
+    // Cover interrupted writes and credential values rejected by outer JSON or nested parsing.
     for contents in [
         "",
         r#"{"auth_mode":"private-credential-value"}"#,
-        jwt_auth.as_str(),
+        nested_secret.as_str(),
     ] {
         std::fs::write(home.path().join("auth.json"), contents).unwrap();
         let error = manager.refresh_token().await.unwrap_err();

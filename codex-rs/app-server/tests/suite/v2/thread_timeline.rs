@@ -36,7 +36,7 @@ use tempfile::TempDir;
 use uuid::Uuid;
 
 #[tokio::test]
-async fn timeline_pages_mix_items_and_resolve_the_opening_realtime_session() -> Result<()> {
+async fn timeline_pages_mix_items_and_turn_boundaries() -> Result<()> {
     let server = create_mock_responses_server_repeating_assistant("Done").await;
     let codex_home = TempDir::new()?;
     MockResponsesConfig::new(&server.uri()).write(codex_home.path())?;

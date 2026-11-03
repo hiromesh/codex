@@ -1113,7 +1113,7 @@ async fn mcp_tool_call_completion_notification_contains_truncated_large_result()
     assert!(mcp.shutdown_gracefully().await?.success());
 
     // The UI receives a truncated result, but the trace retains the original
-    // content and metadata, including audio removed during model sanitization.
+    // content and metadata.
     let bundles = std::fs::read_dir(traces.path())?.collect::<std::io::Result<Vec<_>>>()?;
     assert_eq!(bundles.len(), 1);
     let bundle = bundles[0].path();
@@ -1136,8 +1136,7 @@ async fn mcp_tool_call_completion_notification_contains_truncated_large_result()
         serde_json::from_reader(std::fs::File::open(bundle.join(payload_path))?)?;
     let expected = json!({
         "content": [
-            {"type": "text", "text": "large-mcp-content-".repeat(DEFAULT_OUTPUT_BYTES_CAP / 8)},
-            {"type": "audio", "data": "UklGRg==", "mimeType": "audio/wav"}
+            {"type": "text", "text": "large-mcp-content-".repeat(DEFAULT_OUTPUT_BYTES_CAP / 8)}
         ],
         "structuredContent": {"large": "structured-value-".repeat(DEFAULT_OUTPUT_BYTES_CAP / 8)},
         "isError": false,
@@ -1489,10 +1488,7 @@ impl ServerHandler for ToolAppsMcpServer {
             let mut result = CallToolResult::structured(json!({
                 "large": "structured-value-".repeat(DEFAULT_OUTPUT_BYTES_CAP / 8),
             }));
-            result.content = vec![
-                ContentBlock::text(large_text),
-                ContentBlock::audio("UklGRg==", "audio/wav"),
-            ];
+            result.content = vec![ContentBlock::text(large_text)];
             result.meta = Some(meta);
             return Ok(result.into());
         }

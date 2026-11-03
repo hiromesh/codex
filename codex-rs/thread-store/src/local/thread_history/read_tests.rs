@@ -11,11 +11,6 @@ use codex_protocol::protocol::SessionMeta;
 use codex_protocol::protocol::SessionMetaLine;
 use codex_protocol::protocol::SessionSource;
 use codex_protocol::protocol::ThreadHistoryMode;
-use codex_protocol::realtime::BemItemPresentation;
-use codex_protocol::realtime::RealtimeItem;
-use codex_protocol::realtime::RealtimeItemContent;
-use codex_protocol::realtime::RealtimeSessionOutcome;
-use codex_protocol::realtime::RealtimeTranscriptRole;
 use codex_rollout::RolloutItem;
 use codex_rollout::RolloutLine;
 use pretty_assertions::assert_eq;
@@ -409,164 +404,6 @@ async fn item_anchors_reject_items_outside_the_requested_scope() {
         );
     }
 }
-
-#[tokio::test]
-async fn timeline_interleaves_items_and_restores_page_boundary_session_state() {
-    let (_home, store, thread_id) = store_with_mode(ThreadHistoryMode::Paginated).await;
-    let db = history_db(&store).await;
-    for (item_id, ordinal) in [
-        ("before", 10),
-        ("middle", 20),
-        ("after", 30),
-        ("closed", 40),
-    ] {
-        insert_item(db, thread_id, "turn-1", item_id, ordinal).await;
-    }
-    for (ordinal, item) in [
-        (
-            11,
-            RealtimeItem {
-                id: "voice-1:started".to_string(),
-                realtime_session_id: "voice-1".to_string(),
-                content: RealtimeItemContent::RealtimeSessionStarted,
-            },
-        ),
-        (
-            12,
-            RealtimeItem {
-                id: "voice-1:source:0".to_string(),
-                realtime_session_id: "voice-1".to_string(),
-                content: RealtimeItemContent::TranscriptSegment {
-                    role: RealtimeTranscriptRole::Assistant,
-                    text: "Before the artifact".to_string(),
-                },
-            },
-        ),
-        (
-            21,
-            RealtimeItem {
-                id: "artifact".to_string(),
-                realtime_session_id: "voice-1".to_string(),
-                content: RealtimeItemContent::BemItemPromoted {
-                    turn_id: "turn-1".to_string(),
-                    item_id: "middle".to_string(),
-                    presentation: BemItemPresentation::InlineMarkdown,
-                },
-            },
-        ),
-        (
-            31,
-            RealtimeItem {
-                id: "voice-1:closed".to_string(),
-                realtime_session_id: "voice-1".to_string(),
-                content: RealtimeItemContent::RealtimeSessionClosed {
-                    outcome: RealtimeSessionOutcome::Ended,
-                },
-            },
-        ),
-    ] {
-        let item_json = serde_json::to_string(&item).expect("serialize realtime item");
-        sqlx::query(
-            r#"
-INSERT INTO thread_realtime_items (
-    thread_id, item_id, rollout_ordinal, created_at_ms, item_type, item_json
-) VALUES (?, ?, ?, ?, json_extract(?, '$.type'), ?)
-            "#,
-        )
-        .bind(thread_id.to_string())
-        .bind(&item.id)
-        .bind(ordinal)
-        .bind(ordinal * 1_000)
-        .bind(&item_json)
-        .bind(&item_json)
-        .execute(db)
-        .await
-        .expect("insert realtime item");
-    }
-
-    let latest = store
-        .list_timeline(ListTimelineParams {
-            thread_id,
-            cursor: None,
-            page_size: 3,
-        })
-        .await
-        .expect("list latest timeline page");
-    assert_eq!(
-        latest
-            .items
-            .iter()
-            .map(|item| match item {
-                ThreadTimelineEntry::Item { position, .. }
-                | ThreadTimelineEntry::Realtime { position, .. }
-                | ThreadTimelineEntry::TurnStarted { position, .. }
-                | ThreadTimelineEntry::TurnCompleted { position, .. } => *position,
-            })
-            .collect::<Vec<_>>(),
-        vec![30, 31, 40]
-    );
-    assert_eq!(
-        latest.active_realtime_session_at_page_start,
-        Some("voice-1".to_string())
-    );
-    let older = store
-        .list_timeline(ListTimelineParams {
-            thread_id,
-            cursor: latest.next_cursor,
-            page_size: 3,
-        })
-        .await
-        .expect("list older timeline page");
-    assert_eq!(
-        older
-            .items
-            .iter()
-            .map(|item| match item {
-                ThreadTimelineEntry::Item { position, .. }
-                | ThreadTimelineEntry::Realtime { position, .. }
-                | ThreadTimelineEntry::TurnStarted { position, .. }
-                | ThreadTimelineEntry::TurnCompleted { position, .. } => *position,
-            })
-            .collect::<Vec<_>>(),
-        vec![12, 20, 21]
-    );
-    assert_eq!(
-        older.active_realtime_session_at_page_start,
-        Some("voice-1".to_string())
-    );
-    let oldest = store
-        .list_timeline(ListTimelineParams {
-            thread_id,
-            cursor: older.next_cursor,
-            page_size: 3,
-        })
-        .await
-        .expect("list oldest timeline page");
-    assert_eq!(oldest.active_realtime_session_at_page_start, None);
-    assert!(matches!(
-        oldest.items.as_slice(),
-        [
-            ThreadTimelineEntry::Item { position: 10, .. },
-            ThreadTimelineEntry::Realtime { position: 11, .. }
-        ]
-    ));
-
-    let ordinary_items = store
-        .list_items(item_params(
-            thread_id,
-            /*turn_id*/ None,
-            /*cursor*/ None,
-            /*page_size*/ 10,
-            SortDirection::Asc,
-        ))
-        .await
-        .expect("existing item API excludes realtime facts");
-    assert_eq!(
-        item_ids(&ordinary_items),
-        vec!["before", "middle", "after", "closed"]
-    );
-}
-
 #[tokio::test]
 async fn timeline_turn_boundaries_page_through_shared_ordinals() {
     let (_home, store, thread_id) = store_with_mode(ThreadHistoryMode::Paginated).await;
@@ -630,7 +467,7 @@ async fn timeline_turn_boundaries_page_through_shared_ordinals() {
     assert_eq!(
         all.items
             .iter()
-            .map(crate::local::thread_history::realtime::entry_key)
+            .map(timeline_entry_key)
             .collect::<Vec<_>>(),
         vec![
             (10, 0, "complete"),
@@ -671,124 +508,6 @@ async fn timeline_turn_boundaries_page_through_shared_ordinals() {
     .collect::<Vec<ThreadTimelineEntry>>();
     assert_eq!(completed, expected);
 }
-
-#[tokio::test]
-async fn timeline_page_state_excludes_realtime_events_after_fork_cutoff() {
-    let (home, store, child_id) = store_with_mode(ThreadHistoryMode::Paginated).await;
-    let source_id = ThreadId::default();
-    let source_path = rollout_path(home.path(), source_id);
-    write_rollout_with_end(
-        source_path.as_path(),
-        source_id,
-        /*history_base*/ None,
-        /*next_ordinal*/ 5,
-    );
-    write_rollout_with_end(
-        rollout_path(home.path(), child_id).as_path(),
-        child_id,
-        Some(history_position(
-            source_path.as_path(),
-            source_id,
-            /*end_ordinal_exclusive*/ 3,
-        )),
-        /*next_ordinal*/ 2,
-    );
-
-    let db = history_db(&store).await;
-    insert_turn(
-        db,
-        source_id,
-        "source-turn",
-        /*rollout_ordinal*/ 1,
-        "completed",
-        /*error_json*/ None,
-        /*first_user_item_id*/ None,
-        /*final_agent_item_id*/ None,
-    )
-    .await;
-    sqlx::query("UPDATE thread_turns SET rollout_end_ordinal = 4 WHERE thread_id = ?")
-        .bind(source_id.to_string())
-        .execute(db)
-        .await
-        .expect("source turn end");
-    insert_item(
-        db,
-        child_id,
-        "child-turn",
-        "child-item",
-        /*rollout_ordinal*/ 4,
-    )
-    .await;
-    for (ordinal, item) in [
-        (
-            1,
-            RealtimeItem {
-                id: "voice:started".to_string(),
-                realtime_session_id: "voice".to_string(),
-                content: RealtimeItemContent::RealtimeSessionStarted,
-            },
-        ),
-        (
-            3,
-            RealtimeItem {
-                id: "voice:closed".to_string(),
-                realtime_session_id: "voice".to_string(),
-                content: RealtimeItemContent::RealtimeSessionClosed {
-                    outcome: RealtimeSessionOutcome::Ended,
-                },
-            },
-        ),
-    ] {
-        let item_json = serde_json::to_string(&item).expect("serialize realtime item");
-        sqlx::query(
-            r#"
-INSERT INTO thread_realtime_items (
-    thread_id, item_id, rollout_ordinal, created_at_ms, item_type, item_json
-) VALUES (?, ?, ?, ?, json_extract(?, '$.type'), ?)
-            "#,
-        )
-        .bind(source_id.to_string())
-        .bind(&item.id)
-        .bind(ordinal)
-        .bind(ordinal * 1_000)
-        .bind(&item_json)
-        .bind(&item_json)
-        .execute(db)
-        .await
-        .expect("insert realtime boundary");
-    }
-
-    let page = store
-        .list_timeline(ListTimelineParams {
-            thread_id: child_id,
-            cursor: None,
-            page_size: 1,
-        })
-        .await
-        .expect("list forked timeline page");
-
-    assert_eq!(
-        page.active_realtime_session_at_page_start,
-        Some("voice".to_string())
-    );
-    let inherited = store
-        .list_timeline(ListTimelineParams {
-            thread_id: child_id,
-            cursor: page.next_cursor,
-            page_size: 10,
-        })
-        .await
-        .expect("inherited timeline");
-    assert_eq!(
-        inherited
-            .items
-            .iter()
-            .map(crate::local::thread_history::realtime::entry_key)
-            .collect::<Vec<_>>(),
-        vec![(1, 0, "source-turn"), (1, 2, "voice:started")]
-    );
-}
-
 #[tokio::test]
 async fn list_items_filters_exclusive_update_ordinals_across_pages_and_turns() {
     let (_home, store, thread_id) = store_with_mode(ThreadHistoryMode::Paginated).await;
@@ -1809,4 +1528,18 @@ fn item_ids(page: &ItemPage) -> Vec<&str> {
         .iter()
         .map(|item| item.item_id.as_str())
         .collect()
+}
+
+fn timeline_entry_key(entry: &ThreadTimelineEntry) -> (u64, u8, &str) {
+    match entry {
+        ThreadTimelineEntry::TurnStarted {
+            position, turn_id, ..
+        } => (*position, 0, turn_id.as_str()),
+        ThreadTimelineEntry::Item {
+            position, item, ..
+        } => (*position, 1, item.id()),
+        ThreadTimelineEntry::TurnCompleted {
+            position, turn_id, ..
+        } => (*position, 3, turn_id.as_str()),
+    }
 }

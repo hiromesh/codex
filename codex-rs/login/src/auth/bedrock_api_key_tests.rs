@@ -17,7 +17,6 @@ fn api_key_auth() -> AuthDotJson {
         openai_api_key: Some("sk-test-key".to_string()),
         tokens: None,
         last_refresh: None,
-        agent_identity: None,
         personal_access_token: None,
         bedrock_api_key: None,
         bedrock_access_keys: None,
@@ -30,7 +29,6 @@ fn bedrock_only_auth() -> AuthDotJson {
         openai_api_key: None,
         tokens: None,
         last_refresh: None,
-        agent_identity: None,
         personal_access_token: None,
         bedrock_api_key: Some(bedrock_auth()),
         bedrock_access_keys: None,
@@ -89,7 +87,6 @@ async fn login_with_bedrock_api_key_replaces_openai_auth() -> anyhow::Result<()>
         openai_api_key: None,
         tokens: None,
         last_refresh: None,
-        agent_identity: None,
         personal_access_token: None,
         bedrock_api_key: Some(bedrock_auth()),
         bedrock_access_keys: None,
@@ -103,7 +100,6 @@ async fn login_with_bedrock_api_key_replaces_openai_auth() -> anyhow::Result<()>
             | CodexAuth::Chatgpt(_)
             | CodexAuth::ChatgptAuthTokens(_)
             | CodexAuth::Headers(_)
-            | CodexAuth::AgentIdentity(_)
             | CodexAuth::PersonalAccessToken(_)
             | CodexAuth::BedrockAccessKeys(_) => None,
         }),
@@ -174,7 +170,6 @@ async fn access_keys_auth_round_trips_and_logs_out() -> anyhow::Result<()> {
             | CodexAuth::Chatgpt(_)
             | CodexAuth::ChatgptAuthTokens(_)
             | CodexAuth::Headers(_)
-            | CodexAuth::AgentIdentity(_)
             | CodexAuth::PersonalAccessToken(_)
             | CodexAuth::BedrockApiKey(_) => None,
         }),
@@ -222,7 +217,6 @@ async fn bedrock_only_auth_storage_creates_primary_auth() -> anyhow::Result<()> 
             | CodexAuth::Chatgpt(_)
             | CodexAuth::ChatgptAuthTokens(_)
             | CodexAuth::Headers(_)
-            | CodexAuth::AgentIdentity(_)
             | CodexAuth::PersonalAccessToken(_)
             | CodexAuth::BedrockAccessKeys(_) => None,
         }),

@@ -153,13 +153,6 @@ async fn legacy_identity_persistence_does_not_reload_credentials() -> anyhow::Re
     stored.tokens = replacement.get_current_auth_json().unwrap().tokens;
     storage.save(&stored)?;
     let stored = storage.load()?.unwrap();
-    let identity = serde_json::from_value(json!({
-        "agent_runtime_id": "legacy-runtime",
-        "agent_private_key": codex_agent_identity::generate_agent_key_material()?.private_key_pkcs8_base64,
-        "account_id": "workspace-a", "chatgpt_user_id": "user-a", "plan_type": "pro",
-        "chatgpt_account_is_fedramp": false, "task_id": "legacy-task",
-    }))?;
-    captured.persist_managed_chatgpt_agent_identity_record(identity)?;
     assert_eq!(captured.get_token()?, original.get_token()?);
     assert_eq!(manager.auth_change_state_for(&captured), Some(initial));
     assert_eq!(storage.load()?.unwrap().tokens, stored.tokens);
