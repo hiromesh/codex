@@ -553,8 +553,6 @@ codex_release_archive(
     release = "historical",
 )
 
-include("//bazel/modules:wine.MODULE.bazel")
-
 voice_sources = use_extension("//third_party/voice:extensions.bzl", "voice_sources")
 use_repo(
     voice_sources,

@@ -295,7 +295,6 @@ async fn configured_vertex_models_filter_catalog_and_normalize_tool_metadata_wit
             .find(|info| info.slug == model)
             .expect("bundled model catalog should contain the supported Vertex model");
         configured_model.use_responses_lite = true;
-        configured_model.tool_mode = Some(ToolMode::CodeModeOnly);
         configured_model.apply_patch_tool_type = Some(ApplyPatchToolType::Freeform);
         configured_model.multi_agent_version = Some(MultiAgentVersion::V2);
         let mut expected_model = configured_model.clone();

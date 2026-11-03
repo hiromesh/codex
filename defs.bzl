@@ -2,8 +2,6 @@ load("@crates//:data.bzl", "DEP_DATA")
 load("@crates//:defs.bzl", "all_crate_deps")
 load("@rules_rust//cargo/private:cargo_build_script_wrapper.bzl", "cargo_build_script")
 load("@rules_rust//rust:defs.bzl", "rust_binary", "rust_library", "rust_proc_macro", "rust_test")
-load("//bazel/rules/testing:foreign_platform_binary.bzl", "foreign_platform_binary")
-load("//bazel/rules/testing/wine:wine_runtime.bzl", "WINE_TEST_TARGET_COMPATIBLE_WITH", "wine_test_runtime")
 
 # Reserve 8 MiB of stack on Windows and statically link the CRT on MSVC.
 WINDOWS_GNULLVM_RUSTC_LINK_FLAGS = [
@@ -211,8 +209,7 @@ def codex_rust_crate(
         test_threads = 0,
         unit_test_timeout = None,
         extra_binaries = [],
-        extra_binaries_non_windows = [],
-        run_tests_with_wine_exec = False):
+        extra_binaries_non_windows = []):
     """Defines a Rust crate with library, binaries, and tests wired for Bazel + Cargo parity.
 
     The macro mirrors Cargo conventions: it builds a library when `src/` exists,
@@ -276,9 +273,6 @@ def codex_rust_crate(
         extra_binaries_non_windows: Like `extra_binaries`, but omitted from
             Windows test data and environment variables. Tests using these
             binaries must be excluded when targeting Windows.
-        run_tests_with_wine_exec: Boolean, defaults to False. Whether to emit a
-            Wine-exec variant for each integration test. Variants inherit the
-            native test's timeout, tags, and shard count.
     """
     test_env = {
         # The launcher resolves an absolute workspace root at runtime so
@@ -528,11 +522,6 @@ def codex_rust_crate(
             "//conditions:default": cargo_env_runfiles | non_windows_cargo_env_runfiles,
         })
 
-    wine_host_binaries = {
-        env_var.removeprefix("CARGO_BIN_EXE_"): binary_label
-        for binary_label, env_var in (cargo_env_runfiles | non_windows_cargo_env_runfiles).items()
-    }
-
     integration_test_kwargs = {}
     if integration_test_args:
         integration_test_kwargs["args"] = integration_test_args
@@ -561,7 +550,7 @@ def codex_rust_crate(
 
         integration_test_binary = test_name + "-bin"
 
-        # There are four generated integration-test shapes:
+        # There are three generated integration-test shapes:
         #
         # 1. Unsharded native tests keep the plain rust_test label for minimal
         #    churn and the usual rules_rust Cargo-like environment.
@@ -572,12 +561,6 @@ def codex_rust_crate(
         # 3. Windows cross tests always use the workspace_root_test wrapper so
         #    runfile env vars become Windows-native absolute paths before the
         #    Rust process starts.
-        # 4. Wine-exec tests reuse the native Rust test binary behind a shared
-        #    Linux runner. The runner starts the cross-built Windows exec server
-        #    under pinned Wine, injects its URL into the test environment, and
-        #    owns cleanup. The outer workspace_root_test resolves the runner,
-        #    test, and server from runfiles, sets a Cargo-like cwd, and applies
-        #    the native test's shard count.
         if test_shard_count:
             # This target is intentionally a binary-like helper, not the public
             # test target. The wrapper below owns cwd setup, runfile env
@@ -644,53 +627,6 @@ def codex_rust_crate(
                 tags = test_tags,
                 version = crate_version,
                 **test_kwargs
-            )
-
-        if run_tests_with_wine_exec:
-            wine_test_name = test_name.removesuffix("-test") + "-wine-exec-test"
-            native_test_binary = ":" + (integration_test_binary if test_shard_count else test_name)
-            wine_test_binaries = dict(wine_host_binaries)
-
-            wine_exec_server = wine_test_name + "-windows-exec-server"
-            foreign_platform_binary(
-                name = wine_exec_server,
-                binary = "//codex-rs/exec-server/testing:exec-server",
-                extra_rustc_flags = WINDOWS_GNULLVM_RUSTC_LINK_FLAGS,
-                platform = "//:windows_x86_64_gnullvm",
-                tags = ["manual"],
-                target_compatible_with = [
-                    "@platforms//cpu:x86_64",
-                    "@platforms//os:linux",
-                ],
-                testonly = True,
-                visibility = ["//visibility:private"],
-            )
-            wine_test_binaries["wine-windows-exec-server"] = ":" + wine_exec_server
-            wine_runtime = wine_test_runtime(wine_test_binaries)
-            wine_runfile_env = dict(wine_runtime.runfile_env)
-            wine_runfile_env[native_test_binary] = "CODEX_WINE_EXEC_TEST_BINARY"
-
-            wine_test_kwargs = {}
-            wine_test_kwargs.update(integration_test_kwargs)
-            if test_shard_count:
-                wine_test_kwargs["shard_count"] = test_shard_count
-                wine_test_kwargs["flaky"] = True
-
-            # The Wine runner is a binary rather than a rust_test, but it still
-            # needs a Cargo-like cwd, Bazel sharding, and absolute runfile paths.
-            # `workspace_root_test` establishes all three before Wine starts.
-            workspace_root_test(
-                name = wine_test_name,
-                data = wine_runtime.data,
-                env = test_env,
-                runfile_env = wine_runfile_env,
-                test_bin = "//codex-rs/exec-server/testing:wine-exec-test-runner",
-                workspace_root_marker = "//codex-rs/utils/cargo-bin:repo_root.marker",
-                target_compatible_with = WINE_TEST_TARGET_COMPATIBLE_WITH,
-                # This wrapper has no Rust sources and transitions a data
-                # dependency to a Windows toolchain the lint does not register.
-                tags = test_tags + ["no-argument-comment-lint"],
-                **wine_test_kwargs
             )
 
         windows_cross_test_kwargs = {}

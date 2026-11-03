@@ -12,7 +12,6 @@ codex_rust_crate(
         "//codex-rs/cli:codex",
     ],
     integration_test_timeout = "long",
-    run_tests_with_wine_exec = True,
     test_shard_counts = {
         # Note app-server-all-test has a large number of integration tests, so
         # even a single shard can be quite slow. When there is a legitimate

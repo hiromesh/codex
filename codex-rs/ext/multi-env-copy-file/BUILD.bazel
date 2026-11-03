@@ -8,6 +8,5 @@ codex_rust_crate(
         "//codex-rs/linux-sandbox:codex-linux-sandbox",
         "//codex-rs/cli:codex",
     ],
-    run_tests_with_wine_exec = True,
     test_tags = ["no-sandbox"],
 )

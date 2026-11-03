@@ -13,7 +13,7 @@ use core_test_support::responses::ResponsesRequest;
 use pretty_assertions::assert_eq;
 use test_case::test_case;
 
-/// The selected executor may be local, Docker, or Wine; the second executor is host-native.
+/// The selected executor may be local, Docker, or remote; the second executor is host-native.
 /// One flow covers same-environment rejection and both directions across executor boundaries.
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn copy_file_transfers_between_selected_and_native_executors() -> Result<()> {
@@ -207,7 +207,7 @@ async fn copy_file_transfers_between_selected_and_native_executors() -> Result<(
     Ok(())
 }
 
-/// Under wine-exec this crosses Linux/Windows with one local endpoint in both directions.
+/// This crosses Linux/Windows when the remote executor runs on a different platform.
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn copy_file_transfers_between_local_and_foreign_executors() -> Result<()> {
     core_test_support::skip_if_no_remote_env!(Ok(()));

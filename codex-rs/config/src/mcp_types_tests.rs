@@ -519,17 +519,9 @@ fn deserialize_server_config_with_parallel_tool_calls() {
 fn serialize_round_trips_server_config_with_omitted_tool_exposure_surfaces() {
     for omitted_surfaces in [
         vec![],
-        vec![ToolExposureSurface::CodeMode],
         vec![ToolExposureSurface::Deferred],
         vec![ToolExposureSurface::Direct],
-        vec![ToolExposureSurface::CodeMode, ToolExposureSurface::Deferred],
-        vec![ToolExposureSurface::CodeMode, ToolExposureSurface::Direct],
         vec![ToolExposureSurface::Deferred, ToolExposureSurface::Direct],
-        vec![
-            ToolExposureSurface::CodeMode,
-            ToolExposureSurface::Deferred,
-            ToolExposureSurface::Direct,
-        ],
     ] {
         let serialized_surfaces = omitted_surfaces
             .iter()

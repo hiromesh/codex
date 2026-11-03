@@ -26,10 +26,8 @@ excluded_targets="$(
     -- 'attr(tags, "no-argument-comment-lint", //codex-rs/...)'
 )"
 
-# The lint configuration does not register the transitioned Windows toolchain.
 printf '%s\n' \
-  "//codex-rs/..." \
-  "-//codex-rs/core/tests/remote_env_windows:smoke-test"
+  "//codex-rs/..."
 if [[ -n "${excluded_targets}" ]]; then
   printf '%s\n' "${excluded_targets}" | sed 's/^/-/'
 fi

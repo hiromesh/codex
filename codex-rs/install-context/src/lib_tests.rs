@@ -18,11 +18,6 @@ fn detects_standalone_install_from_release_layout() -> std::io::Result<()> {
     fs::create_dir_all(&resources_dir)?;
     let exe_path = release_dir.join(if cfg!(windows) { "codex.exe" } else { "codex" });
     fs::write(&exe_path, "")?;
-    fs::write(release_dir.join(CODE_MODE_HOST_EXECUTABLE_NAME), "")?;
-    fs::write(
-        resources_dir.join(CODE_MODE_HOST_EXECUTABLE_NAME),
-        "managed host",
-    )?;
     fs::write(resources_dir.join(default_rg_command()), "")?;
     fs::write(resources_dir.join(TEST_RESOURCE_NAME), "")?;
     let canonical_release_dir = AbsolutePathBuf::from_absolute_path(release_dir.canonicalize()?)?;
@@ -45,18 +40,6 @@ fn detects_standalone_install_from_release_layout() -> std::io::Result<()> {
             },
             package_layout: None,
         }
-    );
-    assert_eq!(
-        context.code_mode_host_program_from_exe(Some(&exe_path)),
-        canonical_release_dir
-            .join(CODE_MODE_HOST_EXECUTABLE_NAME)
-            .into_path_buf()
-    );
-    assert_eq!(
-        context.code_mode_host_program(),
-        canonical_resources_dir
-            .join(CODE_MODE_HOST_EXECUTABLE_NAME)
-            .into_path_buf()
     );
     assert_eq!(
         context.bundled_resource(TEST_RESOURCE_NAME),
@@ -109,7 +92,6 @@ fn detects_package_layout_independently_from_install_method() -> std::io::Result
     )?;
     let exe_path = bin_dir.join(if cfg!(windows) { "codex.exe" } else { "codex" });
     fs::write(&exe_path, "")?;
-    fs::write(bin_dir.join(CODE_MODE_HOST_EXECUTABLE_NAME), "")?;
     fs::write(resources_dir.join(TEST_RESOURCE_NAME), "")?;
     fs::write(path_dir.join(default_rg_command()), "")?;
     let canonical_package_dir =
@@ -143,18 +125,6 @@ fn detects_package_layout_independently_from_install_method() -> std::io::Result
         Some(CodexPackageManifest {
             version: Version::new(1, 2, 3),
         })
-    );
-    assert_eq!(
-        context.code_mode_host_program_from_exe(Some(&exe_path)),
-        canonical_bin_dir
-            .join(CODE_MODE_HOST_EXECUTABLE_NAME)
-            .into_path_buf()
-    );
-    assert_eq!(
-        context.code_mode_host_program(),
-        canonical_bin_dir
-            .join(CODE_MODE_HOST_EXECUTABLE_NAME)
-            .into_path_buf()
     );
     assert_eq!(
         context.rg_command(),
@@ -282,24 +252,17 @@ fn bundled_file_lookups_ignore_directories() -> std::io::Result<()> {
     let resources_dir = package_dir.path().join(RESOURCES_DIRNAME);
     let path_dir = package_dir.path().join(PATH_DIRNAME);
     fs::create_dir_all(&bin_dir)?;
-    fs::create_dir_all(bin_dir.join(CODE_MODE_HOST_EXECUTABLE_NAME))?;
     fs::create_dir_all(resources_dir.join(TEST_RESOURCE_NAME))?;
     fs::create_dir_all(path_dir.join(default_rg_command()))?;
     fs::write(package_dir.path().join(PACKAGE_METADATA_FILENAME), "{}")?;
     let exe_path = bin_dir.join(if cfg!(windows) { "codex.exe" } else { "codex" });
     fs::write(&exe_path, "")?;
-    let fallback_exe_path = package_dir.path().join("fallback-codex");
-    fs::write(&fallback_exe_path, "")?;
 
     let context = InstallContext::from_exe_with_codex_home(
         /*is_macos*/ false,
         /*current_exe*/ Some(&exe_path),
         /*method_override*/ None,
         /*codex_home*/ None,
-    );
-    assert_eq!(
-        context.code_mode_host_program_from_exe(Some(&fallback_exe_path)),
-        package_dir.path().join(CODE_MODE_HOST_EXECUTABLE_NAME)
     );
     assert_eq!(context.rg_command(), default_rg_command());
     assert_eq!(context.bundled_resource(TEST_RESOURCE_NAME), None);

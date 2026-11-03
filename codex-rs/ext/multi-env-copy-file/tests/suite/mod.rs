@@ -245,8 +245,8 @@ async fn copy_file_validates_endpoints() -> Result<()> {
     let platform = match convention {
         PathConvention::Posix => "unix",
         PathConvention::Windows => {
-            // Opening a directory as a file reports PermissionDenied on native Windows
-            // and InvalidInput through the Wine executor.
+            // Opening a directory as a file reports PermissionDenied or
+            // InvalidInput depending on the Windows execution environment.
             filters.push((
                 r": (?:permission denied|invalid input parameter)",
                 ": <DIRECTORY_ERROR>",

@@ -3,10 +3,8 @@
 //! Direct specifications, search indexes, and cached definitions remain unchanged.
 
 use crate::LoadableToolSpec;
-use crate::ToolName;
 use codex_protocol::openai_models::IndirectDescriptionPrefixes;
 use std::collections::BTreeMap;
-use std::collections::BTreeSet;
 use std::collections::btree_map::Entry;
 
 /// Conflicting catalog selectors for the same namespace, without including their prompt text.
