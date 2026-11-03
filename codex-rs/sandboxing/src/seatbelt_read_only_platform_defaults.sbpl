@@ -141,9 +141,7 @@
 (allow file-read*
   (literal "/private/var/db/eligibilityd/eligibility.plist"))
 
-; Audio and power management services.
-(allow mach-lookup (global-name "com.apple.audio.audiohald"))
-(allow mach-lookup (global-name "com.apple.audio.AudioComponentRegistrar"))
+; Power management services.
 (allow mach-lookup (global-name "com.apple.PowerManagement.control"))
 
 ; Allow reading the minimum system runtime so exec works.

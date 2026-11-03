@@ -885,7 +885,7 @@ mod tests {
     }
 
     #[test]
-    fn buffered_voice_handoff_retains_only_preexisting_typed_reasoning() {
+    fn buffered_user_follow_up_retains_only_preexisting_typed_reasoning() {
         let thread_id = ThreadId::new().to_string();
         let turn_id = "mixed-reasoning-turn".to_string();
         let mut store = ThreadEventStore::new(/*capacity*/ 16);
@@ -907,7 +907,7 @@ mod tests {
                 thread_id.clone(),
                 turn_id.clone(),
                 ThreadItemPayload::UserMessage {
-                    id: "voice-marker".into(),
+                    id: "user-marker".into(),
                     client_id: None,
                     content: vec![UserInput::Text {
                     text:
@@ -921,7 +921,7 @@ mod tests {
         ));
         for (id, text) in [
             ("typed-reasoning", "Typed tail"),
-            ("private-reasoning", "Private voice reasoning"),
+            ("private-reasoning", "Private follow-up reasoning"),
         ] {
             if id == "private-reasoning" {
                 store.push_notification(ServerNotification::ItemStarted(

@@ -330,8 +330,7 @@ the model catalog still determines which service tiers a model supports.
 Existing threads retain their provider configuration. Input RPCs reject requests when managed
 `model_provider` or `model_providers` requirements no longer match that configuration, or cannot
 be loaded. This covers turn start/steer, review, compaction, manual queue start, and active goal
-updates. Realtime connections use separate routing configuration and are not checked here.
-Interrupt, realtime stop, and goal pause/clear remain available.
+updates. Interrupt and goal pause/clear remain available.
 
 Resume and input RPCs also reject a thread whose saved provider differs from the current
 configured provider, including profile and app-server launch overrides. The JSON-RPC error's

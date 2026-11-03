@@ -14,7 +14,6 @@ use crate::compact_remote_v2::BackgroundCompactionCandidate;
 use crate::compact_remote_v2::run_inline_remote_auto_compact_task as run_inline_remote_auto_compact_task_v2;
 use crate::connectors;
 use crate::context::ContextualUserFragment;
-use crate::context::UserVerificationNotice;
 use crate::cyber_access_program;
 use crate::environment_selection::TurnEnvironmentSnapshot;
 use crate::feedback_tags;

@@ -1,6 +1,6 @@
 //! Width-independent display content retained after an MCP call completes.
 //!
-//! The wire result can contain multi-megabyte image, audio, or resource bodies. Validate each
+//! The wire result can contain multi-megabyte media or resource bodies. Validate each
 //! block once with the MCP model, then retain only what history rendering actually displays.
 
 use crate::text_formatting::format_json_compact;
@@ -76,9 +76,6 @@ impl McpToolResult {
                         }
                         McpContentDisplay::Summary("Returned image".into())
                     }
-                    Ok(ContentBlock::Audio(_)) => {
-                        McpContentDisplay::Summary("<audio content>".into())
-                    }
                     Ok(ContentBlock::Resource(resource)) => {
                         let summary = match resource.resource {
                             ResourceContents::TextResourceContents { uri, .. }
@@ -92,7 +89,8 @@ impl McpToolResult {
                     Ok(ContentBlock::ResourceLink(link)) => {
                         McpContentDisplay::Summary(format!("link: {}", link.uri).into())
                     }
-                    Ok(_) | Err(_) => McpContentDisplay::Json(block.to_string()),
+                    Ok(_) => McpContentDisplay::Summary("<unsupported content>".into()),
+                    Err(_) => McpContentDisplay::Json(block.to_string()),
                 };
                 McpContentBlock {
                     display,

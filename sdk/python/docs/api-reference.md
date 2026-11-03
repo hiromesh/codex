@@ -378,8 +378,7 @@ from openai_codex.types import (
 ### Notifications and generated models
 
 Known notifications have typed `Notification.payload` values, including
-authentication recovery, thread queue/project changes, thread reversion, and
-realtime item updates. The `Notification.payload` type covers every registered
+authentication recovery, thread queue/project changes, and thread reversion. The `Notification.payload` type covers every registered
 event. Unknown methods and payloads that fail validation still produce
 `UnknownNotification`, with the raw data in
 `.params`. When an event gains a typed payload, read its named fields instead

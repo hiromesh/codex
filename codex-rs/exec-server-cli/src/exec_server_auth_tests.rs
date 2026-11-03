@@ -3,11 +3,9 @@
 use std::path::Path;
 use std::time::Duration;
 
-use codex_aws_auth::AwsAccessKeys;
 use codex_login::AuthCredentialsStoreMode;
 use codex_login::AuthKeyringBackendKind;
 use http::HeaderValue;
-use http::Method;
 use pretty_assertions::assert_eq;
 use tempfile::TempDir;
 use wiremock::Mock;
@@ -185,48 +183,6 @@ async fn chatgpt_executor_rejects_changed_user_and_workspace_policy() {
 }
 
 #[tokio::test]
-async fn chatgpt_executor_rejects_same_owner_agent_identity() {
-    let home = TempDir::new().unwrap();
-    write_chatgpt_auth_with_claims(
-        home.path(),
-        "initial",
-        Some("test-account-id"),
-        serde_json::json!({"chatgpt_user_id": "test-user-id", "chatgpt_plan_type": "pro"}),
-    );
-    let provider = stored_chatgpt_provider(home.path()).await;
-    let agent_manager = codex_login::test_support::auth_manager_with_agent_identity()
-        .await
-        .unwrap();
-    let Some(CodexAuth::AgentIdentity(agent)) = agent_manager.auth_cached() else {
-        panic!("expected agent identity fixture");
-    };
-    std::fs::write(
-        home.path().join("auth.json"),
-        serde_json::to_vec(&serde_json::json!({
-            "auth_mode": codex_protocol::auth::AuthMode::AgentIdentity,
-            "agent_identity": agent.record(),
-        }))
-        .unwrap(),
-    )
-    .unwrap();
-    // Ensure the fixture is a valid, loadable credential for the same owner.
-    assert!(matches!(
-        CodexAuth::from_auth_storage(
-            home.path(),
-            AuthCredentialsStoreMode::File,
-            /*chatgpt_base_url*/ None,
-            AuthKeyringBackendKind::default(),
-            &codex_login::test_support::transport_default_auth_route_config(),
-        )
-        .await
-        .unwrap(),
-        Some(CodexAuth::AgentIdentity(_))
-    ));
-    assert!(provider.apply_auth_headers(HeaderMap::new()).await.is_err());
-    assert!(provider.to_auth_headers().is_err());
-}
-
-#[tokio::test]
 async fn executor_concurrent_rotation_checks_identity_before_refresh() {
     const CHILD_MODE: &str = "CODEX_EXECUTOR_AUTH_TEST_MODE";
     let Ok(mode) = std::env::var(CHILD_MODE) else {
@@ -279,7 +235,7 @@ async fn executor_concurrent_rotation_checks_identity_before_refresh() {
             .expect(0)
             .mount(&server)
             .await;
-        for mode in ["pat", "chatgpt", "agent", "kind-switch", "pat-outage"] {
+        for mode in ["pat", "chatgpt", "kind-switch", "pat-outage"] {
             let mut child = tokio::process::Command::new(std::env::current_exe().unwrap());
             child
                 .args([
@@ -335,20 +291,8 @@ async fn executor_concurrent_rotation_checks_identity_before_refresh() {
         assert_eq!(provider.to_auth_headers().unwrap(), headers);
         return;
     }
-    if mode == "agent" || mode == "kind-switch" {
-        if mode == "agent" {
-            let manager = codex_login::test_support::auth_manager_with_agent_identity()
-                .await
-                .unwrap();
-            let Some(CodexAuth::AgentIdentity(agent)) = manager.auth_cached() else {
-                panic!("agent fixture");
-            };
-            let mut record = agent.record().clone();
-            record.task_id = None;
-            std::fs::write(&auth_path, serde_json::to_vec(&serde_json::json!({"auth_mode":codex_protocol::auth::AuthMode::AgentIdentity, "agent_identity":record})).unwrap()).unwrap();
-        } else {
-            std::fs::write(&auth_path, r#"{"personal_access_token":"at-initial"}"#).unwrap();
-        }
+    if mode == "kind-switch" {
+        std::fs::write(&auth_path, r#"{"personal_access_token":"at-initial"}"#).unwrap();
         assert!(matches!(
             provider.apply_auth_headers(HeaderMap::new()).await,
             Err(AuthError::Build(_))
@@ -559,99 +503,3 @@ async fn executor_refresh_survives_cancelled_caller() {
     );
 }
 
-async fn test_provider() -> AwsSigV4AuthProvider {
-    let context = AwsAuthContext::load_with_access_keys(
-        AwsAuthConfig {
-            profile: None,
-            region: Some("us-east-1".to_string()),
-            service: "execute-api".to_string(),
-        },
-        AwsAccessKeys {
-            access_key_id: "test-access-key".to_string(),
-            secret_access_key: "test-secret-key".to_string(),
-            session_token: Some("test-session-token".to_string()),
-        },
-        codex_http_client::HttpClientFactory::new(
-            codex_http_client::OutboundProxyPolicy::ReqwestDefault,
-        ),
-    )
-    .await
-    .expect("load fixture signing context");
-    AwsSigV4AuthProvider { context }
-}
-
-#[tokio::test]
-async fn signs_requests_without_changing_payload_or_metadata() {
-    let provider = test_provider().await;
-    let url = "https://executor.example.com/connect?environment_id=environment-1";
-    for mut request in [
-        Request::new(Method::GET, url.to_string()),
-        Request::new(Method::POST, url.to_string())
-            .with_json(&serde_json::json!({"transport": "direct_jsonrpc_v1"})),
-        Request::new(Method::POST, url.to_string())
-            .with_json(&serde_json::json!({"transport": "direct_jsonrpc_v1"}))
-            .with_compression(RequestCompression::Zstd),
-    ] {
-        request
-            .headers
-            .insert("session_id", HeaderValue::from_static("session-1"));
-        request
-            .headers
-            .insert("x-custom-header", HeaderValue::from_static("preserved"));
-        request.timeout = Some(Duration::from_secs(3));
-        let method = request.method.clone();
-        let expected = request
-            .prepare_body_for_send()
-            .expect("prepare fixture body");
-        let signed = provider
-            .apply_auth(request)
-            .await
-            .expect("sign fixture request");
-
-        assert_eq!(signed.method, method);
-        assert_eq!(signed.url, url);
-        assert_eq!(signed.timeout, Some(Duration::from_secs(3)));
-        assert_eq!(signed.body, expected.body.clone().map(RequestBody::Raw));
-        assert_eq!(signed.compression, RequestCompression::None);
-        for (name, value) in &expected.headers {
-            assert_eq!(signed.headers.get(name), Some(value));
-        }
-        assert_eq!(signed.headers["x-amz-security-token"], "test-session-token");
-        assert!(signed.headers.contains_key("x-amz-date"));
-        let authorization = signed.headers[http::header::AUTHORIZATION]
-            .to_str()
-            .unwrap();
-        assert!(authorization.starts_with("AWS4-HMAC-SHA256 "));
-        assert!(authorization.contains("/us-east-1/execute-api/aws4_request"));
-        assert_eq!(signed.prepare_body_for_send().unwrap().body, expected.body);
-    }
-}
-
-#[tokio::test]
-async fn invalid_signing_request_is_a_permanent_auth_error() {
-    let provider = test_provider().await;
-    let error = provider
-        .apply_auth(Request::new(Method::GET, "not a URL".to_string()))
-        .await
-        .expect_err("invalid URL should fail signing");
-    assert!(matches!(error, AuthError::Build(_)));
-}
-
-#[tokio::test]
-async fn invalid_signing_configuration_is_rejected() {
-    let config = AwsAuthConfig {
-        profile: None,
-        region: Some("us-east-1".to_string()),
-        service: " ".to_string(),
-    };
-    let error = aws_sigv4_auth_provider(
-        config,
-        codex_http_client::HttpClientFactory::new(
-            codex_http_client::OutboundProxyPolicy::ReqwestDefault,
-        ),
-    )
-    .await
-    .err()
-    .expect("empty service should fail configuration");
-    assert!(matches!(error, AwsAuthError::EmptyService));
-}

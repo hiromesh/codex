@@ -351,7 +351,6 @@ fn projected_content_preserves_full_rendering() {
         result(vec![
             json!({"type": "text", "text": text}),
             json!({"type": "image", "mimeType": "image/png", "data": PNG}),
-            json!({"type": "audio", "mimeType": "audio/wav", "data": "audio data"}),
             json!({"type": "resource", "resource": {"uri": "file:///text.txt", "text": "resource body"}}),
             json!({"type": "resource", "resource": {"uri": "file:///blob.bin", "blob": "binary data"}}),
             json!({"type": "resource_link", "uri": "file:///linked.txt", "name": "linked"}),
@@ -372,7 +371,6 @@ fn projected_content_preserves_full_rendering() {
         vec![
             format_text(text),
             "Returned image".to_string(),
-            "<audio content>".to_string(),
             "embedded resource: file:///text.txt".to_string(),
             "embedded resource: file:///blob.bin".to_string(),
             "link: file:///linked.txt".to_string(),

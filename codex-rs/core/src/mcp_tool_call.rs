@@ -1003,7 +1003,10 @@ fn sanitize_mcp_tool_result_for_model(
             .into_iter()
             .filter_map(|block| {
                 if let Some(content_type) = block.get("type").and_then(serde_json::Value::as_str) {
-                    if content_type == "audio" {
+                    if !matches!(
+                        content_type,
+                        "text" | "image" | "resource" | "resource_link"
+                    ) {
                         return None;
                     }
                     if content_type == "image" && !supports_image_input {

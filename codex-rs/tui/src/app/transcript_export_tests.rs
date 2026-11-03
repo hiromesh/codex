@@ -136,7 +136,6 @@ fn persisted_transcript_includes_file_and_mcp_details() {
             "result": {"content": [
                 {"type": "text", "text": "\u{1b}[31mmatching docs\u{1b}[0m\nnext line"},
                 {"type": "image", "data": "c2VjcmV0", "mimeType": "image/png"},
-                {"type": "audio", "data": "c2VjcmV0", "mimeType": "audio/wav"},
                 {"type": "resource", "resource": {
                     "uri": "file:///report.md", "text": "hidden resource body"}},
                 {"type": "resource_link", "uri": "file:///linked.md", "name": "linked"}
@@ -164,7 +163,6 @@ fn persisted_transcript_includes_file_and_mcp_details() {
         "matching docs",
         "next line",
         "Returned image",
-        "<audio content>",
         "embedded resource: file:///report.md",
         "link: file:///linked.md",
         r#"structured result: {"count":1}"#,

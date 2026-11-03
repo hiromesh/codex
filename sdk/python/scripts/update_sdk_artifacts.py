@@ -609,8 +609,6 @@ def _preserve_inline_media_class_names(out_path: Path) -> None:
         "UrlUserInput": "ImageUserInput",
         "ImageUrlContentItem": "InputImageContentItem",
         "ImageUrlFunctionCallOutputContentItem": "InputImageFunctionCallOutputContentItem",
-        "UrlUserInput1": "AudioUserInput",
-        "AudioUrlContentItem": "InputAudioContentItem",
     }
     for generated_name, stable_name in stable_names.items():
         if source.count(f"class {generated_name}(") != 1:

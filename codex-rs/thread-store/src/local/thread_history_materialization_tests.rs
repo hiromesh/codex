@@ -1258,7 +1258,7 @@ async fn subagent_prefix_advances_projection_without_materializing_history() {
         .append_items(AppendThreadItemsParams {
             thread_id,
             items: vec![
-                RolloutItem::Ignored(serde_json::json!({"type": "legacy_realtime_item"})),
+                RolloutItem::Ignored(serde_json::json!({"type": "legacy_ignored_item"})),
                 turn_started("parent-turn"),
                 completed_item(
                     thread_id,
@@ -1271,7 +1271,7 @@ async fn subagent_prefix_advances_projection_without_materializing_history() {
                 ),
                 turn_completed("parent-turn"),
                 turn_started("child-turn"),
-                RolloutItem::Ignored(serde_json::json!({"type": "legacy_realtime_item"})),
+                RolloutItem::Ignored(serde_json::json!({"type": "legacy_ignored_item"})),
                 completed_item(
                     thread_id,
                     "child-turn",

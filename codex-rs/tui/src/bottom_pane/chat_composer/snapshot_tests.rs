@@ -1,4 +1,4 @@
-//! Snapshot coverage for draft text, plugin mentions, shortcuts, and live voice controls.
+//! Snapshot coverage for draft text, plugin mentions, and shortcuts.
 
 use super::tests::new_test_composer;
 use super::tests::snapshot_composer_state_with_width;

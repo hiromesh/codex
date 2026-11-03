@@ -425,26 +425,6 @@
           ],
           "title": "InputImageDynamicToolCallOutputContentItem",
           "type": "object"
-        },
-        {
-          "properties": {
-            "audioUrl": {
-              "type": "string"
-            },
-            "type": {
-              "enum": [
-                "inputAudio"
-              ],
-              "title": "InputAudioDynamicToolCallOutputContentItemType",
-              "type": "string"
-            }
-          },
-          "required": [
-            "audioUrl",
-            "type"
-          ],
-          "title": "InputAudioDynamicToolCallOutputContentItem",
-          "type": "object"
         }
       ]
     },
@@ -561,26 +541,6 @@
             "type"
           ],
           "title": "InputImageFunctionCallOutputContentItem",
-          "type": "object"
-        },
-        {
-          "properties": {
-            "audio_url": {
-              "type": "string"
-            },
-            "type": {
-              "enum": [
-                "input_audio"
-              ],
-              "title": "InputAudioFunctionCallOutputContentItemType",
-              "type": "string"
-            }
-          },
-          "required": [
-            "audio_url",
-            "type"
-          ],
-          "title": "InputAudioFunctionCallOutputContentItem",
           "type": "object"
         },
         {
@@ -2728,68 +2688,6 @@
             "type"
           ],
           "title": "LocalImageUserInput",
-          "type": "object"
-        },
-        {
-          "anyOf": [
-            {
-              "properties": {
-                "url": {
-                  "type": "string"
-                }
-              },
-              "required": [
-                "url"
-              ],
-              "title": "UrlUserInput",
-              "type": "object"
-            },
-            {
-              "properties": {
-                "fileId": {
-                  "type": "string"
-                }
-              },
-              "required": [
-                "fileId"
-              ],
-              "title": "FileIdUserInput",
-              "type": "object"
-            }
-          ],
-          "properties": {
-            "type": {
-              "enum": [
-                "audio"
-              ],
-              "title": "AudioUserInputType",
-              "type": "string"
-            }
-          },
-          "required": [
-            "type"
-          ],
-          "title": "AudioUserInput",
-          "type": "object"
-        },
-        {
-          "properties": {
-            "path": {
-              "type": "string"
-            },
-            "type": {
-              "enum": [
-                "localAudio"
-              ],
-              "title": "LocalAudioUserInputType",
-              "type": "string"
-            }
-          },
-          "required": [
-            "path",
-            "type"
-          ],
-          "title": "LocalAudioUserInput",
           "type": "object"
         },
         {

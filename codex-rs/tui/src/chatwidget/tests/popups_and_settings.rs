@@ -3106,10 +3106,10 @@ async fn experimental_features_popup_snapshot() {
             enabled: true,
         },
         ExperimentalFeatureItem {
-            key: "voice_conversations".to_string(),
+            key: "future_feature".to_string(),
             writable: true,
-            name: "Voice conversations".to_string(),
-            description: "Talk with Codex using /voice.".to_string(),
+            name: "Future feature".to_string(),
+            description: "A future experimental feature.".to_string(),
             enabled: false,
         },
     ];

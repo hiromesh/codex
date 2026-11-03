@@ -169,9 +169,6 @@ fn export_activity_cell(item: &ThreadItemPayload) -> Option<PlainHistoryCell> {
                         Ok(rmcp::model::ContentBlock::Image(_)) => {
                             lines.push("Returned image".into());
                         }
-                        Ok(rmcp::model::ContentBlock::Audio(_)) => {
-                            lines.push("<audio content>".into());
-                        }
                         Ok(rmcp::model::ContentBlock::Resource(_)) => {
                             let uri = content
                                 .pointer("/resource/uri")
@@ -182,7 +179,8 @@ fn export_activity_cell(item: &ThreadItemPayload) -> Option<PlainHistoryCell> {
                         Ok(rmcp::model::ContentBlock::ResourceLink(link)) => {
                             lines.push(format!("link: {}", link.uri).into());
                         }
-                        _ => lines.push(content.to_string().into()),
+                        Ok(_) => lines.push("<unsupported content>".into()),
+                        Err(_) => lines.push(content.to_string().into()),
                     }
                 }
                 if let Some(content) = &result.structured_content {

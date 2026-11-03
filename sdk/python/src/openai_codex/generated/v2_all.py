@@ -605,12 +605,6 @@ class ResponseTooManyFailedAttemptsCodexErrorInfo(BaseModel):
     ]
 
 
-class CodexResponseHandoffMode(Enum):
-    thinking = "thinking"
-    commentary = "commentary"
-    bem_tags = "bemTags"
-
-
 class CollabAgentStatus(Enum):
     pending_init = "pendingInit"
     running = "running"
@@ -1080,22 +1074,6 @@ class InputTextContentItem(BaseModel):
     type: Annotated[Literal["input_text"], Field(title="InputTextContentItemType")]
 
 
-class InputAudioContentItem(BaseModel):
-    model_config = ConfigDict(
-        populate_by_name=True,
-    )
-    type: Annotated[Literal["input_audio"], Field(title="InputAudioContentItemType")]
-    audio_url: str
-
-
-class FileIdContentItem1(BaseModel):
-    model_config = ConfigDict(
-        populate_by_name=True,
-    )
-    type: Annotated[Literal["input_audio"], Field(title="InputAudioContentItemType")]
-    file_id: str
-
-
 class OutputTextContentItem(BaseModel):
     model_config = ConfigDict(
         populate_by_name=True,
@@ -1112,12 +1090,6 @@ class ContextCompactedNotification(BaseModel):
     )
     thread_id: Annotated[str, Field(alias="threadId")]
     turn_id: Annotated[str, Field(alias="turnId")]
-
-
-class ConversationTextRole(Enum):
-    user = "user"
-    developer = "developer"
-    assistant = "assistant"
 
 
 class CreditsSnapshot(BaseModel):
@@ -1170,28 +1142,12 @@ class InputImageDynamicToolCallOutputContentItem(BaseModel):
     ]
 
 
-class InputAudioDynamicToolCallOutputContentItem(BaseModel):
-    model_config = ConfigDict(
-        populate_by_name=True,
-    )
-    audio_url: Annotated[str, Field(alias="audioUrl")]
-    type: Annotated[
-        Literal["inputAudio"], Field(title="InputAudioDynamicToolCallOutputContentItemType")
-    ]
-
-
 class DynamicToolCallOutputContentItem(
     RootModel[
-        InputTextDynamicToolCallOutputContentItem
-        | InputImageDynamicToolCallOutputContentItem
-        | InputAudioDynamicToolCallOutputContentItem
+        InputTextDynamicToolCallOutputContentItem | InputImageDynamicToolCallOutputContentItem
     ]
 ):
-    root: (
-        InputTextDynamicToolCallOutputContentItem
-        | InputImageDynamicToolCallOutputContentItem
-        | InputAudioDynamicToolCallOutputContentItem
-    )
+    root: InputTextDynamicToolCallOutputContentItem | InputImageDynamicToolCallOutputContentItem
 
 
 class DynamicToolCallStatus(Enum):
@@ -1716,16 +1672,6 @@ class InputTextFunctionCallOutputContentItem(BaseModel):
     ]
 
 
-class InputAudioFunctionCallOutputContentItem(BaseModel):
-    model_config = ConfigDict(
-        populate_by_name=True,
-    )
-    audio_url: str
-    type: Annotated[
-        Literal["input_audio"], Field(title="InputAudioFunctionCallOutputContentItemType")
-    ]
-
-
 class EncryptedContentFunctionCallOutputContentItem(BaseModel):
     model_config = ConfigDict(
         populate_by_name=True,
@@ -2168,7 +2114,6 @@ class InitializeParams(BaseModel):
 class InputModality(Enum):
     text = "text"
     image = "image"
-    audio = "audio"
 
 
 class InstalledApp(BaseModel):
@@ -3789,66 +3734,6 @@ class RateLimitWindow(BaseModel):
     resets_at: Annotated[int | None, Field(alias="resetsAt")] = None
     used_percent: Annotated[int, Field(alias="usedPercent")]
     window_duration_mins: Annotated[int | None, Field(alias="windowDurationMins")] = None
-
-
-class RealtimeConversationVersion(Enum):
-    v1 = "v1"
-    v2 = "v2"
-    v3 = "v3"
-
-
-class RealtimeOutputModality(Enum):
-    text = "text"
-    audio = "audio"
-
-
-class RealtimeVoice(Enum):
-    alloy = "alloy"
-    arbor = "arbor"
-    ash = "ash"
-    aube = "aube"
-    ballad = "ballad"
-    breeze = "breeze"
-    bubbie = "bubbie"
-    cedar = "cedar"
-    coral = "coral"
-    cove = "cove"
-    echo = "echo"
-    ember = "ember"
-    haetsal = "haetsal"
-    hanul = "hanul"
-    himari = "himari"
-    juniper = "juniper"
-    leher = "leher"
-    maple = "maple"
-    marin = "marin"
-    miko = "miko"
-    neer = "neer"
-    porto = "porto"
-    rindo = "rindo"
-    rio = "rio"
-    rivage = "rivage"
-    sage = "sage"
-    selva = "selva"
-    shimmer = "shimmer"
-    sol = "sol"
-    sonna = "sonna"
-    spruce = "spruce"
-    tinta = "tinta"
-    vale = "vale"
-    verse = "verse"
-    viola = "viola"
-
-
-class RealtimeVoicesList(BaseModel):
-    model_config = ConfigDict(
-        populate_by_name=True,
-    )
-    default_v1: Annotated[RealtimeVoice, Field(alias="defaultV1")]
-    default_v2: Annotated[RealtimeVoice, Field(alias="defaultV2")]
-    v1: list[RealtimeVoice]
-    v2: list[RealtimeVoice]
-    v3: list[RealtimeVoice] | None = []
 
 
 class ReasoningEffort(str, Enum):
@@ -6090,235 +5975,6 @@ class ThreadReadStateOperation(
     root: ReadThreadReadStateOperation | UnreadThreadReadStateOperation
 
 
-class ThreadRealtimeAudioChunk(BaseModel):
-    model_config = ConfigDict(
-        populate_by_name=True,
-    )
-    data: str
-    item_id: Annotated[str | None, Field(alias="itemId")] = None
-    num_channels: Annotated[int, Field(alias="numChannels", ge=0)]
-    sample_rate: Annotated[int, Field(alias="sampleRate", ge=0)]
-    samples_per_channel: Annotated[int | None, Field(alias="samplesPerChannel", ge=0)] = None
-
-
-class WholeItemThreadRealtimeBemItemPresentation(BaseModel):
-    model_config = ConfigDict(
-        populate_by_name=True,
-    )
-    type: Annotated[
-        Literal["wholeItem"], Field(title="WholeItemThreadRealtimeBemItemPresentationType")
-    ]
-
-
-class InlineMarkdownThreadRealtimeBemItemPresentation(BaseModel):
-    model_config = ConfigDict(
-        populate_by_name=True,
-    )
-    type: Annotated[
-        Literal["inlineMarkdown"],
-        Field(title="InlineMarkdownThreadRealtimeBemItemPresentationType"),
-    ]
-
-
-class InlineVisualizationThreadRealtimeBemItemPresentation(BaseModel):
-    model_config = ConfigDict(
-        populate_by_name=True,
-    )
-    index: Annotated[int, Field(ge=0)]
-    type: Annotated[
-        Literal["inlineVisualization"],
-        Field(title="InlineVisualizationThreadRealtimeBemItemPresentationType"),
-    ]
-
-
-class ThreadRealtimeBemItemPresentation(
-    RootModel[
-        WholeItemThreadRealtimeBemItemPresentation
-        | InlineMarkdownThreadRealtimeBemItemPresentation
-        | InlineVisualizationThreadRealtimeBemItemPresentation
-    ]
-):
-    root: Annotated[
-        WholeItemThreadRealtimeBemItemPresentation
-        | InlineMarkdownThreadRealtimeBemItemPresentation
-        | InlineVisualizationThreadRealtimeBemItemPresentation,
-        Field(
-            description="EXPERIMENTAL - how an existing agent item appears in a realtime conversation."
-        ),
-    ]
-
-
-class ThreadRealtimeClosedNotification(BaseModel):
-    model_config = ConfigDict(
-        populate_by_name=True,
-    )
-    reason: str | None = None
-    thread_id: Annotated[str, Field(alias="threadId")]
-
-
-class ThreadRealtimeErrorNotification(BaseModel):
-    model_config = ConfigDict(
-        populate_by_name=True,
-    )
-    message: str
-    thread_id: Annotated[str, Field(alias="threadId")]
-
-
-class ThreadRealtimeInitialItem(BaseModel):
-    model_config = ConfigDict(
-        populate_by_name=True,
-    )
-    role: ConversationTextRole
-    text: str
-
-
-class RealtimeSessionStartedThreadRealtimeItem(BaseModel):
-    model_config = ConfigDict(
-        populate_by_name=True,
-    )
-    id: str
-    realtime_session_id: Annotated[str, Field(alias="realtimeSessionId")]
-    type: Annotated[
-        Literal["realtimeSessionStarted"],
-        Field(title="RealtimeSessionStartedThreadRealtimeItemType"),
-    ]
-
-
-class BemItemPromotedThreadRealtimeItem(BaseModel):
-    model_config = ConfigDict(
-        populate_by_name=True,
-    )
-    id: str
-    realtime_session_id: Annotated[str, Field(alias="realtimeSessionId")]
-    item_id: str
-    presentation: ThreadRealtimeBemItemPresentation
-    turn_id: str
-    type: Annotated[
-        Literal["bemItemPromoted"], Field(title="BemItemPromotedThreadRealtimeItemType")
-    ]
-
-
-class ThreadRealtimeItemAddedNotification(BaseModel):
-    model_config = ConfigDict(
-        populate_by_name=True,
-    )
-    item: Any
-    thread_id: Annotated[str, Field(alias="threadId")]
-
-
-class ThreadRealtimeItemTranscriptDeltaNotification(BaseModel):
-    model_config = ConfigDict(
-        populate_by_name=True,
-    )
-    delta: str
-    item_id: Annotated[str, Field(alias="itemId")]
-    thread_id: Annotated[str, Field(alias="threadId")]
-
-
-class ThreadRealtimeOutputAudioDeltaNotification(BaseModel):
-    model_config = ConfigDict(
-        populate_by_name=True,
-    )
-    audio: ThreadRealtimeAudioChunk
-    thread_id: Annotated[str, Field(alias="threadId")]
-
-
-class ThreadRealtimeSdpNotification(BaseModel):
-    model_config = ConfigDict(
-        populate_by_name=True,
-    )
-    sdp: str
-    thread_id: Annotated[str, Field(alias="threadId")]
-
-
-class ThreadRealtimeSessionOutcome(Enum):
-    ended = "ended"
-    failed = "failed"
-
-
-class WebsocketThreadRealtimeStartTransport(BaseModel):
-    model_config = ConfigDict(
-        populate_by_name=True,
-    )
-    type: Annotated[Literal["websocket"], Field(title="WebsocketThreadRealtimeStartTransportType")]
-
-
-class WebrtcThreadRealtimeStartTransport(BaseModel):
-    model_config = ConfigDict(
-        populate_by_name=True,
-    )
-    sdp: Annotated[
-        str,
-        Field(
-            description="SDP offer generated by a WebRTC RTCPeerConnection after configuring audio and the realtime events data channel."
-        ),
-    ]
-    type: Annotated[Literal["webrtc"], Field(title="WebrtcThreadRealtimeStartTransportType")]
-
-
-class ExistingCallThreadRealtimeStartTransport(BaseModel):
-    model_config = ConfigDict(
-        populate_by_name=True,
-    )
-    call_id: Annotated[
-        str,
-        Field(
-            alias="callId",
-            description="Identifier of a realtime call already created and negotiated by the client.",
-        ),
-    ]
-    type: Annotated[
-        Literal["existingCall"], Field(title="ExistingCallThreadRealtimeStartTransportType")
-    ]
-
-
-class ThreadRealtimeStartTransport(
-    RootModel[
-        WebsocketThreadRealtimeStartTransport
-        | WebrtcThreadRealtimeStartTransport
-        | ExistingCallThreadRealtimeStartTransport
-    ]
-):
-    root: Annotated[
-        WebsocketThreadRealtimeStartTransport
-        | WebrtcThreadRealtimeStartTransport
-        | ExistingCallThreadRealtimeStartTransport,
-        Field(description="EXPERIMENTAL - transport used by thread realtime."),
-    ]
-
-
-class ThreadRealtimeStartedNotification(BaseModel):
-    model_config = ConfigDict(
-        populate_by_name=True,
-    )
-    realtime_session_id: Annotated[str | None, Field(alias="realtimeSessionId")] = None
-    thread_id: Annotated[str, Field(alias="threadId")]
-    version: RealtimeConversationVersion
-
-
-class ThreadRealtimeTranscriptDeltaNotification(BaseModel):
-    model_config = ConfigDict(
-        populate_by_name=True,
-    )
-    delta: Annotated[str, Field(description="Live transcript delta from the realtime event.")]
-    role: str
-    thread_id: Annotated[str, Field(alias="threadId")]
-
-
-class ThreadRealtimeTranscriptDoneNotification(BaseModel):
-    model_config = ConfigDict(
-        populate_by_name=True,
-    )
-    role: str
-    text: Annotated[str, Field(description="Final complete text for the transcript part.")]
-    thread_id: Annotated[str, Field(alias="threadId")]
-
-
-class ThreadRealtimeTranscriptRole(Enum):
-    user = "user"
-    assistant = "assistant"
-
-
 class ThreadResumeParams(BaseModel):
     model_config = ConfigDict(
         populate_by_name=True,
@@ -6837,30 +6493,6 @@ class LocalImageUserInput(BaseModel):
     type: Annotated[Literal["localImage"], Field(title="LocalImageUserInputType")]
 
 
-class AudioUserInput(BaseModel):
-    model_config = ConfigDict(
-        populate_by_name=True,
-    )
-    type: Annotated[Literal["audio"], Field(title="AudioUserInputType")]
-    url: str
-
-
-class FileIdUserInput1(BaseModel):
-    model_config = ConfigDict(
-        populate_by_name=True,
-    )
-    type: Annotated[Literal["audio"], Field(title="AudioUserInputType")]
-    file_id: Annotated[str, Field(alias="fileId")]
-
-
-class LocalAudioUserInput(BaseModel):
-    model_config = ConfigDict(
-        populate_by_name=True,
-    )
-    path: str
-    type: Annotated[Literal["localAudio"], Field(title="LocalAudioUserInputType")]
-
-
 class SkillUserInput(BaseModel):
     model_config = ConfigDict(
         populate_by_name=True,
@@ -6885,9 +6517,6 @@ class UserInput(
         | ImageUserInput
         | FileIdUserInput
         | LocalImageUserInput
-        | AudioUserInput
-        | FileIdUserInput1
-        | LocalAudioUserInput
         | SkillUserInput
         | MentionUserInput
     ]
@@ -6897,9 +6526,6 @@ class UserInput(
         | ImageUserInput
         | FileIdUserInput
         | LocalImageUserInput
-        | AudioUserInput
-        | FileIdUserInput1
-        | LocalAudioUserInput
         | SkillUserInput
         | MentionUserInput
     )
@@ -8390,22 +8016,10 @@ class FileIdContentItem(BaseModel):
 
 class ContentItem(
     RootModel[
-        InputTextContentItem
-        | InputImageContentItem
-        | FileIdContentItem
-        | InputAudioContentItem
-        | FileIdContentItem1
-        | OutputTextContentItem
+        InputTextContentItem | InputImageContentItem | FileIdContentItem | OutputTextContentItem
     ]
 ):
-    root: (
-        InputTextContentItem
-        | InputImageContentItem
-        | FileIdContentItem
-        | InputAudioContentItem
-        | FileIdContentItem1
-        | OutputTextContentItem
-    )
+    root: InputTextContentItem | InputImageContentItem | FileIdContentItem | OutputTextContentItem
 
 
 class ExperimentalFeature(BaseModel):
@@ -8640,7 +8254,6 @@ class FunctionCallOutputContentItem(
         InputTextFunctionCallOutputContentItem
         | InputImageFunctionCallOutputContentItem
         | FileIdFunctionCallOutputContentItem
-        | InputAudioFunctionCallOutputContentItem
         | EncryptedContentFunctionCallOutputContentItem
     ]
 ):
@@ -8648,7 +8261,6 @@ class FunctionCallOutputContentItem(
         InputTextFunctionCallOutputContentItem
         | InputImageFunctionCallOutputContentItem
         | FileIdFunctionCallOutputContentItem
-        | InputAudioFunctionCallOutputContentItem
         | EncryptedContentFunctionCallOutputContentItem,
         Field(
             description="Responses API compatible content items that can be returned by a tool call. This is a subset of ContentItem with the types we support as function call outputs."
@@ -10059,164 +9671,6 @@ class ConfigWarningServerNotification(BaseModel):
     params: ConfigWarningNotification
 
 
-class ThreadRealtimeStartedServerNotification(BaseModel):
-    model_config = ConfigDict(
-        populate_by_name=True,
-    )
-    emitted_at_ms: Annotated[
-        int | None,
-        Field(
-            alias="emittedAtMs",
-            description="Unix timestamp (in milliseconds) when app-server emitted this notification.",
-        ),
-    ] = None
-    method: Annotated[
-        Literal["thread/realtime/started"], Field(title="Thread/realtime/startedNotificationMethod")
-    ]
-    params: ThreadRealtimeStartedNotification
-
-
-class ThreadRealtimeItemAddedServerNotification(BaseModel):
-    model_config = ConfigDict(
-        populate_by_name=True,
-    )
-    emitted_at_ms: Annotated[
-        int | None,
-        Field(
-            alias="emittedAtMs",
-            description="Unix timestamp (in milliseconds) when app-server emitted this notification.",
-        ),
-    ] = None
-    method: Annotated[
-        Literal["thread/realtime/itemAdded"],
-        Field(title="Thread/realtime/itemAddedNotificationMethod"),
-    ]
-    params: ThreadRealtimeItemAddedNotification
-
-
-class ThreadRealtimeItemTranscriptDeltaServerNotification(BaseModel):
-    model_config = ConfigDict(
-        populate_by_name=True,
-    )
-    emitted_at_ms: Annotated[
-        int | None,
-        Field(
-            alias="emittedAtMs",
-            description="Unix timestamp (in milliseconds) when app-server emitted this notification.",
-        ),
-    ] = None
-    method: Annotated[
-        Literal["thread/realtime/item/transcript/delta"],
-        Field(title="Thread/realtime/item/transcript/deltaNotificationMethod"),
-    ]
-    params: ThreadRealtimeItemTranscriptDeltaNotification
-
-
-class ThreadRealtimeTranscriptDeltaServerNotification(BaseModel):
-    model_config = ConfigDict(
-        populate_by_name=True,
-    )
-    emitted_at_ms: Annotated[
-        int | None,
-        Field(
-            alias="emittedAtMs",
-            description="Unix timestamp (in milliseconds) when app-server emitted this notification.",
-        ),
-    ] = None
-    method: Annotated[
-        Literal["thread/realtime/transcript/delta"],
-        Field(title="Thread/realtime/transcript/deltaNotificationMethod"),
-    ]
-    params: ThreadRealtimeTranscriptDeltaNotification
-
-
-class ThreadRealtimeTranscriptDoneServerNotification(BaseModel):
-    model_config = ConfigDict(
-        populate_by_name=True,
-    )
-    emitted_at_ms: Annotated[
-        int | None,
-        Field(
-            alias="emittedAtMs",
-            description="Unix timestamp (in milliseconds) when app-server emitted this notification.",
-        ),
-    ] = None
-    method: Annotated[
-        Literal["thread/realtime/transcript/done"],
-        Field(title="Thread/realtime/transcript/doneNotificationMethod"),
-    ]
-    params: ThreadRealtimeTranscriptDoneNotification
-
-
-class ThreadRealtimeOutputAudioDeltaServerNotification(BaseModel):
-    model_config = ConfigDict(
-        populate_by_name=True,
-    )
-    emitted_at_ms: Annotated[
-        int | None,
-        Field(
-            alias="emittedAtMs",
-            description="Unix timestamp (in milliseconds) when app-server emitted this notification.",
-        ),
-    ] = None
-    method: Annotated[
-        Literal["thread/realtime/outputAudio/delta"],
-        Field(title="Thread/realtime/outputAudio/deltaNotificationMethod"),
-    ]
-    params: ThreadRealtimeOutputAudioDeltaNotification
-
-
-class ThreadRealtimeSdpServerNotification(BaseModel):
-    model_config = ConfigDict(
-        populate_by_name=True,
-    )
-    emitted_at_ms: Annotated[
-        int | None,
-        Field(
-            alias="emittedAtMs",
-            description="Unix timestamp (in milliseconds) when app-server emitted this notification.",
-        ),
-    ] = None
-    method: Annotated[
-        Literal["thread/realtime/sdp"], Field(title="Thread/realtime/sdpNotificationMethod")
-    ]
-    params: ThreadRealtimeSdpNotification
-
-
-class ThreadRealtimeErrorServerNotification(BaseModel):
-    model_config = ConfigDict(
-        populate_by_name=True,
-    )
-    emitted_at_ms: Annotated[
-        int | None,
-        Field(
-            alias="emittedAtMs",
-            description="Unix timestamp (in milliseconds) when app-server emitted this notification.",
-        ),
-    ] = None
-    method: Annotated[
-        Literal["thread/realtime/error"], Field(title="Thread/realtime/errorNotificationMethod")
-    ]
-    params: ThreadRealtimeErrorNotification
-
-
-class ThreadRealtimeClosedServerNotification(BaseModel):
-    model_config = ConfigDict(
-        populate_by_name=True,
-    )
-    emitted_at_ms: Annotated[
-        int | None,
-        Field(
-            alias="emittedAtMs",
-            description="Unix timestamp (in milliseconds) when app-server emitted this notification.",
-        ),
-    ] = None
-    method: Annotated[
-        Literal["thread/realtime/closed"], Field(title="Thread/realtime/closedNotificationMethod")
-    ]
-    params: ThreadRealtimeClosedNotification
-
-
 class AccountLoginCompletedServerNotification(BaseModel):
     model_config = ConfigDict(
         populate_by_name=True,
@@ -10755,66 +10209,6 @@ class ThreadReadStateChangedNotification(BaseModel):
     thread_id: Annotated[str, Field(alias="threadId")]
 
 
-class TranscriptSegmentThreadRealtimeItem(BaseModel):
-    model_config = ConfigDict(
-        populate_by_name=True,
-    )
-    id: str
-    realtime_session_id: Annotated[str, Field(alias="realtimeSessionId")]
-    role: ThreadRealtimeTranscriptRole
-    text: str
-    type: Annotated[
-        Literal["transcriptSegment"], Field(title="TranscriptSegmentThreadRealtimeItemType")
-    ]
-
-
-class RealtimeSessionClosedThreadRealtimeItem(BaseModel):
-    model_config = ConfigDict(
-        populate_by_name=True,
-    )
-    id: str
-    realtime_session_id: Annotated[str, Field(alias="realtimeSessionId")]
-    outcome: ThreadRealtimeSessionOutcome
-    type: Annotated[
-        Literal["realtimeSessionClosed"], Field(title="RealtimeSessionClosedThreadRealtimeItemType")
-    ]
-
-
-class ThreadRealtimeItem(
-    RootModel[
-        RealtimeSessionStartedThreadRealtimeItem
-        | TranscriptSegmentThreadRealtimeItem
-        | BemItemPromotedThreadRealtimeItem
-        | RealtimeSessionClosedThreadRealtimeItem
-    ]
-):
-    root: Annotated[
-        RealtimeSessionStartedThreadRealtimeItem
-        | TranscriptSegmentThreadRealtimeItem
-        | BemItemPromotedThreadRealtimeItem
-        | RealtimeSessionClosedThreadRealtimeItem,
-        Field(
-            description="EXPERIMENTAL - a thread-scoped realtime item in the canonical timeline."
-        ),
-    ]
-
-
-class ThreadRealtimeItemCompletedNotification(BaseModel):
-    model_config = ConfigDict(
-        populate_by_name=True,
-    )
-    item: ThreadRealtimeItem
-    thread_id: Annotated[str, Field(alias="threadId")]
-
-
-class ThreadRealtimeItemStartedNotification(BaseModel):
-    model_config = ConfigDict(
-        populate_by_name=True,
-    )
-    item: ThreadRealtimeItem
-    thread_id: Annotated[str, Field(alias="threadId")]
-
-
 class ThreadResumeInitialTurnsPageParams(BaseModel):
     model_config = ConfigDict(
         populate_by_name=True,
@@ -10957,15 +10351,6 @@ class ThreadStartParams(BaseModel):
             description="Optional client-supplied analytics source classification for this thread.",
         ),
     ] = None
-
-
-class RealtimeThreadTimelineEntry(BaseModel):
-    model_config = ConfigDict(
-        populate_by_name=True,
-    )
-    item: ThreadRealtimeItem
-    position: Annotated[int, Field(ge=0)]
-    type: Annotated[Literal["realtime"], Field(title="RealtimeThreadTimelineEntryType")]
 
 
 class ThreadTokenUsage(BaseModel):
@@ -12034,42 +11419,6 @@ class ExternalAgentConfigImportCompletedServerNotification(BaseModel):
     params: ExternalAgentConfigImportCompletedNotification
 
 
-class ThreadRealtimeItemStartedServerNotification(BaseModel):
-    model_config = ConfigDict(
-        populate_by_name=True,
-    )
-    emitted_at_ms: Annotated[
-        int | None,
-        Field(
-            alias="emittedAtMs",
-            description="Unix timestamp (in milliseconds) when app-server emitted this notification.",
-        ),
-    ] = None
-    method: Annotated[
-        Literal["thread/realtime/item/started"],
-        Field(title="Thread/realtime/item/startedNotificationMethod"),
-    ]
-    params: ThreadRealtimeItemStartedNotification
-
-
-class ThreadRealtimeItemCompletedServerNotification(BaseModel):
-    model_config = ConfigDict(
-        populate_by_name=True,
-    )
-    emitted_at_ms: Annotated[
-        int | None,
-        Field(
-            alias="emittedAtMs",
-            description="Unix timestamp (in milliseconds) when app-server emitted this notification.",
-        ),
-    ] = None
-    method: Annotated[
-        Literal["thread/realtime/item/completed"],
-        Field(title="Thread/realtime/item/completedNotificationMethod"),
-    ]
-    params: ThreadRealtimeItemCompletedNotification
-
-
 class SubAgentSessionSource(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
@@ -12227,17 +11576,11 @@ class TurnCompletedThreadTimelineEntry(BaseModel):
 
 class ThreadTimelineEntry(
     RootModel[
-        ItemThreadTimelineEntry
-        | RealtimeThreadTimelineEntry
-        | TurnStartedThreadTimelineEntry
-        | TurnCompletedThreadTimelineEntry
+        ItemThreadTimelineEntry | TurnStartedThreadTimelineEntry | TurnCompletedThreadTimelineEntry
     ]
 ):
     root: Annotated[
-        ItemThreadTimelineEntry
-        | RealtimeThreadTimelineEntry
-        | TurnStartedThreadTimelineEntry
-        | TurnCompletedThreadTimelineEntry,
+        ItemThreadTimelineEntry | TurnStartedThreadTimelineEntry | TurnCompletedThreadTimelineEntry,
         Field(description="EXPERIMENTAL - one item or turn boundary in canonical rollout order."),
     ]
 
@@ -13719,17 +13062,6 @@ class ServerNotification(
         | ConfigWarningServerNotification
         | FuzzyFileSearchSessionUpdatedServerNotification
         | FuzzyFileSearchSessionCompletedServerNotification
-        | ThreadRealtimeStartedServerNotification
-        | ThreadRealtimeItemAddedServerNotification
-        | ThreadRealtimeItemStartedServerNotification
-        | ThreadRealtimeItemTranscriptDeltaServerNotification
-        | ThreadRealtimeItemCompletedServerNotification
-        | ThreadRealtimeTranscriptDeltaServerNotification
-        | ThreadRealtimeTranscriptDoneServerNotification
-        | ThreadRealtimeOutputAudioDeltaServerNotification
-        | ThreadRealtimeSdpServerNotification
-        | ThreadRealtimeErrorServerNotification
-        | ThreadRealtimeClosedServerNotification
         | AccountLoginCompletedServerNotification
     ]
 ):
@@ -13806,17 +13138,6 @@ class ServerNotification(
         | ConfigWarningServerNotification
         | FuzzyFileSearchSessionUpdatedServerNotification
         | FuzzyFileSearchSessionCompletedServerNotification
-        | ThreadRealtimeStartedServerNotification
-        | ThreadRealtimeItemAddedServerNotification
-        | ThreadRealtimeItemStartedServerNotification
-        | ThreadRealtimeItemTranscriptDeltaServerNotification
-        | ThreadRealtimeItemCompletedServerNotification
-        | ThreadRealtimeTranscriptDeltaServerNotification
-        | ThreadRealtimeTranscriptDoneServerNotification
-        | ThreadRealtimeOutputAudioDeltaServerNotification
-        | ThreadRealtimeSdpServerNotification
-        | ThreadRealtimeErrorServerNotification
-        | ThreadRealtimeClosedServerNotification
         | AccountLoginCompletedServerNotification,
         Field(
             description="Notification sent from the server to the client.",

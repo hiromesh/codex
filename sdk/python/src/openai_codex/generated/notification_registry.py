@@ -65,17 +65,6 @@ from .v2_all import ThreadPredictionUpdatedNotification
 from .v2_all import ThreadProjectUpdatedNotification
 from .v2_all import ThreadQueueChangedNotification
 from .v2_all import ThreadReadStateChangedNotification
-from .v2_all import ThreadRealtimeClosedNotification
-from .v2_all import ThreadRealtimeErrorNotification
-from .v2_all import ThreadRealtimeItemAddedNotification
-from .v2_all import ThreadRealtimeItemCompletedNotification
-from .v2_all import ThreadRealtimeItemStartedNotification
-from .v2_all import ThreadRealtimeItemTranscriptDeltaNotification
-from .v2_all import ThreadRealtimeOutputAudioDeltaNotification
-from .v2_all import ThreadRealtimeSdpNotification
-from .v2_all import ThreadRealtimeStartedNotification
-from .v2_all import ThreadRealtimeTranscriptDeltaNotification
-from .v2_all import ThreadRealtimeTranscriptDoneNotification
 from .v2_all import ThreadRevertedNotification
 from .v2_all import ThreadSectionChangedNotification
 from .v2_all import ThreadSettingsUpdatedNotification
@@ -149,17 +138,6 @@ KnownNotificationPayload: TypeAlias = (
     | ThreadProjectUpdatedNotification
     | ThreadQueueChangedNotification
     | ThreadReadStateChangedNotification
-    | ThreadRealtimeClosedNotification
-    | ThreadRealtimeErrorNotification
-    | ThreadRealtimeItemAddedNotification
-    | ThreadRealtimeItemCompletedNotification
-    | ThreadRealtimeItemStartedNotification
-    | ThreadRealtimeItemTranscriptDeltaNotification
-    | ThreadRealtimeOutputAudioDeltaNotification
-    | ThreadRealtimeSdpNotification
-    | ThreadRealtimeStartedNotification
-    | ThreadRealtimeTranscriptDeltaNotification
-    | ThreadRealtimeTranscriptDoneNotification
     | ThreadRevertedNotification
     | ThreadSectionChangedNotification
     | ThreadSettingsUpdatedNotification
@@ -236,17 +214,6 @@ NOTIFICATION_MODELS: dict[str, type[KnownNotificationPayload]] = {
     "thread/project/updated": ThreadProjectUpdatedNotification,
     "thread/queue/changed": ThreadQueueChangedNotification,
     "thread/readState/changed": ThreadReadStateChangedNotification,
-    "thread/realtime/closed": ThreadRealtimeClosedNotification,
-    "thread/realtime/error": ThreadRealtimeErrorNotification,
-    "thread/realtime/item/completed": ThreadRealtimeItemCompletedNotification,
-    "thread/realtime/item/started": ThreadRealtimeItemStartedNotification,
-    "thread/realtime/item/transcript/delta": ThreadRealtimeItemTranscriptDeltaNotification,
-    "thread/realtime/itemAdded": ThreadRealtimeItemAddedNotification,
-    "thread/realtime/outputAudio/delta": ThreadRealtimeOutputAudioDeltaNotification,
-    "thread/realtime/sdp": ThreadRealtimeSdpNotification,
-    "thread/realtime/started": ThreadRealtimeStartedNotification,
-    "thread/realtime/transcript/delta": ThreadRealtimeTranscriptDeltaNotification,
-    "thread/realtime/transcript/done": ThreadRealtimeTranscriptDoneNotification,
     "thread/reverted": ThreadRevertedNotification,
     "thread/section/changed": ThreadSectionChangedNotification,
     "thread/settings/updated": ThreadSettingsUpdatedNotification,

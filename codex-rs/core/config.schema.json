@@ -961,16 +961,10 @@
             "in_app_chat": {
               "type": "boolean"
             },
-            "in_app_dictation": {
-              "type": "boolean"
-            },
             "in_app_local_automation": {
               "type": "boolean"
             },
             "in_app_updates": {
-              "type": "boolean"
-            },
-            "in_app_voice": {
               "type": "boolean"
             },
             "incremental_exec_tools": {
@@ -1085,9 +1079,6 @@
               "type": "boolean"
             },
             "psp": {
-              "type": "boolean"
-            },
-            "realtime_conversation": {
               "type": "boolean"
             },
             "reasoning_effort_override": {
@@ -2557,24 +2548,6 @@
       ],
       "type": "string"
     },
-    "MicrophoneChannels": {
-      "anyOf": [
-        {
-          "format": "uint16",
-          "minimum": 1.0,
-          "type": "integer"
-        },
-        {
-          "items": {
-            "format": "uint16",
-            "minimum": 1.0,
-            "type": "integer"
-          },
-          "type": "array"
-        }
-      ],
-      "description": "Selected microphone inputs. Scalars preserve existing single-channel configuration."
-    },
     "ModelAvailabilityNuxConfig": {
       "additionalProperties": {
         "format": "uint32",
@@ -3988,106 +3961,6 @@
       },
       "type": "object"
     },
-    "RealtimeAudioToml": {
-      "additionalProperties": false,
-      "properties": {
-        "microphone": {
-          "type": "string"
-        },
-        "microphone_channel": {
-          "allOf": [
-            {
-              "$ref": "#/definitions/MicrophoneChannels"
-            }
-          ],
-          "description": "One-based microphone channels to mix; unset mixes all input channels."
-        },
-        "speaker": {
-          "type": "string"
-        }
-      },
-      "type": "object"
-    },
-    "RealtimeConversationVersion": {
-      "enum": [
-        "v1",
-        "v2",
-        "v3"
-      ],
-      "type": "string"
-    },
-    "RealtimeToml": {
-      "additionalProperties": false,
-      "properties": {
-        "transport": {
-          "$ref": "#/definitions/RealtimeTransport"
-        },
-        "type": {
-          "$ref": "#/definitions/RealtimeWsMode"
-        },
-        "version": {
-          "$ref": "#/definitions/RealtimeConversationVersion"
-        },
-        "voice": {
-          "$ref": "#/definitions/RealtimeVoice"
-        }
-      },
-      "type": "object"
-    },
-    "RealtimeTransport": {
-      "enum": [
-        "webrtc",
-        "websocket"
-      ],
-      "type": "string"
-    },
-    "RealtimeVoice": {
-      "enum": [
-        "alloy",
-        "arbor",
-        "ash",
-        "aube",
-        "ballad",
-        "breeze",
-        "bubbie",
-        "cedar",
-        "coral",
-        "cove",
-        "echo",
-        "ember",
-        "haetsal",
-        "hanul",
-        "himari",
-        "juniper",
-        "leher",
-        "maple",
-        "marin",
-        "miko",
-        "neer",
-        "porto",
-        "rindo",
-        "rio",
-        "rivage",
-        "sage",
-        "selva",
-        "shimmer",
-        "sol",
-        "sonna",
-        "spruce",
-        "tinta",
-        "vale",
-        "verse",
-        "viola"
-      ],
-      "type": "string"
-    },
-    "RealtimeWsMode": {
-      "enum": [
-        "conversational",
-        "transcription"
-      ],
-      "type": "string"
-    },
     "ReasoningEffort": {
       "description": "A non-empty reasoning effort value advertised by the model.",
       "minLength": 1,
@@ -4752,9 +4625,7 @@
               "open_presets": null,
               "previous_permission_mode": null,
               "prompt_stack_back": null,
-              "skip_question": null,
-              "toggle_voice": null,
-              "toggle_voice_mute": null
+              "skip_question": null
             },
             "composer": {
               "history_search_next": null,
@@ -5325,22 +5196,6 @@
             }
           ],
           "description": "Skip the focused question."
-        },
-        "toggle_voice": {
-          "allOf": [
-            {
-              "$ref": "#/definitions/KeybindingsSpec"
-            }
-          ],
-          "description": "Start or stop a voice conversation."
-        },
-        "toggle_voice_mute": {
-          "allOf": [
-            {
-              "$ref": "#/definitions/KeybindingsSpec"
-            }
-          ],
-          "description": "Toggle the microphone in an active voice conversation."
         }
       },
       "type": "object"
@@ -5764,9 +5619,7 @@
             "open_presets": null,
             "previous_permission_mode": null,
             "prompt_stack_back": null,
-            "skip_question": null,
-            "toggle_voice": null,
-            "toggle_voice_mute": null
+            "skip_question": null
           }
         },
         "composer": {
@@ -6951,15 +6804,6 @@
       "description": "Optional product SKU forwarded on host-owned Codex Apps MCP requests.",
       "type": "string"
     },
-    "audio": {
-      "allOf": [
-        {
-          "$ref": "#/definitions/RealtimeAudioToml"
-        }
-      ],
-      "default": null,
-      "description": "Machine-local realtime audio device preferences used by realtime voice."
-    },
     "auto_review": {
       "allOf": [
         {
@@ -7035,30 +6879,6 @@
     },
     "experimental_compact_prompt_file": {
       "$ref": "#/definitions/AbsolutePathBuf"
-    },
-    "experimental_realtime_start_instructions": {
-      "description": "Experimental / do not use. Replaces the built-in realtime start instructions inserted into developer messages when realtime becomes active.",
-      "type": "string"
-    },
-    "experimental_realtime_webrtc_call_base_url": {
-      "description": "Experimental / do not use. Overrides only the WebRTC realtime call creation base URL. This is separate from `experimental_realtime_ws_base_url` because WebRTC call creation is HTTP, while sideband control is websocket.",
-      "type": "string"
-    },
-    "experimental_realtime_ws_backend_prompt": {
-      "description": "Experimental / do not use. Overrides only the realtime conversation websocket transport instructions (the `Op::RealtimeConversation` `/ws` session.update instructions) without changing normal prompts.",
-      "type": "string"
-    },
-    "experimental_realtime_ws_base_url": {
-      "description": "Experimental / do not use. Overrides only the realtime conversation websocket transport base URL (the `Op::RealtimeConversation` `/v1/realtime` connection) without changing normal provider HTTP requests.",
-      "type": "string"
-    },
-    "experimental_realtime_ws_model": {
-      "description": "Experimental / do not use. Selects the realtime websocket model/snapshot used for the `Op::RealtimeConversation` connection.",
-      "type": "string"
-    },
-    "experimental_realtime_ws_startup_context": {
-      "description": "Experimental / do not use. Replaces the synthesized realtime startup context appended to websocket session instructions. An empty string disables startup context injection entirely.",
-      "type": "string"
     },
     "experimental_thread_store": {
       "allOf": [
@@ -7305,16 +7125,10 @@
         "in_app_chat": {
           "type": "boolean"
         },
-        "in_app_dictation": {
-          "type": "boolean"
-        },
         "in_app_local_automation": {
           "type": "boolean"
         },
         "in_app_updates": {
-          "type": "boolean"
-        },
-        "in_app_voice": {
           "type": "boolean"
         },
         "incremental_exec_tools": {
@@ -7429,9 +7243,6 @@
           "type": "boolean"
         },
         "psp": {
-          "type": "boolean"
-        },
-        "realtime_conversation": {
           "type": "boolean"
         },
         "reasoning_effort_override": {
@@ -8011,15 +7822,6 @@
         "$ref": "#/definitions/ProjectConfig"
       },
       "type": "object"
-    },
-    "realtime": {
-      "allOf": [
-        {
-          "$ref": "#/definitions/RealtimeToml"
-        }
-      ],
-      "default": null,
-      "description": "Experimental / do not use. Realtime websocket session selection. `version` controls v1/v2 and `type` controls conversational/transcription."
     },
     "responses_api_metadata": {
       "additionalProperties": {

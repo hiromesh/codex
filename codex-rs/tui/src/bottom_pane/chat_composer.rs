@@ -14,7 +14,7 @@
 //! search, or blocking view. The app reads clipboard text asynchronously and delivers a normal
 //! paste only while the same thread, draft, and cursor remain eligible. Intervening input or focus
 //! loss cancels the pending paste; a late clipboard result cannot overwrite newer input.
-//! The live voice strip renders after effort ignition, followed by the Astra sparkle when eligible.
+//! The Astra sparkle renders after effort ignition when eligible.
 //! Owned transcripts keep persistent status below the composer and hints on a separate final row.
 //! Shortcut help expands above the composer, with its close hint replacing the final shortcuts row
 //! so input and persistent status stay anchored when help opens or closes.
@@ -217,7 +217,7 @@
 //! erases a held slash also clears the tracked command. An empty main-composer `Esc`
 //! can stop the active flourish. Once shown, it fades out by 15 seconds; command entry, popups, and
 //! focus loss hide the field without restarting that deadline. Rendering runs after the textarea,
-//! placeholder, effort ignition, and voice strip, and draws only in eligible blank cells without
+//! placeholder and effort ignition, and draws only in eligible blank cells without
 //! overwriting the placeholder or normal cursor. Hidden frames do not schedule animation redraws;
 //! motion settings, the starfield preference, and true-color support also gate the effect.
 //!

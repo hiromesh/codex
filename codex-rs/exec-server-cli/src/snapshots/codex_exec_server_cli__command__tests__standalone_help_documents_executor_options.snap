@@ -77,40 +77,15 @@ Options:
           Register this exec-server as a remote environment using the given base
           URL
 
-      --remote-transport <REMOTE_TRANSPORT>
-          Transport used for the remote executor connection
-
-          [default: noise]
-          [possible values: noise, direct]
-
       --environment-id <ID>
           Environment id to attach to when registering remotely
 
       --name <NAME>
           Human-readable environment name
 
-      --use-agent-identity-auth
-          Use Agent Identity auth from CODEX_ACCESS_TOKEN for remote
-          registration
-
       --executor-credential-stdin
           Read rotating executor credentials from stdin; exit when the pipe
           closes
-
-      --aws-sigv4
-          Sign Direct registration and WebSocket handshake requests with AWS
-          SigV4
-
-      --aws-profile <PROFILE>
-          AWS profile used for SigV4 authentication
-
-      --aws-region <REGION>
-          AWS signing region. Uses the SDK region chain when omitted
-
-      --aws-service <SERVICE>
-          AWS signing service
-
-          [default: execute-api]
 
       --exit-on-stdin-close
           Exit when the parent-owned standard-input pipe closes

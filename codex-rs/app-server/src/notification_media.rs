@@ -166,13 +166,14 @@ fn without_thread_item_media(mut item: ThreadItemPayload) -> ThreadItemPayload {
             // TODO(ruslan): Handle oversized results that core has already collapsed into a
             // truncated text preview, which can contain inline media that this filter retains.
             result.content.retain(|item| {
-                !matches!(
-                    item.get("type").and_then(serde_json::Value::as_str),
-                    Some("image" | "audio")
-                ) && item
-                    .get("resource")
-                    .and_then(|resource| resource.get("blob"))
-                    .is_none()
+                match item.get("type").and_then(serde_json::Value::as_str) {
+                    Some("text" | "resource_link") => true,
+                    Some("resource") => item
+                        .get("resource")
+                        .and_then(|resource| resource.get("blob"))
+                        .is_none(),
+                    _ => false,
+                }
             });
         }
         ThreadItemPayload::ImageGeneration(item) => {
