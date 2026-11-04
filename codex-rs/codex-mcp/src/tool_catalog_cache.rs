@@ -94,7 +94,7 @@ impl McpToolCatalogCache {
         runtime_context: &McpRuntimeContext,
         resolved_environment: Option<&Arc<Environment>>,
         client_context: (&ElicitationCapability, &ClientMcpExtensions),
-        connection_identity: Option<(&McpServerConnectionIdentity, McpProtocolMode, bool)>,
+        connection_identity: Option<(&McpServerConnectionIdentity, McpProtocolMode)>,
     ) -> Option<McpToolCatalogCacheContext> {
         let identity = ToolCatalogIdentity::new(
             server_name,
@@ -324,7 +324,7 @@ impl ToolCatalogIdentity {
         runtime_context: &McpRuntimeContext,
         environment: Option<&Arc<Environment>>,
         client_context: (&ElicitationCapability, &ClientMcpExtensions),
-        connection_identity: Option<(&McpServerConnectionIdentity, McpProtocolMode, bool)>,
+        connection_identity: Option<(&McpServerConnectionIdentity, McpProtocolMode)>,
     ) -> Option<Self> {
         let transport =
             ToolCatalogTransportIdentity::new(config, client_context, connection_identity)?;
@@ -351,7 +351,7 @@ impl ToolCatalogTransportIdentity {
     fn new(
         config: &McpServerConfig,
         client_context: (&ElicitationCapability, &ClientMcpExtensions),
-        connection_identity: Option<(&McpServerConnectionIdentity, McpProtocolMode, bool)>,
+        connection_identity: Option<(&McpServerConnectionIdentity, McpProtocolMode)>,
     ) -> Option<Self> {
         let (client_elicitation_capability, client_mcp_extensions) = client_context;
         if let McpServerTransportConfig::StreamableHttp {
@@ -366,7 +366,7 @@ impl ToolCatalogTransportIdentity {
             if http_headers_helper.is_some() {
                 return None;
             }
-            let (connection_identity, protocol_mode, agent_plugin) = connection_identity?;
+            let (connection_identity, protocol_mode) = connection_identity?;
             if config.oauth.is_some()
                 || config.scopes.is_some()
                 || config.oauth_resource.is_some()
@@ -395,7 +395,6 @@ impl ToolCatalogTransportIdentity {
                         .map(|headers| headers.iter().collect::<BTreeMap<_, _>>()),
                     &config.auth,
                     &config.environment_id,
-                    agent_plugin,
                     protocol_mode.preferred_protocol_version().as_str(),
                     client_elicitation_capability,
                     client_mcp_extensions.iter().collect::<BTreeMap<_, _>>(),
@@ -434,7 +433,7 @@ impl ToolCatalogTransportIdentity {
         // An unmarked helper can expose different tools after a legacy fallback.
         if matches!(
             connection_identity,
-            Some((_, McpProtocolMode::DiscoverLocalStdio, _))
+            Some((_, McpProtocolMode::DiscoverLocalStdio))
         ) {
             return None;
         }
@@ -459,7 +458,7 @@ impl ToolCatalogTransportIdentity {
                 env_vars,
                 cwd,
                 &config.environment_id,
-                connection_identity.map(|(_, mode, _)| mode.preferred_protocol_version()),
+                connection_identity.map(|(_, mode)| mode.preferred_protocol_version()),
                 client_elicitation_capability,
                 client_mcp_extensions.iter().collect::<BTreeMap<_, _>>(),
             ))

@@ -1,7 +1,5 @@
 use super::*;
-use crate::token_data::IdTokenInfo;
 use anyhow::Context;
-use base64::Engine;
 use codex_secrets::LocalSecretsNamespace;
 use codex_secrets::SecretScope;
 use codex_secrets::SecretsBackendKind;
@@ -98,11 +96,6 @@ async fn file_storage_load_returns_auth_dot_json() -> anyhow::Result<()> {
     let auth_dot_json = AuthDotJson {
         auth_mode: Some(AuthMode::ApiKey),
         openai_api_key: Some("test-key".to_string()),
-        tokens: None,
-        last_refresh: Some(Utc::now()),
-        personal_access_token: None,
-        bedrock_api_key: None,
-        bedrock_access_keys: None,
     };
 
     storage
@@ -121,11 +114,6 @@ async fn file_storage_save_persists_auth_dot_json() -> anyhow::Result<()> {
     let auth_dot_json = AuthDotJson {
         auth_mode: Some(AuthMode::ApiKey),
         openai_api_key: Some("test-key".to_string()),
-        tokens: None,
-        last_refresh: Some(Utc::now()),
-        personal_access_token: None,
-        bedrock_api_key: None,
-        bedrock_access_keys: None,
     };
 
     let file = get_auth_file(codex_home.path());
@@ -188,26 +176,6 @@ fn file_storage_failed_replacement_cleans_up_temporary_file() -> anyhow::Result<
     Ok(())
 }
 
-#[tokio::test]
-async fn file_storage_round_trips_personal_access_token_auth() -> anyhow::Result<()> {
-    let codex_home = tempdir()?;
-    let storage = FileAuthStorage::new(codex_home.path().to_path_buf());
-    let auth_dot_json = AuthDotJson {
-        auth_mode: Some(AuthMode::PersonalAccessToken),
-        openai_api_key: None,
-        tokens: None,
-        last_refresh: None,
-        personal_access_token: Some("at-example".to_string()),
-        bedrock_api_key: None,
-        bedrock_access_keys: None,
-    };
-
-    storage.save(&auth_dot_json)?;
-
-    let loaded = storage.load()?;
-    assert_eq!(Some(auth_dot_json), loaded);
-    Ok(())
-}
 
 #[test]
 fn file_storage_delete_removes_auth_file() -> anyhow::Result<()> {
@@ -215,11 +183,6 @@ fn file_storage_delete_removes_auth_file() -> anyhow::Result<()> {
     let auth_dot_json = AuthDotJson {
         auth_mode: Some(AuthMode::ApiKey),
         openai_api_key: Some("sk-test-key".to_string()),
-        tokens: None,
-        last_refresh: None,
-        personal_access_token: None,
-        bedrock_api_key: None,
-        bedrock_access_keys: None,
     };
     let storage = create_auth_storage(
         dir.path().to_path_buf(),
@@ -246,11 +209,6 @@ fn ephemeral_storage_save_load_delete_is_in_memory_only() -> anyhow::Result<()> 
     let auth_dot_json = AuthDotJson {
         auth_mode: Some(AuthMode::ApiKey),
         openai_api_key: Some("sk-ephemeral".to_string()),
-        tokens: None,
-        last_refresh: Some(Utc::now()),
-        personal_access_token: None,
-        bedrock_api_key: None,
-        bedrock_access_keys: None,
     };
 
     storage.save(&auth_dot_json)?;
@@ -344,48 +302,11 @@ fn encrypted_auth_file(codex_home: &Path) -> PathBuf {
     codex_home.join("secrets").join("codex_auth.age")
 }
 
-fn id_token_with_prefix(prefix: &str) -> IdTokenInfo {
-    #[derive(Serialize)]
-    struct Header {
-        alg: &'static str,
-        typ: &'static str,
-    }
-
-    let header = Header {
-        alg: "none",
-        typ: "JWT",
-    };
-    let payload = json!({
-        "email": format!("{prefix}@example.com"),
-        "https://api.openai.com/auth": {
-            "chatgpt_account_id": format!("{prefix}-account"),
-        },
-    });
-    let encode = |bytes: &[u8]| base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(bytes);
-    let header_b64 = encode(&serde_json::to_vec(&header).expect("serialize header"));
-    let payload_b64 = encode(&serde_json::to_vec(&payload).expect("serialize payload"));
-    let signature_b64 = encode(b"sig");
-    let fake_jwt = format!("{header_b64}.{payload_b64}.{signature_b64}");
-
-    crate::token_data::parse_chatgpt_jwt_claims(&fake_jwt).expect("fake JWT should parse")
-}
 
 fn auth_with_prefix(prefix: &str) -> AuthDotJson {
     AuthDotJson {
         auth_mode: Some(AuthMode::ApiKey),
         openai_api_key: Some(format!("{prefix}-api-key")),
-        tokens: Some(TokenData {
-            id_token: id_token_with_prefix(prefix),
-            access_token: format!("{prefix}-access"),
-            refresh_token: format!("{prefix}-refresh"),
-            oauth_provenance: None,
-            login_owner_id: None,
-            account_id: Some(format!("{prefix}-account-id")),
-        }),
-        last_refresh: None,
-        personal_access_token: None,
-        bedrock_api_key: None,
-        bedrock_access_keys: None,
     }
 }
 
@@ -401,11 +322,6 @@ fn secrets_keyring_auth_storage_load_returns_deserialized_auth() -> anyhow::Resu
     let expected = AuthDotJson {
         auth_mode: Some(AuthMode::ApiKey),
         openai_api_key: Some("sk-test".to_string()),
-        tokens: None,
-        last_refresh: None,
-        personal_access_token: None,
-        bedrock_api_key: None,
-        bedrock_access_keys: None,
     };
     seed_secrets_backend_with_auth(&mock_keyring, codex_home.path(), &expected)?;
 

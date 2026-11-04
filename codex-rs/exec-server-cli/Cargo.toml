@@ -50,4 +50,5 @@ jsonwebtoken = { workspace = true }
 pretty_assertions = { workspace = true }
 tempfile = { workspace = true }
 tokio = { workspace = true, features = ["io-util", "process"] }
+url = { workspace = true }
 wiremock = { workspace = true }

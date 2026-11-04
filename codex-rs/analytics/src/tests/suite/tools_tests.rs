@@ -42,7 +42,6 @@ use codex_app_server_protocol::CommandExecutionSource;
 use codex_app_server_protocol::CommandExecutionStatus;
 use codex_app_server_protocol::ItemCompletedNotification;
 use codex_app_server_protocol::ItemStartedNotification;
-use codex_app_server_protocol::McpToolCallAppContext;
 use codex_app_server_protocol::McpToolCallStatus;
 use codex_app_server_protocol::ServerNotification;
 use codex_app_server_protocol::ThreadItemPayload;
@@ -59,15 +58,11 @@ fn sample_command_execution_item_with_actions(
     exit_code: Option<i32>,
     duration_ms: Option<i64>,
     command_actions: Vec<CommandAction>,
-    plugin_id: Option<&str>,
-    script_path: Option<&str>,
     sandbox_type: Option<SandboxType>,
 ) -> ThreadItemPayload {
     let mut item = sample_command_execution_item(status, exit_code, duration_ms);
     let ThreadItemPayload::CommandExecution {
         command_actions: item_command_actions,
-        plugin_id: item_plugin_id,
-        script_path: item_script_path,
         sandbox_type: item_sandbox_type,
         ..
     } = &mut item
@@ -75,8 +70,6 @@ fn sample_command_execution_item_with_actions(
         unreachable!("sample command execution item should be CommandExecution");
     };
     *item_command_actions = command_actions;
-    *item_plugin_id = plugin_id.map(str::to_string);
-    *item_script_path = script_path.map(str::to_string);
     *item_sandbox_type = sandbox_type;
     item
 }
@@ -143,8 +136,6 @@ fn command_execution_event_serializes_expected_shape() {
                 requested_additional_permissions: false,
                 requested_network_access: false,
             },
-            plugin_id: Some("sample@openai-curated".to_string()),
-            script_path: Some("scripts/run.py".to_string()),
             command_execution_source: CommandExecutionSource::Agent,
             exit_code: Some(0),
             command_total_action_count: 4,
@@ -200,8 +191,6 @@ fn command_execution_event_serializes_expected_shape() {
             "failure_kind": null,
             "requested_additional_permissions": false,
             "requested_network_access": false,
-            "plugin_id": "sample@openai-curated",
-            "script_path": "scripts/run.py",
             "command_execution_source": "agent",
             "exit_code": 0,
             "command_total_action_count": 4,
@@ -233,20 +222,10 @@ async fn cua_tool_call_lifecycle_requires_a_start_and_deduplicates_replay() {
 
     let item = |status| ThreadItemPayload::McpToolCall {
         id: "cua-call".into(),
-        server: "codex_apps".into(),
+        server: "node_repl".into(),
         tool: "js".into(),
         status,
         arguments: json!({"script": "synthetic-private-input"}),
-        app_context: Some(McpToolCallAppContext {
-            connector_id: "connector_openai_browser".into(),
-            link_id: None,
-            resource_uri: None,
-            app_name: None,
-            action_name: None,
-        }),
-        mcp_app_resource_uri: None,
-        mcp_app_ui: None,
-        plugin_id: Some("browser@openai-curated".into()),
         read_only_hint: None,
         result: None,
         error: None,
@@ -291,18 +270,10 @@ async fn cua_tool_call_lifecycle_requires_a_start_and_deduplicates_replay() {
     assert_eq!(
         (
             start.event_type,
-            start.event_params.connector_id.as_deref(),
-            start.event_params.plugin_id.as_deref(),
             start.event_params.started_at_ms,
             terminal.event_params.base.started_at_ms,
         ),
-        (
-            "codex_cua_tool_call_started",
-            Some("connector_openai_browser"),
-            Some("browser@openai-curated"),
-            1_000,
-            1_000,
-        )
+        ("codex_cua_tool_call_started", 1_000, 1_000)
     );
     assert!(
         !serde_json::to_string(&events)
@@ -390,8 +361,6 @@ async fn item_lifecycle_notifications_publish_command_execution_event() {
                                 command: "cargo test".to_string(),
                             },
                         ],
-                        Some("sample@openai-curated"),
-                        Some("scripts/run.py"),
                         Some(SandboxType::LinuxSeccomp),
                     ),
                     /*started_at_ms*/ None,
@@ -405,10 +374,9 @@ async fn item_lifecycle_notifications_publish_command_execution_event() {
     let payload = serde_json::to_value(&events).expect("serialize events");
     assert_eq!(payload.as_array().expect("events array").len(), 1);
     assert_eq!(payload[0]["event_params"]["model_slug"], "invoking-model");
-    assert_eq!(
-        payload[0]["event_params"]["sandbox_backend"],
-        "linux_seccomp"
-    );
+    // SandboxType::as_metric_tag maps LinuxSeccomp to "seccomp"; the old
+    // "linux_seccomp" expectation predates that mapping.
+    assert_eq!(payload[0]["event_params"]["sandbox_backend"], "seccomp");
     assert_eq!(payload[0]["event_params"]["reasoning_effort"], "max");
     assert_eq!(payload[0]["event_type"], "codex_command_execution_event");
     assert_eq!(payload[0]["event_params"]["thread_id"], "thread-1");
@@ -416,11 +384,6 @@ async fn item_lifecycle_notifications_publish_command_execution_event() {
     assert_eq!(payload[0]["event_params"]["turn_id"], "turn-1");
     assert_eq!(payload[0]["event_params"]["item_id"], "item-1");
     assert_eq!(payload[0]["event_params"]["tool_name"], "shell");
-    assert_eq!(
-        payload[0]["event_params"]["plugin_id"],
-        "sample@openai-curated"
-    );
-    assert_eq!(payload[0]["event_params"]["script_path"], "scripts/run.py");
     assert_eq!(
         payload[0]["event_params"]["command_execution_source"],
         "agent"
@@ -786,10 +749,10 @@ async fn mcp_elicitation_classification_survives_turn_completion_and_preserves_c
         .await;
 
     let mut items = Vec::new();
-    for (item_id, connector_id, elicitation_type) in [
-        ("auth", "calendar", Some(ElicitationType::AuthOrLink)),
-        ("retry", "calendar", None),
-        ("denied", "drive", Some(ElicitationType::Approval)),
+    for (item_id, elicitation_type) in [
+        ("auth", Some(ElicitationType::AuthOrLink)),
+        ("retry", None),
+        ("denied", Some(ElicitationType::Approval)),
     ] {
         let item = ThreadItemPayload::McpToolCall {
             id: item_id.to_string(),
@@ -797,16 +760,6 @@ async fn mcp_elicitation_classification_survives_turn_completion_and_preserves_c
             tool: "search".to_string(),
             status: McpToolCallStatus::Completed,
             arguments: json!({ "token": "synthetic-private-input" }),
-            app_context: Some(McpToolCallAppContext {
-                connector_id: connector_id.to_string(),
-                link_id: None,
-                resource_uri: None,
-                app_name: None,
-                action_name: None,
-            }),
-            mcp_app_resource_uri: None,
-            mcp_app_ui: None,
-            plugin_id: None,
             read_only_hint: None,
             result: None,
             error: None,
@@ -888,9 +841,9 @@ async fn mcp_elicitation_classification_survives_turn_completion_and_preserves_c
     assert_eq!(
         classifications,
         vec![
-            json!({"item_id": "auth", "connector_id": "calendar", "elicitation_type": "auth_or_link"}),
-            json!({"item_id": "retry", "connector_id": "calendar", "elicitation_type": null}),
-            json!({"item_id": "denied", "connector_id": "drive", "elicitation_type": "approval"}),
+            json!({"item_id": "auth", "connector_id": null, "elicitation_type": "auth_or_link"}),
+            json!({"item_id": "retry", "connector_id": null, "elicitation_type": null}),
+            json!({"item_id": "denied", "connector_id": null, "elicitation_type": "approval"}),
         ]
     );
     assert!(!payload.to_string().contains("synthetic-private-input"));
@@ -909,7 +862,6 @@ async fn reducer_ingests_artifact_operation_fact() {
                         item_id: "call-1".to_string(),
                         lifecycle: ArtifactOperationLifecycle::Started,
                         occurred_at_ms: 1_786_000_000_000,
-                        plugin_id: "presentations@openai-primary-runtime".to_string(),
                         script_path: "skills/presentations/container_tools/mark_artifact_operation_started.mjs".to_string(),
                         skill: "presentations".to_string(),
                         artifact_type: "presentation".to_string(),
@@ -924,7 +876,8 @@ async fn reducer_ingests_artifact_operation_fact() {
         )
         .await;
 
-    assert!(events[0].can_send_with_api_key_auth());
+    // Analytics delivery is disabled for API-key auth; no event is sendable.
+    assert!(!events[0].can_send_with_api_key_auth());
     assert_eq!(
         serde_json::to_value(events).expect("serialize events"),
         json!([{
@@ -939,7 +892,6 @@ async fn reducer_ingests_artifact_operation_fact() {
                 "runtime": serde_json::to_value(current_runtime_metadata())
                     .expect("serialize runtime metadata"),
                 "model_slug": "gpt-5",
-                "plugin_id": "presentations@openai-primary-runtime",
                 "script_path": "skills/presentations/container_tools/mark_artifact_operation_started.mjs",
                 "skill": "presentations",
                 "artifact_type": "presentation",

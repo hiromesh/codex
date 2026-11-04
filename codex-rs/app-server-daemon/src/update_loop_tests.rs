@@ -240,9 +240,7 @@ async fn explicit_update_migrates_running_and_stopped_installations() {
             crate::managed_install::package_root(home.path()),
             home.path().join("packages/standalone")
         );
-        let settings = format!(
-            r#"{{"updater":{{"autoUpdateEnabled":{running}}},"remoteControlEnabled":true}}"#
-        );
+        let settings = format!(r#"{{"updater":{{"autoUpdateEnabled":{running}}}}}"#);
         std::fs::write(&legacy.settings_file, &settings).unwrap();
         let daemon_settings = legacy.load_settings().await.unwrap();
         let old_backend = crate::backend::pid_backend(legacy.backend_paths(&daemon_settings));

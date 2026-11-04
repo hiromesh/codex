@@ -119,7 +119,6 @@ pub(crate) async fn make_test_app() -> Box<App> {
         rate_limit_refresh_state: Default::default(),
         pending_mcp_login_start: None,
         active_mcp_login_ids: HashMap::new(),
-        pending_plugin_enabled_writes: HashMap::new(),
         pending_hook_enabled_writes: HashMap::new(),
         recap: recap::RecapState::default(),
         _test_codex_home: test_codex_home,

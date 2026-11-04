@@ -69,7 +69,6 @@ fn connection_identity(
     McpServerConnectionIdentity::new(
         "docs",
         server,
-        /*host_plugin_root*/ None,
         OAuthCredentialsStoreMode::default(),
         AuthKeyringBackendKind::default(),
         McpOAuthRefreshMode::Legacy,
@@ -77,7 +76,6 @@ fn connection_identity(
         runtime_context,
         /*runtime_auth_provider*/ None,
         /*auth*/ None,
-        /*codex_apps_cache_identity*/ None,
         ElicitationCapability::default(),
         ClientMcpExtensions::default(),
         /*previous_identity*/ None,
@@ -166,7 +164,7 @@ fn tool_catalog_cache_does_not_reuse_catalogs_across_credential_policies() {
                     &ElicitationCapability::default(),
                     &ClientMcpExtensions::default(),
                 ),
-                Some((identity, McpProtocolMode::Legacy, false)),
+                Some((identity, McpProtocolMode::Legacy)),
             )
             .expect("explicit authorization permits catalog caching")
     };

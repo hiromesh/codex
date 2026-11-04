@@ -696,7 +696,6 @@ mod thread_processor_behavior_tests {
 
         assert_eq!(config.model_provider_id, "session");
         assert_eq!(config.model_provider, session_provider);
-        assert!(!config.features.enabled(Feature::Plugins));
         assert!(config.bypass_hook_trust);
         Ok(())
     }
@@ -726,7 +725,6 @@ mod thread_processor_behavior_tests {
         };
         let config_snapshot = ThreadConfigSnapshot {
             turn_extension_init: Default::default(),
-            disabled_plugin_ids: Vec::new(),
             model: "gpt-5".to_string(),
             model_provider_id: "openai".to_string(),
             service_tier: Some("flex".to_string()),

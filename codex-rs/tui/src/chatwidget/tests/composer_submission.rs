@@ -1,5 +1,4 @@
 use super::*;
-use crate::app_event::ConnectorsSnapshot;
 use crate::bottom_pane::RestrictedInputMode;
 use crate::history_cell::ThreadRecapLoadingCell;
 use base64::Engine;
@@ -963,7 +962,6 @@ async fn submission_prefers_selected_duplicate_skill_path() {
             path: repo_skill_path.into(),
             scope: crate::test_support::skill_scope_repo(),
             enabled: true,
-            plugin_id: None,
         },
         SkillMetadata {
             name: "figma".to_string(),
@@ -974,7 +972,6 @@ async fn submission_prefers_selected_duplicate_skill_path() {
             path: user_skill_path.clone().into(),
             scope: crate::test_support::skill_scope_user(),
             enabled: true,
-            plugin_id: None,
         },
     ]));
 
@@ -1002,68 +999,6 @@ async fn submission_prefers_selected_duplicate_skill_path() {
         })
         .collect::<Vec<_>>();
     assert_eq!(selected_skill_paths, vec![user_skill_path.to_path_buf()]);
-}
-
-#[tokio::test]
-async fn plugin_mention_does_not_suppress_same_name_skill() {
-    let (mut chat, _rx, mut op_rx) = make_chatwidget_manual(/*model_override*/ None).await;
-    chat.thread_id = Some(ThreadId::new());
-    chat.set_feature_enabled(Feature::Plugins, /*enabled*/ true);
-    chat.bottom_pane
-        .set_plugin_mentions(Some(vec![PluginCapabilitySummary {
-            config_name: "app-0123456789abcdef0123456789abcdef@test".to_string(),
-            display_name: "foo".to_string(),
-            plugin_namespace: None,
-            description: None,
-            has_skills: true,
-            mcp_server_names: Vec::new(),
-            app_connector_ids: Vec::new(),
-        }]));
-    let skill_path = test_path_buf("/tmp/foo/SKILL.md").abs();
-    chat.set_skills(Some(vec![SkillMetadata {
-        name: "foo".to_string(),
-        description: "Foo skill".to_string(),
-        short_description: None,
-        interface: None,
-        dependencies: None,
-        path: skill_path.clone().into(),
-        scope: crate::test_support::skill_scope_user(),
-        enabled: true,
-        plugin_id: None,
-    }]));
-
-    chat.submit_user_message(UserMessage {
-        text: "@foo $foo".to_string(),
-        local_images: Vec::new(),
-        remote_image_urls: Vec::new(),
-        text_elements: Vec::new(),
-        mention_bindings: vec![MentionBinding {
-            sigil: '@',
-            mention: "foo".to_string(),
-            path: "plugin://app-0123456789abcdef0123456789abcdef@test".to_string(),
-        }],
-    });
-
-    let Op::UserTurn { items, .. } = next_submit_op(&mut op_rx) else {
-        panic!("expected Op::UserTurn");
-    };
-    assert_eq!(
-        items,
-        vec![
-            UserInput::Text {
-                text: "@foo $foo".to_string(),
-                text_elements: Vec::new(),
-            },
-            UserInput::Skill {
-                name: "foo".to_string(),
-                path: skill_path.to_path_buf(),
-            },
-            UserInput::Mention {
-                name: "foo".to_string(),
-                path: "plugin://app-0123456789abcdef0123456789abcdef@test".to_string(),
-            },
-        ]
-    );
 }
 
 #[tokio::test]
@@ -2086,64 +2021,6 @@ async fn enqueueing_history_prompt_multiple_times_is_stable() {
     for message in chat.input_queue.queued_user_messages.iter() {
         assert_eq!(message.text, "repeat me");
     }
-}
-
-#[tokio::test]
-async fn submit_user_message_ignores_inaccessible_app_mentions_from_bindings() {
-    let (mut chat, _rx, mut op_rx) = make_chatwidget_manual(/*model_override*/ None).await;
-    chat.thread_id = Some(ThreadId::new());
-    set_chatgpt_auth(&mut chat);
-    chat.config
-        .features
-        .enable(Feature::Apps)
-        .expect("test config should allow feature update");
-
-    chat.on_connectors_loaded(
-        Ok(ConnectorsSnapshot {
-            connectors: vec![AppInfo {
-                id: "arabica_uae".to_string(),
-                name: "% Arabica UAE".to_string(),
-                description: Some("Directory-only app".to_string()),
-                logo_url: None,
-                logo_url_dark: None,
-                icon_assets: None,
-                icon_dark_assets: None,
-                distribution_channel: None,
-                branding: None,
-                app_metadata: None,
-                labels: None,
-                install_url: Some("https://example.test/arabica".to_string()),
-                is_accessible: false,
-                is_enabled: true,
-                plugin_display_names: Vec::new(),
-            }],
-        }),
-        /*is_final*/ false,
-    );
-
-    chat.submit_user_message(UserMessage {
-        text: "$arabica-uae".to_string(),
-        local_images: Vec::new(),
-        remote_image_urls: Vec::new(),
-        text_elements: Vec::new(),
-        mention_bindings: vec![MentionBinding {
-            sigil: '$',
-            mention: "arabica-uae".to_string(),
-            path: "app://arabica_uae".to_string(),
-        }],
-    });
-
-    let items = match next_submit_op(&mut op_rx) {
-        Op::UserTurn { items, .. } => items,
-        other => panic!("expected Op::UserTurn, got {other:?}"),
-    };
-    assert_eq!(
-        items,
-        vec![UserInput::Text {
-            text: "$arabica-uae".to_string(),
-            text_elements: Vec::new(),
-        }]
-    );
 }
 
 #[test]

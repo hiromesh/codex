@@ -123,12 +123,8 @@ pub const ENVIRONMENT_CONTEXT_OPEN_TAG: &str = "<environment_context>";
 pub const ENVIRONMENT_CONTEXT_CLOSE_TAG: &str = "</environment_context>";
 pub const ENVIRONMENTS_INSTRUCTIONS_OPEN_TAG: &str = "<environments_instructions>";
 pub const ENVIRONMENTS_INSTRUCTIONS_CLOSE_TAG: &str = "</environments_instructions>";
-pub const APPS_INSTRUCTIONS_OPEN_TAG: &str = "<apps_instructions>";
-pub const APPS_INSTRUCTIONS_CLOSE_TAG: &str = "</apps_instructions>";
 pub const SKILLS_INSTRUCTIONS_OPEN_TAG: &str = "<skills_instructions>";
 pub const SKILLS_INSTRUCTIONS_CLOSE_TAG: &str = "</skills_instructions>";
-pub const PLUGINS_INSTRUCTIONS_OPEN_TAG: &str = "<plugins_instructions>";
-pub const PLUGINS_INSTRUCTIONS_CLOSE_TAG: &str = "</plugins_instructions>";
 pub const TOOLS_OPEN_TAG: &str = "<tools>";
 pub const TOOLS_CLOSE_TAG: &str = "</tools>";
 pub const COLLABORATION_MODE_OPEN_TAG: &str = "<collaboration_mode>";
@@ -267,9 +263,6 @@ pub struct ThreadSettingsOverrides {
     /// Updated personality preference.
     pub personality: Option<Personality>,
 
-    /// Replace the thread's disabled plugin IDs. Omission preserves the current
-    /// selection, and an empty list clears it.
-    pub disabled_plugin_ids: Option<Vec<String>>,
 }
 
 /// Source classification for client-supplied context.
@@ -1407,7 +1400,6 @@ pub enum HookSource {
     Project,
     Mdm,
     SessionFlags,
-    Plugin,
     CloudRequirements,
     CloudManagedConfig,
     LegacyManagedConfigFile,
@@ -2008,9 +2000,6 @@ pub struct ThreadSettingsSnapshot {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub personality: Option<Personality>,
     pub collaboration_mode: CollaborationMode,
-    /// Thread-owned plugin selection, retained even when a plugin is unavailable.
-    #[serde(default)]
-    pub disabled_plugin_ids: Vec<String>,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, Default, PartialEq, Eq, JsonSchema, TS)]
@@ -2435,27 +2424,6 @@ pub struct McpToolCallBeginEvent {
     #[serde(default)]
     pub turn_id: String,
     pub invocation: McpInvocation,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    #[ts(optional)]
-    pub connector_id: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    #[ts(optional)]
-    pub mcp_app_resource_uri: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    #[ts(optional)]
-    pub mcp_app_ui: Option<crate::items::McpAppUi>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    #[ts(optional)]
-    pub link_id: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    #[ts(optional)]
-    pub app_name: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    #[ts(optional)]
-    pub action_name: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    #[ts(optional)]
-    pub plugin_id: Option<String>,
     /// Whether the selected tool is annotated as read-only, not its execution outcome.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[ts(optional)]
@@ -2470,27 +2438,6 @@ pub struct McpToolCallEndEvent {
     #[serde(default)]
     pub turn_id: String,
     pub invocation: McpInvocation,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    #[ts(optional)]
-    pub connector_id: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    #[ts(optional)]
-    pub mcp_app_resource_uri: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    #[ts(optional)]
-    pub mcp_app_ui: Option<crate::items::McpAppUi>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    #[ts(optional)]
-    pub link_id: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    #[ts(optional)]
-    pub app_name: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    #[ts(optional)]
-    pub action_name: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    #[ts(optional)]
-    pub plugin_id: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[ts(optional)]
     pub read_only_hint: Option<bool>,
@@ -3042,10 +2989,6 @@ pub struct TurnContextItem {
     /// Root turn that owns this turn's attribution, retained across recovery.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub root_turn_id: Option<String>,
-    /// Plugin selection captured for this turn. Absent in older histories.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    #[ts(optional)]
-    pub disabled_plugin_ids: Option<Vec<String>>,
     pub cwd: AbsolutePathBuf,
     pub approval_policy: AskForApproval,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -3287,14 +3230,6 @@ pub enum ExecCommandStatus {
 pub struct ExecCommandBeginEvent {
     /// Identifier so this can be paired with the ExecCommandEnd event.
     pub call_id: String,
-    /// Trusted first-party plugin attributed to this command, when known.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    #[ts(optional)]
-    pub plugin_id: Option<String>,
-    /// Safe plugin-relative path attributed to this command, when known.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    #[ts(optional)]
-    pub script_path: Option<String>,
     /// Identifier for the underlying PTY process (when available).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[ts(optional)]
@@ -3321,14 +3256,6 @@ pub struct ExecCommandBeginEvent {
 pub struct ExecCommandEndEvent {
     /// Identifier for the ExecCommandBegin that finished.
     pub call_id: String,
-    /// Trusted first-party plugin attributed to this command, when known.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    #[ts(optional)]
-    pub plugin_id: Option<String>,
-    /// Safe plugin-relative path attributed to this command, when known.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    #[ts(optional)]
-    pub script_path: Option<String>,
     /// Identifier for the underlying PTY process (when available).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[ts(optional)]
@@ -4292,7 +4219,7 @@ mod tests {
             "execution_mode": "sync",
             "scope": "turn",
             "source_path": test_path_buf("/tmp/hooks.json").abs(),
-            "source": "plugin",
+            "source": "project",
             "display_order": 0,
             "status": "completed",
             "status_message": null,
@@ -5111,13 +5038,6 @@ mod tests {
                 server: "server".into(),
                 tool: "tool".into(),
                 arguments: json!({"arg": "value"}),
-                connector_id: Some("connector".into()),
-                mcp_app_resource_uri: Some("app://connector".into()),
-                mcp_app_ui: None,
-                link_id: Some("link_123".into()),
-                app_name: Some("Calendar".into()),
-                action_name: Some("create_event".into()),
-                plugin_id: Some("sample@test".into()),
                 read_only_hint: Some(false),
                 status: McpToolCallStatus::InProgress,
                 result: None,
@@ -5134,15 +5054,6 @@ mod tests {
                 assert_eq!(event.call_id, "mcp-1");
                 assert_eq!(event.invocation.server, "server");
                 assert_eq!(event.invocation.tool, "tool");
-                assert_eq!(event.connector_id.as_deref(), Some("connector"));
-                assert_eq!(
-                    event.mcp_app_resource_uri.as_deref(),
-                    Some("app://connector")
-                );
-                assert_eq!(event.link_id.as_deref(), Some("link_123"));
-                assert_eq!(event.app_name.as_deref(), Some("Calendar"));
-                assert_eq!(event.action_name.as_deref(), Some("create_event"));
-                assert_eq!(event.plugin_id.as_deref(), Some("sample@test"));
                 assert_eq!(event.read_only_hint, Some(false));
             }
             _ => panic!("expected McpToolCallBegin event"),
@@ -5200,13 +5111,6 @@ mod tests {
                 server: "server".into(),
                 tool: "tool".into(),
                 arguments: json!({"arg": "value"}),
-                connector_id: Some("connector".into()),
-                mcp_app_resource_uri: Some("app://connector".into()),
-                mcp_app_ui: None,
-                link_id: Some("link_123".into()),
-                app_name: Some("Calendar".into()),
-                action_name: Some("create_event".into()),
-                plugin_id: Some("sample@test".into()),
                 read_only_hint: None,
                 status: McpToolCallStatus::Completed,
                 result: Some(CallToolResult {
@@ -5228,15 +5132,6 @@ mod tests {
                 assert_eq!(event.call_id, "mcp-1");
                 assert_eq!(event.invocation.server, "server");
                 assert_eq!(event.invocation.tool, "tool");
-                assert_eq!(event.connector_id.as_deref(), Some("connector"));
-                assert_eq!(
-                    event.mcp_app_resource_uri.as_deref(),
-                    Some("app://connector")
-                );
-                assert_eq!(event.link_id.as_deref(), Some("link_123"));
-                assert_eq!(event.app_name.as_deref(), Some("Calendar"));
-                assert_eq!(event.action_name.as_deref(), Some("create_event"));
-                assert_eq!(event.plugin_id.as_deref(), Some("sample@test"));
                 assert_eq!(event.duration, Duration::from_millis(42));
                 assert!(event.is_success());
             }
@@ -5255,8 +5150,6 @@ mod tests {
                 model_context: None,
                 sandbox_type: None,
                 id: "exec-1".into(),
-                plugin_id: Some("sample@openai-curated".into()),
-                script_path: Some("scripts/run.py".into()),
                 process_id: Some("pid-1".into()),
                 command: vec!["echo".into(), "done".into()],
                 cwd: cwd.clone(),
@@ -5280,8 +5173,6 @@ mod tests {
                 model_context: None,
                 sandbox_type: None,
                 id: "exec-1".into(),
-                plugin_id: Some("sample@openai-curated".into()),
-                script_path: Some("scripts/run.py".into()),
                 process_id: Some("pid-1".into()),
                 command: vec!["echo".into(), "done".into()],
                 cwd,
@@ -5301,14 +5192,10 @@ mod tests {
             started.as_legacy_events(/*show_raw_agent_reasoning*/ false).as_slice(),
             [EventMsg::ExecCommandBegin(ExecCommandBeginEvent {
                 call_id,
-                plugin_id,
-                script_path,
                 turn_id,
                 started_at_ms: 10,
                 ..
             })] if call_id == "exec-1"
-                && plugin_id.as_deref() == Some("sample@openai-curated")
-                && script_path.as_deref() == Some("scripts/run.py")
                 && turn_id == "turn-1"
         ));
         assert!(matches!(
@@ -5317,15 +5204,11 @@ mod tests {
                 .as_slice(),
             [EventMsg::ExecCommandEnd(ExecCommandEndEvent {
                 call_id,
-                plugin_id,
-                script_path,
                 turn_id,
                 completed_at_ms: 20,
                 aggregated_output,
                 ..
             })] if call_id == "exec-1"
-                && plugin_id.as_deref() == Some("sample@openai-curated")
-                && script_path.as_deref() == Some("scripts/run.py")
                 && turn_id == "turn-1"
                 && aggregated_output == "done\n"
         ));
@@ -5793,7 +5676,6 @@ mod tests {
         let item = TurnContextItem {
             turn_id: None,
             root_turn_id: None,
-            disabled_plugin_ids: None,
             cwd: test_path_buf("/tmp").abs(),
             approval_policy: AskForApproval::Never,
             approvals_reviewer: None,

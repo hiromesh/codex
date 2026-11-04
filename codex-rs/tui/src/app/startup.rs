@@ -1057,7 +1057,6 @@ See the Codex keymap documentation for supported actions and examples."
             rate_limit_refresh_state: Default::default(),
             pending_mcp_login_start: None,
             active_mcp_login_ids: HashMap::new(),
-            pending_plugin_enabled_writes: HashMap::new(),
             pending_hook_enabled_writes: HashMap::new(),
             recap: recap::RecapState::default(),
             #[cfg(test)]

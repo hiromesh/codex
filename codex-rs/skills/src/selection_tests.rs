@@ -36,8 +36,6 @@ fn make_skill(name: &str, path: &str) -> SkillMetadata {
         policy: None,
         path_to_skills_md: test_path_buf(path).abs().into(),
         scope: codex_protocol::protocol::SkillScope::User,
-        plugin_id: None,
-        remote_plugin_id: None,
     }
 }
 

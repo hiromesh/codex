@@ -161,7 +161,6 @@ async fn widget_replacement_preserves_mention_usage_with_history_disabled() -> R
                         .into(),
                     scope: SkillScope::User,
                     enabled: true,
-                    plugin_id: None,
                 })
                 .collect(),
             errors: Vec::new(),

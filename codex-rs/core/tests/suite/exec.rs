@@ -28,8 +28,7 @@ where
     I: IntoIterator<Item = S>,
     S: Into<String>,
 {
-    let sandbox_type = get_platform_sandbox()
-        .expect("should be able to get sandbox type");
+    let sandbox_type = get_platform_sandbox().expect("should be able to get sandbox type");
     assert_eq!(sandbox_type, SandboxType::MacosSeatbelt);
     let cwd = tmp.path().abs();
 

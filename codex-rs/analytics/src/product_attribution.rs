@@ -76,8 +76,6 @@ fn event_thread_id(event: &TrackEventRequest) -> Option<&str> {
             Some(&event.event_params.guardian_review.thread_id)
         }
         TrackEventRequest::GuardianV2(event) => Some(&event.event_params.guardian_v2.thread_id),
-        TrackEventRequest::AppMentioned(event) => event.event_params.thread_id.as_deref(),
-        TrackEventRequest::AppUsed(event) => event.event_params.app.thread_id.as_deref(),
         TrackEventRequest::HookRun(event) => event.event_params.thread_id.as_deref(),
         TrackEventRequest::Compaction(event) => Some(&event.event_params.thread_id),
         TrackEventRequest::Goal(event) => Some(&event.event_params.thread_id),

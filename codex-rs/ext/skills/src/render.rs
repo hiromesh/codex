@@ -1075,7 +1075,7 @@ pub(crate) fn build_alias_plan(entries: &[&SkillCatalogEntry]) -> Option<AliasPl
     }
     let mut alias_ordered_entries = entries.to_vec();
     alias_ordered_entries.sort_by_key(|entry| entry.alias_root_order().unwrap_or(usize::MAX));
-    let roots = match source {
+    let roots: Vec<String> = match source {
         SkillSourceKind::Host => alias_ordered_entries
             .iter()
             .filter_map(|entry| entry.alias_root())

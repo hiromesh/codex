@@ -317,16 +317,9 @@ impl ChatWidget {
             .filter(|binding| binding.sigil == '$')
             .map(|binding| binding.mention.clone())
             .collect();
-        let mut skill_names_lower: HashSet<String> = HashSet::new();
         let mut selected_skill_paths = HashSet::new();
-        let mut selected_plugin_ids: HashSet<String> = HashSet::new();
 
         if let Some(skills) = self.bottom_pane.skills() {
-            skill_names_lower = skills
-                .iter()
-                .map(|skill| skill.name.to_ascii_lowercase())
-                .collect();
-
             // TODO(anp): Preserve executor path identity through both structured skill input paths
             // below and selection. UserInput::Skill still relies on host-native path interpretation.
             for binding in &mention_bindings {
@@ -361,69 +354,6 @@ impl ChatWidget {
                 items.push(UserInput::Skill {
                     name: skill.name.clone(),
                     path: PathBuf::from(skill.path.as_str()),
-                });
-            }
-        }
-
-        if let Some(plugins) = self.plugins_for_mentions() {
-            for binding in &mention_bindings {
-                let Some(plugin_config_name) = binding
-                    .path
-                    .strip_prefix("plugin://")
-                    .filter(|id| !id.is_empty())
-                else {
-                    continue;
-                };
-                if !selected_plugin_ids.insert(plugin_config_name.to_string()) {
-                    continue;
-                }
-                if let Some(plugin) = plugins
-                    .iter()
-                    .find(|plugin| plugin.config_name == plugin_config_name)
-                {
-                    items.push(UserInput::Mention {
-                        name: plugin.display_name.clone(),
-                        path: binding.path.clone(),
-                    });
-                }
-            }
-        }
-
-        let mut selected_app_ids: HashSet<String> = HashSet::new();
-        if let Some(apps) = self.connectors_for_mentions() {
-            for binding in &mention_bindings {
-                let Some(app_id) = binding
-                    .path
-                    .strip_prefix("app://")
-                    .filter(|id| !id.is_empty())
-                else {
-                    continue;
-                };
-                if selected_app_ids.contains(app_id) {
-                    continue;
-                }
-                if let Some(app) = apps
-                    .iter()
-                    .find(|app| app.id == app_id && is_app_mentionable(app))
-                {
-                    selected_app_ids.insert(app_id.to_string());
-                    items.push(UserInput::Mention {
-                        name: app.name.clone(),
-                        path: binding.path.clone(),
-                    });
-                }
-            }
-
-            let app_mentions = find_app_mentions(&mentions, apps, &skill_names_lower);
-            for app in app_mentions {
-                let slug = codex_connectors::metadata::connector_mention_slug(&app);
-                if bound_names.contains(&slug) || !selected_app_ids.insert(app.id.clone()) {
-                    continue;
-                }
-                let app_id = app.id.as_str();
-                items.push(UserInput::Mention {
-                    name: app.name.clone(),
-                    path: format!("app://{app_id}"),
                 });
             }
         }

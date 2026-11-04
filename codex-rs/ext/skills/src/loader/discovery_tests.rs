@@ -4,7 +4,6 @@ use std::path::Path;
 use codex_exec_server::FileSystemEnvironmentAccessor;
 use codex_exec_server::LOCAL_FS;
 use codex_utils_path_uri::PathUri;
-use codex_utils_plugins::SkillDiscoveryMode;
 use pretty_assertions::assert_eq;
 use tempfile::TempDir;
 
@@ -33,7 +32,6 @@ async fn discover(root: &Path) -> SkillDiscovery {
         SkillDiscoveryOptions {
             directory_symlinks: DirectorySymlinkPolicy::Follow,
             hidden_directories: HiddenDirectoryPolicy::Skip,
-            mode: SkillDiscoveryMode::Recursive,
         },
     )
     .await

@@ -74,7 +74,6 @@ use tokio::sync::mpsc;
 use tokio::sync::oneshot;
 use tokio::time::timeout;
 use toml::Value as TomlValue;
-use tracing::warn;
 
 pub use crate::path::AppServerPath;
 pub use crate::remote::RemoteAppServerClient;
@@ -449,26 +448,6 @@ impl InProcessAppServerClient {
                         let Some(event) = event else {
                             break;
                         };
-                        if let InProcessServerEvent::ServerRequest(request) = &event
-                            && let ServerRequest::ChatgptAuthTokensRefresh { request_id, .. } =
-                                request.as_ref()
-                        {
-                            let send_result = request_sender.fail_server_request(
-                                request_id.clone(),
-                                JSONRPCErrorError {
-                                    code: -32000,
-                                    message: "chatgpt auth token refresh is not supported for in-process app-server clients".to_string(),
-                                    data: None,
-                                },
-                            );
-                            if let Err(err) = send_result {
-                                warn!(
-                                    "failed to reject unsupported chatgpt auth token refresh request: {err}"
-                                );
-                            }
-                            continue;
-                        }
-
                         if event_tx.send(event).is_err() {
                             event_stream_enabled = false;
                         }

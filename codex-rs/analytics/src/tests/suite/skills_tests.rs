@@ -131,8 +131,6 @@ async fn reducer_ingests_skill_invoked_fact() {
                             .expect("native skill path"),
                         scope: codex_protocol::protocol::SkillScope::User,
                     },
-                    plugin_id: None,
-                    remote_plugin_id: None,
                     invocation_type: InvocationType::Explicit,
                 }],
             })),
@@ -150,8 +148,6 @@ async fn reducer_ingests_skill_invoked_fact() {
             "event_params": {
                 "product_client_id": TEST_PRODUCT_CLIENT_ID,
                 "skill_scope": "user",
-                "plugin_id": null,
-                "remote_plugin_id": null,
                 "thread_id": "thread-1",
                 "turn_id": "turn-1",
                 "invoke_type": "explicit",
@@ -161,43 +157,3 @@ async fn reducer_ingests_skill_invoked_fact() {
     );
 }
 
-#[tokio::test]
-async fn reducer_includes_plugin_ids_for_plugin_skill_invocations() {
-    let mut reducer = AnalyticsReducer::default();
-    let mut events = Vec::new();
-    let tracking = test_tracking_context("thread-1", "turn-1");
-    let skill_path = std::env::temp_dir()
-        .ancestors()
-        .last()
-        .expect("temporary directory root")
-        .join("Users/abc/.codex/plugins/cache/test/sample/skills/doc/SKILL.md");
-
-    reducer
-        .ingest(
-            AnalyticsFact::Custom(CustomAnalyticsFact::SkillInvoked(SkillInvokedInput {
-                tracking,
-                invocations: vec![SkillInvocation {
-                    skill_name: "sample:doc".to_string(),
-                    location: SkillInvocationLocation::Host {
-                        path: PathUri::from_host_native_path(&skill_path)
-                            .expect("native skill path"),
-                        scope: codex_protocol::protocol::SkillScope::User,
-                    },
-                    plugin_id: Some("sample@test".to_string()),
-                    remote_plugin_id: Some("plugins~Plugin_sample".to_string()),
-                    invocation_type: InvocationType::Explicit,
-                }],
-            })),
-            &mut events,
-        )
-        .await;
-
-    let payload = serde_json::to_value(&events).expect("serialize events");
-    assert_eq!(
-        (
-            &payload[0]["event_params"]["plugin_id"],
-            &payload[0]["event_params"]["remote_plugin_id"],
-        ),
-        (&json!("sample@test"), &json!("plugins~Plugin_sample"))
-    );
-}

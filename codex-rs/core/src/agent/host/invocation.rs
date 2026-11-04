@@ -244,7 +244,6 @@ pub(crate) async fn prepare(
             exec_policy,
             exec_policy_source_requirements,
             dynamic_tools,
-            disabled_plugin_ids: turn.disabled_plugin_ids.clone(),
         })
     })
     .await

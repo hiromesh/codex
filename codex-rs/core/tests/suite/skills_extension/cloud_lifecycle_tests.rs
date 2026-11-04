@@ -1,4 +1,4 @@
-//! Cloud catalog reuse, refresh retries, and auth-scoped retention through real Core turns.
+//! Cloud catalog reuse, refresh retries, and connection-scoped retention through real Core turns.
 
 use super::*;
 use codex_extension_api::ThreadLifecycleContributor;
@@ -90,7 +90,7 @@ impl ThreadLifecycleContributor<Config> for SessionResources {
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn cloud_skills_reuse_cache_and_invalidate_on_connection_or_auth_change() -> Result<()> {
+async fn cloud_skills_reuse_cache_and_invalidate_on_connection_change() -> Result<()> {
     core_test_support::skip_if_no_network!(Ok(()));
 
     let server = responses::start_mock_server().await;
@@ -123,11 +123,7 @@ async fn cloud_skills_reuse_cache_and_invalidate_on_connection_or_auth_change() 
     let mut builder = apps_enabled_builder(apps.chatgpt_base_url)
         .with_exec_server_url("none")
         .with_extensions(Arc::new(extensions.build()))
-        .with_auth(CodexAuth::from_external_chatgpt_tokens(
-            "header.e30.initial",
-            "account-a",
-            /*chatgpt_plan_type*/ None,
-        )?)
+        .with_auth(CodexAuth::from_api_key("test-api-key"))
         .with_config(move |config| {
             config.include_skill_instructions = true;
             config.cloud_skill_enabled = true;
@@ -135,21 +131,13 @@ async fn cloud_skills_reuse_cache_and_invalidate_on_connection_or_auth_change() 
     let test = builder.build_with_auto_env(&server).await?;
     let mut last_available_skill = calendar;
     // Back off failures across steps and turns; reconnects allow immediate recovery.
-    for (turn, next_reply, expected_skill, new_account, expected_lists, expected_reads) in [
-        ("discovered", Ok(Some(calendar)), Some(calendar), None, 1, 1),
-        (
-            "cached",
-            Ok(Some(updated_calendar)),
-            Some(calendar),
-            None,
-            0,
-            0,
-        ),
+    for (turn, next_reply, expected_skill, expected_lists, expected_reads) in [
+        ("discovered", Ok(Some(calendar)), Some(calendar), 1, 1),
+        ("cached", Ok(Some(updated_calendar)), Some(calendar), 0, 0),
         (
             "refreshed",
             Ok(Some(updated_calendar)),
             Some(updated_calendar),
-            None,
             1,
             1,
         ),
@@ -157,42 +145,22 @@ async fn cloud_skills_reuse_cache_and_invalidate_on_connection_or_auth_change() 
             "same-account-failure",
             Err(()),
             Some(updated_calendar),
-            None,
             1,
             0,
         ),
-        ("removed", Ok(None), None, None, 1, 0),
-        ("empty-cached", Ok(Some(updated_calendar)), None, None, 0, 0),
+        ("removed", Ok(None), None, 1, 0),
+        ("empty-cached", Ok(Some(updated_calendar)), None, 0, 0),
         (
             "restored",
             Ok(Some(updated_calendar)),
             Some(updated_calendar),
-            None,
-            1,
-            1,
-        ),
-        (
-            "auth-changed-failure",
-            Err(()),
-            None,
-            Some("account-b"),
-            1,
-            0,
-        ),
-        ("new-account-cooldown", Ok(Some(gmail)), None, None, 0, 0),
-        (
-            "new-account-discovered",
-            Ok(Some(gmail)),
-            Some(gmail),
-            None,
             1,
             1,
         ),
         (
             "connection-replaced-failure",
             Err(()),
-            Some(gmail),
-            None,
+            Some(updated_calendar),
             1,
             0,
         ),
@@ -200,7 +168,6 @@ async fn cloud_skills_reuse_cache_and_invalidate_on_connection_or_auth_change() 
             "replacement-connection-discovered",
             Ok(Some(gmail)),
             Some(gmail),
-            None,
             1,
             1,
         ),
@@ -214,7 +181,6 @@ async fn cloud_skills_reuse_cache_and_invalidate_on_connection_or_auth_change() 
                 | "same-account-failure"
                 | "removed"
                 | "restored"
-                | "new-account-discovered"
                 | "connection-replaced-failure"
                 | "replacement-connection-discovered"
         ) {
@@ -232,34 +198,9 @@ async fn cloud_skills_reuse_cache_and_invalidate_on_connection_or_auth_change() 
         } else {
             None
         };
-        if let Some(account) = new_account {
-            let client = resources
-                .0
-                .lock()
-                .expect("session resources lock")
-                .clone()
-                .expect("thread MCP resource client");
-            let previous_auth = client.auth_cache_key_for_server(CODEX_APPS_MCP_SERVER_NAME);
-            codex_login::auth::login_with_chatgpt_auth_tokens(
-                test.codex_home_path(),
-                "header.e30.changed",
-                account,
-                /*chatgpt_plan_type*/ None,
-            )?;
-            test.thread_manager.auth_manager().reload().await;
-            // Wait for the real auth transition, without manually refreshing MCP.
-            tokio::time::timeout(Duration::from_secs(10), async {
-                while client.auth_cache_key_for_server(CODEX_APPS_MCP_SERVER_NAME) == previous_auth
-                {
-                    tokio::task::yield_now().await;
-                }
-            })
-            .await?;
-            assert_eq!(provider.lists.load(Ordering::SeqCst), previous_lists);
-        }
         // Empty catalogs must also reject reads of the previously cached skill.
         let (plugin, _) = expected_skill.unwrap_or(last_available_skill);
-        // Auth changes revoke the old catalog, but never reuse its alias for a different root.
+        // Connection changes revoke the old catalog, but never reuse its alias for a different root.
         let alias = if plugin == "calendar" {
             "c0/demo"
         } else {

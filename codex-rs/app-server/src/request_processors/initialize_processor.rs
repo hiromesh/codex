@@ -17,8 +17,6 @@ const NON_ORIGINATING_CLIENT_NAMES: &[&str] = &["codex_app_server_daemon", "code
 
 #[derive(Clone)]
 pub(crate) struct InitializeRequestProcessor {
-    gateway_login_control: Arc<codex_login::GatewayLoginControl>,
-    gateway_login_initialized: Arc<std::sync::OnceLock<()>>,
     outgoing: Arc<OutgoingMessageSender>,
     analytics_events_client: AnalyticsEventsClient,
     config: Arc<Config>,
@@ -28,15 +26,12 @@ pub(crate) struct InitializeRequestProcessor {
 impl InitializeRequestProcessor {
     #[allow(clippy::too_many_arguments)]
     pub(crate) fn new(
-        gateway_login_control: Arc<codex_login::GatewayLoginControl>,
         outgoing: Arc<OutgoingMessageSender>,
         analytics_events_client: AnalyticsEventsClient,
         config: Arc<Config>,
         rpc_transport: AppServerRpcTransport,
     ) -> Self {
         Self {
-            gateway_login_control,
-            gateway_login_initialized: Arc::new(std::sync::OnceLock::new()),
             outgoing,
             analytics_events_client,
             config,
@@ -114,19 +109,6 @@ impl InitializeRequestProcessor {
             self.outgoing
                 .enable_human_approval_connection(connection_id)
                 .await;
-        }
-
-        if capabilities.explicit_gateway_oauth || mutates_global_identity {
-            // Only the first originating client may restore legacy automatic login.
-            // Any explicit opt-in is sticky across subsequent connections.
-            self.gateway_login_initialized.get_or_init(|| {
-                if !capabilities.explicit_gateway_oauth {
-                    self.gateway_login_control.allow_automatic_login();
-                }
-            });
-            if capabilities.explicit_gateway_oauth {
-                self.gateway_login_control.require_explicit_login();
-            }
         }
 
         if mutates_global_identity {

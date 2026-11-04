@@ -521,9 +521,6 @@ fn notes_for_report(report: &DoctorReport) -> Vec<DoctorNote> {
     non_ok_notes(report)
         .into_iter()
         .for_each(|note| notes.push(note));
-    auth_reachability_note(report)
-        .into_iter()
-        .for_each(|note| notes.push(note));
     notes
 }
 
@@ -622,23 +619,6 @@ fn actionable_note_summary(check: &DoctorCheck) -> String {
         return format!("{} - {remediation}", check.summary);
     }
     check.summary.clone()
-}
-
-fn auth_reachability_note(report: &DoctorReport) -> Option<DoctorNote> {
-    let websocket = find_check(report, "websocket")?;
-    let reachability = find_check(report, "reachability")?;
-    let auth_mode = detail::detail_value(websocket, "auth mode")?;
-    let reachability_mode = detail::detail_value(reachability, "reachability mode")?;
-    let auth_mode_lower = auth_mode.to_ascii_lowercase();
-    let reachability_mode_lower = reachability_mode.to_ascii_lowercase();
-    if auth_mode_lower.contains("chatgpt") && reachability_mode_lower.contains("api key") {
-        return Some(DoctorNote {
-            status: DisplayStatus::Warning,
-            name: "auth".to_string(),
-            summary: "mixed auth signals: ChatGPT login plus API key env var; HTTP reachability uses API-key mode".to_string(),
-        });
-    }
-    None
 }
 
 fn display_summary(check: &DoctorCheck, options: HumanOutputOptions) -> String {
@@ -1746,7 +1726,7 @@ Run codex doctor without --summary for detailed diagnostics.
                     CheckStatus::Ok,
                     "Responses WebSocket handshake succeeded",
                 )
-                .detail("auth mode: chatgpt"),
+                .detail("auth mode: api_key"),
                 DoctorCheck::new(
                     "network.provider_reachability",
                     "reachability",
@@ -1772,11 +1752,8 @@ Run codex doctor without --summary for detailed diagnostics.
         assert!(rendered.contains("⚠ rollouts"));
         assert!(rendered.contains("⚠ sandbox"));
         assert!(rendered.contains("⚠ mcp"));
-        assert!(rendered.contains(
-            "⚠ auth         mixed auth signals: ChatGPT login plus API key env var; HTTP reachability uses API-key mode"
-        ));
         assert!(rendered.contains("○ app-server   not running (ephemeral mode)"));
-        assert!(rendered.contains("5 ok · 1 idle · 5 notes · 1 warn · 0 fail degraded"));
+        assert!(rendered.contains("5 ok · 1 idle · 4 notes · 1 warn · 0 fail degraded"));
     }
 
     #[test]

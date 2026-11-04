@@ -538,7 +538,7 @@ impl Environment {
         self.read_environment_config(params).await
     }
 
-    /// Discovers plugin and skill manifests through the environment's discovery API.
+    /// Discovers skill manifests through the environment's discovery API.
     pub async fn discover_capability_roots(
         &self,
         params: CapabilityRootsDiscoverParams,

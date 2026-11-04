@@ -1,4 +1,3 @@
-
 use codex_core::TurnInputRequest;
 use core_test_support::test_codex::local_requests;
 use std::sync::Arc;
@@ -49,18 +48,15 @@ async fn refresh_models_on_models_etag_mismatch_and_avoid_duplicate_models_fetch
     )
     .await;
 
-    let auth = CodexAuth::create_dummy_chatgpt_auth_for_testing();
+    let auth = CodexAuth::from_api_key("test-api-key");
     let mut builder = test_codex()
         .with_auth(auth)
         .with_model("gpt-5.2")
+        .with_mock_model_catalog(&server)
         .with_config(|config| {
             // Keep this test deterministic: no request retries, and a small stream retry budget.
             config.model_provider.request_max_retries = Some(0);
             config.model_provider.stream_max_retries = Some(1);
-            config
-                .features
-                .disable(Feature::Apps)
-                .expect("test config should allow feature update");
         });
 
     let test = builder.build(&server).await?;

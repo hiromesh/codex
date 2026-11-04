@@ -158,12 +158,6 @@
             "null"
           ]
         },
-        "pluginId": {
-          "type": [
-            "string",
-            "null"
-          ]
-        },
         "source": {
           "$ref": "#/definitions/HookSource"
         },
@@ -206,7 +200,6 @@
         "project",
         "mdm",
         "sessionFlags",
-        "plugin",
         "cloudRequirements",
         "cloudManagedConfig",
         "legacyManagedConfigFile",

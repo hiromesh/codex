@@ -39,9 +39,7 @@ codex-app-server-daemon = { workspace = true }
 codex-arg0 = { workspace = true }
 codex-config = { workspace = true }
 codex-network-proxy = { workspace = true }
-codex-connectors = { workspace = true }
 codex-core = { workspace = true }
-codex-core-plugins = { workspace = true }
 codex-diagnostics = { workspace = true }
 codex-home = { workspace = true }
 codex-exec-server = { workspace = true }
@@ -55,13 +53,11 @@ codex-file-watcher = { workspace = true }
 codex-hooks = { workspace = true }
 codex-http-client = { workspace = true }
 codex-otel = { workspace = true }
-codex-plugin = { workspace = true }
 codex-shell-command = { workspace = true }
 codex-skills = { workspace = true }
 codex-skills-extension = { workspace = true }
 codex-utils-cli = { workspace = true }
 codex-utils-pty = { workspace = true }
-codex-backend-client = { workspace = true }
 codex-file-search = { workspace = true }
 codex-login = { workspace = true }
 codex-memories-extension = { workspace = true }
@@ -69,7 +65,6 @@ codex-web-search-extension = { workspace = true }
 codex-websocket-auth = { workspace = true }
 codex-memories-write = { workspace = true }
 codex-mcp = { workspace = true }
-codex-mcp-extension = { workspace = true }
 codex-model-provider = { workspace = true }
 codex-model-provider-info = { workspace = true }
 codex-models-manager = { workspace = true }

@@ -404,7 +404,6 @@ impl App {
             self.runtime_permission_profile_override = None;
         }
         self.pending_primary_events.clear();
-        self.pending_plugin_enabled_writes.clear();
         self.pending_hook_enabled_writes.clear();
         self.temporary_structured_requests.clear();
         for (_, cancellation) in self.pending_thread_titles.drain() {

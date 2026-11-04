@@ -53,7 +53,6 @@ pub(crate) fn record_confirmed_code_mode_send(
 ) {
     if !matches!(source, ToolCallSource::CodeMode { .. })
         || result.is_error == Some(true)
-        || !prepared_call.is_host_owned_apps()
         || !matches!(
             prepared_call.tool_info().tool.name.as_ref(),
             "user_message_send_message"

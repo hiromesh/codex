@@ -165,7 +165,6 @@
         "project",
         "mdm",
         "sessionFlags",
-        "plugin",
         "cloudRequirements",
         "cloudManagedConfig",
         "legacyManagedConfigFile",

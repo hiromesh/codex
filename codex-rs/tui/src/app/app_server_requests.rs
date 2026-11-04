@@ -196,7 +196,6 @@ impl PendingAppServerRequests {
                 None
             }
             ServerRequest::DynamicToolCall { .. } => None,
-            ServerRequest::ChatgptAuthTokensRefresh { .. } => None,
             ServerRequest::AttestationGenerate { request_id, .. } => {
                 Some(UnsupportedAppServerRequest {
                     request_id: request_id.clone(),
@@ -479,8 +478,7 @@ impl PendingAppServerRequests {
     }
 
     pub(super) fn contains_server_request(&self, request: &ServerRequest) -> bool {
-        matches!(request, ServerRequest::ChatgptAuthTokensRefresh { .. })
-            || self.pending_request(request).is_some()
+        self.pending_request(request).is_some()
     }
 
     fn pending_request(&self, request: &ServerRequest) -> Option<&PendingServerRequest> {
@@ -527,7 +525,6 @@ impl PendingAppServerRequests {
                     request_id: request_id.clone(),
                 })
             }
-            ServerRequest::ChatgptAuthTokensRefresh { .. } => None,
             ServerRequest::DynamicToolCall { .. }
             | ServerRequest::AttestationGenerate { .. }
             | ServerRequest::CurrentTimeRead { .. }
@@ -985,22 +982,6 @@ mod tests {
                 "content": { "answer": "yes" },
                 "_meta": { "source": "tui" }
             })
-        );
-    }
-
-    #[test]
-    fn does_not_mark_chatgpt_auth_refresh_as_unsupported() {
-        let mut pending = PendingAppServerRequests::default();
-
-        assert_eq!(
-            pending.note_server_request(&ServerRequest::ChatgptAuthTokensRefresh {
-                request_id: AppServerRequestId::Integer(100),
-                params: codex_app_server_protocol::ChatgptAuthTokensRefreshParams {
-                    reason: codex_app_server_protocol::ChatgptAuthTokensRefreshReason::Unauthorized,
-                    previous_account_id: Some("workspace-1".to_string()),
-                },
-            }),
-            None
         );
     }
 

@@ -248,6 +248,8 @@ pub(crate) async fn run_command(
         };
     }
 
+    let duration = Duration::from_secs(handler.timeout_sec);
+    let timeout_started = Instant::now();
     let mut command = build_command(&runtime.shell, command_line, &runtime.environment, env);
     command.current_dir(cwd);
 

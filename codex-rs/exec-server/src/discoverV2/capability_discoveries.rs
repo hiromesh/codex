@@ -1,6 +1,5 @@
 //! Loads metadata within the request's sandbox and builds a bounded response.
 
-use std::collections::HashMap;
 use std::io;
 use std::sync::Arc;
 
@@ -8,14 +7,10 @@ use codex_file_system::ExecutorFileSystem;
 use codex_skills::parse_skill_frontmatter_metadata;
 use codex_skills::parse_skill_metadata;
 use futures::StreamExt;
-use serde::Deserialize;
-use serde::Serialize;
 
 use crate::CapabilityRootDiscoverRequest;
 use crate::CapabilityRootDiscovery;
-use crate::CapabilityTextFile;
 use crate::DiscoverV2CapabilitiesResponse;
-use crate::ExecutorPlugin;
 use crate::ExecutorSkill;
 use crate::LocalFileSystem;
 use crate::SkillDiscoveryRoot;
@@ -27,45 +22,11 @@ use crate::discover_v2::capability_locations::CapabilityLocations;
 const MAX_RESPONSE_BYTES: usize = 4 * 1024 * 1024;
 const MAX_CAPABILITIES: usize = 2_048;
 const MAX_WARNINGS: usize = 64;
-// Match V1: namespace, separator, and skill name.
-const MAX_QUALIFIED_NAME_LEN: usize = 64 * 2 + 1;
 
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-enum DiscoveredSource {
-    Plugin(Box<ExecutorPlugin>),
-    Skills(Vec<ExecutorSkill>),
-}
-
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
 struct CapabilityDiscovery {
-    content: DiscoveredSource,
+    skills: Vec<ExecutorSkill>,
     warnings: Vec<String>,
-}
-
-// Only the metadata V2 returns or needs to materialize discovered configuration.
-#[derive(Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct PluginManifestMetadata {
-    #[serde(default)]
-    name: String,
-    interface: Option<PluginManifestInterface>,
-    mcp_servers: Option<serde_json::Value>,
-    apps: Option<String>,
-}
-
-#[derive(Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct PluginManifestInterface {
-    display_name: Option<String>,
-}
-
-impl Default for CapabilityDiscovery {
-    fn default() -> Self {
-        Self {
-            content: DiscoveredSource::Skills(Vec::new()),
-            warnings: Vec::new(),
-        }
-    }
 }
 
 pub(super) async fn load_capability_discoveries(
@@ -161,11 +122,7 @@ async fn load_capability_discovery(
     let discovery = discover_root(
         file_system,
         CapabilityRootDiscoverRequest {
-            id: location
-                .plugin
-                .as_ref()
-                .map(|plugin| plugin.id.clone())
-                .unwrap_or_default(),
+            id: location.standalone_root_id.clone().unwrap_or_default(),
             path: location.root.clone(),
             sandbox: None,
         },
@@ -180,45 +137,10 @@ fn parse_root(
 ) -> CapabilityDiscovery {
     let mut warnings = discovery.warnings;
     warnings.extend(discovery.error);
-    if location.plugin.is_some() && discovery.plugin.is_none() {
-        warnings.push(format!(
-            "installed plugin at {} has no readable manifest",
-            location.root
-        ));
-        return CapabilityDiscovery {
-            warnings,
-            ..Default::default()
-        };
-    }
-
-    // V1 precedence: first manifest per root, nearest root per skill.
-    let mut plugin_namespaces = HashMap::new();
-    for manifest in &discovery.namespace_manifests {
-        #[derive(Deserialize)]
-        struct ManifestName {
-            #[serde(default)]
-            name: String,
-        }
-        let Some(root) = manifest.path.parent().and_then(|path| path.parent()) else {
-            continue;
-        };
-        let Ok(parsed) = serde_json::from_str::<ManifestName>(&manifest.contents) else {
-            continue;
-        };
-        let name = if parsed.name.trim().is_empty() {
-            let Some(name) = root.basename() else {
-                continue;
-            };
-            name
-        } else {
-            parsed.name
-        };
-        plugin_namespaces.entry(root).or_insert(name);
-    }
 
     // Reuse the contents already read by V1.
     let mut skills = Vec::new();
-    'skills: for skill in discovery.skills {
+    for skill in discovery.skills {
         let parsed = parse_skill_frontmatter_metadata(&skill.instructions.contents, || {
             skill
                 .instructions
@@ -240,35 +162,13 @@ fn parse_root(
             }
         };
         let path = skill.instructions.path;
-        let mut ancestor = path.parent();
-        let mut namespace = None;
-        while let Some(root) = ancestor {
-            if let Some(name) = plugin_namespaces.get(&root) {
-                // Check V1's name limit before cloning the namespace.
-                if name.chars().take(MAX_QUALIFIED_NAME_LEN + 1).count()
-                    + 1
-                    + parsed.name.chars().count()
-                    > MAX_QUALIFIED_NAME_LEN
-                {
-                    warnings.push(format!(
-                        "invalid skill metadata at {path}: qualified name exceeds {MAX_QUALIFIED_NAME_LEN} characters"
-                    ));
-                    continue 'skills;
-                }
-                namespace = Some(name.clone());
-                break;
-            }
-            ancestor = root.parent();
-        }
         let metadata = skill.metadata.as_ref().and_then(|metadata| {
             parse_skill_metadata(&metadata.contents).map_err(|error| {
                 tracing::warn!(path = %metadata.path, %error, "ignoring invalid discovered skill metadata");
             }).ok()
         }).unwrap_or_default();
         skills.push(ExecutorSkill {
-            name: namespace
-                .map(|namespace| format!("{namespace}:{}", parsed.name))
-                .unwrap_or(parsed.name),
+            name: parsed.name,
             description: parsed.description,
             short_description: parsed.short_description,
             path,
@@ -283,74 +183,7 @@ fn parse_root(
             policy: metadata.policy,
         });
     }
-    let content = if let (Some(plugin), Some(mut files)) = (location.plugin, discovery.plugin) {
-        let manifest =
-            match serde_json::from_str::<PluginManifestMetadata>(&files.manifest.contents) {
-                Ok(manifest) => manifest,
-                Err(_) => {
-                    warnings.push(format!(
-                        "invalid plugin manifest at {}",
-                        files.manifest.path
-                    ));
-                    return CapabilityDiscovery {
-                        warnings,
-                        ..Default::default()
-                    };
-                }
-            };
-        let name = if manifest.name.trim().is_empty() {
-            location.root.basename().unwrap_or(manifest.name)
-        } else {
-            manifest.name
-        };
-        let display_name = manifest
-            .interface
-            .and_then(|interface| interface.display_name)
-            .map(|display_name| display_name.trim().to_string())
-            .filter(|display_name| !display_name.is_empty())
-            .unwrap_or(name);
-        // V2 materializes inline declarations; the path identifies their source manifest.
-        if files.mcp_config.is_none() {
-            if let Some(contents) = manifest
-                .mcp_servers
-                .as_ref()
-                .filter(|value| value.is_object())
-            {
-                files.mcp_config = Some(CapabilityTextFile {
-                    path: files.manifest.path.clone(),
-                    contents: contents.to_string(),
-                });
-            } else if manifest
-                .mcp_servers
-                .as_ref()
-                .is_some_and(serde_json::Value::is_string)
-            {
-                warnings.push(format!(
-                    "plugin `{}` at {} declares an MCP configuration file, but discovery returned no contents",
-                    plugin.id, location.root
-                ));
-            }
-        }
-
-        if files.apps_config.is_none() && manifest.apps.is_some() {
-            warnings.push(format!(
-                "plugin `{}` at {} declares an Apps configuration file, but discovery returned no contents",
-                plugin.id, location.root
-            ));
-        }
-        DiscoveredSource::Plugin(Box::new(ExecutorPlugin {
-            id: plugin.id,
-            display_name,
-            remote_plugin_id: plugin.remote_plugin_id,
-            version: plugin.version,
-            root: location.root,
-            files,
-            skills,
-        }))
-    } else {
-        DiscoveredSource::Skills(skills)
-    };
-    CapabilityDiscovery { content, warnings }
+    CapabilityDiscovery { skills, warnings }
 }
 
 #[derive(Default)]
@@ -387,32 +220,14 @@ fn append_capability_discovery(
             .take(MAX_WARNINGS.saturating_sub(response.warnings.len())),
     );
 
-    match discovery.content {
-        DiscoveredSource::Plugin(plugin) => {
-            let remaining = MAX_CAPABILITIES - budget.capabilities;
-            if remaining == 0 {
-                budget.truncated = true;
-                return Ok(());
-            }
-            let mut plugin = *plugin;
-            budget.truncated |= plugin.skills.len() > remaining - 1;
-            plugin.skills.truncate(remaining - 1); // The plugin itself also counts.
-            let size = serde_json::to_vec(&plugin).map_err(io::Error::other)?.len();
-            if budget.admit(1 + plugin.skills.len(), size) {
-                response.plugins.push(plugin);
-            }
+    for skill in discovery.skills {
+        if budget.capabilities == MAX_CAPABILITIES {
+            budget.truncated = true;
+            break;
         }
-        DiscoveredSource::Skills(skills) => {
-            for skill in skills {
-                if budget.capabilities == MAX_CAPABILITIES {
-                    budget.truncated = true;
-                    break;
-                }
-                let size = serde_json::to_vec(&skill).map_err(io::Error::other)?.len();
-                if budget.admit(/*capabilities*/ 1, size) {
-                    response.skills.push(skill);
-                }
-            }
+        let size = serde_json::to_vec(&skill).map_err(io::Error::other)?.len();
+        if budget.admit(/*capabilities*/ 1, size) {
+            response.skills.push(skill);
         }
     }
     Ok(())
@@ -422,11 +237,6 @@ fn finish_response(
     mut response: DiscoverV2CapabilitiesResponse,
     truncated: bool,
 ) -> io::Result<DiscoverV2CapabilitiesResponse> {
-    response.plugins.sort_unstable_by(|left, right| {
-        left.id
-            .cmp(&right.id)
-            .then_with(|| left.root.to_string().cmp(&right.root.to_string()))
-    });
     // Keep standalone skill precedence.
     response.warnings.truncate(MAX_WARNINGS);
 
@@ -457,7 +267,7 @@ fn enforce_response_size(
             // Drop extra warnings first; keep the limit warning.
             if response.warnings.len() > 1 {
                 response.warnings.truncate(1);
-            } else if response.skills.pop().is_none() && response.plugins.pop().is_none() {
+            } else if response.skills.pop().is_none() {
                 break;
             }
         }

@@ -44,26 +44,9 @@ pub(super) fn same_owner(previous: Option<&CodexAuth>, current: Option<&CodexAut
     let (Some(previous), Some(current)) = (previous, current) else {
         return false;
     };
-    if previous.api_auth_mode() != current.api_auth_mode() {
-        return false;
-    }
-    let (Some(user), Some(workspace)) = (previous.get_chatgpt_user_id(), previous.get_account_id())
-    else {
-        return false;
-    };
-    let current_login = login_owner_id(Some(current));
-    (current_login.is_none() || login_owner_id(Some(previous)) == current_login)
-        && !user.trim().is_empty()
-        && !workspace.trim().is_empty()
-        && current.get_chatgpt_user_id().as_ref() == Some(&user)
-        && current.get_account_id().as_ref() == Some(&workspace)
+    previous.api_key() == current.api_key()
 }
 
 pub(super) fn same_login(previous: Option<&CodexAuth>, current: Option<&CodexAuth>) -> bool {
-    same_owner(previous, current) && login_owner_id(previous) == login_owner_id(current)
-}
-
-fn login_owner_id(auth: Option<&CodexAuth>) -> Option<String> {
-    auth.and_then(|auth| auth.get_token_data().ok())
-        .and_then(|tokens| tokens.login_owner_id)
+    same_owner(previous, current)
 }

@@ -117,10 +117,6 @@ pub(crate) enum ApprovalAction {
         server: String,
         tool_name: String,
         arguments: Option<serde_json::Value>,
-        connector_id: Option<String>,
-        connector_name: Option<String>,
-        connector_description: Option<String>,
-        connected_account_email: Option<String>,
         tool_title: Option<String>,
         tool_description: Option<String>,
         #[serde(skip_serializing)]
@@ -556,7 +552,6 @@ impl Session {
                                 ReviewDecision::Abort,
                             ]
                         }),
-                        /*plugin_attribution_override*/ None,
                     )
                     .await
                 };
@@ -609,7 +604,6 @@ impl Session {
                     /*proposed_execpolicy_amendment*/ None,
                     additional_permissions.clone(),
                     Some(vec![ReviewDecision::Approved, ReviewDecision::Abort]),
-                    /*plugin_attribution_override*/ None,
                 )
                 .await
             }
@@ -685,7 +679,6 @@ impl Session {
                     /*proposed_execpolicy_amendment*/ None,
                     /*additional_permissions*/ None,
                     /*available_decisions*/ None,
-                    /*plugin_attribution_override*/ None,
                 )
                 .await
             }

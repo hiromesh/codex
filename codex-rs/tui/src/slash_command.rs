@@ -24,7 +24,6 @@ pub enum SlashCommand {
     AutoReview,
     Memories,
     Skills,
-    Import,
     Hooks,
     Review,
     Rename,
@@ -64,8 +63,6 @@ pub enum SlashCommand {
     #[strum(to_string = "pets", serialize = "pet")]
     Pets,
     Mcp,
-    Apps,
-    Plugins,
     Logout,
     Quit,
     Exit,
@@ -112,7 +109,6 @@ impl SlashCommand {
             SlashCommand::Diff => "show git diff (including untracked files)",
             SlashCommand::Mention => "mention a file",
             SlashCommand::Skills => "use skills to improve how Codex performs specific tasks",
-            SlashCommand::Import => "import setup, this project, and recent chats from Claude Code",
             SlashCommand::Hooks => "view and manage lifecycle hooks",
             SlashCommand::Daemon => "Manage the local background server",
             SlashCommand::Warnings => "view retained warnings and diagnostic details",
@@ -149,8 +145,6 @@ impl SlashCommand {
             SlashCommand::AutoReview => "approve one retry of a recent auto-review denial",
             SlashCommand::Memories => "configure memory use and generation",
             SlashCommand::Mcp => "list MCP tools; use /mcp verbose or /mcp login <name>",
-            SlashCommand::Apps => "manage apps",
-            SlashCommand::Plugins => "browse plugins",
             SlashCommand::Logout => "log out of Codex",
             SlashCommand::Rollout => "print the rollout file path",
             SlashCommand::TestApproval => "test approval request",
@@ -255,7 +249,6 @@ impl SlashCommand {
             | SlashCommand::Vim
             | SlashCommand::Experimental
             | SlashCommand::Memories
-            | SlashCommand::Import
             | SlashCommand::Review
             | SlashCommand::Plan
             | SlashCommand::Cd
@@ -287,8 +280,6 @@ impl SlashCommand {
             | SlashCommand::App
             | SlashCommand::Goal
             | SlashCommand::Mcp
-            | SlashCommand::Apps
-            | SlashCommand::Plugins
             | SlashCommand::Title
             | SlashCommand::Statusline
             | SlashCommand::AutoReview

@@ -6,8 +6,6 @@ use crate::config::RolloutBudgetConfig;
 use crate::config::test_config;
 use crate::init_state_db;
 use crate::installation_id::INSTALLATION_ID_FILENAME;
-use crate::mcp::McpEnvironmentScope;
-use crate::mcp::McpThreadIdentity;
 use crate::rollout::RolloutRecorder;
 use crate::session::session::SessionSettingsUpdate;
 use crate::session::step_context::StepContext;
@@ -334,135 +332,6 @@ async fn fixed_thread_text_supersedes_the_live_provider_and_isolated_helpers_rej
             Some(CodexErrKind::InvalidRequest)
         );
     }
-}
-
-/// A thread opt-out wins over a shared client without disabling its siblings.
-#[tokio::test]
-async fn thread_analytics_opt_out_overrides_shared_client() {
-    let server = MockServer::start().await;
-    wiremock::Mock::given(wiremock::matchers::method("POST"))
-        .and(wiremock::matchers::path("/codex/analytics-events/events"))
-        .respond_with(wiremock::ResponseTemplate::new(200))
-        .mount(&server)
-        .await;
-    let temp_dir = tempdir().expect("tempdir");
-    let mut config = test_config().await;
-    config.chatgpt_base_url = server.uri();
-    config.model_provider.base_url = Some(server.uri());
-    let auth = CodexAuth::create_dummy_chatgpt_auth_for_testing();
-    let shared_client = AnalyticsEventsClient::new(
-        AuthManager::from_auth_for_testing(auth.clone()),
-        server.uri(),
-        /*analytics_enabled*/ Some(true),
-    );
-    let mut expected_thread_ids = Vec::new();
-    let mut opted_out_thread_ids = Vec::new();
-
-    for (name, client_override, expected_enabled) in [
-        (
-            "enabled_override",
-            Some(shared_client.clone()),
-            [false, true, true],
-        ),
-        (
-            "disabled_override",
-            Some(AnalyticsEventsClient::disabled()),
-            [false, false, false],
-        ),
-        ("no_override", None, [false, true, true]),
-    ] {
-        config.codex_home = temp_dir.path().join(name).abs();
-        config.cwd = config.codex_home.abs();
-        std::fs::create_dir_all(&config.codex_home).expect("create codex home");
-        let mut manager = ThreadManager::with_models_provider_and_home_for_tests(
-            auth.clone(),
-            config.model_provider.clone(),
-            config.codex_home.to_path_buf(),
-            Arc::new(codex_exec_server::EnvironmentManager::default_for_tests()),
-        );
-        Arc::get_mut(&mut manager.state)
-            .expect("unshared thread manager state")
-            .analytics_events_client = client_override;
-
-        for (setting, enabled) in [Some(false), Some(true), None]
-            .into_iter()
-            .zip(expected_enabled)
-        {
-            config.analytics_enabled = setting;
-            let started = manager
-                .start_thread(StartThreadOptions::new(config.clone()))
-                .await
-                .expect("start analytics test thread");
-            let services = &started.thread.session.services;
-            assert_eq!(started.thread.analytics_enabled(), enabled);
-            assert_eq!(
-                services
-                    .session_extension_data
-                    .get::<AnalyticsEventsClient>()
-                    .expect("analytics client in session store")
-                    .is_enabled(),
-                enabled,
-            );
-            let thread_id = started.thread_id.to_string();
-            if enabled {
-                expected_thread_ids.push(thread_id.clone());
-            } else {
-                opted_out_thread_ids.push(thread_id.clone());
-            }
-            services.analytics_events_client.track_app_used(
-                codex_analytics::TrackEventsContext {
-                    turn_metadata: None,
-                    model_slug: "test-model".to_string(),
-                    turn_id: format!("test-turn-{thread_id}"),
-                    thread_id,
-                    product_client_id: "codex_work_cca".to_string(),
-                },
-                codex_analytics::AppInvocation {
-                    connector_id: Some("test-connector".to_string()),
-                    app_name: None,
-                    invocation_type: None,
-                },
-                /*elicitation_type*/ None,
-            );
-            services.analytics_events_client.flush().await;
-        }
-        let shutdown = manager
-            .shutdown_all_threads_bounded(Duration::from_secs(10))
-            .await;
-        assert_eq!(shutdown.completed.len(), 3);
-    }
-
-    let events: Vec<serde_json::Value> = server
-        .received_requests()
-        .await
-        .expect("analytics requests")
-        .into_iter()
-        .filter(|request| request.url.path() == "/codex/analytics-events/events")
-        .flat_map(|request| {
-            request.body_json::<serde_json::Value>().expect("JSON body")["events"]
-                .as_array()
-                .expect("events array")
-                .clone()
-        })
-        .collect();
-    assert!(events.iter().all(|event| {
-        !opted_out_thread_ids
-            .iter()
-            .any(|thread_id| event["event_params"]["thread_id"] == thread_id.as_str())
-    }));
-    let mut actual_thread_ids: Vec<String> = events
-        .iter()
-        .filter(|event| event["event_type"] == "codex_app_used")
-        .map(|event| {
-            event["event_params"]["thread_id"]
-                .as_str()
-                .expect("app usage thread ID")
-                .to_string()
-        })
-        .collect();
-    actual_thread_ids.sort();
-    expected_thread_ids.sort();
-    assert_eq!(actual_thread_ids, expected_thread_ids);
 }
 
 /// Controls without a custom allocation policy still produce distinct thread identifiers.
@@ -1181,7 +1050,6 @@ async fn mcp_invalidation_refreshes_threads_that_are_still_starting() {
         &config,
         Arc::clone(&auth_manager),
         build_models_manager(&config, auth_manager),
-        crate::CodexAppsToolsCache::default(),
         SessionSource::Exec,
         Arc::new(codex_exec_server::EnvironmentManager::default_for_tests()),
         Arc::new(extensions.build()),
@@ -1421,11 +1289,8 @@ async fn spawn_internal_session_preserves_parent_lineage_without_forking_history
     extensions.mcp_server_contributor(parent_contributor);
     let manager_state = Arc::get_mut(&mut manager.state).expect("unshared thread manager state");
     manager_state.extensions = Arc::new(extensions.build());
-    manager_state.mcp_manager = Arc::new(McpManager::new_with_extensions(
-        Arc::clone(&manager_state.plugins_manager),
-        Arc::clone(&manager_state.extensions),
-        manager_state.mcp_manager.codex_apps_tools_cache(),
-    ));
+    manager_state.mcp_manager =
+        Arc::new(McpManager::new_with_extensions(Arc::clone(&manager_state.extensions)));
     let parent_provider = Arc::new(ParentInstructionsProvider(parent_instructions.clone()));
     manager_state.user_instructions_provider = parent_provider.clone();
     let parent = manager
@@ -1666,417 +1531,6 @@ async fn spawn_internal_session_preserves_parent_lineage_without_forking_history
 }
 
 #[tokio::test]
-async fn start_thread_seeds_extension_data_for_mcp_and_lifecycle_contributors() {
-    struct InitialDataRecorder {
-        lifecycle_observed: Arc<std::sync::Mutex<Vec<(String, String)>>>,
-        mcp_observed: Arc<std::sync::Mutex<Vec<(String, SessionSource)>>>,
-        mcp_loaded: Arc<std::sync::atomic::AtomicUsize>,
-    }
-
-    impl codex_extension_api::ThreadLifecycleContributor<Config> for InitialDataRecorder {
-        fn on_thread_start<'a>(
-            &'a self,
-            input: codex_extension_api::ThreadStartInput<'a, Config>,
-        ) -> codex_extension_api::ExtensionFuture<'a, ()> {
-            Box::pin(async move {
-                let selected_root = input
-                    .thread_store
-                    .get::<Vec<SelectedCapabilityRoot>>()
-                    .and_then(|roots| roots.first().cloned())
-                    .expect("selected root should be available");
-                self.lifecycle_observed
-                    .lock()
-                    .unwrap_or_else(std::sync::PoisonError::into_inner)
-                    .push((input.thread_store.level_id().to_string(), selected_root.id));
-                input
-                    .thread_store
-                    .insert(Vec::<SelectedCapabilityRoot>::new());
-            })
-        }
-    }
-
-    impl codex_extension_api::McpServerContributor<Config> for InitialDataRecorder {
-        fn id(&self) -> &'static str {
-            "selected_root_test"
-        }
-
-        fn contribute<'a>(
-            &'a self,
-            _context: codex_extension_api::McpServerContributionContext<'a, Config>,
-        ) -> codex_extension_api::ExtensionFuture<'a, Vec<codex_extension_api::McpServerContribution>>
-        {
-            Box::pin(async { Vec::new() })
-        }
-
-        fn selected_plugins<'a>(
-            &'a self,
-            context: codex_extension_api::McpServerContributionContext<'a, Config>,
-            _plugins_config: &'a codex_config::types::PluginsConfigToml,
-        ) -> codex_extension_api::ExtensionFuture<'a, Vec<codex_extension_api::SelectedPlugin<'a>>>
-        {
-            Box::pin(async move {
-                assert_eq!(
-                    context.selected_environments(),
-                    Some([].as_slice()),
-                    "thread MCP projection must preserve explicitly empty selections"
-                );
-                let thread_init = context
-                    .thread_init()
-                    .expect("initial MCP resolution should be thread-scoped");
-                let selected_root = thread_init
-                    .get::<Vec<SelectedCapabilityRoot>>()
-                    .and_then(|roots| roots.first().cloned())
-                    .expect("selected root should be available");
-                self.mcp_observed
-                    .lock()
-                    .unwrap_or_else(std::sync::PoisonError::into_inner)
-                    .push((
-                        selected_root.id.clone(),
-                        context
-                            .session_source()
-                            .expect("thread-scoped MCP resolution should identify its source")
-                            .clone(),
-                    ));
-                let mut server = codex_mcp::codex_apps_mcp_server_config(
-                    "https://selected.invalid",
-                    /*apps_mcp_product_sku*/ None,
-                    /*originator*/ None,
-                );
-                let CapabilityRootLocation::Environment { environment_id, .. } =
-                    &selected_root.location;
-                let source_environment_id = environment_id.clone();
-                server.environment_id = source_environment_id.clone();
-                server.enabled = false;
-                let selected_root_id = selected_root.id;
-                let plugin_id = format!("plugin-{selected_root_id}");
-                let mcp_loaded = Arc::clone(&self.mcp_loaded);
-                vec![codex_extension_api::SelectedPlugin {
-                    selected_root_id: selected_root_id.clone(),
-                    plugin_id: plugin_id.clone(),
-                    identity: codex_core_plugins::PluginIdentity::Local {
-                        plugin_id: plugin_id.clone(),
-                    },
-                    enabled: true,
-                    mcp: Box::pin(async move {
-                        mcp_loaded.fetch_add(1, Ordering::Relaxed);
-                        codex_extension_api::SelectedPluginContribution {
-                            plugin_display_name: plugin_id,
-                            source_environment_id,
-                            connector_ids: vec![format!("{selected_root_id}-connector")],
-                            servers: vec![(selected_root_id, server)],
-                        }
-                    }),
-                }]
-            })
-        }
-    }
-
-    let temp_dir = tempdir().expect("tempdir");
-    let mut config = test_config().await;
-    config.codex_home = temp_dir.path().join("codex-home").abs();
-    config.cwd = config.codex_home.abs();
-    config
-        .features
-        .enable(Feature::Apps)
-        .expect("test config should allow apps");
-    config
-        .features
-        .enable(Feature::Plugins)
-        .expect("enable plugins");
-    std::fs::create_dir_all(&config.codex_home).expect("create codex home");
-
-    let lifecycle_observed = Arc::new(std::sync::Mutex::new(Vec::new()));
-    let mcp_observed = Arc::new(std::sync::Mutex::new(Vec::new()));
-    let mcp_loaded = Arc::new(std::sync::atomic::AtomicUsize::new(0));
-    let recorder = Arc::new(InitialDataRecorder {
-        lifecycle_observed: Arc::clone(&lifecycle_observed),
-        mcp_observed: Arc::clone(&mcp_observed),
-        mcp_loaded: Arc::clone(&mcp_loaded),
-    });
-    let mut extensions = codex_extension_api::ExtensionRegistryBuilder::new();
-    extensions.thread_lifecycle_contributor(recorder.clone());
-    extensions.mcp_server_contributor(recorder.clone());
-    let auth_manager =
-        AuthManager::from_auth_for_testing(CodexAuth::create_dummy_chatgpt_auth_for_testing());
-    let manager = ThreadManager::new(
-        &config,
-        auth_manager.clone(),
-        build_models_manager(&config, auth_manager),
-        crate::CodexAppsToolsCache::default(),
-        SessionSource::Exec,
-        Arc::new(codex_exec_server::EnvironmentManager::default_for_tests()),
-        Arc::new(extensions.build()),
-        Arc::new(crate::test_support::EmptyUserInstructionsProvider),
-        /*analytics_events_client*/ None,
-        passthrough_image_store(),
-        thread_store_from_config(&config, /*state_db*/ None),
-        /*agent_graph_store*/ None,
-        TEST_INSTALLATION_ID.to_string(),
-        /*attestation_provider*/ None,
-        /*external_time_provider*/ None,
-    );
-    let selected_root_init = |id: &str, environment_id: &str| {
-        let mut init = codex_extension_api::ExtensionDataInit::new();
-        init.insert(vec![SelectedCapabilityRoot {
-            id: id.to_string(),
-            location: CapabilityRootLocation::Environment {
-                environment_id: environment_id.to_string(),
-                path: PathUri::parse(&format!("file:///plugins/{id}")).expect("plugin root URI"),
-            },
-        }]);
-        init
-    };
-
-    let first_thread = manager
-        .start_thread(StartThreadOptions {
-            metrics_service_name: Some("codex_work_desktop".to_string()),
-            environments: Some(Vec::new()),
-            thread_extension_init: selected_root_init("selected-a", "env-a"),
-            ..StartThreadOptions::new(config.clone())
-        })
-        .await
-        .expect("start first thread");
-    let second_session_source = SessionSource::SubAgent(SubAgentSource::Review);
-    let second_thread = manager
-        .start_thread(StartThreadOptions {
-            environments: Some(Vec::new()),
-            session_source: Some(second_session_source.clone()),
-            thread_extension_init: selected_root_init("selected-b", "env-b"),
-            ..StartThreadOptions::new(config.clone())
-        })
-        .await
-        .expect("start second thread");
-    let first_session = &first_thread.thread.session;
-    let first_originator = first_session.originator().await;
-    let first_resolved = first_session
-        .services
-        .mcp_manager
-        .runtime_config_for_step(
-            &config,
-            &first_session.services.mcp_thread_init,
-            &first_session.services.thread_extension_data,
-            McpThreadIdentity {
-                auth_changed: false,
-                session_source: &SessionSource::Exec,
-                originator: &first_originator,
-                disabled_plugin_ids: &[],
-                environments: McpEnvironmentScope::Selected(
-                    &first_session.services.turn_environments.selections(),
-                ),
-            },
-            /*ready_selected_capability_roots*/ &[],
-            /*executor_capability_discovery*/ None,
-            /*executor_capability_discovery_v2*/ None,
-        )
-        .await;
-    let second_session = &second_thread.thread.session;
-    let second_originator = second_session.originator().await;
-    let second_resolved = second_session
-        .services
-        .mcp_manager
-        .runtime_config_for_step(
-            &config,
-            &second_session.services.mcp_thread_init,
-            &second_session.services.thread_extension_data,
-            McpThreadIdentity {
-                auth_changed: false,
-                session_source: &second_session_source,
-                originator: &second_originator,
-                disabled_plugin_ids: &[],
-                environments: McpEnvironmentScope::Selected(
-                    &second_session.services.turn_environments.selections(),
-                ),
-            },
-            /*ready_selected_capability_roots*/ &[],
-            /*executor_capability_discovery*/ None,
-            /*executor_capability_discovery_v2*/ None,
-        )
-        .await;
-
-    assert_eq!(
-        *lifecycle_observed
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner),
-        vec![
-            (first_thread.thread_id.to_string(), "selected-a".to_string()),
-            (
-                second_thread.thread_id.to_string(),
-                "selected-b".to_string()
-            ),
-        ]
-    );
-    assert_eq!(
-        *mcp_observed
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner),
-        vec![
-            ("selected-a".to_string(), SessionSource::Exec),
-            ("selected-b".to_string(), second_session_source.clone()),
-            ("selected-a".to_string(), SessionSource::Exec),
-            ("selected-b".to_string(), second_session_source),
-        ]
-    );
-    let selected_servers = |config: &codex_mcp::McpConfig| {
-        codex_mcp::configured_mcp_servers(config)
-            .into_iter()
-            .filter(|(name, _)| name.starts_with("selected-"))
-            .map(|(name, server)| (name, server.environment_id))
-            .collect::<std::collections::BTreeMap<_, _>>()
-    };
-    assert_eq!(
-        selected_servers(&first_resolved.config),
-        std::collections::BTreeMap::from([("selected-a".to_string(), "env-a".to_string())])
-    );
-    assert_eq!(
-        selected_servers(&second_resolved.config),
-        std::collections::BTreeMap::from([("selected-b".to_string(), "env-b".to_string())])
-    );
-    for (config, name, source_environment_id) in [
-        (&first_resolved.config, "selected-a", "env-a"),
-        (&second_resolved.config, "selected-b", "env-b"),
-    ] {
-        let server = config
-            .mcp_server_catalog
-            .server(name)
-            .expect("selected plugin server should be registered");
-        let plugin_id = format!("plugin-{name}");
-        let mut expected = codex_mcp::ResolvedMcpCatalog::builder();
-        expected.register(codex_mcp::McpServerRegistration::from_selected_plugin(
-            name.to_string(),
-            codex_mcp::McpPluginAttribution::new(plugin_id.clone(), plugin_id),
-            /*selection_order*/ 0,
-            source_environment_id,
-            server.config().clone(),
-        ));
-        assert_eq!(Some(server), expected.build().server(name));
-    }
-    let codex_apps_server = codex_mcp::configured_mcp_servers(&first_resolved.config)
-        .remove(codex_mcp::CODEX_APPS_MCP_SERVER_NAME)
-        .expect("Codex Apps server should be configured");
-    let codex_apps_headers = match codex_apps_server.transport {
-        codex_config::McpServerTransportConfig::StreamableHttp { http_headers, .. } => http_headers,
-        codex_config::McpServerTransportConfig::Stdio { .. } => {
-            panic!("Codex Apps server should use streamable HTTP")
-        }
-    };
-    assert_eq!(
-        codex_apps_headers
-            .expect("Codex Apps headers should be configured")
-            .get("originator"),
-        Some(&"codex_work_desktop".to_string())
-    );
-    for (policy, disabled_plugin_ids, selected_enabled, expected_mcp_loads) in [
-        ("", vec!["plugin-selected-a".to_string()], false, 1),
-        ("", vec![], true, 1),
-        ("[plugins._default]\nenabled = false", vec![], false, 0),
-        (
-            "[plugins._default]\nenabled = false\n[plugins.plugin-selected-a]\nenabled = true",
-            vec![],
-            true,
-            1,
-        ),
-    ] {
-        let mut config = config.clone();
-        config.config_layer_stack = config
-            .config_layer_stack
-            .with_user_config(
-                &config.codex_home.join("config.toml").abs(),
-                toml::from_str(policy).expect("plugin policy"),
-            )
-            .expect("plugin policy layers");
-        config.plugins = toml::from_str::<codex_config::config_toml::ConfigToml>(policy)
-            .unwrap()
-            .plugins;
-        let loaded_before = mcp_loaded.load(Ordering::Relaxed);
-        let projection = first_session
-            .services
-            .mcp_manager
-            .runtime_config_for_step(
-                &config,
-                &first_session.services.mcp_thread_init,
-                &first_session.services.thread_extension_data,
-                McpThreadIdentity {
-                    auth_changed: false,
-                    session_source: &SessionSource::Exec,
-                    originator: &first_originator,
-                    disabled_plugin_ids: &disabled_plugin_ids,
-                    environments: McpEnvironmentScope::Selected(
-                        &first_session.services.turn_environments.selections(),
-                    ),
-                },
-                /*ready_selected_capability_roots*/ &[],
-                /*executor_capability_discovery*/ None,
-                /*executor_capability_discovery_v2*/ None,
-            )
-            .await;
-        assert_eq!(
-            projection.selected_plugins.disabled_plugin_roots,
-            if selected_enabled {
-                vec![]
-            } else {
-                vec!["selected-a".to_string()]
-            }
-        );
-        assert_eq!(
-            selected_servers(&projection.config).contains_key("selected-a"),
-            selected_enabled
-        );
-        assert_eq!(
-            projection
-                .config
-                .connector_snapshot
-                .disabled_connector_ids()
-                .contains("selected-a-connector"),
-            !disabled_plugin_ids.is_empty()
-        );
-        assert_eq!(
-            projection.selected_plugins.plugins.len(),
-            usize::from(selected_enabled)
-        );
-        assert_eq!(
-            mcp_loaded.load(Ordering::Relaxed) - loaded_before,
-            expected_mcp_loads
-        );
-        // Installation-derived rejections must not become global plugin-ID denials.
-        let ready_roots = vec![SelectedCapabilityRoot {
-            id: "selected-a".to_string(),
-            location: CapabilityRootLocation::Environment {
-                environment_id: "env-a".to_string(),
-                path: PathUri::parse("file:///plugins/selected-a").expect("plugin root URI"),
-            },
-        }];
-        let selected = first_session
-            .services
-            .mcp_manager
-            .selected_plugins_for_step(
-                codex_extension_api::McpServerContributionContext::for_step(
-                    &config,
-                    &first_session.services.mcp_thread_init,
-                    &first_session.services.thread_extension_data,
-                    &first_originator,
-                    &ready_roots,
-                    /*executor_capability_discovery*/ None,
-                    /*executor_capability_discovery_v2*/ None,
-                )
-                .with_selected_environments(&[])
-                .with_session_source(&SessionSource::Exec),
-                &config.plugins,
-                &disabled_plugin_ids,
-            )
-            .await;
-        let mut selected_disabled_ids = selected.disabled_plugin_ids;
-        selected_disabled_ids.sort();
-        selected_disabled_ids.dedup();
-        assert_eq!(selected_disabled_ids, disabled_plugin_ids);
-        assert_eq!(
-            selected.disabled_plugin_roots,
-            projection.selected_plugins.disabled_plugin_roots
-        );
-        assert_eq!(selected.plugins.len(), usize::from(selected_enabled));
-    }
-}
-
-#[tokio::test]
 async fn selected_capability_roots_round_trip_through_fork() {
     let temp_dir = tempdir().expect("tempdir");
     let mut config = test_config().await;
@@ -2244,12 +1698,11 @@ async fn resume_and_fork_do_not_restore_thread_environments_from_rollout() {
     std::fs::create_dir_all(&config.codex_home).expect("create codex home");
 
     let auth_manager =
-        AuthManager::from_auth_for_testing(CodexAuth::create_dummy_chatgpt_auth_for_testing());
+        AuthManager::from_auth_for_testing(CodexAuth::from_api_key("test-api-key"));
     let manager = ThreadManager::new(
         &config,
         auth_manager.clone(),
         build_models_manager(&config, auth_manager.clone()),
-        crate::CodexAppsToolsCache::default(),
         SessionSource::Exec,
         Arc::new(codex_exec_server::EnvironmentManager::default_for_tests()),
         empty_extension_registry(),
@@ -2401,7 +1854,7 @@ async fn explicit_installation_id_skips_codex_home_file() {
     std::fs::create_dir_all(&config.codex_home).expect("create codex home");
 
     let auth_manager =
-        AuthManager::from_auth_for_testing(CodexAuth::create_dummy_chatgpt_auth_for_testing());
+        AuthManager::from_auth_for_testing(CodexAuth::from_api_key("test-api-key"));
     let installation_id = uuid::Uuid::new_v4().to_string();
     let state_db = init_state_db(&config).await;
     let thread_store = thread_store_from_config(&config, state_db.clone());
@@ -2409,7 +1862,6 @@ async fn explicit_installation_id_skips_codex_home_file() {
         &config,
         auth_manager.clone(),
         build_models_manager(&config, auth_manager),
-        crate::CodexAppsToolsCache::default(),
         SessionSource::Exec,
         Arc::new(codex_exec_server::EnvironmentManager::default_for_tests()),
         empty_extension_registry(),
@@ -2448,12 +1900,11 @@ async fn resume_active_thread_from_rollout_returns_running_thread() {
     std::fs::create_dir_all(&config.codex_home).expect("create codex home");
 
     let auth_manager =
-        AuthManager::from_auth_for_testing(CodexAuth::create_dummy_chatgpt_auth_for_testing());
+        AuthManager::from_auth_for_testing(CodexAuth::from_api_key("test-api-key"));
     let manager = ThreadManager::new(
         &config,
         auth_manager.clone(),
         build_models_manager(&config, auth_manager.clone()),
-        crate::CodexAppsToolsCache::default(),
         SessionSource::Exec,
         Arc::new(codex_exec_server::EnvironmentManager::default_for_tests()),
         empty_extension_registry(),
@@ -2514,12 +1965,11 @@ async fn resume_stopped_thread_from_rollout_spawns_new_thread() {
     std::fs::create_dir_all(&config.codex_home).expect("create codex home");
 
     let auth_manager =
-        AuthManager::from_auth_for_testing(CodexAuth::create_dummy_chatgpt_auth_for_testing());
+        AuthManager::from_auth_for_testing(CodexAuth::from_api_key("test-api-key"));
     let manager = ThreadManager::new(
         &config,
         auth_manager.clone(),
         build_models_manager(&config, auth_manager.clone()),
-        crate::CodexAppsToolsCache::default(),
         SessionSource::Exec,
         Arc::new(codex_exec_server::EnvironmentManager::default_for_tests()),
         empty_extension_registry(),
@@ -2585,14 +2035,13 @@ async fn resume_stopped_thread_from_rollout_preserves_thread_source() {
     std::fs::create_dir_all(&config.codex_home).expect("create codex home");
 
     let auth_manager =
-        AuthManager::from_auth_for_testing(CodexAuth::create_dummy_chatgpt_auth_for_testing());
+        AuthManager::from_auth_for_testing(CodexAuth::from_api_key("test-api-key"));
     let state_db = init_state_db(&config).await;
     let thread_store = thread_store_from_config(&config, state_db.clone());
     let manager = ThreadManager::new(
         &config,
         auth_manager.clone(),
         build_models_manager(&config, auth_manager.clone()),
-        crate::CodexAppsToolsCache::default(),
         SessionSource::Exec,
         Arc::new(codex_exec_server::EnvironmentManager::default_for_tests()),
         empty_extension_registry(),
@@ -2674,12 +2123,11 @@ async fn subtree_listing_uses_injected_graph_store_without_state_db() {
         descendant_thread_ids: descendant_thread_ids.clone(),
     });
     let auth_manager =
-        AuthManager::from_auth_for_testing(CodexAuth::create_dummy_chatgpt_auth_for_testing());
+        AuthManager::from_auth_for_testing(CodexAuth::from_api_key("test-api-key"));
     let manager = ThreadManager::new(
         &config,
         auth_manager.clone(),
         build_models_manager(&config, auth_manager),
-        crate::CodexAppsToolsCache::default(),
         SessionSource::Exec,
         Arc::new(codex_exec_server::EnvironmentManager::default_for_tests()),
         empty_extension_registry(),
@@ -2716,7 +2164,7 @@ async fn rollout_path_resume_and_fork_read_history_through_thread_store() {
     std::fs::create_dir_all(&config.codex_home).expect("create codex home");
 
     let auth_manager =
-        AuthManager::from_auth_for_testing(CodexAuth::create_dummy_chatgpt_auth_for_testing());
+        AuthManager::from_auth_for_testing(CodexAuth::from_api_key("test-api-key"));
     let state_db = init_state_db(&config).await;
     let thread_store = thread_store_from_config(&config, state_db.clone());
     let in_memory_store = thread_store
@@ -2727,7 +2175,6 @@ async fn rollout_path_resume_and_fork_read_history_through_thread_store() {
         &config,
         auth_manager.clone(),
         build_models_manager(&config, auth_manager.clone()),
-        crate::CodexAppsToolsCache::default(),
         SessionSource::Exec,
         Arc::new(codex_exec_server::EnvironmentManager::default_for_tests()),
         empty_extension_registry(),
@@ -2827,7 +2274,7 @@ async fn metadata_update_without_result_reads_only_when_the_caller_needs_the_thr
     std::fs::create_dir_all(&config.codex_home).expect("create codex home");
 
     let auth_manager =
-        AuthManager::from_auth_for_testing(CodexAuth::create_dummy_chatgpt_auth_for_testing());
+        AuthManager::from_auth_for_testing(CodexAuth::from_api_key("test-api-key"));
     let thread_store = thread_store_from_config(&config, /*state_db*/ None);
     let in_memory_store = thread_store
         .as_any()
@@ -2837,7 +2284,6 @@ async fn metadata_update_without_result_reads_only_when_the_caller_needs_the_thr
         &config,
         auth_manager.clone(),
         build_models_manager(&config, auth_manager),
-        crate::CodexAppsToolsCache::default(),
         SessionSource::Exec,
         Arc::new(codex_exec_server::EnvironmentManager::default_for_tests()),
         empty_extension_registry(),
@@ -2957,14 +2403,16 @@ async fn new_uses_active_provider_for_model_refresh() {
     std::fs::create_dir_all(&config.codex_home).expect("create codex home");
     config.model_catalog = None;
     config.model_provider.base_url = Some(server.uri());
+    config.model_provider.model_catalog_url = Some(format!("{}/models", server.uri()).into());
 
     let auth_manager =
-        AuthManager::from_auth_for_testing(CodexAuth::create_dummy_chatgpt_auth_for_testing());
+        AuthManager::from_auth_for_testing(CodexAuth::from_api_key("test-api-key"));
+    let models_manager = build_models_manager(&config, auth_manager.clone());
+    models_manager.set_api_key_model_discovery_enabled(/*enabled*/ true);
     let manager = ThreadManager::new(
         &config,
         auth_manager.clone(),
-        build_models_manager(&config, auth_manager),
-        crate::CodexAppsToolsCache::default(),
+        models_manager,
         SessionSource::Exec,
         Arc::new(codex_exec_server::EnvironmentManager::default_for_tests()),
         empty_extension_registry(),
@@ -3051,19 +2499,20 @@ async fn injected_models_manager_controls_refresh_policy() {
     std::fs::create_dir_all(&config.codex_home).expect("create codex home");
     config.model_catalog = None;
     config.model_provider.base_url = Some(server.uri());
+    config.model_provider.model_catalog_url = Some(format!("{}/models", server.uri()).into());
 
     let auth_manager =
-        AuthManager::from_auth_for_testing(CodexAuth::create_dummy_chatgpt_auth_for_testing());
+        AuthManager::from_auth_for_testing(CodexAuth::from_api_key("test-api-key"));
     let provider = create_model_provider(
         config.model_provider.clone(),
         Some(Arc::clone(&auth_manager)),
     );
     let models_manager = provider.models_manager_without_cache(config.model_catalog.clone());
+    models_manager.set_api_key_model_discovery_enabled(/*enabled*/ true);
     let manager = ThreadManager::new(
         &config,
         auth_manager,
         models_manager,
-        crate::CodexAppsToolsCache::default(),
         SessionSource::Custom("test-embedder".to_string()),
         Arc::new(codex_exec_server::EnvironmentManager::default_for_tests()),
         empty_extension_registry(),
@@ -3338,13 +2787,12 @@ async fn interrupted_fork_snapshot_does_not_synthesize_turn_id_for_legacy_histor
     std::fs::create_dir_all(&config.codex_home).expect("create codex home");
 
     let auth_manager =
-        AuthManager::from_auth_for_testing(CodexAuth::create_dummy_chatgpt_auth_for_testing());
+        AuthManager::from_auth_for_testing(CodexAuth::from_api_key("test-api-key"));
     let state_db = init_state_db(&config).await;
     let manager = ThreadManager::new(
         &config,
         auth_manager.clone(),
         build_models_manager(&config, auth_manager.clone()),
-        crate::CodexAppsToolsCache::default(),
         SessionSource::Exec,
         Arc::new(codex_exec_server::EnvironmentManager::default_for_tests()),
         empty_extension_registry(),
@@ -3450,13 +2898,12 @@ async fn interrupted_fork_snapshot_preserves_explicit_turn_id() {
     std::fs::create_dir_all(&config.codex_home).expect("create codex home");
 
     let auth_manager =
-        AuthManager::from_auth_for_testing(CodexAuth::create_dummy_chatgpt_auth_for_testing());
+        AuthManager::from_auth_for_testing(CodexAuth::from_api_key("test-api-key"));
     let state_db = init_state_db(&config).await;
     let manager = ThreadManager::new(
         &config,
         auth_manager.clone(),
         build_models_manager(&config, auth_manager.clone()),
-        crate::CodexAppsToolsCache::default(),
         SessionSource::Exec,
         Arc::new(codex_exec_server::EnvironmentManager::default_for_tests()),
         empty_extension_registry(),
@@ -3555,13 +3002,12 @@ async fn interrupted_fork_snapshot_uses_persisted_mid_turn_history_without_live_
     std::fs::create_dir_all(&config.codex_home).expect("create codex home");
 
     let auth_manager =
-        AuthManager::from_auth_for_testing(CodexAuth::create_dummy_chatgpt_auth_for_testing());
+        AuthManager::from_auth_for_testing(CodexAuth::from_api_key("test-api-key"));
     let state_db = init_state_db(&config).await;
     let manager = ThreadManager::new(
         &config,
         auth_manager.clone(),
         build_models_manager(&config, auth_manager.clone()),
-        crate::CodexAppsToolsCache::default(),
         SessionSource::Exec,
         Arc::new(codex_exec_server::EnvironmentManager::default_for_tests()),
         empty_extension_registry(),

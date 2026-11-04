@@ -14,8 +14,6 @@ use codex_login::AuthManager;
 use codex_login::CodexAuth;
 use codex_login::ExternalAuth;
 use codex_login::ExternalAuthRefreshContext;
-use codex_login::TokenData;
-use codex_protocol::auth::AuthMode;
 use codex_protocol::error::CodexErr;
 use codex_protocol::openai_models::ModelAccessPrograms;
 use codex_protocol::openai_models::ModelOrigin;
@@ -322,7 +320,7 @@ fn openai_manager_for_tests(
         codex_home,
         endpoint_client,
         Some(AuthManager::from_auth_for_testing(
-            CodexAuth::create_dummy_chatgpt_auth_for_testing(),
+            CodexAuth::from_api_key("sk-test"),
         )),
     )
 }
@@ -332,7 +330,9 @@ fn openai_manager_for_tests_with_auth(
     endpoint_client: Arc<dyn ModelsEndpointClient>,
     auth_manager: Option<Arc<AuthManager>>,
 ) -> OpenAiModelsManager {
-    OpenAiModelsManager::new(codex_home, endpoint_client, auth_manager)
+    let manager = OpenAiModelsManager::new(codex_home, endpoint_client, auth_manager);
+    manager.set_api_key_model_discovery_enabled(/*enabled*/ true);
+    manager
 }
 
 async fn mutate_file_cache_for_test<F>(codex_home: &Path, f: F)
@@ -451,9 +451,10 @@ async fn manager_without_cache_fetches_on_every_refresh() {
     let manager = OpenAiModelsManager::new_without_cache(
         endpoint.clone(),
         Some(AuthManager::from_auth_for_testing(
-            CodexAuth::create_dummy_chatgpt_auth_for_testing(),
+            CodexAuth::from_api_key("sk-test"),
         )),
     );
+    manager.set_api_key_model_discovery_enabled(/*enabled*/ true);
 
     let catalog = manager
         .raw_model_catalog(
@@ -491,9 +492,10 @@ async fn injected_cache_hit_avoids_remote_fetch() {
         cache,
         endpoint.clone(),
         Some(AuthManager::from_auth_for_testing(
-            CodexAuth::create_dummy_chatgpt_auth_for_testing(),
+            CodexAuth::from_api_key("sk-test"),
         )),
     );
+    manager.set_api_key_model_discovery_enabled(/*enabled*/ true);
 
     let catalog = manager
         .raw_model_catalog(
@@ -515,9 +517,10 @@ async fn injected_cache_read_error_falls_back_and_persists_remote_models() {
         cache.clone(),
         endpoint.clone(),
         Some(AuthManager::from_auth_for_testing(
-            CodexAuth::create_dummy_chatgpt_auth_for_testing(),
+            CodexAuth::from_api_key("sk-test"),
         )),
     );
+    manager.set_api_key_model_discovery_enabled(/*enabled*/ true);
 
     let catalog = manager
         .raw_model_catalog(
@@ -557,9 +560,10 @@ async fn injected_cache_write_error_does_not_fail_remote_refresh() {
         cache,
         endpoint.clone(),
         Some(AuthManager::from_auth_for_testing(
-            CodexAuth::create_dummy_chatgpt_auth_for_testing(),
+            CodexAuth::from_api_key("sk-test"),
         )),
     );
+    manager.set_api_key_model_discovery_enabled(/*enabled*/ true);
 
     let catalog = manager
         .raw_model_catalog(RefreshStrategy::Online, DEFAULT_HTTP_CLIENT_FACTORY)
@@ -622,47 +626,6 @@ async fn injected_cache_ttl_refresh_preserves_cached_payload() {
     assert_eq!(stored_entries[0].models, cached_models);
 }
 
-async fn chatgpt_auth_tokens_for_tests(codex_home: &Path) -> CodexAuth {
-    let auth_dot_json = codex_login::AuthDotJson {
-        auth_mode: Some(AuthMode::ChatgptAuthTokens),
-        openai_api_key: None,
-        tokens: Some(TokenData {
-            id_token: codex_login::token_data::parse_chatgpt_jwt_claims(
-                "eyJhbGciOiJub25lIiwidHlwIjoiSldUIn0.\
-eyJlbWFpbCI6InVzZXJAZXhhbXBsZS5jb20iLCJodHRwczovL2FwaS5vcGVuYWkuY29tL2F1dGgiOnsiY2hhdGdwdF9wbGFuX3R5cGUiOiJwcm8iLCJjaGF0Z3B0X3VzZXJfaWQiOiJ1c2VyLWlkIiwiY2hhdGdwdF9hY2NvdW50X2lkIjoiYWNjb3VudC1pZCJ9fQ.\
-c2ln",
-            )
-            .expect("fake id token should parse"),
-            access_token: "Access Token".to_string(),
-            refresh_token: "test".to_string(),
-            oauth_provenance: None,
-            login_owner_id: None,
-            account_id: Some("account_id".to_string()),
-        }),
-        last_refresh: Some(Utc::now()),
-        agent_identity: None,
-        personal_access_token: None,
-        bedrock_api_key: None,
-        bedrock_access_keys: None,
-    };
-    std::fs::create_dir_all(codex_home).expect("codex home should be created");
-    std::fs::write(
-        codex_home.join("auth.json"),
-        serde_json::to_string(&auth_dot_json).expect("auth should serialize"),
-    )
-    .expect("auth.json should be written");
-
-    CodexAuth::from_auth_storage(
-        codex_home,
-        AuthCredentialsStoreMode::File,
-        /*chatgpt_base_url*/ None,
-        AuthKeyringBackendKind::default(),
-        &codex_login::test_support::transport_default_auth_route_config(),
-    )
-    .await
-    .expect("auth should load")
-    .expect("auth should be present")
-}
 
 #[tokio::test]
 async fn static_manager_preserves_supported_requested_model_when_fallback_is_allowed() {
@@ -1159,14 +1122,7 @@ async fn authoritative_catalog_access_rejection_invalidates_cache_until_refresh_
     for error in [
         catalog_http_error(/*status*/ 401),
         catalog_http_error(/*status*/ 403),
-        CodexErr::RefreshTokenFailed(codex_protocol::error::RefreshTokenFailedError::new(
-            codex_protocol::error::RefreshTokenFailedReason::Revoked,
-            "credentials revoked",
-        )),
-        CodexErrorDetails::GatewayLoginRequired(
-            codex_login::GatewayAuthError::LoginRequired.to_string(),
-        )
-        .into(),
+        CodexErrorDetails::GatewayLoginRequired("gateway login required".to_string()).into(),
     ] {
         // Like a native TTL backend, this cache may return an invalidated stored entry.
         let cache = Arc::new(TestModelsCache::default());
@@ -1245,7 +1201,7 @@ async fn authoritative_catalog_refresh_failure_preserves_snapshot_and_freshness(
         catalog_http_error(/*status*/ 503),
         catalog_http_error(/*status*/ 404),
         CodexErr::InvalidRequest("malformed catalog".to_string()),
-        CodexErr::InvalidRequest(codex_login::GatewayAuthError::LoginInProgress.to_string()),
+        CodexErr::InvalidRequest("gateway login in progress".to_string()),
     ] {
         let cache = Arc::new(TestModelsCache::default());
         let mut model = remote_model("provider-model", "Provider Model", /*priority*/ 0);
@@ -1544,9 +1500,10 @@ async fn refresh_available_models_drops_removed_remote_models() {
         )),
         endpoint.clone(),
         Some(AuthManager::from_auth_for_testing(
-            CodexAuth::create_dummy_chatgpt_auth_for_testing(),
+            CodexAuth::from_api_key("sk-test"),
         )),
     );
+    manager.set_api_key_model_discovery_enabled(/*enabled*/ true);
 
     manager
         .refresh_available_models(
@@ -1636,14 +1593,7 @@ impl TestAuthAwareModelsEndpoint {
     }
 
     async fn uses_codex_backend(&self) -> bool {
-        match self.auth_manager.as_ref() {
-            Some(auth_manager) => auth_manager
-                .auth()
-                .await
-                .as_ref()
-                .is_some_and(CodexAuth::uses_codex_backend),
-            None => false,
-        }
+        false
     }
 
     async fn list_models(&self) -> CoreResult<ModelsEndpointResponse> {
@@ -1696,7 +1646,7 @@ async fn refresh_available_models_fetches_when_external_api_key_overrides_chatgp
     let dynamic_slug = "dynamic-model-only-for-test-external-api-key";
     let codex_home = tempdir().expect("temp dir");
     let auth_manager =
-        AuthManager::from_auth_for_testing(CodexAuth::create_dummy_chatgpt_auth_for_testing());
+        AuthManager::from_auth_for_testing(CodexAuth::from_api_key("sk-test"));
     auth_manager
         .set_external_auth(Arc::new(TestExternalApiKeyAuth))
         .await
@@ -1738,7 +1688,7 @@ async fn refresh_available_models_uses_cached_chatgpt_when_external_api_key_is_u
     let dynamic_slug = "dynamic-model-only-for-test-unresolved-external-api-key";
     let codex_home = tempdir().expect("temp dir");
     let auth_manager =
-        AuthManager::from_auth_for_testing(CodexAuth::create_dummy_chatgpt_auth_for_testing());
+        AuthManager::from_auth_for_testing(CodexAuth::from_api_key("sk-test"));
     auth_manager
         .set_external_auth(Arc::new(TestUnresolvedExternalApiKeyAuth))
         .await
@@ -1778,42 +1728,6 @@ async fn refresh_available_models_uses_cached_chatgpt_when_external_api_key_is_u
     );
 }
 
-#[tokio::test]
-async fn refresh_available_models_fetches_with_chatgpt_auth_tokens() {
-    let dynamic_slug = "dynamic-model-only-for-test-chatgpt-auth-tokens";
-    let codex_home = tempdir().expect("temp dir");
-    let endpoint = TestModelsEndpoint::new(vec![vec![remote_model(
-        dynamic_slug,
-        "ChatGPT Auth Tokens",
-        /*priority*/ 1,
-    )]]);
-    let auth = chatgpt_auth_tokens_for_tests(codex_home.path()).await;
-    let manager = openai_manager_for_tests_with_auth(
-        codex_home.path().to_path_buf(),
-        endpoint.clone(),
-        Some(AuthManager::from_auth_for_testing(auth)),
-    );
-
-    manager
-        .refresh_available_models(RefreshStrategy::Online, &DEFAULT_HTTP_CLIENT_FACTORY)
-        .await
-        .expect("refresh should fetch with ChatGPT auth tokens");
-
-    assert!(
-        manager
-            .get_remote_models()
-            .await
-            .iter()
-            .any(|candidate| candidate.slug == dynamic_slug),
-        "remote refresh should include models fetched with ChatGPT auth tokens"
-    );
-    assert_eq!(
-        endpoint.fetch_count(),
-        1,
-        "endpoint should fetch models with ChatGPT auth tokens"
-    );
-}
-
 #[test]
 fn build_available_models_picks_default_after_hiding_hidden_models() {
     let manager = static_manager_for_tests(ModelsResponse { models: Vec::new() });
@@ -1830,52 +1744,6 @@ fn build_available_models_picks_default_after_hiding_hidden_models() {
     let available = manager.build_available_models(vec![hidden_model, visible_model]);
 
     assert_eq!(available, vec![expected_hidden, expected_visible]);
-}
-
-#[tokio::test]
-async fn static_manager_reads_latest_auth_mode() {
-    let auth_manager =
-        AuthManager::from_auth_for_testing(CodexAuth::create_dummy_chatgpt_auth_for_testing());
-    let chatgpt_only_model = {
-        let mut model = remote_model("chatgpt-only", "ChatGPT Only", /*priority*/ 0);
-        model.supported_in_api = false;
-        model
-    };
-    let api_model = remote_model("api-model", "API Model", /*priority*/ 1);
-    let manager = StaticModelsManager::new(
-        Some(Arc::clone(&auth_manager)),
-        ModelsResponse {
-            models: vec![chatgpt_only_model, api_model],
-        },
-        ModelOrigin::ExplicitConfig,
-    );
-
-    let chatgpt_models = manager
-        .list_models(RefreshStrategy::Online, DEFAULT_HTTP_CLIENT_FACTORY)
-        .await;
-    assert_eq!(
-        chatgpt_models
-            .iter()
-            .map(|model| model.model.as_str())
-            .collect::<Vec<_>>(),
-        vec!["chatgpt-only", "api-model"]
-    );
-
-    auth_manager
-        .set_external_auth(Arc::new(TestExternalApiKeyAuth))
-        .await
-        .expect("external API key auth should resolve");
-    let api_models = manager
-        .list_models(RefreshStrategy::Online, DEFAULT_HTTP_CLIENT_FACTORY)
-        .await;
-
-    assert_eq!(
-        api_models
-            .iter()
-            .map(|model| model.model.as_str())
-            .collect::<Vec<_>>(),
-        vec!["api-model"]
-    );
 }
 
 #[test]

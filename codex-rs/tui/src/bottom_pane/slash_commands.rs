@@ -56,8 +56,6 @@ impl SlashCommandItem {
 #[derive(Clone, Copy, Debug, Default)]
 pub(crate) struct BuiltinCommandFlags {
     pub(crate) collaboration_modes_enabled: bool,
-    pub(crate) connectors_enabled: bool,
-    pub(crate) plugins_command_enabled: bool,
     pub(crate) token_activity_command_enabled: bool,
     pub(crate) service_tier_commands_enabled: bool,
     pub(crate) daybreak_command_description: Option<&'static str>,
@@ -71,8 +69,6 @@ pub(crate) fn builtins_for_input(flags: BuiltinCommandFlags) -> Vec<(&'static st
     built_in_slash_commands()
         .into_iter()
         .filter(|(_, cmd)| flags.collaboration_modes_enabled || *cmd != SlashCommand::Plan)
-        .filter(|(_, cmd)| flags.connectors_enabled || *cmd != SlashCommand::Apps)
-        .filter(|(_, cmd)| flags.plugins_command_enabled || *cmd != SlashCommand::Plugins)
         .filter(|(_, cmd)| flags.token_activity_command_enabled || *cmd != SlashCommand::Usage)
         .filter(|(_, cmd)| flags.goal_command_enabled || *cmd != SlashCommand::Goal)
         .filter(|(_, cmd)| flags.worktrees_enabled || *cmd != SlashCommand::Worktree)
@@ -176,8 +172,6 @@ mod tests {
     fn all_enabled_flags() -> BuiltinCommandFlags {
         BuiltinCommandFlags {
             collaboration_modes_enabled: true,
-            connectors_enabled: true,
-            plugins_command_enabled: true,
             token_activity_command_enabled: true,
             service_tier_commands_enabled: true,
             daybreak_command_description: Some(""),

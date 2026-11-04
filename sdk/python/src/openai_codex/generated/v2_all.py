@@ -29,21 +29,8 @@ class ApiKeyAccount(BaseModel):
     type: Annotated[Literal["apiKey"], Field(title="ApiKeyAccountType")]
 
 
-class AmazonBedrockAccount(BaseModel):
-    model_config = ConfigDict(
-        populate_by_name=True,
-    )
-    type: Annotated[Literal["amazonBedrock"], Field(title="AmazonBedrockAccountType")]
-    uses_codex_managed_credentials: Annotated[
-        bool | None, Field(alias="usesCodexManagedCredentials")
-    ] = False
-
-
-class GcpAccount(BaseModel):
-    model_config = ConfigDict(
-        populate_by_name=True,
-    )
-    type: Annotated[Literal["gcp"], Field(title="GcpAccountType")]
+class Account(RootModel[ApiKeyAccount]):
+    root: ApiKeyAccount
 
 
 class AccountRoutingOverride(Enum):
@@ -171,178 +158,10 @@ class AnalyticsConfig(BaseModel):
     enabled: bool | None = None
 
 
-class AppBranding(BaseModel):
-    model_config = ConfigDict(
-        populate_by_name=True,
-    )
-    category: str | None = None
-    developer: str | None = None
-    is_discoverable_app: Annotated[bool, Field(alias="isDiscoverableApp")]
-    privacy_policy: Annotated[str | None, Field(alias="privacyPolicy")] = None
-    terms_of_service: Annotated[str | None, Field(alias="termsOfService")] = None
-    website: str | None = None
-
-
-class AppLinksConfig(BaseModel):
-    model_config = ConfigDict(
-        populate_by_name=True,
-    )
-
-
-class AppReview(BaseModel):
-    model_config = ConfigDict(
-        populate_by_name=True,
-    )
-    status: str
-
-
-class AppScreenshot(BaseModel):
-    model_config = ConfigDict(
-        populate_by_name=True,
-    )
-    file_id: Annotated[str | None, Field(alias="fileId")] = None
-    url: str | None = None
-    user_prompt: Annotated[str, Field(alias="userPrompt")]
-
-
-class AppSummary(BaseModel):
-    model_config = ConfigDict(
-        populate_by_name=True,
-    )
-    category: str | None = None
-    description: str | None = None
-    id: str
-    install_url: Annotated[str | None, Field(alias="installUrl")] = None
-    name: str
-
-
-class AppTemplateUnavailableReason(Enum):
-    not_configured_for_workspace = "NOT_CONFIGURED_FOR_WORKSPACE"
-    no_active_workspace = "NO_ACTIVE_WORKSPACE"
-
-
-class AppToolApproval(Enum):
-    auto = "auto"
-    prompt = "prompt"
-    writes = "writes"
-    approve = "approve"
-
-
-class AppToolConfig(BaseModel):
-    model_config = ConfigDict(
-        populate_by_name=True,
-    )
-    approval_mode: AppToolApproval | None = None
-    enabled: bool | None = None
-
-
-class AppToolSummary(BaseModel):
-    model_config = ConfigDict(
-        populate_by_name=True,
-    )
-    description: str
-    disabled_reason: Annotated[str | None, Field(alias="disabledReason")] = None
-    is_enabled: Annotated[bool | None, Field(alias="isEnabled")] = True
-    is_read_only: Annotated[bool | None, Field(alias="isReadOnly")] = False
-    name: str
-    title: str | None = None
-
-
-class AppToolsConfig(BaseModel):
-    model_config = ConfigDict(
-        populate_by_name=True,
-    )
-
-
 class ApprovalsReviewer(Enum):
     user = "user"
     auto_review = "auto_review"
     guardian_subagent = "guardian_subagent"
-
-
-class AppsDefaultConfig(BaseModel):
-    model_config = ConfigDict(
-        populate_by_name=True,
-    )
-    approvals_reviewer: ApprovalsReviewer | None = None
-    default_tools_approval_mode: AppToolApproval | None = None
-    destructive_enabled: bool | None = True
-    enabled: bool | None = True
-    open_world_enabled: bool | None = True
-
-
-class AppsInstalledParams(BaseModel):
-    model_config = ConfigDict(
-        populate_by_name=True,
-    )
-    force_refresh: Annotated[
-        bool | None,
-        Field(
-            alias="forceRefresh",
-            description="When true and Apps are permitted, refresh and publish the hosted connector runtime tool snapshot first.",
-        ),
-    ] = None
-    thread_id: Annotated[
-        str | None,
-        Field(
-            alias="threadId",
-            description="Optional loaded thread id used to evaluate effective app configuration.",
-        ),
-    ] = None
-
-
-class AppsListParams(BaseModel):
-    model_config = ConfigDict(
-        populate_by_name=True,
-    )
-    cursor: Annotated[
-        str | None, Field(description="Opaque pagination cursor returned by a previous call.")
-    ] = None
-    force_refetch: Annotated[
-        bool | None,
-        Field(
-            alias="forceRefetch",
-            description="When true, bypass app caches and fetch the latest data from sources.",
-        ),
-    ] = None
-    limit: Annotated[
-        int | None,
-        Field(description="Optional page size; defaults to a reasonable server-side value.", ge=0),
-    ] = None
-    thread_id: Annotated[
-        str | None,
-        Field(
-            alias="threadId",
-            description="Optional thread id used to evaluate app feature gating from that thread's config.",
-        ),
-    ] = None
-
-
-class AppsReadParams(BaseModel):
-    model_config = ConfigDict(
-        populate_by_name=True,
-    )
-    app_ids: Annotated[
-        list[str],
-        Field(
-            alias="appIds",
-            description="App ids to read. The server accepts at most 100 ids and deduplicates repeated ids while preserving their first-request order.",
-        ),
-    ]
-    include_tools: Annotated[
-        bool | None,
-        Field(
-            alias="includeTools",
-            description="When true, include display-only public tool summaries in the returned metadata.",
-        ),
-    ] = None
-    thread_id: Annotated[
-        str | None,
-        Field(
-            alias="threadId",
-            description="Optional loaded thread id used to evaluate effective app configuration.",
-        ),
-    ] = None
 
 
 class AskForApprovalValue(Enum):
@@ -383,15 +202,10 @@ class AsyncUserInputQuestion(BaseModel):
     title: str
 
 
-class AuthMode(Enum):
-    apikey = "apikey"
-    chatgpt = "chatgpt"
-    chatgpt_auth_tokens = "chatgptAuthTokens"
-    headers = "headers"
-    agent_identity = "agentIdentity"
-    personal_access_token = "personalAccessToken"
-    bedrock_api_key = "bedrockApiKey"
-    bedrock_access_keys = "bedrockAccessKeys"
+class AuthMode(RootModel[Literal["apikey"]]):
+    root: Annotated[
+        Literal["apikey"], Field(description="Authentication mode for OpenAI-backed providers.")
+    ]
 
 
 class AuthRecoveryNotification(BaseModel):
@@ -462,18 +276,6 @@ class ByteRange(BaseModel):
     )
     end: Annotated[int, Field(ge=0)]
     start: Annotated[int, Field(ge=0)]
-
-
-class CancelLoginAccountParams(BaseModel):
-    model_config = ConfigDict(
-        populate_by_name=True,
-    )
-    login_id: Annotated[str, Field(alias="loginId")]
-
-
-class CancelLoginAccountStatus(Enum):
-    canceled = "canceled"
-    not_found = "notFound"
 
 
 class EnvironmentCapabilityRootLocation(BaseModel):
@@ -771,13 +573,6 @@ class CommandExecutionStatus(Enum):
     declined = "declined"
 
 
-class CommandMigration(BaseModel):
-    model_config = ConfigDict(
-        populate_by_name=True,
-    )
-    name: str
-
-
 class ComputerUseMacosConfig(BaseModel):
     model_config = ConfigDict(
         populate_by_name=True,
@@ -1017,21 +812,6 @@ class ConfiguredHookMatcherGroup(BaseModel):
     matcher: str | None = None
 
 
-class ConnectorMetadata(BaseModel):
-    model_config = ConfigDict(
-        populate_by_name=True,
-    )
-    description: str | None = None
-    distribution_channel: Annotated[str | None, Field(alias="distributionChannel")] = None
-    icon_url: Annotated[str | None, Field(alias="iconUrl")] = None
-    icon_url_dark: Annotated[str | None, Field(alias="iconUrlDark")] = None
-    id: str
-    install_url: Annotated[str | None, Field(alias="installUrl")] = None
-    name: str
-    plugin_display_names: Annotated[list[str] | None, Field(alias="pluginDisplayNames")] = []
-    tool_summaries: Annotated[list[AppToolSummary] | None, Field(alias="toolSummaries")] = None
-
-
 class ConsumeAccountRateLimitResetCreditOutcome(Enum):
     reset = "reset"
     nothing_to_reset = "nothingToReset"
@@ -1261,88 +1041,6 @@ class ExperimentalFeatureStage(Enum):
     stable = "stable"
     deprecated = "deprecated"
     removed = "removed"
-
-
-class ExternalAgentConfigDetectParams(BaseModel):
-    model_config = ConfigDict(
-        populate_by_name=True,
-    )
-    cwds: Annotated[
-        list[str] | None,
-        Field(description="Zero or more working directories to include for repo-scoped detection."),
-    ] = None
-    include_home: Annotated[
-        bool | None,
-        Field(
-            alias="includeHome",
-            description="If true, include detection under the user's home directory.",
-        ),
-    ] = None
-    max_session_age_days: Annotated[
-        int | None,
-        Field(
-            alias="maxSessionAgeDays",
-            description="Maximum age in days for detected sessions. Missing values use the default limit.",
-            ge=0,
-        ),
-    ] = None
-    max_sessions: Annotated[
-        int | None,
-        Field(
-            alias="maxSessions",
-            description="Maximum number of sessions to detect. Missing values use the default limit.",
-            ge=0,
-        ),
-    ] = None
-    migration_source: Annotated[
-        str | None,
-        Field(
-            alias="migrationSource",
-            description="Optional migration-source selector. Missing or unrecognized values use the default source.",
-        ),
-    ] = None
-    source: Annotated[
-        str | None,
-        Field(
-            description="Deprecated field retained for compatibility. This field is ignored; use `migrationSource` to select the migration source."
-        ),
-    ] = None
-
-
-class ExternalAgentConfigImportHistoryRecordResponse(BaseModel):
-    model_config = ConfigDict(
-        populate_by_name=True,
-    )
-    import_id: Annotated[str, Field(alias="importId")]
-
-
-class ExternalAgentConfigImportResponse(BaseModel):
-    model_config = ConfigDict(
-        populate_by_name=True,
-    )
-    import_id: Annotated[str, Field(alias="importId")]
-
-
-class ExternalAgentConfigMigrationItemType(Enum):
-    agents_md = "AGENTS_MD"
-    config = "CONFIG"
-    skills = "SKILLS"
-    plugins = "PLUGINS"
-    mcp_server_config = "MCP_SERVER_CONFIG"
-    subagents = "SUBAGENTS"
-    hooks = "HOOKS"
-    commands = "COMMANDS"
-    memory = "MEMORY"
-    sessions = "SESSIONS"
-
-
-class ExternalAgentDetectedConnectorSource(Enum):
-    remote_mcp_servers_config = "remoteMcpServersConfig"
-    session_tool_use = "sessionToolUse"
-
-
-class ExternalAgentImportedConnectorSource(RootModel[Literal["remoteMcpServersConfig"]]):
-    root: Literal["remoteMcpServersConfig"]
 
 
 class FeedbackRequirements(BaseModel):
@@ -1760,25 +1458,6 @@ class GatewayAuth(
     root: NoneGatewayAuth | EnvironmentVariableGatewayAuth | ExternallyConfiguredGatewayAuth
 
 
-class GatewayOAuthCancelResponse(BaseModel):
-    model_config = ConfigDict(
-        populate_by_name=True,
-    )
-
-
-class GatewayOAuthLoginResponse(BaseModel):
-    model_config = ConfigDict(
-        populate_by_name=True,
-    )
-
-
-class GatewayOAuthStatus(Enum):
-    not_ready = "notReady"
-    started = "started"
-    succeeded = "succeeded"
-    failed = "failed"
-
-
 class GetAccountParams(BaseModel):
     model_config = ConfigDict(
         populate_by_name=True,
@@ -1810,6 +1489,14 @@ class GetAccountRateLimitsParams(BaseModel):
             description="The client supports automatic Luna Reserve fallback. For eligible ChatGPT CLI users, allow the backend to record experiment exposure after ordinary usage is blocked.",
         ),
     ] = None
+
+
+class GetAccountResponse(BaseModel):
+    model_config = ConfigDict(
+        populate_by_name=True,
+    )
+    account: Account | None = None
+    requires_openai_auth: Annotated[bool, Field(alias="requiresOpenaiAuth")]
 
 
 class GetAccountTokenUsageParams(BaseModel):
@@ -1849,8 +1536,6 @@ class McpToolCallGuardianApprovalReviewAction(BaseModel):
     model_config = ConfigDict(
         populate_by_name=True,
     )
-    connector_id: Annotated[str | None, Field(alias="connectorId")] = None
-    connector_name: Annotated[str | None, Field(alias="connectorName")] = None
     server: str
     tool_name: Annotated[str, Field(alias="toolName")]
     tool_title: Annotated[str | None, Field(alias="toolTitle")] = None
@@ -1933,13 +1618,6 @@ class HookHandlerType(Enum):
     agent = "agent"
 
 
-class HookMigration(BaseModel):
-    model_config = ConfigDict(
-        populate_by_name=True,
-    )
-    name: str
-
-
 class HookOutputEntryKind(Enum):
     warning = "warning"
     stop = "stop"
@@ -1975,7 +1653,6 @@ class HookSource(Enum):
     project = "project"
     mdm = "mdm"
     session_flags = "sessionFlags"
-    plugin = "plugin"
     cloud_requirements = "cloudRequirements"
     cloud_managed_config = "cloudManagedConfig"
     legacy_managed_config_file = "legacyManagedConfigFile"
@@ -2014,32 +1691,6 @@ class ImageDetail(Enum):
     low = "low"
     high = "high"
     original = "original"
-
-
-class UsageLimitExceededImageGenerationFailure(BaseModel):
-    model_config = ConfigDict(
-        populate_by_name=True,
-    )
-    limit_id: Annotated[str, Field(alias="limitId")]
-    resets_at: Annotated[int | None, Field(alias="resetsAt")] = None
-    type: Annotated[
-        Literal["usageLimitExceeded"], Field(title="UsageLimitExceededImageGenerationFailureType")
-    ]
-
-
-class ImageGenerationFailure(RootModel[UsageLimitExceededImageGenerationFailure]):
-    root: UsageLimitExceededImageGenerationFailure
-
-
-class ImageGenerationInputImage(BaseModel):
-    model_config = ConfigDict(
-        populate_by_name=True,
-    )
-    path: AbsolutePathBuf
-    sha256: Annotated[
-        str,
-        Field(description="Lowercase SHA-256 of the file bytes read before image normalization."),
-    ]
 
 
 class InAppBrowserRequirements(BaseModel):
@@ -2116,32 +1767,6 @@ class InputModality(Enum):
     image = "image"
 
 
-class InstalledApp(BaseModel):
-    model_config = ConfigDict(
-        populate_by_name=True,
-    )
-    callable: Annotated[
-        bool,
-        Field(
-            description="Whether the connector is enabled and has a non-synthetic, model-visible tool allowed by effective MCP and app/tool policy in the committed runtime snapshot."
-        ),
-    ]
-    enabled: Annotated[
-        bool,
-        Field(
-            description="Effective enabled state after applying global, workspace, local, and managed configuration at read time."
-        ),
-    ]
-    id: str
-    runtime_name: Annotated[
-        str | None,
-        Field(
-            alias="runtimeName",
-            description="Best-effort name carried by the runtime tool catalog. Canonical app metadata remains owned by `app/read`.",
-        ),
-    ] = None
-
-
 class InternalChatMessageMetadataPassthrough(BaseModel):
     model_config = ConfigDict(
         populate_by_name=True,
@@ -2183,68 +1808,8 @@ class ApiKeyLoginAccountParams(BaseModel):
     type: Annotated[Literal["apiKey"], Field(title="ApiKeyv2::LoginAccountParamsType")]
 
 
-class ChatgptDeviceCodeLoginAccountParams(BaseModel):
-    model_config = ConfigDict(
-        populate_by_name=True,
-    )
-    type: Annotated[
-        Literal["chatgptDeviceCode"], Field(title="ChatgptDeviceCodev2::LoginAccountParamsType")
-    ]
-
-
-class ChatgptAuthTokensLoginAccountParams(BaseModel):
-    model_config = ConfigDict(
-        populate_by_name=True,
-    )
-    access_token: Annotated[
-        str,
-        Field(
-            alias="accessToken",
-            description="Access token (JWT) supplied by the client. This token is used for backend API requests and email extraction.",
-        ),
-    ]
-    chatgpt_account_id: Annotated[
-        str,
-        Field(
-            alias="chatgptAccountId",
-            description="Workspace/account identifier supplied by the client.",
-        ),
-    ]
-    chatgpt_plan_type: Annotated[
-        str | None,
-        Field(
-            alias="chatgptPlanType",
-            description="Optional plan type supplied by the client.\n\nWhen `null`, Codex attempts to derive the plan type from access-token claims. If unavailable, the plan defaults to `unknown`.",
-        ),
-    ] = None
-    type: Annotated[
-        Literal["chatgptAuthTokens"], Field(title="ChatgptAuthTokensv2::LoginAccountParamsType")
-    ]
-
-
-class AmazonBedrockLoginAccountParams(BaseModel):
-    model_config = ConfigDict(
-        populate_by_name=True,
-    )
-    api_key: Annotated[str, Field(alias="apiKey")]
-    region: str
-    type: Annotated[
-        Literal["amazonBedrock"], Field(title="AmazonBedrockv2::LoginAccountParamsType")
-    ]
-
-
-class AmazonBedrockAccessKeysLoginAccountParams(BaseModel):
-    model_config = ConfigDict(
-        populate_by_name=True,
-    )
-    access_key_id: Annotated[str, Field(alias="accessKeyId")]
-    region: str
-    secret_access_key: Annotated[str, Field(alias="secretAccessKey")]
-    session_token: Annotated[str | None, Field(alias="sessionToken")] = None
-    type: Annotated[
-        Literal["amazonBedrockAccessKeys"],
-        Field(title="AmazonBedrockAccessKeysv2::LoginAccountParamsType"),
-    ]
+class LoginAccountParams(RootModel[ApiKeyLoginAccountParams]):
+    root: Annotated[ApiKeyLoginAccountParams, Field(title="LoginAccountParams")]
 
 
 class ApiKeyLoginAccountResponse(BaseModel):
@@ -2254,82 +1819,8 @@ class ApiKeyLoginAccountResponse(BaseModel):
     type: Annotated[Literal["apiKey"], Field(title="ApiKeyv2::LoginAccountResponseType")]
 
 
-class ChatgptLoginAccountResponse(BaseModel):
-    model_config = ConfigDict(
-        populate_by_name=True,
-    )
-    auth_url: Annotated[
-        str,
-        Field(
-            alias="authUrl",
-            description="URL the client should open in a browser to initiate the OAuth flow.",
-        ),
-    ]
-    login_id: Annotated[str, Field(alias="loginId")]
-    type: Annotated[Literal["chatgpt"], Field(title="Chatgptv2::LoginAccountResponseType")]
-
-
-class ChatgptDeviceCodeLoginAccountResponse(BaseModel):
-    model_config = ConfigDict(
-        populate_by_name=True,
-    )
-    login_id: Annotated[str, Field(alias="loginId")]
-    type: Annotated[
-        Literal["chatgptDeviceCode"], Field(title="ChatgptDeviceCodev2::LoginAccountResponseType")
-    ]
-    user_code: Annotated[
-        str,
-        Field(alias="userCode", description="One-time code the user must enter after signing in."),
-    ]
-    verification_url: Annotated[
-        str,
-        Field(
-            alias="verificationUrl",
-            description="URL the client should open in a browser to complete device code authorization.",
-        ),
-    ]
-
-
-class ChatgptAuthTokensLoginAccountResponse(BaseModel):
-    model_config = ConfigDict(
-        populate_by_name=True,
-    )
-    type: Annotated[
-        Literal["chatgptAuthTokens"], Field(title="ChatgptAuthTokensv2::LoginAccountResponseType")
-    ]
-
-
-class AmazonBedrockLoginAccountResponse(BaseModel):
-    model_config = ConfigDict(
-        populate_by_name=True,
-    )
-    type: Annotated[
-        Literal["amazonBedrock"], Field(title="AmazonBedrockv2::LoginAccountResponseType")
-    ]
-
-
-class LoginAccountResponse(
-    RootModel[
-        ApiKeyLoginAccountResponse
-        | ChatgptLoginAccountResponse
-        | ChatgptDeviceCodeLoginAccountResponse
-        | ChatgptAuthTokensLoginAccountResponse
-        | AmazonBedrockLoginAccountResponse
-    ]
-):
-    root: Annotated[
-        ApiKeyLoginAccountResponse
-        | ChatgptLoginAccountResponse
-        | ChatgptDeviceCodeLoginAccountResponse
-        | ChatgptAuthTokensLoginAccountResponse
-        | AmazonBedrockLoginAccountResponse,
-        Field(title="LoginAccountResponse"),
-    ]
-
-
-class LoginAppBrand(Enum):
-    codex = "codex"
-    chatgpt = "chatgpt"
+class LoginAccountResponse(RootModel[ApiKeyLoginAccountResponse]):
+    root: Annotated[ApiKeyLoginAccountResponse, Field(title="LoginAccountResponse")]
 
 
 class LogoutAccountResponse(BaseModel):
@@ -2372,93 +1863,6 @@ class ManagedHooksRequirements(BaseModel):
     windows_managed_dir: Annotated[str | None, Field(alias="windowsManagedDir")] = None
 
 
-class MarketplaceAddParams(BaseModel):
-    model_config = ConfigDict(
-        populate_by_name=True,
-    )
-    ref_name: Annotated[str | None, Field(alias="refName")] = None
-    source: str
-    sparse_paths: Annotated[list[str] | None, Field(alias="sparsePaths")] = None
-
-
-class MarketplaceAddResponse(BaseModel):
-    model_config = ConfigDict(
-        populate_by_name=True,
-    )
-    already_added: Annotated[bool, Field(alias="alreadyAdded")]
-    installed_root: Annotated[AbsolutePathBuf, Field(alias="installedRoot")]
-    marketplace_name: Annotated[str, Field(alias="marketplaceName")]
-
-
-class MarketplaceInterface(BaseModel):
-    model_config = ConfigDict(
-        populate_by_name=True,
-    )
-    display_name: Annotated[str | None, Field(alias="displayName")] = None
-
-
-class MarketplaceLoadErrorInfo(BaseModel):
-    model_config = ConfigDict(
-        populate_by_name=True,
-    )
-    marketplace_path: Annotated[AbsolutePathBuf, Field(alias="marketplacePath")]
-    message: str
-
-
-class MarketplaceRemoveParams(BaseModel):
-    model_config = ConfigDict(
-        populate_by_name=True,
-    )
-    marketplace_name: Annotated[str, Field(alias="marketplaceName")]
-
-
-class MarketplaceRemoveResponse(BaseModel):
-    model_config = ConfigDict(
-        populate_by_name=True,
-    )
-    installed_root: Annotated[AbsolutePathBuf | None, Field(alias="installedRoot")] = None
-    marketplace_name: Annotated[str, Field(alias="marketplaceName")]
-
-
-class MarketplaceUpgradeErrorInfo(BaseModel):
-    model_config = ConfigDict(
-        populate_by_name=True,
-    )
-    marketplace_name: Annotated[str, Field(alias="marketplaceName")]
-    message: str
-
-
-class MarketplaceUpgradeParams(BaseModel):
-    model_config = ConfigDict(
-        populate_by_name=True,
-    )
-    marketplace_name: Annotated[str | None, Field(alias="marketplaceName")] = None
-
-
-class MarketplaceUpgradeResponse(BaseModel):
-    model_config = ConfigDict(
-        populate_by_name=True,
-    )
-    errors: list[MarketplaceUpgradeErrorInfo]
-    selected_marketplaces: Annotated[list[str], Field(alias="selectedMarketplaces")]
-    upgraded_roots: Annotated[list[AbsolutePathBuf], Field(alias="upgradedRoots")]
-
-
-class McpAppDisplayMode(Enum):
-    inline = "inline"
-    fullscreen = "fullscreen"
-
-
-class McpAppUi(BaseModel):
-    model_config = ConfigDict(
-        populate_by_name=True,
-    )
-    preferred_model_display_mode: Annotated[
-        McpAppDisplayMode, Field(alias="preferredModelDisplayMode")
-    ]
-    resource_uri: Annotated[str, Field(alias="resourceUri")]
-
-
 class McpAuthStatus(Enum):
     unknown = "unknown"
     unsupported = "unsupported"
@@ -2467,18 +1871,13 @@ class McpAuthStatus(Enum):
     o_auth = "oAuth"
 
 
-class McpResourceReadTarget(BaseModel):
+class McpResourceReadParams(BaseModel):
     model_config = ConfigDict(
         populate_by_name=True,
     )
-    connector_id: Annotated[str, Field(alias="connectorId")]
-    link_id: Annotated[
-        str | None,
-        Field(
-            alias="linkId",
-            description="Null explicitly requests no-auth access, subject to the app's resource policy.",
-        ),
-    ]
+    server: str
+    thread_id: Annotated[str | None, Field(alias="threadId")] = None
+    uri: str
 
 
 class McpServerConnectionStatus(Enum):
@@ -2517,13 +1916,6 @@ class McpServerInfo(BaseModel):
     title: str | None = None
     version: str
     website_url: Annotated[str | None, Field(alias="websiteUrl")] = None
-
-
-class McpServerMigration(BaseModel):
-    model_config = ConfigDict(
-        populate_by_name=True,
-    )
-    name: str
 
 
 class McpServerOauthClientRegistration(Enum):
@@ -2636,17 +2028,6 @@ class McpServerToolCallResponse(BaseModel):
     structured_content: Annotated[Any | None, Field(alias="structuredContent")] = None
 
 
-class McpToolCallAppContext(BaseModel):
-    model_config = ConfigDict(
-        populate_by_name=True,
-    )
-    action_name: Annotated[str | None, Field(alias="actionName")] = None
-    app_name: Annotated[str | None, Field(alias="appName")] = None
-    connector_id: Annotated[str, Field(alias="connectorId")]
-    link_id: Annotated[str | None, Field(alias="linkId")] = None
-    resource_uri: Annotated[str | None, Field(alias="resourceUri")] = None
-
-
 class McpToolCallError(BaseModel):
     model_config = ConfigDict(
         populate_by_name=True,
@@ -2756,7 +2137,6 @@ class ModelProviderCapabilitiesReadResponse(BaseModel):
     model_config = ConfigDict(
         populate_by_name=True,
     )
-    image_generation: Annotated[bool, Field(alias="imageGeneration")]
     web_search: Annotated[bool, Field(alias="webSearch")]
 
 
@@ -3152,419 +2532,6 @@ class PlanType(str, Enum):
         return member
 
 
-class PluginAuthPolicy(Enum):
-    on_install = "ON_INSTALL"
-    on_use = "ON_USE"
-
-
-class PluginAvailability(Enum):
-    disabled_by_admin = "DISABLED_BY_ADMIN"
-    available = "AVAILABLE"
-
-
-class PluginDisabledReason(Enum):
-    disabled_by_admin = "disabled_by_admin"
-    plan_not_eligible = "plan_not_eligible"
-    required_app_unavailable = "required_app_unavailable"
-    unknown = "unknown"
-
-
-class PluginHookSummary(BaseModel):
-    model_config = ConfigDict(
-        populate_by_name=True,
-    )
-    event_name: Annotated[HookEventName, Field(alias="eventName")]
-    key: str
-
-
-class PluginInstallParams(BaseModel):
-    model_config = ConfigDict(
-        populate_by_name=True,
-    )
-    install_attempt_id: Annotated[
-        str | None,
-        Field(
-            alias="installAttemptId",
-            description="Client-generated identifier used to correlate one installation attempt.",
-        ),
-    ] = None
-    marketplace_path: Annotated[AbsolutePathBuf | None, Field(alias="marketplacePath")] = None
-    plugin_name: Annotated[str, Field(alias="pluginName")]
-    remote_marketplace_name: Annotated[str | None, Field(alias="remoteMarketplaceName")] = None
-
-
-class PluginInstallPolicy(Enum):
-    not_available = "NOT_AVAILABLE"
-    available = "AVAILABLE"
-    installed_by_default = "INSTALLED_BY_DEFAULT"
-
-
-class PluginInstallPolicySource(Enum):
-    workspace_setting = "WORKSPACE_SETTING"
-    implicit_canonical_app = "IMPLICIT_CANONICAL_APP"
-
-
-class PluginInstallResponse(BaseModel):
-    model_config = ConfigDict(
-        populate_by_name=True,
-    )
-    apps_needing_auth: Annotated[list[AppSummary], Field(alias="appsNeedingAuth")]
-    auth_policy: Annotated[PluginAuthPolicy, Field(alias="authPolicy")]
-
-
-class PluginInstalledParams(BaseModel):
-    model_config = ConfigDict(
-        populate_by_name=True,
-    )
-    cwds: Annotated[
-        list[AbsolutePathBuf] | None,
-        Field(description="Optional working directories used to discover repo marketplaces."),
-    ] = None
-    install_suggestion_plugin_names: Annotated[
-        list[str] | None,
-        Field(
-            alias="installSuggestionPluginNames",
-            description="Additional uninstalled plugin names that should be returned when present locally. This is used by mention surfaces that intentionally expose install entrypoints.",
-        ),
-    ] = None
-
-
-class PluginInterface(BaseModel):
-    model_config = ConfigDict(
-        populate_by_name=True,
-    )
-    brand_color: Annotated[str | None, Field(alias="brandColor")] = None
-    capabilities: list[str]
-    category: str | None = None
-    composer_icon: Annotated[
-        AbsolutePathBuf | None,
-        Field(
-            alias="composerIcon",
-            description="Local composer icon path, resolved from the installed plugin package.",
-        ),
-    ] = None
-    composer_icon_url: Annotated[
-        str | None,
-        Field(
-            alias="composerIconUrl", description="Remote composer icon URL from the plugin catalog."
-        ),
-    ] = None
-    default_prompt: Annotated[
-        list[str] | None,
-        Field(
-            alias="defaultPrompt",
-            description="Starter prompts for the plugin. Capped at 3 entries with a maximum of 128 characters per entry.",
-        ),
-    ] = None
-    developer_name: Annotated[str | None, Field(alias="developerName")] = None
-    display_name: Annotated[str | None, Field(alias="displayName")] = None
-    logo: Annotated[
-        AbsolutePathBuf | None,
-        Field(description="Local logo path, resolved from the installed plugin package."),
-    ] = None
-    logo_dark: Annotated[
-        AbsolutePathBuf | None,
-        Field(
-            alias="logoDark",
-            description="Local dark-mode logo path, resolved from the installed plugin package.",
-        ),
-    ] = None
-    logo_url: Annotated[
-        str | None, Field(alias="logoUrl", description="Remote logo URL from the plugin catalog.")
-    ] = None
-    logo_url_dark: Annotated[
-        str | None,
-        Field(
-            alias="logoUrlDark", description="Remote dark-mode logo URL from the plugin catalog."
-        ),
-    ] = None
-    long_description: Annotated[str | None, Field(alias="longDescription")] = None
-    privacy_policy_url: Annotated[str | None, Field(alias="privacyPolicyUrl")] = None
-    screenshot_urls: Annotated[
-        list[str],
-        Field(
-            alias="screenshotUrls", description="Remote screenshot URLs from the plugin catalog."
-        ),
-    ]
-    screenshots: Annotated[
-        list[AbsolutePathBuf],
-        Field(description="Local screenshot paths, resolved from the installed plugin package."),
-    ]
-    short_description: Annotated[str | None, Field(alias="shortDescription")] = None
-    terms_of_service_url: Annotated[str | None, Field(alias="termsOfServiceUrl")] = None
-    website_url: Annotated[str | None, Field(alias="websiteUrl")] = None
-
-
-class PluginListMarketplaceKind(Enum):
-    local = "local"
-    vertical = "vertical"
-    workspace_directory = "workspace-directory"
-    shared_with_me = "shared-with-me"
-    created_by_me_remote = "created-by-me-remote"
-
-
-class PluginListParams(BaseModel):
-    model_config = ConfigDict(
-        populate_by_name=True,
-    )
-    cwds: Annotated[
-        list[AbsolutePathBuf] | None,
-        Field(
-            description="Optional working directories used to discover repo marketplaces. When omitted, only home-scoped marketplaces and the official curated marketplace are considered."
-        ),
-    ] = None
-    force_refetch: Annotated[
-        bool | None,
-        Field(
-            alias="forceRefetch",
-            description="Whether the client requests a fresh remote plugin catalog fetch.",
-        ),
-    ] = None
-    marketplace_kinds: Annotated[
-        list[PluginListMarketplaceKind] | None,
-        Field(
-            alias="marketplaceKinds",
-            description="Optional marketplace kind filter. When omitted, only local marketplaces are queried, plus the default remote catalog when enabled by feature flag.",
-        ),
-    ] = None
-
-
-class PluginReadParams(BaseModel):
-    model_config = ConfigDict(
-        populate_by_name=True,
-    )
-    marketplace_path: Annotated[AbsolutePathBuf | None, Field(alias="marketplacePath")] = None
-    plugin_name: Annotated[str, Field(alias="pluginName")]
-    remote_marketplace_name: Annotated[str | None, Field(alias="remoteMarketplaceName")] = None
-
-
-class PluginReconcileChangedPlugin(BaseModel):
-    model_config = ConfigDict(
-        populate_by_name=True,
-    )
-    has_apps: Annotated[bool, Field(alias="hasApps")]
-    has_hooks: Annotated[bool, Field(alias="hasHooks")]
-    has_mcps: Annotated[bool, Field(alias="hasMcps")]
-    has_skills: Annotated[
-        bool,
-        Field(
-            alias="hasSkills",
-            description="Whether either bundle declares skill roots; not a validated inventory of enabled skills.",
-        ),
-    ]
-    id: Annotated[
-        str, Field(description="Local plugin ID (`name@marketplace`), matching `PluginSummary.id`.")
-    ]
-
-
-class PluginReconcileParams(BaseModel):
-    model_config = ConfigDict(
-        populate_by_name=True,
-    )
-    reason: Annotated[
-        str | None,
-        Field(
-            description="Optional client-provided reason recorded with the reconciliation attempt."
-        ),
-    ] = None
-
-
-class PluginReconcileResponse(BaseModel):
-    model_config = ConfigDict(
-        populate_by_name=True,
-    )
-    changed_plugins: Annotated[
-        list[PluginReconcileChangedPlugin],
-        Field(
-            alias="changedPlugins",
-            description="Plugins affected by bundle changes, enablement changes, or removals. Installed-state changes compare against the previous cached snapshot, including cached reinstalls. Removal hints survive cache cleanup failures; unchanged plugins are omitted.",
-        ),
-    ]
-    failed_materialization_remote_plugin_ids: Annotated[
-        list[str],
-        Field(
-            alias="failedMaterializationRemotePluginIds",
-            description="Subset of failures for which the requested bundle could not be materialized. A previously cached version may still be available.",
-        ),
-    ]
-    failed_remote_plugin_ids: Annotated[
-        list[str],
-        Field(
-            alias="failedRemotePluginIds",
-            description="Backend remote plugin IDs whose bundle or identity update failed.",
-        ),
-    ]
-
-
-class PluginSearchScope(Enum):
-    global_ = "global"
-    workspace = "workspace"
-    personal = "personal"
-
-
-class PluginShareCheckoutParams(BaseModel):
-    model_config = ConfigDict(
-        populate_by_name=True,
-    )
-    remote_plugin_id: Annotated[str, Field(alias="remotePluginId")]
-
-
-class PluginShareCheckoutResponse(BaseModel):
-    model_config = ConfigDict(
-        populate_by_name=True,
-    )
-    marketplace_name: Annotated[str, Field(alias="marketplaceName")]
-    marketplace_path: Annotated[AbsolutePathBuf, Field(alias="marketplacePath")]
-    plugin_id: Annotated[str, Field(alias="pluginId")]
-    plugin_name: Annotated[str, Field(alias="pluginName")]
-    plugin_path: Annotated[AbsolutePathBuf, Field(alias="pluginPath")]
-    remote_plugin_id: Annotated[str, Field(alias="remotePluginId")]
-    remote_version: Annotated[str | None, Field(alias="remoteVersion")] = None
-
-
-class PluginShareDeleteParams(BaseModel):
-    model_config = ConfigDict(
-        populate_by_name=True,
-    )
-    remote_plugin_id: Annotated[str, Field(alias="remotePluginId")]
-
-
-class PluginShareDeleteResponse(BaseModel):
-    model_config = ConfigDict(
-        populate_by_name=True,
-    )
-
-
-class PluginShareDiscoverability(Enum):
-    listed = "LISTED"
-    unlisted = "UNLISTED"
-    private = "PRIVATE"
-
-
-class PluginShareListParams(BaseModel):
-    model_config = ConfigDict(
-        populate_by_name=True,
-    )
-
-
-class PluginSharePrincipalRole(Enum):
-    reader = "reader"
-    editor = "editor"
-    owner = "owner"
-
-
-class PluginSharePrincipalType(Enum):
-    user = "user"
-    group = "group"
-    workspace = "workspace"
-
-
-class PluginShareSaveResponse(BaseModel):
-    model_config = ConfigDict(
-        populate_by_name=True,
-    )
-    can_publish_to_workspace: Annotated[bool | None, Field(alias="canPublishToWorkspace")] = None
-    remote_plugin_id: Annotated[str, Field(alias="remotePluginId")]
-    share_url: Annotated[str, Field(alias="shareUrl")]
-
-
-class PluginShareTargetRole(Enum):
-    reader = "reader"
-    editor = "editor"
-
-
-class PluginShareUpdateDiscoverability(Enum):
-    unlisted = "UNLISTED"
-    private = "PRIVATE"
-    listed = "LISTED"
-
-
-class PluginSkillReadParams(BaseModel):
-    model_config = ConfigDict(
-        populate_by_name=True,
-    )
-    remote_marketplace_name: Annotated[str, Field(alias="remoteMarketplaceName")]
-    remote_plugin_id: Annotated[str, Field(alias="remotePluginId")]
-    skill_name: Annotated[str, Field(alias="skillName")]
-
-
-class PluginSkillReadResponse(BaseModel):
-    model_config = ConfigDict(
-        populate_by_name=True,
-    )
-    contents: str | None = None
-
-
-class LocalPluginSource(BaseModel):
-    model_config = ConfigDict(
-        populate_by_name=True,
-    )
-    path: AbsolutePathBuf
-    type: Annotated[Literal["local"], Field(title="LocalPluginSourceType")]
-
-
-class GitPluginSource(BaseModel):
-    model_config = ConfigDict(
-        populate_by_name=True,
-    )
-    path: str | None = None
-    ref_name: Annotated[str | None, Field(alias="refName")] = None
-    sha: str | None = None
-    type: Annotated[Literal["git"], Field(title="GitPluginSourceType")]
-    url: str
-
-
-class NpmPluginSource(BaseModel):
-    model_config = ConfigDict(
-        populate_by_name=True,
-    )
-    package: str
-    registry: Annotated[
-        str | None,
-        Field(
-            description="Optional HTTPS registry URL. Authentication stays in the user's npm config."
-        ),
-    ] = None
-    type: Annotated[Literal["npm"], Field(title="NpmPluginSourceType")]
-    version: Annotated[str | None, Field(description="Optional npm version or version range.")] = (
-        None
-    )
-
-
-class RemotePluginSource(BaseModel):
-    model_config = ConfigDict(
-        populate_by_name=True,
-    )
-    type: Annotated[Literal["remote"], Field(title="RemotePluginSourceType")]
-
-
-class PluginSource(
-    RootModel[LocalPluginSource | GitPluginSource | NpmPluginSource | RemotePluginSource]
-):
-    root: LocalPluginSource | GitPluginSource | NpmPluginSource | RemotePluginSource
-
-
-class PluginUninstallParams(BaseModel):
-    model_config = ConfigDict(
-        populate_by_name=True,
-    )
-    plugin_id: Annotated[str, Field(alias="pluginId")]
-
-
-class PluginUninstallResponse(BaseModel):
-    model_config = ConfigDict(
-        populate_by_name=True,
-    )
-
-
-class PluginsMigration(BaseModel):
-    model_config = ConfigDict(
-        populate_by_name=True,
-    )
-    marketplace_name: Annotated[str, Field(alias="marketplaceName")]
-    plugin_names: Annotated[list[str], Field(alias="pluginNames")]
-
-
 class ProcessExitedNotification(BaseModel):
     model_config = ConfigDict(
         populate_by_name=True,
@@ -3845,37 +2812,6 @@ class ReasoningTextDeltaNotification(BaseModel):
     turn_id: Annotated[str, Field(alias="turnId")]
 
 
-class RemoteControlConnectionStatus(Enum):
-    disabled = "disabled"
-    connecting = "connecting"
-    connected = "connected"
-    errored = "errored"
-
-
-class RemoteControlDisableParams(BaseModel):
-    model_config = ConfigDict(
-        populate_by_name=True,
-    )
-    ephemeral: bool | None = None
-
-
-class RemoteControlEnableParams(BaseModel):
-    model_config = ConfigDict(
-        populate_by_name=True,
-    )
-    ephemeral: bool | None = None
-
-
-class RemoteControlStatusChangedNotification(BaseModel):
-    model_config = ConfigDict(
-        populate_by_name=True,
-    )
-    environment_id: Annotated[str | None, Field(alias="environmentId")] = None
-    installation_id: Annotated[str, Field(alias="installationId")]
-    server_name: Annotated[str, Field(alias="serverName")]
-    status: RemoteControlConnectionStatus
-
-
 class RequestHeader(BaseModel):
     model_config = ConfigDict(
         populate_by_name=True,
@@ -4052,21 +2988,6 @@ class ToolSearchOutputResponseItem(BaseModel):
     status: str
     tools: list[Any]
     type: Annotated[Literal["tool_search_output"], Field(title="ToolSearchOutputResponseItemType")]
-
-
-class ImageGenerationCallResponseItem(BaseModel):
-    model_config = ConfigDict(
-        populate_by_name=True,
-    )
-    encrypted_content: str | None = None
-    id: str | None = None
-    internal_chat_message_metadata_passthrough: InternalChatMessageMetadataPassthrough | None = None
-    result: str
-    revised_prompt: str | None = None
-    status: str
-    type: Annotated[
-        Literal["image_generation_call"], Field(title="ImageGenerationCallResponseItemType")
-    ]
 
 
 class CompactionResponseItem(BaseModel):
@@ -4285,32 +3206,6 @@ class SandboxWorkspaceWrite(BaseModel):
     exclude_tmpdir_env_var: bool | None = False
     network_access: bool | None = False
     writable_roots: list[str] | None = []
-
-
-class DailyScheduledTaskSchedule(BaseModel):
-    model_config = ConfigDict(
-        populate_by_name=True,
-    )
-    time: str
-    type: Annotated[Literal["daily"], Field(title="DailyScheduledTaskScheduleType")]
-
-
-class WeekdaysScheduledTaskSchedule(BaseModel):
-    model_config = ConfigDict(
-        populate_by_name=True,
-    )
-    time: str
-    type: Annotated[Literal["weekdays"], Field(title="WeekdaysScheduledTaskScheduleType")]
-
-
-class ScheduledTaskWeekday(Enum):
-    mo = "MO"
-    tu = "TU"
-    we = "WE"
-    th = "TH"
-    fr = "FR"
-    sa = "SA"
-    su = "SU"
 
 
 class SelectedCapabilityRoot(BaseModel):
@@ -4564,24 +3459,6 @@ class McpServerEventStreamNotificationServerNotification(BaseModel):
     params: McpServerEventStreamNotification
 
 
-class RemoteControlStatusChangedServerNotification(BaseModel):
-    model_config = ConfigDict(
-        populate_by_name=True,
-    )
-    emitted_at_ms: Annotated[
-        int | None,
-        Field(
-            alias="emittedAtMs",
-            description="Unix timestamp (in milliseconds) when app-server emitted this notification.",
-        ),
-    ] = None
-    method: Annotated[
-        Literal["remoteControl/status/changed"],
-        Field(title="RemoteControl/status/changedNotificationMethod"),
-    ]
-    params: RemoteControlStatusChangedNotification
-
-
 class FsChangedServerNotification(BaseModel):
     model_config = ConfigDict(
         populate_by_name=True,
@@ -4830,15 +3707,6 @@ class ServerRequestResolvedNotification(BaseModel):
     thread_id: Annotated[str, Field(alias="threadId")]
 
 
-class SessionMigration(BaseModel):
-    model_config = ConfigDict(
-        populate_by_name=True,
-    )
-    cwd: str
-    path: str
-    title: str | None = None
-
-
 class SessionSourceValue(Enum):
     cli = "cli"
     vscode = "vscode"
@@ -4881,22 +3749,13 @@ class SkillInterface(BaseModel):
     display_name: Annotated[str | None, Field(alias="displayName")] = None
     icon_large: Annotated[AbsolutePathBuf | None, Field(alias="iconLarge")] = None
     icon_large_url: Annotated[
-        str | None,
-        Field(alias="iconLargeUrl", description="Remote large icon URL from the plugin catalog."),
+        str | None, Field(alias="iconLargeUrl", description="Remote large icon URL.")
     ] = None
     icon_small: Annotated[AbsolutePathBuf | None, Field(alias="iconSmall")] = None
     icon_small_url: Annotated[
-        str | None,
-        Field(alias="iconSmallUrl", description="Remote small icon URL from the plugin catalog."),
+        str | None, Field(alias="iconSmallUrl", description="Remote small icon URL.")
     ] = None
     short_description: Annotated[str | None, Field(alias="shortDescription")] = None
-
-
-class SkillMigration(BaseModel):
-    model_config = ConfigDict(
-        populate_by_name=True,
-    )
-    name: str
 
 
 class SkillScope(Enum):
@@ -4904,18 +3763,6 @@ class SkillScope(Enum):
     repo = "repo"
     system = "system"
     admin = "admin"
-
-
-class SkillSummary(BaseModel):
-    model_config = ConfigDict(
-        populate_by_name=True,
-    )
-    description: str
-    enabled: bool
-    interface: SkillInterface | None = None
-    name: str
-    path: LegacyAppPathString | None = None
-    short_description: Annotated[str | None, Field(alias="shortDescription")] = None
 
 
 class SkillToolDependency(BaseModel):
@@ -5031,13 +3878,6 @@ class OtherSubAgentSource(BaseModel):
         populate_by_name=True,
     )
     other: str
-
-
-class SubagentMigration(BaseModel):
-    model_config = ConfigDict(
-        populate_by_name=True,
-    )
-    name: str
 
 
 class TerminalInteractionNotification(BaseModel):
@@ -5442,7 +4282,6 @@ class McpToolCallThreadItem(BaseModel):
     model_config = ConfigDict(
         populate_by_name=True,
     )
-    app_context: Annotated[McpToolCallAppContext | None, Field(alias="appContext")] = None
     arguments: Any
     completed_at_ms: Annotated[
         int | None,
@@ -5457,21 +4296,6 @@ class McpToolCallThreadItem(BaseModel):
     ] = None
     error: McpToolCallError | None = None
     id: str
-    mcp_app_resource_uri: Annotated[
-        str | None,
-        Field(
-            alias="mcpAppResourceUri",
-            description="Legacy compatibility field; prefer `mcpAppUi.resourceUri` when available.",
-        ),
-    ] = None
-    mcp_app_ui: Annotated[
-        McpAppUi | None,
-        Field(
-            alias="mcpAppUi",
-            description="Presentation captured from the invoked descriptor; absent in older history.",
-        ),
-    ] = None
-    plugin_id: Annotated[str | None, Field(alias="pluginId")] = None
     read_only_hint: Annotated[bool | None, Field(alias="readOnlyHint")] = None
     result: McpToolCallResult | None = None
     server: str
@@ -5605,93 +4429,6 @@ class SleepThreadItem(BaseModel):
         ),
     ] = None
     type: Annotated[Literal["sleep"], Field(title="SleepThreadItemType")]
-
-
-class FileIdThreadItem(BaseModel):
-    model_config = ConfigDict(
-        populate_by_name=True,
-    )
-    completed_at_ms: Annotated[
-        int | None,
-        Field(
-            alias="completedAtMs",
-            description="Unix timestamp in milliseconds when the item completed, if recorded.",
-        ),
-    ] = None
-    failure: ImageGenerationFailure | None = None
-    generation_id: Annotated[
-        str | None,
-        Field(
-            alias="generationId",
-            description="Image generation identifier for the generated image, when provided by the image backend.",
-        ),
-    ] = None
-    id: str
-    input_images: Annotated[
-        list[ImageGenerationInputImage] | None,
-        Field(
-            alias="inputImages",
-            description="Observed local inputs for a completed generation, absent on older items.",
-        ),
-    ] = None
-    revised_prompt: Annotated[str | None, Field(alias="revisedPrompt")] = None
-    saved_path: Annotated[AbsolutePathBuf | None, Field(alias="savedPath")] = None
-    started_at_ms: Annotated[
-        int | None,
-        Field(
-            alias="startedAtMs",
-            description="Unix timestamp in milliseconds when the item started, if recorded.",
-        ),
-    ] = None
-    status: str
-    transparent_background: Annotated[bool | None, Field(alias="transparentBackground")] = None
-    type: Annotated[Literal["imageGeneration"], Field(title="ImageGenerationThreadItemType")]
-    file_id: Annotated[str, Field(alias="fileId")]
-
-
-class ResultThreadItem(BaseModel):
-    model_config = ConfigDict(
-        populate_by_name=True,
-    )
-    completed_at_ms: Annotated[
-        int | None,
-        Field(
-            alias="completedAtMs",
-            description="Unix timestamp in milliseconds when the item completed, if recorded.",
-        ),
-    ] = None
-    failure: ImageGenerationFailure | None = None
-    generation_id: Annotated[
-        str | None,
-        Field(
-            alias="generationId",
-            description="Image generation identifier for the generated image, when provided by the image backend.",
-        ),
-    ] = None
-    id: str
-    input_images: Annotated[
-        list[ImageGenerationInputImage] | None,
-        Field(
-            alias="inputImages",
-            description="Observed local inputs for a completed generation, absent on older items.",
-        ),
-    ] = None
-    revised_prompt: Annotated[str | None, Field(alias="revisedPrompt")] = None
-    saved_path: Annotated[AbsolutePathBuf | None, Field(alias="savedPath")] = None
-    started_at_ms: Annotated[
-        int | None,
-        Field(
-            alias="startedAtMs",
-            description="Unix timestamp in milliseconds when the item started, if recorded.",
-        ),
-    ] = None
-    status: str
-    transparent_background: Annotated[bool | None, Field(alias="transparentBackground")] = None
-    type: Annotated[Literal["imageGeneration"], Field(title="ImageGenerationThreadItemType")]
-    result: str
-
-
-ImageGenerationThreadItem = ResultThreadItem
 
 
 class EnteredReviewModeThreadItem(BaseModel):
@@ -6373,11 +5110,6 @@ class Tool(BaseModel):
     title: str | None = None
 
 
-class ToolExposureSurface(Enum):
-    deferred = "deferred"
-    direct = "direct"
-
-
 class TurnDiffUpdatedNotification(BaseModel):
     model_config = ConfigDict(
         populate_by_name=True,
@@ -6656,26 +5388,6 @@ class WriteStatus(Enum):
     ok_overridden = "okOverridden"
 
 
-class ChatgptAccount(BaseModel):
-    model_config = ConfigDict(
-        populate_by_name=True,
-    )
-    email: str | None
-    plan_type: Annotated[PlanType, Field(alias="planType")]
-    type: Annotated[Literal["chatgpt"], Field(title="ChatgptAccountType")]
-    workspace_name: Annotated[
-        str | None,
-        Field(
-            alias="workspaceName",
-            description="Display name of the selected ChatGPT workspace, when available.",
-        ),
-    ] = None
-
-
-class Account(RootModel[ApiKeyAccount | ChatgptAccount | AmazonBedrockAccount | GcpAccount]):
-    root: ApiKeyAccount | ChatgptAccount | AmazonBedrockAccount | GcpAccount
-
-
 class AccountLoginCompletedNotification(BaseModel):
     model_config = ConfigDict(
         populate_by_name=True,
@@ -6718,70 +5430,6 @@ class AdditionalContextEntry(BaseModel):
     value: str
 
 
-class AppConfig(BaseModel):
-    model_config = ConfigDict(
-        populate_by_name=True,
-    )
-    approvals_reviewer: ApprovalsReviewer | None = None
-    default_tools_approval_mode: AppToolApproval | None = None
-    default_tools_enabled: bool | None = None
-    destructive_enabled: bool | None = None
-    enabled: bool | None = True
-    links: Annotated[
-        AppLinksConfig | None, Field(description="Per-account approval settings keyed by link ID.")
-    ] = None
-    omit_tools_from: Annotated[
-        list[ToolExposureSurface] | None,
-        Field(description="Additional model-facing surfaces omitted for this connector's tools."),
-    ] = None
-    open_world_enabled: bool | None = None
-    tools: AppToolsConfig | None = None
-
-
-class AppLinkConfig(BaseModel):
-    model_config = ConfigDict(
-        populate_by_name=True,
-    )
-    approvals_reviewer: ApprovalsReviewer | None = None
-    default_tools_approval_mode: AppToolApproval | None = None
-
-
-class AppMetadata(BaseModel):
-    model_config = ConfigDict(
-        populate_by_name=True,
-    )
-    categories: list[str] | None = None
-    developer: str | None = None
-    first_party_requires_install: Annotated[
-        bool | None, Field(alias="firstPartyRequiresInstall")
-    ] = None
-    review: AppReview | None = None
-    screenshots: list[AppScreenshot] | None = None
-    seo_description: Annotated[str | None, Field(alias="seoDescription")] = None
-    show_in_composer_when_unlinked: Annotated[
-        bool | None, Field(alias="showInComposerWhenUnlinked")
-    ] = None
-    sub_categories: Annotated[list[str] | None, Field(alias="subCategories")] = None
-    version: str | None = None
-    version_id: Annotated[str | None, Field(alias="versionId")] = None
-    version_notes: Annotated[str | None, Field(alias="versionNotes")] = None
-
-
-class AppTemplateSummary(BaseModel):
-    model_config = ConfigDict(
-        populate_by_name=True,
-    )
-    canonical_connector_id: Annotated[str | None, Field(alias="canonicalConnectorId")] = None
-    category: str | None = None
-    description: str | None = None
-    logo_url: Annotated[str | None, Field(alias="logoUrl")] = None
-    logo_url_dark: Annotated[str | None, Field(alias="logoUrlDark")] = None
-    materialized_app_ids: Annotated[list[str], Field(alias="materializedAppIds")]
-    name: str
-    reason: AppTemplateUnavailableReason | None = None
-    template_id: Annotated[str, Field(alias="templateId")]
-
-
 class ApplicationNetworkRequirements(BaseModel):
     model_config = ConfigDict(
         populate_by_name=True,
@@ -6803,28 +5451,6 @@ class ApplicationStorageRequirements(BaseModel):
     projectless_workspace_root: Annotated[
         LegacyAppPathString | None, Field(alias="projectlessWorkspaceRoot")
     ] = None
-
-
-class AppsConfig(BaseModel):
-    model_config = ConfigDict(
-        populate_by_name=True,
-    )
-    field_default: Annotated[AppsDefaultConfig | None, Field(alias="_default")] = None
-
-
-class AppsInstalledResponse(BaseModel):
-    model_config = ConfigDict(
-        populate_by_name=True,
-    )
-    apps: list[InstalledApp]
-
-
-class AppsReadResponse(BaseModel):
-    model_config = ConfigDict(
-        populate_by_name=True,
-    )
-    apps: list[ConnectorMetadata]
-    missing_app_ids: Annotated[list[str], Field(alias="missingAppIds")]
 
 
 class BrowserUseConfig(BaseModel):
@@ -6858,13 +5484,6 @@ class BrowserUseRequirements(BaseModel):
     disable_auto_review: Annotated[bool | None, Field(alias="disableAutoReview")] = None
     extension: BrowserUseExtensionRequirements | None = None
     origins: dict[str, Any] | None = None
-
-
-class CancelLoginAccountResponse(BaseModel):
-    model_config = ConfigDict(
-        populate_by_name=True,
-    )
-    status: CancelLoginAccountStatus
 
 
 class InitializeRequest(BaseModel):
@@ -7158,138 +5777,6 @@ class HooksListRequest(BaseModel):
     params: HooksListParams
 
 
-class MarketplaceAddRequest(BaseModel):
-    model_config = ConfigDict(
-        populate_by_name=True,
-    )
-    id: RequestId
-    method: Annotated[Literal["marketplace/add"], Field(title="Marketplace/addRequestMethod")]
-    params: MarketplaceAddParams
-
-
-class MarketplaceRemoveRequest(BaseModel):
-    model_config = ConfigDict(
-        populate_by_name=True,
-    )
-    id: RequestId
-    method: Annotated[Literal["marketplace/remove"], Field(title="Marketplace/removeRequestMethod")]
-    params: MarketplaceRemoveParams
-
-
-class MarketplaceUpgradeRequest(BaseModel):
-    model_config = ConfigDict(
-        populate_by_name=True,
-    )
-    id: RequestId
-    method: Annotated[
-        Literal["marketplace/upgrade"], Field(title="Marketplace/upgradeRequestMethod")
-    ]
-    params: MarketplaceUpgradeParams
-
-
-class PluginListRequest(BaseModel):
-    model_config = ConfigDict(
-        populate_by_name=True,
-    )
-    id: RequestId
-    method: Annotated[Literal["plugin/list"], Field(title="Plugin/listRequestMethod")]
-    params: PluginListParams
-
-
-class PluginInstalledRequest(BaseModel):
-    model_config = ConfigDict(
-        populate_by_name=True,
-    )
-    id: RequestId
-    method: Annotated[Literal["plugin/installed"], Field(title="Plugin/installedRequestMethod")]
-    params: PluginInstalledParams
-
-
-class PluginReconcileRequest(BaseModel):
-    model_config = ConfigDict(
-        populate_by_name=True,
-    )
-    id: RequestId
-    method: Annotated[Literal["plugin/reconcile"], Field(title="Plugin/reconcileRequestMethod")]
-    params: PluginReconcileParams
-
-
-class PluginReadRequest(BaseModel):
-    model_config = ConfigDict(
-        populate_by_name=True,
-    )
-    id: RequestId
-    method: Annotated[Literal["plugin/read"], Field(title="Plugin/readRequestMethod")]
-    params: PluginReadParams
-
-
-class PluginSkillReadRequest(BaseModel):
-    model_config = ConfigDict(
-        populate_by_name=True,
-    )
-    id: RequestId
-    method: Annotated[Literal["plugin/skill/read"], Field(title="Plugin/skill/readRequestMethod")]
-    params: PluginSkillReadParams
-
-
-class PluginShareListRequest(BaseModel):
-    model_config = ConfigDict(
-        populate_by_name=True,
-    )
-    id: RequestId
-    method: Annotated[Literal["plugin/share/list"], Field(title="Plugin/share/listRequestMethod")]
-    params: PluginShareListParams
-
-
-class PluginShareCheckoutRequest(BaseModel):
-    model_config = ConfigDict(
-        populate_by_name=True,
-    )
-    id: RequestId
-    method: Annotated[
-        Literal["plugin/share/checkout"], Field(title="Plugin/share/checkoutRequestMethod")
-    ]
-    params: PluginShareCheckoutParams
-
-
-class PluginShareDeleteRequest(BaseModel):
-    model_config = ConfigDict(
-        populate_by_name=True,
-    )
-    id: RequestId
-    method: Annotated[
-        Literal["plugin/share/delete"], Field(title="Plugin/share/deleteRequestMethod")
-    ]
-    params: PluginShareDeleteParams
-
-
-class AppReadRequest(BaseModel):
-    model_config = ConfigDict(
-        populate_by_name=True,
-    )
-    id: RequestId
-    method: Annotated[Literal["app/read"], Field(title="App/readRequestMethod")]
-    params: AppsReadParams
-
-
-class AppListRequest(BaseModel):
-    model_config = ConfigDict(
-        populate_by_name=True,
-    )
-    id: RequestId
-    method: Annotated[Literal["app/list"], Field(title="App/listRequestMethod")]
-    params: AppsListParams
-
-
-class AppInstalledRequest(BaseModel):
-    model_config = ConfigDict(
-        populate_by_name=True,
-    )
-    id: RequestId
-    method: Annotated[Literal["app/installed"], Field(title="App/installedRequestMethod")]
-    params: AppsInstalledParams
-
-
 class FsReadFileRequest(BaseModel):
     model_config = ConfigDict(
         populate_by_name=True,
@@ -7382,24 +5869,6 @@ class SkillsConfigWriteRequest(BaseModel):
     params: SkillsConfigWriteParams
 
 
-class PluginInstallRequest(BaseModel):
-    model_config = ConfigDict(
-        populate_by_name=True,
-    )
-    id: RequestId
-    method: Annotated[Literal["plugin/install"], Field(title="Plugin/installRequestMethod")]
-    params: PluginInstallParams
-
-
-class PluginUninstallRequest(BaseModel):
-    model_config = ConfigDict(
-        populate_by_name=True,
-    )
-    id: RequestId
-    method: Annotated[Literal["plugin/uninstall"], Field(title="Plugin/uninstallRequestMethod")]
-    params: PluginUninstallParams
-
-
 class TurnInterruptRequest(BaseModel):
     model_config = ConfigDict(
         populate_by_name=True,
@@ -7416,41 +5885,6 @@ class ModelListRequest(BaseModel):
     id: RequestId
     method: Annotated[Literal["model/list"], Field(title="Model/listRequestMethod")]
     params: ModelListParams
-
-
-class AccountGatewayOAuthReadRequest(BaseModel):
-    model_config = ConfigDict(
-        populate_by_name=True,
-    )
-    id: RequestId
-    method: Annotated[
-        Literal["account/gatewayOAuth/read"], Field(title="Account/gatewayOAuth/readRequestMethod")
-    ]
-    params: Annotated[None, Field(None)] = None
-
-
-class AccountGatewayOAuthLoginRequest(BaseModel):
-    model_config = ConfigDict(
-        populate_by_name=True,
-    )
-    id: RequestId
-    method: Annotated[
-        Literal["account/gatewayOAuth/login"],
-        Field(title="Account/gatewayOAuth/loginRequestMethod"),
-    ]
-    params: Annotated[None, Field(None)] = None
-
-
-class AccountGatewayOAuthCancelRequest(BaseModel):
-    model_config = ConfigDict(
-        populate_by_name=True,
-    )
-    id: RequestId
-    method: Annotated[
-        Literal["account/gatewayOAuth/cancel"],
-        Field(title="Account/gatewayOAuth/cancelRequestMethod"),
-    ]
-    params: Annotated[None, Field(None)] = None
 
 
 class ModelProviderListRequest(BaseModel):
@@ -7530,6 +5964,17 @@ class ConfigMcpServerReloadRequest(BaseModel):
     params: Annotated[None, Field(None)] = None
 
 
+class McpServerResourceReadRequest(BaseModel):
+    model_config = ConfigDict(
+        populate_by_name=True,
+    )
+    id: RequestId
+    method: Annotated[
+        Literal["mcpServer/resource/read"], Field(title="McpServer/resource/readRequestMethod")
+    ]
+    params: McpResourceReadParams
+
+
 class McpServerToolCallRequest(BaseModel):
     model_config = ConfigDict(
         populate_by_name=True,
@@ -7541,15 +5986,15 @@ class McpServerToolCallRequest(BaseModel):
     params: McpServerToolCallParams
 
 
-class AccountLoginCancelRequest(BaseModel):
+class AccountLoginStartRequest(BaseModel):
     model_config = ConfigDict(
         populate_by_name=True,
     )
     id: RequestId
     method: Annotated[
-        Literal["account/login/cancel"], Field(title="Account/login/cancelRequestMethod")
+        Literal["account/login/start"], Field(title="Account/login/startRequestMethod")
     ]
-    params: CancelLoginAccountParams
+    params: LoginAccountParams
 
 
 class AccountLogoutRequest(BaseModel):
@@ -7653,30 +6098,6 @@ class ConfigReadRequest(BaseModel):
     id: RequestId
     method: Annotated[Literal["config/read"], Field(title="Config/readRequestMethod")]
     params: ConfigReadParams
-
-
-class ExternalAgentConfigDetectRequest(BaseModel):
-    model_config = ConfigDict(
-        populate_by_name=True,
-    )
-    id: RequestId
-    method: Annotated[
-        Literal["externalAgentConfig/detect"],
-        Field(title="ExternalAgentConfig/detectRequestMethod"),
-    ]
-    params: ExternalAgentConfigDetectParams
-
-
-class ExternalAgentConfigImportReadHistoriesRequest(BaseModel):
-    model_config = ConfigDict(
-        populate_by_name=True,
-    )
-    id: RequestId
-    method: Annotated[
-        Literal["externalAgentConfig/import/readHistories"],
-        Field(title="ExternalAgentConfig/import/readHistoriesRequestMethod"),
-    ]
-    params: Annotated[None, Field(None)] = None
 
 
 class ConfigRequirementsReadRequest(BaseModel):
@@ -8072,73 +6493,6 @@ class ExperimentalFeatureListResponse(BaseModel):
     ] = None
 
 
-class ExternalAgentConfigImportHistoryRecordSuccessParams(BaseModel):
-    model_config = ConfigDict(
-        populate_by_name=True,
-    )
-    cwd: str | None = None
-    item_type: Annotated[ExternalAgentConfigMigrationItemType, Field(alias="itemType")]
-    source: str | None = None
-    target: str | None = None
-    title: Annotated[
-        str | None, Field(description="Original title for an imported session, when available.")
-    ] = None
-
-
-class ExternalAgentConfigImportItemTypeFailure(BaseModel):
-    model_config = ConfigDict(
-        populate_by_name=True,
-    )
-    cwd: str | None = None
-    error_type: Annotated[str | None, Field(alias="errorType")] = None
-    failure_stage: Annotated[str, Field(alias="failureStage")]
-    item_type: Annotated[ExternalAgentConfigMigrationItemType, Field(alias="itemType")]
-    message: str
-    source: str | None = None
-    sub_error_type: Annotated[str | None, Field(alias="subErrorType")] = None
-
-
-class ExternalAgentConfigImportItemTypeSuccess(BaseModel):
-    model_config = ConfigDict(
-        populate_by_name=True,
-    )
-    cwd: str | None = None
-    item_type: Annotated[ExternalAgentConfigMigrationItemType, Field(alias="itemType")]
-    source: str | None = None
-    target: str | None = None
-    title: Annotated[
-        str | None,
-        Field(description="Original title for an imported session; null for other item types."),
-    ] = None
-
-
-class ExternalAgentConfigImportTypeResult(BaseModel):
-    model_config = ConfigDict(
-        populate_by_name=True,
-    )
-    failures: list[ExternalAgentConfigImportItemTypeFailure]
-    item_type: Annotated[ExternalAgentConfigMigrationItemType, Field(alias="itemType")]
-    successes: list[ExternalAgentConfigImportItemTypeSuccess]
-
-
-class ExternalAgentDetectedConnectorCandidate(BaseModel):
-    model_config = ConfigDict(
-        populate_by_name=True,
-    )
-    name: str
-    session_count: Annotated[int, Field(alias="sessionCount", ge=0)]
-    source: ExternalAgentDetectedConnectorSource
-
-
-class ExternalAgentImportedConnectorCandidate(BaseModel):
-    model_config = ConfigDict(
-        populate_by_name=True,
-    )
-    name: str
-    session_count: Annotated[int, Field(alias="sessionCount", ge=0)]
-    source: ExternalAgentImportedConnectorSource
-
-
 class FeedbackSaveParams(BaseModel):
     model_config = ConfigDict(
         populate_by_name=True,
@@ -8268,49 +6622,6 @@ class FunctionCallOutputContentItem(
     ]
 
 
-class GatewayOAuthChangedNotification(BaseModel):
-    model_config = ConfigDict(
-        populate_by_name=True,
-    )
-    auth_url: Annotated[
-        str | None,
-        Field(
-            alias="authUrl",
-            description="Authorization handoff, sent only to the connection that started login.",
-        ),
-    ] = None
-    error: str | None = None
-    provider_id: Annotated[str, Field(alias="providerId")]
-    status: GatewayOAuthStatus
-
-
-class GatewayOAuthReadResponse(BaseModel):
-    model_config = ConfigDict(
-        populate_by_name=True,
-    )
-    error: str | None = None
-    provider_id: Annotated[str, Field(alias="providerId")]
-    provider_name: Annotated[str, Field(alias="providerName")]
-    required: Annotated[
-        bool,
-        Field(
-            description="Whether the selected provider uses gateway OAuth, even when already signed in."
-        ),
-    ]
-    status: Annotated[
-        GatewayOAuthStatus | None,
-        Field(description="Null when the effective provider does not use gateway OAuth."),
-    ] = None
-
-
-class GetAccountResponse(BaseModel):
-    model_config = ConfigDict(
-        populate_by_name=True,
-    )
-    account: Account | None = None
-    requires_openai_auth: Annotated[bool, Field(alias="requiresOpenaiAuth")]
-
-
 class GuardianApprovalReview(BaseModel):
     model_config = ConfigDict(
         populate_by_name=True,
@@ -8396,7 +6707,6 @@ class HookMetadata1(BaseModel):
     is_managed: Annotated[bool, Field(alias="isManaged")]
     key: str
     matcher: str | None = None
-    plugin_id: Annotated[str | None, Field(alias="pluginId")] = None
     source: HookSource
     source_path: Annotated[AbsolutePathBuf, Field(alias="sourcePath")]
     status_message: Annotated[str | None, Field(alias="statusMessage")] = None
@@ -8433,7 +6743,6 @@ class HookMetadata2(BaseModel):
     is_managed: Annotated[bool, Field(alias="isManaged")]
     key: str
     matcher: str | None = None
-    plugin_id: Annotated[str | None, Field(alias="pluginId")] = None
     source: HookSource
     source_path: Annotated[AbsolutePathBuf, Field(alias="sourcePath")]
     status_message: Annotated[str | None, Field(alias="statusMessage")] = None
@@ -8470,7 +6779,6 @@ class PromptHookMetadata(BaseModel):
     is_managed: Annotated[bool, Field(alias="isManaged")]
     key: str
     matcher: str | None = None
-    plugin_id: Annotated[str | None, Field(alias="pluginId")] = None
     source: HookSource
     source_path: Annotated[AbsolutePathBuf, Field(alias="sourcePath")]
     status_message: Annotated[str | None, Field(alias="statusMessage")] = None
@@ -8505,7 +6813,6 @@ class AgentHookMetadata(BaseModel):
     is_managed: Annotated[bool, Field(alias="isManaged")]
     key: str
     matcher: str | None = None
-    plugin_id: Annotated[str | None, Field(alias="pluginId")] = None
     source: HookSource
     source_path: Annotated[AbsolutePathBuf, Field(alias="sourcePath")]
     status_message: Annotated[str | None, Field(alias="statusMessage")] = None
@@ -8601,72 +6908,11 @@ class ListMcpServerStatusParams(BaseModel):
     thread_id: Annotated[str | None, Field(alias="threadId")] = None
 
 
-class ChatgptLoginAccountParams(BaseModel):
-    model_config = ConfigDict(
-        populate_by_name=True,
-    )
-    app_brand: Annotated[LoginAppBrand | None, Field(alias="appBrand")] = None
-    codex_streamlined_login: Annotated[bool | None, Field(alias="codexStreamlinedLogin")] = None
-    type: Annotated[Literal["chatgpt"], Field(title="Chatgptv2::LoginAccountParamsType")]
-    use_hosted_login_success_page: Annotated[
-        bool | None, Field(alias="useHostedLoginSuccessPage")
-    ] = None
-
-
-class LoginAccountParams(
-    RootModel[
-        ApiKeyLoginAccountParams
-        | ChatgptLoginAccountParams
-        | ChatgptDeviceCodeLoginAccountParams
-        | ChatgptAuthTokensLoginAccountParams
-        | AmazonBedrockLoginAccountParams
-        | AmazonBedrockAccessKeysLoginAccountParams
-    ]
-):
-    root: Annotated[
-        ApiKeyLoginAccountParams
-        | ChatgptLoginAccountParams
-        | ChatgptDeviceCodeLoginAccountParams
-        | ChatgptAuthTokensLoginAccountParams
-        | AmazonBedrockLoginAccountParams
-        | AmazonBedrockAccessKeysLoginAccountParams,
-        Field(title="LoginAccountParams"),
-    ]
-
-
-class McpResourceReadParams(BaseModel):
-    model_config = ConfigDict(
-        populate_by_name=True,
-    )
-    connector_id: Annotated[str | None, Field(alias="connectorId")] = None
-    origin_call_id: Annotated[
-        str | None,
-        Field(
-            alias="originCallId",
-            description="Originating MCP tool call used to select the resource's app.",
-        ),
-    ] = None
-    server: str
-    target: Annotated[
-        McpResourceReadTarget | None,
-        Field(description="Explicit hosted app/account. Omit to retain legacy resource discovery."),
-    ] = None
-    thread_id: Annotated[str | None, Field(alias="threadId")] = None
-    uri: str
-
-
 class McpResourceReadResponse(BaseModel):
     model_config = ConfigDict(
         populate_by_name=True,
     )
     contents: list[ResourceContent]
-    origin_call_id: Annotated[
-        str | None,
-        Field(
-            alias="originCallId",
-            description="Originating call when the server applied app-specific resource scoping.",
-        ),
-    ] = None
 
 
 class McpServerStatus(BaseModel):
@@ -8678,11 +6924,10 @@ class McpServerStatus(BaseModel):
         str | None,
         Field(
             alias="httpOrigin",
-            description="HTTP origin of the effective configured endpoint, including plugin servers. Excludes credentials, path, query, and fragment; null for non-HTTP transports.",
+            description="HTTP origin of the effective configured endpoint. Excludes credentials, path, query, and fragment; null for non-HTTP transports.",
         ),
     ] = None
     name: str
-    plugin_id: Annotated[str | None, Field(alias="pluginId")] = None
     resource_templates: Annotated[list[ResourceTemplate], Field(alias="resourceTemplates")]
     resources: list[Resource]
     runtime_status: Annotated[
@@ -8723,22 +6968,6 @@ class MemoryCitation(BaseModel):
     )
     entries: list[MemoryCitationEntry]
     thread_ids: Annotated[list[str], Field(alias="threadIds")]
-
-
-class MigrationDetails(BaseModel):
-    model_config = ConfigDict(
-        populate_by_name=True,
-    )
-    commands: Annotated[list[CommandMigration] | None, Field(validate_default=True)] = []
-    hooks: Annotated[list[HookMigration] | None, Field(validate_default=True)] = []
-    mcp_servers: Annotated[
-        list[McpServerMigration] | None, Field(alias="mcpServers", validate_default=True)
-    ] = []
-    memory: list[str] | None = None
-    plugins: Annotated[list[PluginsMigration] | None, Field(validate_default=True)] = []
-    sessions: Annotated[list[SessionMigration] | None, Field(validate_default=True)] = []
-    skills: Annotated[list[SkillMigration] | None, Field(validate_default=True)] = []
-    subagents: Annotated[list[SubagentMigration] | None, Field(validate_default=True)] = []
 
 
 class MisalignmentErrorDetails(BaseModel):
@@ -8966,42 +7195,6 @@ class PermissionProfileListResponse(BaseModel):
     ] = None
 
 
-class PluginSharePrincipal(BaseModel):
-    model_config = ConfigDict(
-        populate_by_name=True,
-    )
-    name: str
-    principal_id: Annotated[str, Field(alias="principalId")]
-    principal_type: Annotated[PluginSharePrincipalType, Field(alias="principalType")]
-    role: PluginSharePrincipalRole
-
-
-class PluginShareTarget(BaseModel):
-    model_config = ConfigDict(
-        populate_by_name=True,
-    )
-    principal_id: Annotated[str, Field(alias="principalId")]
-    principal_type: Annotated[PluginSharePrincipalType, Field(alias="principalType")]
-    role: PluginShareTargetRole
-
-
-class PluginShareUpdateTargetsParams(BaseModel):
-    model_config = ConfigDict(
-        populate_by_name=True,
-    )
-    discoverability: PluginShareUpdateDiscoverability
-    remote_plugin_id: Annotated[str, Field(alias="remotePluginId")]
-    share_targets: Annotated[list[PluginShareTarget], Field(alias="shareTargets")]
-
-
-class PluginShareUpdateTargetsResponse(BaseModel):
-    model_config = ConfigDict(
-        populate_by_name=True,
-    )
-    discoverability: PluginShareDiscoverability
-    principals: list[PluginSharePrincipal]
-
-
 class ProcessOutputDeltaNotification(BaseModel):
     model_config = ConfigDict(
         populate_by_name=True,
@@ -9195,50 +7388,6 @@ class ReviewStartParams(BaseModel):
     ] = None
     target: ReviewTarget
     thread_id: Annotated[str, Field(alias="threadId")]
-
-
-class HourlyScheduledTaskSchedule(BaseModel):
-    model_config = ConfigDict(
-        populate_by_name=True,
-    )
-    days: list[ScheduledTaskWeekday] | None = None
-    interval_hours: Annotated[int, Field(alias="intervalHours", ge=0)]
-    type: Annotated[Literal["hourly"], Field(title="HourlyScheduledTaskScheduleType")]
-
-
-class WeeklyScheduledTaskSchedule(BaseModel):
-    model_config = ConfigDict(
-        populate_by_name=True,
-    )
-    days: list[ScheduledTaskWeekday]
-    time: str
-    type: Annotated[Literal["weekly"], Field(title="WeeklyScheduledTaskScheduleType")]
-
-
-class ScheduledTaskSchedule(
-    RootModel[
-        HourlyScheduledTaskSchedule
-        | DailyScheduledTaskSchedule
-        | WeekdaysScheduledTaskSchedule
-        | WeeklyScheduledTaskSchedule
-    ]
-):
-    root: (
-        HourlyScheduledTaskSchedule
-        | DailyScheduledTaskSchedule
-        | WeekdaysScheduledTaskSchedule
-        | WeeklyScheduledTaskSchedule
-    )
-
-
-class ScheduledTaskSummary(BaseModel):
-    model_config = ConfigDict(
-        populate_by_name=True,
-    )
-    key: str
-    name: str
-    prompt: str
-    schedule: ScheduledTaskSchedule
 
 
 class ThreadStatusChangedServerNotification(BaseModel):
@@ -9606,24 +7755,6 @@ class AccountUpdatedServerNotification(BaseModel):
     params: AccountUpdatedNotification
 
 
-class AccountGatewayOAuthChangedServerNotification(BaseModel):
-    model_config = ConfigDict(
-        populate_by_name=True,
-    )
-    emitted_at_ms: Annotated[
-        int | None,
-        Field(
-            alias="emittedAtMs",
-            description="Unix timestamp (in milliseconds) when app-server emitted this notification.",
-        ),
-    ] = None
-    method: Annotated[
-        Literal["account/gatewayOAuth/changed"],
-        Field(title="Account/gatewayOAuth/changedNotificationMethod"),
-    ]
-    params: GatewayOAuthChangedNotification
-
-
 class TurnModerationMetadataServerNotification(BaseModel):
     model_config = ConfigDict(
         populate_by_name=True,
@@ -9705,13 +7836,6 @@ class SkillMetadata(BaseModel):
     interface: SkillInterface | None = None
     name: str
     path: LegacyAppPathString
-    plugin_id: Annotated[
-        str | None,
-        Field(
-            alias="pluginId",
-            description="Owning plugin ID, matching `PluginSummary.id`, when known.",
-        ),
-    ] = None
     scope: SkillScope
     short_description: Annotated[
         str | None,
@@ -9960,25 +8084,11 @@ class CommandExecutionThreadItem(BaseModel):
         int | None, Field(alias="exitCode", description="The command's exit code.")
     ] = None
     id: str
-    plugin_id: Annotated[
-        str | None,
-        Field(
-            alias="pluginId",
-            description="Trusted first-party plugin id when this command resolves to one plugin script.",
-        ),
-    ] = None
     process_id: Annotated[
         str | None,
         Field(
             alias="processId",
             description="Identifier for the underlying PTY process (when available).",
-        ),
-    ] = None
-    script_path: Annotated[
-        str | None,
-        Field(
-            alias="scriptPath",
-            description="Safe plugin-relative path when this command resolves to one plugin script.",
         ),
     ] = None
     source: CommandExecutionSource | None = "agent"
@@ -10286,13 +8396,6 @@ class ThreadSettings(BaseModel):
     approvals_reviewer: Annotated[ApprovalsReviewer, Field(alias="approvalsReviewer")]
     collaboration_mode: Annotated[CollaborationMode, Field(alias="collaborationMode")]
     cwd: AbsolutePathBuf
-    disabled_plugin_ids: Annotated[
-        list[str] | None,
-        Field(
-            alias="disabledPluginIds",
-            description="Saved list of disabled plugin IDs. Does not yet filter plugin capabilities.",
-        ),
-    ] = []
     effort: ReasoningEffort | None = None
     model: str
     model_provider: Annotated[str, Field(alias="modelProvider")]
@@ -10526,60 +8629,12 @@ class AccountSession(BaseModel):
     workspaces: list[AccountSessionWorkspace]
 
 
-class AppInfo(BaseModel):
-    model_config = ConfigDict(
-        populate_by_name=True,
-    )
-    app_metadata: Annotated[AppMetadata | None, Field(alias="appMetadata")] = None
-    branding: AppBranding | None = None
-    description: str | None = None
-    distribution_channel: Annotated[str | None, Field(alias="distributionChannel")] = None
-    icon_assets: Annotated[dict[str, Any] | None, Field(alias="iconAssets")] = None
-    icon_dark_assets: Annotated[dict[str, Any] | None, Field(alias="iconDarkAssets")] = None
-    id: str
-    install_url: Annotated[str | None, Field(alias="installUrl")] = None
-    is_accessible: Annotated[bool | None, Field(alias="isAccessible")] = False
-    is_enabled: Annotated[
-        bool | None,
-        Field(
-            alias="isEnabled",
-            description="Whether this app is enabled in config.toml. Example: ```toml [apps.bad_app] enabled = false ```",
-        ),
-    ] = True
-    labels: dict[str, Any] | None = None
-    logo_url: Annotated[str | None, Field(alias="logoUrl")] = None
-    logo_url_dark: Annotated[str | None, Field(alias="logoUrlDark")] = None
-    name: str
-    plugin_display_names: Annotated[list[str] | None, Field(alias="pluginDisplayNames")] = []
-
-
-class AppListUpdatedNotification(BaseModel):
-    model_config = ConfigDict(
-        populate_by_name=True,
-    )
-    data: list[AppInfo]
-
-
 class ApplicationRequirements(BaseModel):
     model_config = ConfigDict(
         populate_by_name=True,
     )
     network: ApplicationNetworkRequirements | None = None
     storage: ApplicationStorageRequirements | None = None
-
-
-class AppsListResponse(BaseModel):
-    model_config = ConfigDict(
-        populate_by_name=True,
-    )
-    data: list[AppInfo]
-    next_cursor: Annotated[
-        str | None,
-        Field(
-            alias="nextCursor",
-            description="Opaque cursor to pass to the next call to continue after the last item. If None, there are no more items to return.",
-        ),
-    ] = None
 
 
 class ThreadStartRequest(BaseModel):
@@ -10636,18 +8691,6 @@ class ThreadTurnsListRequest(BaseModel):
     params: ThreadTurnsListParams
 
 
-class PluginShareUpdateTargetsRequest(BaseModel):
-    model_config = ConfigDict(
-        populate_by_name=True,
-    )
-    id: RequestId
-    method: Annotated[
-        Literal["plugin/share/updateTargets"],
-        Field(title="Plugin/share/updateTargetsRequestMethod"),
-    ]
-    params: PluginShareUpdateTargetsParams
-
-
 class TurnSteerRequest(BaseModel):
     model_config = ConfigDict(
         populate_by_name=True,
@@ -10675,28 +8718,6 @@ class McpServerStatusListRequest(BaseModel):
         Literal["mcpServerStatus/list"], Field(title="McpServerStatus/listRequestMethod")
     ]
     params: ListMcpServerStatusParams
-
-
-class McpServerResourceReadRequest(BaseModel):
-    model_config = ConfigDict(
-        populate_by_name=True,
-    )
-    id: RequestId
-    method: Annotated[
-        Literal["mcpServer/resource/read"], Field(title="McpServer/resource/readRequestMethod")
-    ]
-    params: McpResourceReadParams
-
-
-class AccountLoginStartRequest(BaseModel):
-    model_config = ConfigDict(
-        populate_by_name=True,
-    )
-    id: RequestId
-    method: Annotated[
-        Literal["account/login/start"], Field(title="Account/login/startRequestMethod")
-    ]
-    params: LoginAccountParams
 
 
 class FeedbackSaveRequest(BaseModel):
@@ -10828,61 +8849,6 @@ class ErrorNotification(BaseModel):
     thread_id: Annotated[str, Field(alias="threadId")]
     turn_id: Annotated[str, Field(alias="turnId")]
     will_retry: Annotated[bool, Field(alias="willRetry")]
-
-
-class ExternalAgentConfigImportCompletedNotification(BaseModel):
-    model_config = ConfigDict(
-        populate_by_name=True,
-    )
-    import_id: Annotated[str, Field(alias="importId")]
-    item_type_results: Annotated[
-        list[ExternalAgentConfigImportTypeResult], Field(alias="itemTypeResults")
-    ]
-
-
-class ExternalAgentConfigImportHistory(BaseModel):
-    model_config = ConfigDict(
-        populate_by_name=True,
-    )
-    completed_at_ms: Annotated[int, Field(alias="completedAtMs")]
-    failures: list[ExternalAgentConfigImportItemTypeFailure]
-    import_id: Annotated[str, Field(alias="importId")]
-    provider_id: Annotated[str | None, Field(alias="providerId")] = None
-    successes: list[ExternalAgentConfigImportItemTypeSuccess]
-
-
-class ExternalAgentConfigImportHistoryRecordTypeResultParams(BaseModel):
-    model_config = ConfigDict(
-        populate_by_name=True,
-    )
-    failures: list[ExternalAgentConfigImportItemTypeFailure]
-    item_type: Annotated[ExternalAgentConfigMigrationItemType, Field(alias="itemType")]
-    successes: list[ExternalAgentConfigImportHistoryRecordSuccessParams]
-
-
-class ExternalAgentConfigImportProgressNotification(BaseModel):
-    model_config = ConfigDict(
-        populate_by_name=True,
-    )
-    import_id: Annotated[str, Field(alias="importId")]
-    item_type_results: Annotated[
-        list[ExternalAgentConfigImportTypeResult], Field(alias="itemTypeResults")
-    ]
-
-
-class ExternalAgentConfigMigrationItem(BaseModel):
-    model_config = ConfigDict(
-        populate_by_name=True,
-    )
-    cwd: Annotated[
-        str | None,
-        Field(
-            description="Null or empty means home-scoped migration; non-empty means repo-scoped migration."
-        ),
-    ] = None
-    description: str
-    details: MigrationDetails | None = None
-    item_type: Annotated[ExternalAgentConfigMigrationItemType, Field(alias="itemType")]
 
 
 class FileChangePatchUpdatedNotification(BaseModel):
@@ -11038,108 +9004,6 @@ class ModelsRequirements(BaseModel):
     new_thread: Annotated[NewThreadModelDefaults | None, Field(alias="newThread")] = None
 
 
-class PluginShareContext(BaseModel):
-    model_config = ConfigDict(
-        populate_by_name=True,
-    )
-    can_publish_to_workspace: Annotated[bool | None, Field(alias="canPublishToWorkspace")] = None
-    creator_account_user_id: Annotated[str | None, Field(alias="creatorAccountUserId")] = None
-    creator_name: Annotated[str | None, Field(alias="creatorName")] = None
-    discoverability: PluginShareDiscoverability | None = None
-    remote_plugin_id: Annotated[str, Field(alias="remotePluginId")]
-    remote_version: Annotated[
-        str | None,
-        Field(
-            alias="remoteVersion",
-            description="Version of the remote shared plugin release when available.",
-        ),
-    ] = None
-    share_principals: Annotated[
-        list[PluginSharePrincipal] | None, Field(alias="sharePrincipals")
-    ] = None
-    share_url: Annotated[str | None, Field(alias="shareUrl")] = None
-
-
-class PluginShareSaveParams(BaseModel):
-    model_config = ConfigDict(
-        populate_by_name=True,
-    )
-    discoverability: PluginShareDiscoverability | None = None
-    plugin_path: Annotated[AbsolutePathBuf, Field(alias="pluginPath")]
-    remote_plugin_id: Annotated[str | None, Field(alias="remotePluginId")] = None
-    share_targets: Annotated[list[PluginShareTarget] | None, Field(alias="shareTargets")] = None
-
-
-class PluginSummary(BaseModel):
-    model_config = ConfigDict(
-        populate_by_name=True,
-    )
-    auth_policy: Annotated[PluginAuthPolicy, Field(alias="authPolicy")]
-    availability: Annotated[
-        PluginAvailability | None,
-        Field(description="Availability state for installing and using the plugin."),
-    ] = "AVAILABLE"
-    disabled_reason: Annotated[
-        PluginDisabledReason | None,
-        Field(
-            alias="disabledReason",
-            description="Why the remote plugin is unavailable, when provided by plugin-service.",
-        ),
-    ] = None
-    eligible_plan_types: Annotated[
-        list[str] | None,
-        Field(
-            alias="eligiblePlanTypes",
-            description="Raw plugin-service plan identifiers eligible to install the plugin.",
-        ),
-    ] = None
-    enabled: bool
-    id: str
-    install_policy: Annotated[PluginInstallPolicy, Field(alias="installPolicy")]
-    install_policy_source: Annotated[
-        PluginInstallPolicySource | None, Field(alias="installPolicySource")
-    ] = None
-    installed: bool
-    installed_at: Annotated[
-        int | None,
-        Field(
-            alias="installedAt",
-            description="Unix timestamp in seconds when the remote plugin was installed, when available.",
-        ),
-    ] = None
-    interface: PluginInterface | None = None
-    keywords: list[str] | None = []
-    local_version: Annotated[
-        str | None,
-        Field(
-            alias="localVersion",
-            description="Version of the locally materialized plugin package when available.",
-        ),
-    ] = None
-    must_show_installation_interstitial: Annotated[
-        bool | None, Field(alias="mustShowInstallationInterstitial")
-    ] = None
-    name: str
-    remote_plugin_id: Annotated[
-        str | None,
-        Field(
-            alias="remotePluginId", description="Backend remote plugin identifier when available."
-        ),
-    ] = None
-    share_context: Annotated[
-        PluginShareContext | None,
-        Field(
-            alias="shareContext",
-            description="Remote sharing context associated with this plugin when available.",
-        ),
-    ] = None
-    source: PluginSource
-    version: Annotated[
-        str | None,
-        Field(description="Version advertised by the remote marketplace backend when available."),
-    ] = None
-
-
 class FunctionCallOutputResponseItem(BaseModel):
     model_config = ConfigDict(
         populate_by_name=True,
@@ -11183,7 +9047,6 @@ class ResponseItem(
         | CustomToolCallOutputResponseItem
         | ToolSearchOutputResponseItem
         | WebSearchCallResponseItem
-        | ImageGenerationCallResponseItem
         | CompactionResponseItem
         | ConfigurationUpdateResponseItem
         | CompactionTriggerResponseItem
@@ -11204,7 +9067,6 @@ class ResponseItem(
         | CustomToolCallOutputResponseItem
         | ToolSearchOutputResponseItem
         | WebSearchCallResponseItem
-        | ImageGenerationCallResponseItem
         | CompactionResponseItem
         | ConfigurationUpdateResponseItem
         | CompactionTriggerResponseItem
@@ -11366,59 +9228,6 @@ class AccountRateLimitsUpdatedServerNotification(BaseModel):
     params: AccountRateLimitsUpdatedNotification
 
 
-class AppListUpdatedServerNotification(BaseModel):
-    model_config = ConfigDict(
-        populate_by_name=True,
-    )
-    emitted_at_ms: Annotated[
-        int | None,
-        Field(
-            alias="emittedAtMs",
-            description="Unix timestamp (in milliseconds) when app-server emitted this notification.",
-        ),
-    ] = None
-    method: Annotated[
-        Literal["app/list/updated"], Field(title="App/list/updatedNotificationMethod")
-    ]
-    params: AppListUpdatedNotification
-
-
-class ExternalAgentConfigImportProgressServerNotification(BaseModel):
-    model_config = ConfigDict(
-        populate_by_name=True,
-    )
-    emitted_at_ms: Annotated[
-        int | None,
-        Field(
-            alias="emittedAtMs",
-            description="Unix timestamp (in milliseconds) when app-server emitted this notification.",
-        ),
-    ] = None
-    method: Annotated[
-        Literal["externalAgentConfig/import/progress"],
-        Field(title="ExternalAgentConfig/import/progressNotificationMethod"),
-    ]
-    params: ExternalAgentConfigImportProgressNotification
-
-
-class ExternalAgentConfigImportCompletedServerNotification(BaseModel):
-    model_config = ConfigDict(
-        populate_by_name=True,
-    )
-    emitted_at_ms: Annotated[
-        int | None,
-        Field(
-            alias="emittedAtMs",
-            description="Unix timestamp (in milliseconds) when app-server emitted this notification.",
-        ),
-    ] = None
-    method: Annotated[
-        Literal["externalAgentConfig/import/completed"],
-        Field(title="ExternalAgentConfig/import/completedNotificationMethod"),
-    ]
-    params: ExternalAgentConfigImportCompletedNotification
-
-
 class SubAgentSessionSource(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
@@ -11473,8 +9282,6 @@ class ThreadItem(
         | WebSearchThreadItem
         | ImageViewThreadItem
         | SleepThreadItem
-        | FileIdThreadItem
-        | ResultThreadItem
         | EnteredReviewModeThreadItem
         | ExitedReviewModeThreadItem
         | ContextCompactionThreadItem
@@ -11496,8 +9303,6 @@ class ThreadItem(
         | WebSearchThreadItem
         | ImageViewThreadItem
         | SleepThreadItem
-        | FileIdThreadItem
-        | ResultThreadItem
         | EnteredReviewModeThreadItem
         | ExitedReviewModeThreadItem
         | ContextCompactionThreadItem,
@@ -11693,15 +9498,6 @@ class AdditionalFileSystemPermissions(BaseModel):
     ] = None
 
 
-class PluginShareSaveRequest(BaseModel):
-    model_config = ConfigDict(
-        populate_by_name=True,
-    )
-    id: RequestId
-    method: Annotated[Literal["plugin/share/save"], Field(title="Plugin/share/saveRequestMethod")]
-    params: PluginShareSaveParams
-
-
 class ConfigBatchWriteRequest(BaseModel):
     model_config = ConfigDict(
         populate_by_name=True,
@@ -11724,7 +9520,6 @@ class ConfigRequirements(BaseModel):
     ] = None
     allow_login_shell: Annotated[bool | None, Field(alias="allowLoginShell")] = None
     allow_managed_hooks_only: Annotated[bool | None, Field(alias="allowManagedHooksOnly")] = None
-    allow_remote_control: Annotated[bool | None, Field(alias="allowRemoteControl")] = None
     allowed_approval_policies: Annotated[
         list[AskForApproval] | None, Field(alias="allowedApprovalPolicies")
     ] = None
@@ -11803,70 +9598,6 @@ class ConfigRequirementsReadResponse(BaseModel):
     ] = None
 
 
-class ExternalAgentConfigDetectResponse(BaseModel):
-    model_config = ConfigDict(
-        populate_by_name=True,
-    )
-    connectors: Annotated[
-        list[ExternalAgentDetectedConnectorCandidate] | None, Field(validate_default=True)
-    ] = []
-    items: list[ExternalAgentConfigMigrationItem]
-
-
-class ExternalAgentConfigImportHistoriesReadResponse(BaseModel):
-    model_config = ConfigDict(
-        populate_by_name=True,
-    )
-    connectors: list[ExternalAgentImportedConnectorCandidate]
-    data: list[ExternalAgentConfigImportHistory]
-
-
-class ExternalAgentConfigImportHistoryRecordParams(BaseModel):
-    model_config = ConfigDict(
-        populate_by_name=True,
-    )
-    item_type_results: Annotated[
-        list[ExternalAgentConfigImportHistoryRecordTypeResultParams],
-        Field(
-            alias="itemTypeResults", description="Completed results grouped by imported item type."
-        ),
-    ]
-    provider_id: Annotated[
-        str,
-        Field(
-            alias="providerId",
-            description="Opaque provider identifier for the externally completed import.",
-        ),
-    ]
-
-
-class ExternalAgentConfigImportParams(BaseModel):
-    model_config = ConfigDict(
-        populate_by_name=True,
-    )
-    migration_items: Annotated[
-        list[ExternalAgentConfigMigrationItem], Field(alias="migrationItems")
-    ]
-    migration_source: Annotated[
-        str | None,
-        Field(
-            alias="migrationSource",
-            description="Migration-source selector used to produce the migration items. Pass the same value to detection and import; missing or unrecognized values use the default source.",
-        ),
-    ] = None
-    provider_id: Annotated[
-        str | None,
-        Field(
-            alias="providerId",
-            description="Opaque provider identifier supplied by the caller for analytics attribution and import history display. This does not select the migration source.",
-        ),
-    ] = None
-    source: Annotated[
-        str | None,
-        Field(description="Optional identifier for the product that initiated the import."),
-    ] = None
-
-
 class ItemCompletedNotification(BaseModel):
     model_config = ConfigDict(
         populate_by_name=True,
@@ -11897,78 +9628,6 @@ class ItemStartedNotification(BaseModel):
     ]
     thread_id: Annotated[str, Field(alias="threadId")]
     turn_id: Annotated[str, Field(alias="turnId")]
-
-
-class PluginDetail(BaseModel):
-    model_config = ConfigDict(
-        populate_by_name=True,
-    )
-    app_templates: Annotated[list[AppTemplateSummary], Field(alias="appTemplates")]
-    apps: list[AppSummary]
-    description: str | None = None
-    hooks: list[PluginHookSummary]
-    marketplace_name: Annotated[str, Field(alias="marketplaceName")]
-    marketplace_path: Annotated[AbsolutePathBuf | None, Field(alias="marketplacePath")] = None
-    mcp_servers: Annotated[list[str], Field(alias="mcpServers")]
-    onboarding_skill: Annotated[
-        SkillSummary | None,
-        Field(
-            alias="onboardingSkill",
-            description="The declared onboarding skill, when the plugin and visible skill are enabled.",
-        ),
-    ] = None
-    scheduled_tasks: Annotated[list[ScheduledTaskSummary] | None, Field(alias="scheduledTasks")] = (
-        None
-    )
-    share_url: Annotated[str | None, Field(alias="shareUrl")] = None
-    skills: list[SkillSummary]
-    summary: PluginSummary
-
-
-class PluginMarketplaceEntry(BaseModel):
-    model_config = ConfigDict(
-        populate_by_name=True,
-    )
-    interface: MarketplaceInterface | None = None
-    name: str
-    path: Annotated[
-        AbsolutePathBuf | None,
-        Field(
-            description="Local marketplace file path when the marketplace is backed by a local file. Remote-only catalog marketplaces do not have a local path."
-        ),
-    ] = None
-    plugins: list[PluginSummary]
-
-
-class PluginReadResponse(BaseModel):
-    model_config = ConfigDict(
-        populate_by_name=True,
-    )
-    plugin: PluginDetail
-
-
-class PluginSearchResult(BaseModel):
-    model_config = ConfigDict(
-        populate_by_name=True,
-    )
-    marketplace_name: Annotated[str, Field(alias="marketplaceName")]
-    marketplace_path: Annotated[AbsolutePathBuf | None, Field(alias="marketplacePath")] = None
-    plugin: PluginSummary
-
-
-class PluginShareListItem(BaseModel):
-    model_config = ConfigDict(
-        populate_by_name=True,
-    )
-    local_plugin_path: Annotated[AbsolutePathBuf | None, Field(alias="localPluginPath")] = None
-    plugin: PluginSummary
-
-
-class PluginShareListResponse(BaseModel):
-    model_config = ConfigDict(
-        populate_by_name=True,
-    )
-    data: list[PluginShareListItem]
 
 
 class RawResponseItemCompletedNotification(BaseModel):
@@ -12230,13 +9889,6 @@ class ThreadForkResponse(BaseModel):
         ),
     ]
     cwd: AbsolutePathBuf
-    disabled_plugin_ids: Annotated[
-        list[str] | None,
-        Field(
-            alias="disabledPluginIds",
-            description="Saved list of disabled plugin IDs. Does not yet filter plugin capabilities.",
-        ),
-    ] = []
     instruction_sources: Annotated[
         list[LegacyAppPathString] | None,
         Field(
@@ -12313,13 +9965,6 @@ class ThreadResumeResponse(BaseModel):
         ),
     ] = None
     cwd: AbsolutePathBuf
-    disabled_plugin_ids: Annotated[
-        list[str] | None,
-        Field(
-            alias="disabledPluginIds",
-            description="Saved list of disabled plugin IDs. Does not yet filter plugin capabilities.",
-        ),
-    ] = []
     instruction_sources: Annotated[
         list[LegacyAppPathString] | None,
         Field(
@@ -12402,13 +10047,6 @@ class ThreadStartResponse(BaseModel):
         ),
     ]
     cwd: AbsolutePathBuf
-    disabled_plugin_ids: Annotated[
-        list[str] | None,
-        Field(
-            alias="disabledPluginIds",
-            description="Saved list of disabled plugin IDs. Does not yet filter plugin capabilities.",
-        ),
-    ] = []
     instruction_sources: Annotated[
         list[LegacyAppPathString] | None,
         Field(
@@ -12487,13 +10125,6 @@ class TurnStartParams(BaseModel):
     cwd: Annotated[
         str | None,
         Field(description="Override the working directory for this turn and subsequent turns."),
-    ] = None
-    disabled_plugin_ids: Annotated[
-        list[str] | None,
-        Field(
-            alias="disabledPluginIds",
-            description="Replace this thread's disabled plugin IDs. Omitted/null preserves the list; [] clears it.",
-        ),
     ] = None
     effort: Annotated[
         ReasoningEffort | None,
@@ -12575,30 +10206,6 @@ class TurnStartRequest(BaseModel):
     params: TurnStartParams
 
 
-class ExternalAgentConfigImportRequest(BaseModel):
-    model_config = ConfigDict(
-        populate_by_name=True,
-    )
-    id: RequestId
-    method: Annotated[
-        Literal["externalAgentConfig/import"],
-        Field(title="ExternalAgentConfig/importRequestMethod"),
-    ]
-    params: ExternalAgentConfigImportParams
-
-
-class ExternalAgentConfigImportRecordHistoryRequest(BaseModel):
-    model_config = ConfigDict(
-        populate_by_name=True,
-    )
-    id: RequestId
-    method: Annotated[
-        Literal["externalAgentConfig/import/recordHistory"],
-        Field(title="ExternalAgentConfig/import/recordHistoryRequestMethod"),
-    ]
-    params: ExternalAgentConfigImportHistoryRecordParams
-
-
 class ClientRequest(
     RootModel[
         InitializeRequest
@@ -12636,22 +10243,6 @@ class ClientRequest(
         | SkillsListRequest
         | SkillsExtraRootsSetRequest
         | HooksListRequest
-        | MarketplaceAddRequest
-        | MarketplaceRemoveRequest
-        | MarketplaceUpgradeRequest
-        | PluginListRequest
-        | PluginInstalledRequest
-        | PluginReconcileRequest
-        | PluginReadRequest
-        | PluginSkillReadRequest
-        | PluginShareSaveRequest
-        | PluginShareUpdateTargetsRequest
-        | PluginShareListRequest
-        | PluginShareCheckoutRequest
-        | PluginShareDeleteRequest
-        | AppReadRequest
-        | AppListRequest
-        | AppInstalledRequest
         | FsReadFileRequest
         | FsWriteFileRequest
         | FsCreateDirectoryRequest
@@ -12662,16 +10253,11 @@ class ClientRequest(
         | FsWatchRequest
         | FsUnwatchRequest
         | SkillsConfigWriteRequest
-        | PluginInstallRequest
-        | PluginUninstallRequest
         | TurnStartRequest
         | TurnSteerRequest
         | TurnInterruptRequest
         | ReviewStartRequest
         | ModelListRequest
-        | AccountGatewayOAuthReadRequest
-        | AccountGatewayOAuthLoginRequest
-        | AccountGatewayOAuthCancelRequest
         | ModelProviderListRequest
         | ModelProviderCapabilitiesReadRequest
         | ExperimentalFeatureListRequest
@@ -12683,7 +10269,6 @@ class ClientRequest(
         | McpServerResourceReadRequest
         | McpServerToolCallRequest
         | AccountLoginStartRequest
-        | AccountLoginCancelRequest
         | AccountLogoutRequest
         | AccountRateLimitsReadRequest
         | AccountRateLimitResetCreditConsumeRequest
@@ -12697,10 +10282,6 @@ class ClientRequest(
         | CommandExecTerminateRequest
         | CommandExecResizeRequest
         | ConfigReadRequest
-        | ExternalAgentConfigDetectRequest
-        | ExternalAgentConfigImportRequest
-        | ExternalAgentConfigImportRecordHistoryRequest
-        | ExternalAgentConfigImportReadHistoriesRequest
         | ConfigValueWriteRequest
         | ConfigBatchWriteRequest
         | ConfigRequirementsReadRequest
@@ -12744,22 +10325,6 @@ class ClientRequest(
         | SkillsListRequest
         | SkillsExtraRootsSetRequest
         | HooksListRequest
-        | MarketplaceAddRequest
-        | MarketplaceRemoveRequest
-        | MarketplaceUpgradeRequest
-        | PluginListRequest
-        | PluginInstalledRequest
-        | PluginReconcileRequest
-        | PluginReadRequest
-        | PluginSkillReadRequest
-        | PluginShareSaveRequest
-        | PluginShareUpdateTargetsRequest
-        | PluginShareListRequest
-        | PluginShareCheckoutRequest
-        | PluginShareDeleteRequest
-        | AppReadRequest
-        | AppListRequest
-        | AppInstalledRequest
         | FsReadFileRequest
         | FsWriteFileRequest
         | FsCreateDirectoryRequest
@@ -12770,16 +10335,11 @@ class ClientRequest(
         | FsWatchRequest
         | FsUnwatchRequest
         | SkillsConfigWriteRequest
-        | PluginInstallRequest
-        | PluginUninstallRequest
         | TurnStartRequest
         | TurnSteerRequest
         | TurnInterruptRequest
         | ReviewStartRequest
         | ModelListRequest
-        | AccountGatewayOAuthReadRequest
-        | AccountGatewayOAuthLoginRequest
-        | AccountGatewayOAuthCancelRequest
         | ModelProviderListRequest
         | ModelProviderCapabilitiesReadRequest
         | ExperimentalFeatureListRequest
@@ -12791,7 +10351,6 @@ class ClientRequest(
         | McpServerResourceReadRequest
         | McpServerToolCallRequest
         | AccountLoginStartRequest
-        | AccountLoginCancelRequest
         | AccountLogoutRequest
         | AccountRateLimitsReadRequest
         | AccountRateLimitResetCreditConsumeRequest
@@ -12805,10 +10364,6 @@ class ClientRequest(
         | CommandExecTerminateRequest
         | CommandExecResizeRequest
         | ConfigReadRequest
-        | ExternalAgentConfigDetectRequest
-        | ExternalAgentConfigImportRequest
-        | ExternalAgentConfigImportRecordHistoryRequest
-        | ExternalAgentConfigImportReadHistoriesRequest
         | ConfigValueWriteRequest
         | ConfigBatchWriteRequest
         | ConfigRequirementsReadRequest
@@ -12914,29 +10469,6 @@ class ItemGuardianApprovalReviewStartedNotification(BaseModel):
     turn_id: Annotated[str, Field(alias="turnId")]
 
 
-class PluginInstalledResponse(BaseModel):
-    model_config = ConfigDict(
-        populate_by_name=True,
-    )
-    marketplace_load_errors: Annotated[
-        list[MarketplaceLoadErrorInfo] | None,
-        Field(alias="marketplaceLoadErrors", validate_default=True),
-    ] = []
-    marketplaces: list[PluginMarketplaceEntry]
-
-
-class PluginListResponse(BaseModel):
-    model_config = ConfigDict(
-        populate_by_name=True,
-    )
-    featured_plugin_ids: Annotated[list[str] | None, Field(alias="featuredPluginIds")] = []
-    marketplace_load_errors: Annotated[
-        list[MarketplaceLoadErrorInfo] | None,
-        Field(alias="marketplaceLoadErrors", validate_default=True),
-    ] = []
-    marketplaces: list[PluginMarketplaceEntry]
-
-
 class ThreadStartedServerNotification(BaseModel):
     model_config = ConfigDict(
         populate_by_name=True,
@@ -13039,12 +10571,7 @@ class ServerNotification(
         | McpServerStartupStatusUpdatedServerNotification
         | McpServerEventStreamNotificationServerNotification
         | AccountUpdatedServerNotification
-        | AccountGatewayOAuthChangedServerNotification
         | AccountRateLimitsUpdatedServerNotification
-        | AppListUpdatedServerNotification
-        | RemoteControlStatusChangedServerNotification
-        | ExternalAgentConfigImportProgressServerNotification
-        | ExternalAgentConfigImportCompletedServerNotification
         | FsChangedServerNotification
         | ItemReasoningSummaryTextDeltaServerNotification
         | ItemReasoningSummaryPartAddedServerNotification
@@ -13115,12 +10642,7 @@ class ServerNotification(
         | McpServerStartupStatusUpdatedServerNotification
         | McpServerEventStreamNotificationServerNotification
         | AccountUpdatedServerNotification
-        | AccountGatewayOAuthChangedServerNotification
         | AccountRateLimitsUpdatedServerNotification
-        | AppListUpdatedServerNotification
-        | RemoteControlStatusChangedServerNotification
-        | ExternalAgentConfigImportProgressServerNotification
-        | ExternalAgentConfigImportCompletedServerNotification
         | FsChangedServerNotification
         | ItemReasoningSummaryTextDeltaServerNotification
         | ItemReasoningSummaryPartAddedServerNotification

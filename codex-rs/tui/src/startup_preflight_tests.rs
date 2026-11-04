@@ -1,6 +1,8 @@
 use codex_utils_absolute_path::AbsolutePathBuf;
 use tempfile::TempDir;
 
+use codex_protocol::shell_environment::OPENAI_FEDERATION_RULE_ID_ENV_VAR;
+
 use super::has_only_search_config_override;
 use super::should_delay_startup_composer_for_first_login;
 
@@ -21,7 +23,7 @@ fn startup_delays_composer_for_homes_without_authentication_state() -> std::io::
         &codex_home,
         Ok(system_config_path.clone()),
         || Ok(false),
-        |name| (name == codex_login::CODEX_ACCESS_TOKEN_ENV_VAR).then(|| "  ".into()),
+        |name| (name == OPENAI_FEDERATION_RULE_ID_ENV_VAR).then(|| "  ".into()),
     ));
 
     std::fs::create_dir_all(codex_home.join("tmp").join("arg0"))?;
@@ -54,7 +56,7 @@ fn startup_delays_composer_for_homes_without_authentication_state() -> std::io::
         &codex_home,
         Ok(system_config_path.clone()),
         || Ok(false),
-        |name| { (name == codex_login::CODEX_ACCESS_TOKEN_ENV_VAR).then(|| "access-token".into()) },
+        |name| { (name == OPENAI_FEDERATION_RULE_ID_ENV_VAR).then(|| "access-token".into()) },
     ));
     for disabled_credential in [
         codex_login::OPENAI_API_KEY_ENV_VAR,
@@ -94,7 +96,7 @@ fn startup_delays_composer_for_homes_without_authentication_state() -> std::io::
         || panic!("process credentials should not probe managed configuration"),
         |name| match name {
             "CODEX_HOME" => Some("/custom/home".into()),
-            codex_login::CODEX_ACCESS_TOKEN_ENV_VAR => Some("access-token".into()),
+            OPENAI_FEDERATION_RULE_ID_ENV_VAR => Some("access-token".into()),
             _ => None,
         },
     ));

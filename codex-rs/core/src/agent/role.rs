@@ -93,8 +93,6 @@ async fn apply_role_to_config_inner(
             if !enabled
                 && let Some(
                     feature @ (Feature::ShellTool
-                    | Feature::Apps
-                    | Feature::Plugins
                     | Feature::MemoryTool
                     | Feature::RequestPermissionsTool),
                 ) = feature_for_key(&key)

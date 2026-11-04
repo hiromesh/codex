@@ -16,11 +16,10 @@ use codex_config::FeatureRequirementsToml;
 use codex_config::ManagedAuthPolicy;
 use codex_config::McpEnterpriseManagedAuthConfig;
 use codex_config::McpServerRequirement;
-use codex_config::PluginRequirementsToml;
+use codex_config::Sourced;
 use codex_config::ProfileV2Name;
 use codex_config::ResidencyRequirement;
 use codex_config::SandboxModeRequirement;
-use codex_config::Sourced;
 use codex_config::ThreadConfigLoader;
 use codex_config::apply_default_gcp_auth;
 use codex_config::config_toml::CircuitBreakAction;
@@ -53,8 +52,6 @@ use codex_config::types::TuiKeymap;
 use codex_config::types::TuiNotificationSettings;
 use codex_config::types::TuiPetAnchor;
 use codex_config::types::UriBasedFileOpener;
-use codex_core_plugins::PluginLoadOutcome;
-use codex_core_plugins::PluginsConfigInput;
 use codex_exec_server::ExecutorFileSystem;
 use codex_exec_server::LOCAL_FS;
 use codex_exec_server::ReadFileOptions;
@@ -78,7 +75,6 @@ use codex_login::AuthManagerConfig;
 use codex_login::AuthRouteConfig;
 use codex_mcp::DEFAULT_OPTIONAL_MCP_STARTUP_GRACE;
 use codex_mcp::McpConfig;
-use codex_mcp::McpPluginAttribution;
 use codex_mcp::McpProtocolMode;
 use codex_mcp::McpServerRegistration;
 use codex_mcp::ResolvedMcpCatalog;
@@ -612,9 +608,6 @@ pub struct Config {
     /// requirements).
     pub config_layer_stack: ConfigLayerStack,
 
-    /// Plugin settings resolved with this snapshot, before capability admission.
-    pub plugins: codex_config::types::PluginsConfigToml,
-
     /// Warnings collected during config load that should be shown on startup.
     pub startup_warnings: Vec<String>,
 
@@ -728,9 +721,6 @@ pub struct Config {
 
     /// Whether to inject the `<permissions instructions>` developer block.
     pub include_permissions_instructions: bool,
-
-    /// Whether to inject the `<apps_instructions>` developer block.
-    pub include_apps_instructions: bool,
 
     /// Whether to inject the `<collaboration_mode>` developer block.
     pub include_collaboration_mode_instructions: bool,
@@ -1056,9 +1046,6 @@ pub struct Config {
 
     /// Whether Codex-owned clients should respect host system proxy settings.
     pub respect_system_proxy: bool,
-
-    /// Optional product SKU forwarded to the host-owned apps MCP server.
-    pub apps_mcp_product_sku: Option<String>,
 
     /// Bounded, product-owned metadata attached to every Responses API request.
     pub responses_api_metadata: BTreeMap<String, String>,
@@ -1727,104 +1714,8 @@ impl Config {
         }
     }
 
-    /// Build the plugin-manager input from the effective config.
-    pub fn plugins_config_input(&self) -> PluginsConfigInput {
-        PluginsConfigInput::new(
-            self.config_layer_stack.clone(),
-            self.plugins.clone(),
-            self.model_provider_id.clone(),
-            self.features.enabled(Feature::Plugins),
-            self.features.enabled(Feature::RemotePlugin),
-            self.chatgpt_base_url.clone(),
-            self.http_client_factory(),
-            self.apps_mcp_product_sku.clone(),
-        )
-    }
-
-    /// Applies managed MCP requirements to servers supplied by one plugin.
-    pub fn apply_plugin_mcp_server_requirements(
-        &self,
-        plugin_id: &str,
-        mcp_servers: &mut HashMap<String, McpServerConfig>,
-    ) {
-        filter_plugin_mcp_servers_by_requirements(
-            plugin_id,
-            mcp_servers,
-            self.config_layer_stack.requirements().plugins.as_ref(),
-        );
-        let empty_mcp_allowlist = self
-            .config_layer_stack
-            .requirements()
-            .mcp_servers
-            .as_ref()
-            .filter(|requirements| requirements.value.is_empty());
-        filter_mcp_servers_by_requirements(mcp_servers, empty_mcp_allowlist);
-    }
-
-    pub async fn to_mcp_config(
-        &self,
-        plugins_manager: &codex_core_plugins::PluginsManager,
-    ) -> McpConfig {
-        self.to_mcp_config_with_plugin_registrations(
-            plugins_manager,
-            std::iter::empty::<McpServerRegistration>(),
-        )
-        .await
-    }
-
-    pub(crate) async fn to_mcp_config_with_plugin_registrations(
-        &self,
-        plugins_manager: &codex_core_plugins::PluginsManager,
-        additional_plugin_registrations: impl IntoIterator<Item = McpServerRegistration>,
-    ) -> McpConfig {
-        let plugins_input = self.plugins_config_input();
-        let loaded_plugins = plugins_manager.plugins_for_config(&plugins_input).await;
-        self.to_mcp_config_with_loaded_plugins(&loaded_plugins, additional_plugin_registrations)
-    }
-
-    pub(crate) fn to_mcp_config_with_loaded_plugins(
-        &self,
-        loaded_plugins: &PluginLoadOutcome,
-        additional_plugin_registrations: impl IntoIterator<Item = McpServerRegistration>,
-    ) -> McpConfig {
+    pub fn to_mcp_config(&self) -> McpConfig {
         let mut catalog = ResolvedMcpCatalog::builder();
-        if self.features.enabled(Feature::UseXaa)
-            && let Some(auth) = &self.mcp_enterprise_managed_auth
-        {
-            catalog.enable_ema(auth.idp.clone());
-        }
-        for (plugin_order, plugin) in loaded_plugins
-            .plugins()
-            .iter()
-            .filter(|plugin| plugin.is_active())
-            .enumerate()
-        {
-            let mut plugin_mcp_servers = plugin.mcp_servers.clone();
-            self.apply_plugin_mcp_server_requirements(&plugin.config_name, &mut plugin_mcp_servers);
-            let attribution = if plugin.is_agent_plugin() {
-                McpPluginAttribution::agent_plugin(
-                    plugin.config_name.clone(),
-                    plugin.display_name().to_string(),
-                )
-            } else {
-                McpPluginAttribution::new(
-                    plugin.config_name.clone(),
-                    plugin.display_name().to_string(),
-                )
-            }
-            .with_host_root(PathUri::from_abs_path(&plugin.root));
-            for (name, plugin_server) in plugin_mcp_servers {
-                catalog.register(McpServerRegistration::from_plugin(
-                    name,
-                    attribution.clone(),
-                    plugin_order,
-                    plugin_server,
-                ));
-            }
-        }
-        for registration in additional_plugin_registrations {
-            catalog.register(registration);
-        }
         for (name, server) in self.mcp_servers.get() {
             catalog.register(McpServerRegistration::from_config(
                 name.clone(),
@@ -1834,14 +1725,8 @@ impl Config {
 
         McpConfig {
             chatgpt_base_url: self.chatgpt_base_url.clone(),
-            apps_mcp_product_sku: self.apps_mcp_product_sku.clone(),
             requires_read_only_mcp_tools: false,
             codex_home: self.codex_home.to_path_buf(),
-            mcp_enterprise_managed_auth: self.mcp_enterprise_managed_auth.clone(),
-            ema_state: Default::default(),
-            mcp_ema_cancellation: self.config_layer_stack.mcp_ema_cancellation().clone(),
-            xaa_enabled: self.features.enabled(Feature::UseXaa)
-                && self.mcp_enterprise_managed_auth.is_some(),
             mcp_oauth_credentials_store_mode: self.mcp_oauth_credentials_store_mode,
             mcp_tool_list_changed: self.features.enabled(Feature::McpToolListChanged),
             oauth_refresh_mode: if self.features.enabled(Feature::McpOAuthRefreshCoordination) {
@@ -1858,18 +1743,11 @@ impl Config {
                 .enabled(Feature::SkillMcpDependencyInstall),
             approval_policy: self.permissions.approval_policy.clone(),
             permission_profile: self.permissions.permission_profile().clone(),
-            config_layer_stack: self.config_layer_stack.clone(),
-            plugins: self.plugins.clone(),
-            approvals_reviewer: self.approvals_reviewer,
             environment_cwds: HashMap::new(),
             server_permission_profiles: HashMap::new(),
             codex_self_exe: self.codex_self_exe.clone(),
             codex_linux_sandbox_exe: self.codex_linux_sandbox_exe.clone(),
             use_legacy_landlock: self.features.use_legacy_landlock(),
-            apps_enabled: self.features.enabled(Feature::Apps),
-            apps_early_resource_discovery: self
-                .features
-                .enabled(Feature::AppsEarlyResourceDiscovery),
             prefix_mcp_tool_names: self.prefix_mcp_tool_names(),
             non_prefixed_mcp_tool_servers: if self
                 .features
@@ -1883,11 +1761,6 @@ impl Config {
             },
             protocol_mode: self.mcp_protocol_mode(),
             discover_local_stdio: self.features.enabled(Feature::McpConnectionSharing),
-            host_owned_apps_protocol_mode: if self.features.enabled(Feature::CodexAppsMcp20260728) {
-                McpProtocolMode::V20260728
-            } else {
-                McpProtocolMode::Legacy
-            },
             client_elicitation_capability: if self.features.enabled(Feature::AuthElicitation) {
                 ElicitationCapability::new()
                     .with_form(FormElicitationCapability::new())
@@ -1898,10 +1771,6 @@ impl Config {
                 ElicitationCapability::default()
             },
             mcp_server_catalog: catalog.build(),
-            connector_snapshot:
-                codex_connectors::ConnectorSnapshot::from_plugin_capability_summaries(
-                    loaded_plugins.capability_summaries(),
-                ),
         }
     }
 
@@ -2204,39 +2073,6 @@ fn filter_mcp_servers_by_requirements(
         let allowed = allowlist
             .value
             .get(name)
-            .is_some_and(|requirement| server.matches_requirement(requirement));
-        if allowed {
-            server.disabled_reason = None;
-        } else {
-            server.disable_by_requirements(source.clone());
-        }
-    }
-}
-
-fn filter_plugin_mcp_servers_by_requirements(
-    plugin_config_name: &str,
-    mcp_servers: &mut HashMap<String, McpServerConfig>,
-    plugin_requirements: Option<&Sourced<BTreeMap<String, PluginRequirementsToml>>>,
-) {
-    let Some(requirements) = plugin_requirements else {
-        return;
-    };
-    if !requirements
-        .value
-        .values()
-        .any(|plugin| plugin.mcp_servers.is_some())
-    {
-        return;
-    }
-    let source = requirements.source.clone();
-    let plugin_mcp_requirements = requirements
-        .value
-        .get(plugin_config_name)
-        .and_then(|plugin| plugin.mcp_servers.as_ref());
-
-    for (name, server) in mcp_servers.iter_mut() {
-        let allowed = plugin_mcp_requirements
-            .and_then(|mcp_requirements| mcp_requirements.get(name))
             .is_some_and(|requirement| server.matches_requirement(requirement));
         if allowed {
             server.disabled_reason = None;
@@ -3323,13 +3159,10 @@ impl Config {
             web_search_mode: mut constrained_web_search_mode,
             allow_managed_hooks_only: _,
             allow_appshots: _,
-            allow_remote_control: _,
             computer_use: _,
             feature_requirements,
             managed_hooks: _,
             mcp_servers,
-            plugins: _,
-            marketplaces: _,
             exec_policy: _,
             enforce_residency,
             network: network_requirements,
@@ -4043,7 +3876,6 @@ impl Config {
             .map(|_| BaseInstructionsProvenance::Custom);
         let developer_instructions = developer_instructions.or(cfg.developer_instructions);
         let include_permissions_instructions = cfg.include_permissions_instructions.unwrap_or(true);
-        let include_apps_instructions = cfg.include_apps_instructions.unwrap_or(true);
         let include_collaboration_mode_instructions =
             cfg.include_collaboration_mode_instructions.unwrap_or(true);
         let include_skill_instructions = cfg
@@ -4322,7 +4154,6 @@ impl Config {
         .map_err(std::io::Error::from)?;
         let otel = otel::resolve_config(cfg.otel.unwrap_or_default(), &mut startup_warnings);
         let mut config = Self {
-            plugins: cfg.plugins,
             model,
             daybreak_enabled: cfg.daybreak.unwrap_or(false),
             service_tier,
@@ -4362,7 +4193,6 @@ impl Config {
             developer_instructions,
             compact_prompt,
             include_permissions_instructions,
-            include_apps_instructions,
             include_collaboration_mode_instructions,
             include_skill_instructions,
             skill_max_context_tokens,
@@ -4481,7 +4311,6 @@ impl Config {
                 .chatgpt_base_url
                 .unwrap_or_else(|| DEFAULT_CHATGPT_BASE_URL.to_string()),
             respect_system_proxy,
-            apps_mcp_product_sku: cfg.apps_mcp_product_sku.clone(),
             responses_api_metadata: cfg.responses_api_metadata.unwrap_or_default(),
             experimental_thread_store: thread_store_config(cfg.experimental_thread_store),
             forced_chatgpt_workspace_id,

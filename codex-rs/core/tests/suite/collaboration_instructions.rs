@@ -267,15 +267,12 @@ async fn catalog_collaboration_messages_refresh_without_mode_or_model_change(
     let mut models_mocks =
         vec![mount_models_once_with_etag(&server, catalog(ORIGINAL), ETAG_1).await];
     let test = test_codex()
-        .with_auth(CodexAuth::create_dummy_chatgpt_auth_for_testing())
+        .with_auth(CodexAuth::from_api_key("test-api-key"))
         .with_model(MODEL)
+        .with_mock_model_catalog(&server)
         .with_config(|config| {
             config.model_provider.request_max_retries = Some(0);
             config.model_provider.stream_max_retries = Some(1);
-            config
-                .features
-                .disable(Feature::Apps)
-                .expect("test config should allow feature update");
         })
         .build_with_auto_env(&server)
         .await?;

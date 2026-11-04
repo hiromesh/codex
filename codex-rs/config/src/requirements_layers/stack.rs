@@ -267,17 +267,13 @@ fn populate_merged_regular_fields_with_sources(
         allow_managed_hooks_only,
         allow_browser_and_computer_use,
         allow_appshots,
-        allow_remote_control,
         computer_use,
         browser_use,
         in_app_browser,
         feature_requirements,
         hooks: _,
         mcp_servers,
-        plugins,
-        marketplaces,
         otel: _,
-        apps,
         rules: _,
         enforce_residency,
         network,
@@ -328,16 +324,12 @@ fn populate_merged_regular_fields_with_sources(
         &["allow_browser_and_computer_use"]
     );
     set_sourced!(allow_appshots, &["allow_appshots"]);
-    set_sourced!(allow_remote_control, &["allow_remote_control"]);
     set_sourced!(auto_review, &["auto_review"]);
     set_sourced!(computer_use, &["computer_use"]);
     set_sourced!(browser_use, &["browser_use"]);
     set_sourced!(in_app_browser, &["in_app_browser"]);
     set_sourced!(feature_requirements, &["features", "feature_requirements"]);
     set_sourced!(mcp_servers, &["mcp_servers"]);
-    set_sourced!(plugins, &["plugins"]);
-    set_sourced!(marketplaces, &["marketplaces"]);
-    set_sourced!(apps, &["apps"]);
     set_sourced!(enforce_residency, &["enforce_residency"]);
     set_sourced!(network, &["network_proxy"]);
     set_sourced!(application, &["application"]);

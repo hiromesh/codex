@@ -135,7 +135,7 @@ fn select_skills_from_mentions(
         .filter(|path| {
             !matches!(
                 tool_kind_for_path(path),
-                ToolMentionKind::App | ToolMentionKind::Mcp | ToolMentionKind::Plugin
+                ToolMentionKind::App | ToolMentionKind::Mcp
             )
         })
         .filter_map(|path| {

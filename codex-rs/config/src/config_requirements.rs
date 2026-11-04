@@ -16,10 +16,7 @@ use serde::de::Error as _;
 use std::collections::BTreeMap;
 use std::collections::BTreeSet;
 use std::collections::HashMap;
-use std::convert::Infallible;
 use std::fmt;
-use std::path::PathBuf;
-use std::str::FromStr;
 use wildmatch::WildMatchPattern;
 
 use super::requirements_exec_policy::RequirementsExecPolicyToml;
@@ -29,13 +26,11 @@ use crate::InAppBrowserRequirementsToml;
 use crate::ManagedAuthPolicy;
 use crate::ManagedHooksRequirementsToml;
 use crate::McpServerRequirement;
-use crate::PluginRequirementsToml;
 use crate::RequirementsExecPolicy;
 use crate::browser_computer_use_requirements::BrowserUseRequirementsToml;
 use crate::browser_computer_use_requirements::ComputerUseRequirementsToml;
 use crate::config_toml::ConfigToml;
 use crate::mcp_requirements::validate_mcp_server_requirement;
-use crate::mcp_types::AppToolApproval;
 use crate::permissions_toml::PermissionProfileToml;
 use crate::types::AuthCredentialsStoreMode;
 use crate::types::FeedbackConfigToml;
@@ -182,13 +177,10 @@ pub struct ConfigRequirements {
     pub web_search_mode: ConstrainedWithSource<WebSearchMode>,
     pub allow_managed_hooks_only: Option<Sourced<bool>>,
     pub allow_appshots: Option<Sourced<bool>>,
-    pub allow_remote_control: Option<Sourced<bool>>,
     pub computer_use: Option<Sourced<ComputerUseRequirementsToml>>,
     pub feature_requirements: Option<Sourced<FeatureRequirementsToml>>,
     pub managed_hooks: Option<ConstrainedWithSource<ManagedHooksRequirementsToml>>,
     pub mcp_servers: Option<Sourced<BTreeMap<String, McpServerRequirement>>>,
-    pub plugins: Option<Sourced<BTreeMap<String, PluginRequirementsToml>>>,
-    pub marketplaces: Option<Sourced<MarketplaceRequirementsToml>>,
     // Keep OTEL boxed in both forms so unset values do not inflate ConfigLayerStack/Config stack frames.
     pub otel: Option<Box<Sourced<OtelRequirementsToml>>>,
     pub exec_policy: Option<Sourced<RequirementsExecPolicy>>,
@@ -241,13 +233,10 @@ impl Default for ConfigRequirements {
             ),
             allow_managed_hooks_only: None,
             allow_appshots: None,
-            allow_remote_control: None,
             computer_use: None,
             feature_requirements: None,
             managed_hooks: None,
             mcp_servers: None,
-            plugins: None,
-            marketplaces: None,
             otel: None,
             exec_policy: None,
             enforce_residency: ConstrainedWithSource::new(
@@ -309,41 +298,6 @@ impl ConfigRequirements {
     pub fn exec_policy_source(&self) -> Option<&RequirementSource> {
         self.exec_policy.as_ref().map(|policy| &policy.source)
     }
-}
-
-#[derive(Deserialize, Debug, Clone, Default, PartialEq, Eq)]
-#[serde(deny_unknown_fields)]
-pub struct MarketplaceRequirementsToml {
-    pub restrict_to_allowed_sources: Option<bool>,
-    #[serde(default)]
-    pub allowed_sources: BTreeMap<String, MarketplaceAllowedSourceToml>,
-}
-
-impl MarketplaceRequirementsToml {
-    pub fn is_empty(&self) -> bool {
-        self.restrict_to_allowed_sources.is_none() && self.allowed_sources.is_empty()
-    }
-}
-
-/// Raw marketplace source rule whose active fields are interpreted after
-/// requirements composition.
-#[derive(Deserialize, Debug, Clone, PartialEq, Eq)]
-#[serde(deny_unknown_fields)]
-pub struct MarketplaceAllowedSourceToml {
-    pub source: Option<MarketplaceAllowedSourceKind>,
-    pub url: Option<String>,
-    #[serde(rename = "ref")]
-    pub ref_name: Option<String>,
-    pub host_pattern: Option<String>,
-    pub path: Option<PathBuf>,
-}
-
-#[derive(Deserialize, Debug, Clone, Copy, PartialEq, Eq)]
-#[serde(rename_all = "snake_case")]
-pub enum MarketplaceAllowedSourceKind {
-    Git,
-    HostPattern,
-    Local,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, Default, PartialEq, Eq)]
@@ -934,133 +888,6 @@ impl FeatureRequirementsToml {
     }
 }
 
-#[derive(Deserialize, Debug, Clone, Default, PartialEq, Eq)]
-pub struct AppToolRequirementToml {
-    pub approval_mode: Option<AppToolApproval>,
-    /// Opt-in analytics extraction for this exact tool, not a tool argument.
-    /// The highest-priority rule wins as a whole, including unsupported formats.
-    pub analytics_result_source: Option<AppToolResultSourceRequirementToml>,
-}
-
-#[derive(Deserialize, Debug, Clone, PartialEq, Eq)]
-#[serde(deny_unknown_fields)]
-pub struct AppToolResultSourceRequirementToml {
-    /// Result format to parse; currently only `detailed_message_search_v1` is supported.
-    pub format: AppToolResultSourceFormat,
-    /// Source kind emitted alongside each extracted ID.
-    #[serde(rename = "type")]
-    pub source_type: String,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum AppToolResultSourceFormat {
-    DetailedMessageSearchV1,
-    /// Keep unknown formats so higher-priority rules still override lower ones.
-    Unknown(String),
-}
-
-impl FromStr for AppToolResultSourceFormat {
-    type Err = Infallible;
-
-    fn from_str(value: &str) -> Result<Self, Self::Err> {
-        Ok(match value {
-            "detailed_message_search_v1" => Self::DetailedMessageSearchV1,
-            _ => Self::Unknown(value.to_string()),
-        })
-    }
-}
-
-impl<'de> Deserialize<'de> for AppToolResultSourceFormat {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: serde::Deserializer<'de>,
-    {
-        String::deserialize(deserializer)?
-            .parse()
-            .map_err(D::Error::custom)
-    }
-}
-
-impl AppToolRequirementToml {
-    pub fn is_empty(&self) -> bool {
-        self.approval_mode.is_none() && self.analytics_result_source.is_none()
-    }
-}
-
-#[derive(Deserialize, Debug, Clone, Default, PartialEq, Eq)]
-pub struct AppToolsRequirementsToml {
-    #[serde(default, flatten)]
-    pub tools: BTreeMap<String, AppToolRequirementToml>,
-}
-
-impl AppToolsRequirementsToml {
-    pub fn is_empty(&self) -> bool {
-        self.tools.values().all(AppToolRequirementToml::is_empty)
-    }
-}
-
-#[derive(Deserialize, Debug, Clone, Default, PartialEq, Eq)]
-pub struct AppRequirementToml {
-    pub enabled: Option<bool>,
-    pub tools: Option<AppToolsRequirementsToml>,
-}
-
-impl AppRequirementToml {
-    pub fn is_empty(&self) -> bool {
-        self.enabled.is_none()
-            && self
-                .tools
-                .as_ref()
-                .is_none_or(AppToolsRequirementsToml::is_empty)
-    }
-}
-
-#[derive(Deserialize, Debug, Clone, Default, PartialEq, Eq)]
-pub struct AppsRequirementsToml {
-    #[serde(default, flatten)]
-    pub apps: BTreeMap<String, AppRequirementToml>,
-}
-
-impl AppsRequirementsToml {
-    pub fn is_empty(&self) -> bool {
-        self.apps.values().all(AppRequirementToml::is_empty)
-    }
-}
-
-/// Merge app requirements from a lower-precedence source into an existing higher-precedence set.
-/// This lets managed sources (for example Cloud/MDM) enforce setting disablement across layers,
-/// while exact tool approval settings keep the higher-precedence value when present.
-pub(crate) fn merge_app_requirements_descending(
-    base: &mut AppsRequirementsToml,
-    incoming: AppsRequirementsToml,
-) {
-    for (app_id, incoming_requirement) in incoming.apps {
-        let base_requirement = base.apps.entry(app_id).or_default();
-        let higher_precedence = base_requirement.enabled;
-        let lower_precedence = incoming_requirement.enabled;
-        base_requirement.enabled =
-            if higher_precedence == Some(false) || lower_precedence == Some(false) {
-                Some(false)
-            } else {
-                higher_precedence.or(lower_precedence)
-            };
-
-        let Some(incoming_tools) = incoming_requirement.tools else {
-            continue;
-        };
-        let base_tools = base_requirement.tools.get_or_insert_with(Default::default);
-        for (tool_name, incoming_tool) in incoming_tools.tools {
-            let base_tool = base_tools.tools.entry(tool_name).or_default();
-            if base_tool.approval_mode.is_none() {
-                base_tool.approval_mode = incoming_tool.approval_mode;
-            }
-            if base_tool.analytics_result_source.is_none() {
-                base_tool.analytics_result_source = incoming_tool.analytics_result_source;
-            }
-        }
-    }
-}
-
 /// Base config deserialized from system `requirements.toml` or MDM.
 #[derive(Deserialize, Debug, Clone, Default, PartialEq)]
 pub struct ConfigRequirementsToml {
@@ -1094,7 +921,6 @@ pub struct ConfigRequirementsToml {
     pub allow_managed_hooks_only: Option<bool>,
     pub allow_browser_and_computer_use: Option<bool>,
     pub allow_appshots: Option<bool>,
-    pub allow_remote_control: Option<bool>,
     pub computer_use: Option<ComputerUseRequirementsToml>,
     pub browser_use: Option<BrowserUseRequirementsToml>,
     pub in_app_browser: Option<InAppBrowserRequirementsToml>,
@@ -1102,10 +928,7 @@ pub struct ConfigRequirementsToml {
     pub feature_requirements: Option<FeatureRequirementsToml>,
     pub hooks: Option<ManagedHooksRequirementsToml>,
     pub mcp_servers: Option<BTreeMap<String, McpServerRequirement>>,
-    pub plugins: Option<BTreeMap<String, PluginRequirementsToml>>,
-    pub marketplaces: Option<MarketplaceRequirementsToml>,
     pub otel: Option<Box<OtelRequirementsToml>>,
-    pub apps: Option<AppsRequirementsToml>,
     pub rules: Option<RequirementsExecPolicyToml>,
     pub enforce_residency: Option<ResidencyRequirement>,
     /// Shared managed network constraints; `experimental_network` remains an alias.
@@ -1250,17 +1073,13 @@ pub struct ConfigRequirementsWithSources {
     pub allow_managed_hooks_only: Option<Sourced<bool>>,
     pub allow_browser_and_computer_use: Option<Sourced<bool>>,
     pub allow_appshots: Option<Sourced<bool>>,
-    pub allow_remote_control: Option<Sourced<bool>>,
     pub computer_use: Option<Sourced<ComputerUseRequirementsToml>>,
     pub browser_use: Option<Sourced<BrowserUseRequirementsToml>>,
     pub in_app_browser: Option<Sourced<InAppBrowserRequirementsToml>>,
     pub feature_requirements: Option<Sourced<FeatureRequirementsToml>>,
     pub hooks: Option<Sourced<ManagedHooksRequirementsToml>>,
     pub mcp_servers: Option<Sourced<BTreeMap<String, McpServerRequirement>>>,
-    pub plugins: Option<Sourced<BTreeMap<String, PluginRequirementsToml>>>,
-    pub marketplaces: Option<Sourced<MarketplaceRequirementsToml>>,
     pub otel: Option<Box<Sourced<OtelRequirementsToml>>>,
-    pub apps: Option<Sourced<AppsRequirementsToml>>,
     pub rules: Option<Sourced<RequirementsExecPolicyToml>>,
     pub enforce_residency: Option<Sourced<ResidencyRequirement>>,
     pub network: Option<Sourced<NetworkRequirementsToml>>,
@@ -1334,17 +1153,13 @@ impl ConfigRequirementsWithSources {
             allow_managed_hooks_only: _,
             allow_browser_and_computer_use: _,
             allow_appshots: _,
-            allow_remote_control: _,
             computer_use: _,
             browser_use: _,
             in_app_browser: _,
             feature_requirements: _,
             hooks: _,
             mcp_servers: _,
-            plugins: _,
-            marketplaces: _,
             otel: _,
-            apps: _,
             rules: _,
             enforce_residency: _,
             network: _,
@@ -1405,16 +1220,13 @@ impl ConfigRequirementsWithSources {
                 allow_managed_hooks_only,
                 allow_browser_and_computer_use,
                 allow_appshots,
-                allow_remote_control,
                 computer_use,
                 browser_use,
                 in_app_browser,
                 feature_requirements,
                 hooks,
                 mcp_servers,
-                plugins,
-                marketplaces,
-                rules,
+                        rules,
                 enforce_residency,
                 network,
                 application,
@@ -1464,13 +1276,6 @@ impl ConfigRequirementsWithSources {
             }
         }
 
-        if let Some(incoming_apps) = other.apps.take() {
-            if let Some(existing_apps) = self.apps.as_mut() {
-                merge_app_requirements_descending(&mut existing_apps.value, incoming_apps);
-            } else {
-                self.apps = Some(Sourced::new(incoming_apps, source));
-            }
-        }
     }
 
     pub fn into_toml(self) -> ConfigRequirementsToml {
@@ -1498,17 +1303,13 @@ impl ConfigRequirementsWithSources {
             allow_managed_hooks_only,
             allow_browser_and_computer_use,
             allow_appshots,
-            allow_remote_control,
             computer_use,
             browser_use,
             in_app_browser,
             feature_requirements,
             hooks,
             mcp_servers,
-            plugins,
-            marketplaces,
             otel,
-            apps,
             rules,
             enforce_residency,
             network,
@@ -1553,17 +1354,13 @@ impl ConfigRequirementsWithSources {
             allow_browser_and_computer_use: allow_browser_and_computer_use
                 .map(|sourced| sourced.value),
             allow_appshots: allow_appshots.map(|sourced| sourced.value),
-            allow_remote_control: allow_remote_control.map(|sourced| sourced.value),
             computer_use: computer_use.map(|sourced| sourced.value),
             browser_use: browser_use.map(|sourced| sourced.value),
             in_app_browser: in_app_browser.map(|sourced| sourced.value),
             feature_requirements: feature_requirements.map(|sourced| sourced.value),
             hooks: hooks.map(|sourced| sourced.value),
             mcp_servers: mcp_servers.map(|sourced| sourced.value),
-            plugins: plugins.map(|sourced| sourced.value),
-            marketplaces: marketplaces.map(|sourced| sourced.value),
             otel: otel.map(|sourced| Box::new(sourced.value)),
-            apps: apps.map(|sourced| sourced.value),
             rules: rules.map(|sourced| sourced.value),
             enforce_residency: enforce_residency.map(|sourced| sourced.value),
             network: network.map(|sourced| sourced.value),
@@ -1669,7 +1466,6 @@ impl ConfigRequirementsToml {
             && self.allow_managed_hooks_only.is_none()
             && self.allow_browser_and_computer_use.is_none()
             && self.allow_appshots.is_none()
-            && self.allow_remote_control.is_none()
             && self
                 .computer_use
                 .as_ref()
@@ -1692,21 +1488,9 @@ impl ConfigRequirementsToml {
                 .is_none_or(ManagedHooksRequirementsToml::is_empty)
             && self.mcp_servers.is_none()
             && self
-                .plugins
-                .as_ref()
-                .is_none_or(|plugins| plugins.values().all(PluginRequirementsToml::is_empty))
-            && self
-                .marketplaces
-                .as_ref()
-                .is_none_or(MarketplaceRequirementsToml::is_empty)
-            && self
                 .otel
                 .as_deref()
                 .is_none_or(OtelRequirementsToml::is_empty)
-            && self
-                .apps
-                .as_ref()
-                .is_none_or(AppsRequirementsToml::is_empty)
             && self.rules.is_none()
             && self.enforce_residency.is_none()
             && self.network.is_none()
@@ -2079,17 +1863,13 @@ impl TryFrom<ConfigRequirementsWithSources> for ConfigRequirements {
             allow_managed_hooks_only,
             allow_browser_and_computer_use: _,
             allow_appshots,
-            allow_remote_control,
             computer_use,
             browser_use: _,
             in_app_browser: _,
             feature_requirements,
             hooks,
             mcp_servers,
-            plugins,
-            marketplaces,
             otel,
-            apps: _apps,
             rules,
             enforce_residency,
             network,
@@ -2136,17 +1916,6 @@ impl TryFrom<ConfigRequirementsWithSources> for ConfigRequirements {
                 &requirements.source,
                 /*plugin_name*/ None,
             )?;
-        }
-        if let Some(plugin_requirements) = &plugins {
-            for (plugin_name, plugin) in &plugin_requirements.value {
-                if let Some(requirements) = &plugin.mcp_servers {
-                    validate_mcp_server_requirements(
-                        requirements,
-                        &plugin_requirements.source,
-                        Some(plugin_name),
-                    )?;
-                }
-            }
         }
 
         let approval_policy = match allowed_approval_policies {
@@ -2392,13 +2161,10 @@ impl TryFrom<ConfigRequirementsWithSources> for ConfigRequirements {
             web_search_mode,
             allow_managed_hooks_only,
             allow_appshots,
-            allow_remote_control,
             computer_use,
             feature_requirements,
             managed_hooks,
             mcp_servers,
-            plugins,
-            marketplaces,
             otel,
             exec_policy,
             enforce_residency,
@@ -2648,17 +2414,13 @@ tracestate = { managed = { tenant = "enterprise", region = "us" }, other = { kee
             allow_managed_hooks_only,
             allow_browser_and_computer_use,
             allow_appshots,
-            allow_remote_control,
             computer_use,
             browser_use,
             in_app_browser,
             feature_requirements,
             hooks,
             mcp_servers,
-            plugins,
-            marketplaces,
             otel,
-            apps,
             rules,
             enforce_residency,
             network,
@@ -2717,8 +2479,6 @@ tracestate = { managed = { tenant = "enterprise", region = "us" }, other = { kee
                 .map(|value| Sourced::new(value, RequirementSource::Unknown)),
             allow_appshots: allow_appshots
                 .map(|value| Sourced::new(value, RequirementSource::Unknown)),
-            allow_remote_control: allow_remote_control
-                .map(|value| Sourced::new(value, RequirementSource::Unknown)),
             computer_use: computer_use.map(|value| Sourced::new(value, RequirementSource::Unknown)),
             browser_use: browser_use.map(|value| Sourced::new(value, RequirementSource::Unknown)),
             in_app_browser: in_app_browser
@@ -2727,10 +2487,7 @@ tracestate = { managed = { tenant = "enterprise", region = "us" }, other = { kee
                 .map(|value| Sourced::new(value, RequirementSource::Unknown)),
             hooks: hooks.map(|value| Sourced::new(value, RequirementSource::Unknown)),
             mcp_servers: mcp_servers.map(|value| Sourced::new(value, RequirementSource::Unknown)),
-            plugins: plugins.map(|value| Sourced::new(value, RequirementSource::Unknown)),
-            marketplaces: marketplaces.map(|value| Sourced::new(value, RequirementSource::Unknown)),
             otel: otel.map(|value| Box::new(Sourced::new(*value, RequirementSource::Unknown))),
-            apps: apps.map(|value| Sourced::new(value, RequirementSource::Unknown)),
             rules: rules.map(|value| Sourced::new(value, RequirementSource::Unknown)),
             enforce_residency: enforce_residency
                 .map(|value| Sourced::new(value, RequirementSource::Unknown)),
@@ -2884,19 +2641,6 @@ tracestate = { managed = { tenant = "enterprise", region = "us" }, other = { kee
         )?;
 
         assert_eq!(requirements.allow_appshots, Some(false));
-        assert!(!requirements.is_empty());
-        Ok(())
-    }
-
-    #[test]
-    fn allow_remote_control_false_is_still_configured() -> Result<()> {
-        let requirements: ConfigRequirementsToml = from_str(
-            r#"
-                allow_remote_control = false
-            "#,
-        )?;
-
-        assert_eq!(requirements.allow_remote_control, Some(false));
         assert!(!requirements.is_empty());
         Ok(())
     }
@@ -3224,20 +2968,16 @@ tracestate = { managed = { tenant = "enterprise", region = "us" }, other = { kee
             allow_managed_hooks_only: Some(true),
             allow_browser_and_computer_use: Some(false),
             allow_appshots: Some(false),
-            allow_remote_control: Some(false),
             computer_use: Some(computer_use.clone()),
             browser_use: Some(browser_use.clone()),
             in_app_browser: None,
             feature_requirements: Some(feature_requirements.clone()),
             hooks: None,
             mcp_servers: None,
-            plugins: None,
-            marketplaces: None,
             otel: Some(Box::new(OtelRequirementsToml {
                 environment: Some("managed".to_string()),
                 ..Default::default()
             })),
-            apps: None,
             rules: None,
             enforce_residency: Some(enforce_residency),
             network: None,
@@ -3314,10 +3054,6 @@ tracestate = { managed = { tenant = "enterprise", region = "us" }, other = { kee
                     enforce_source.clone(),
                 )),
                 allow_appshots: Some(Sourced::new(/*value*/ false, enforce_source.clone(),)),
-                allow_remote_control: Some(Sourced::new(
-                    /*value*/ false,
-                    enforce_source.clone(),
-                )),
                 computer_use: Some(Sourced::new(computer_use, enforce_source.clone())),
                 browser_use: Some(Sourced::new(browser_use, enforce_source.clone())),
                 in_app_browser: None,
@@ -3327,17 +3063,14 @@ tracestate = { managed = { tenant = "enterprise", region = "us" }, other = { kee
                 )),
                 hooks: None,
                 mcp_servers: None,
-                plugins: None,
-                marketplaces: None,
-                otel: Some(Box::new(Sourced::new(
+                        otel: Some(Box::new(Sourced::new(
                     OtelRequirementsToml {
                         environment: Some("managed".to_string()),
                         ..Default::default()
                     },
                     source.clone(),
                 ))),
-                apps: None,
-                rules: None,
+                    rules: None,
                 enforce_residency: Some(Sourced::new(enforce_residency, enforce_source)),
                 network: None,
                 application: None,
@@ -3384,17 +3117,13 @@ tracestate = { managed = { tenant = "enterprise", region = "us" }, other = { kee
                 allowed_web_search_modes: None,
                 allow_managed_hooks_only: None,
                 allow_appshots: None,
-                allow_remote_control: None,
                 computer_use: None,
                 browser_use: None,
                 in_app_browser: None,
                 feature_requirements: None,
                 hooks: None,
                 mcp_servers: None,
-                plugins: None,
-                marketplaces: None,
-                apps: None,
-                rules: None,
+                            rules: None,
                 enforce_residency: None,
                 network: None,
                 application: None,
@@ -3451,17 +3180,13 @@ tracestate = { managed = { tenant = "enterprise", region = "us" }, other = { kee
                 allowed_web_search_modes: None,
                 allow_managed_hooks_only: None,
                 allow_appshots: None,
-                allow_remote_control: None,
                 computer_use: None,
                 browser_use: None,
                 in_app_browser: None,
                 feature_requirements: None,
                 hooks: None,
                 mcp_servers: None,
-                plugins: None,
-                marketplaces: None,
-                apps: None,
-                rules: None,
+                            rules: None,
                 enforce_residency: None,
                 network: None,
                 application: None,
@@ -3632,332 +3357,6 @@ allowed_approvals_reviewers = ["user"]
             ))
         );
         Ok(())
-    }
-
-    #[test]
-    fn deserialize_apps_requirements() -> Result<()> {
-        let toml_str = r#"
-            [apps.connector_123123]
-            enabled = false
-        "#;
-        let requirements: ConfigRequirementsToml = from_str(toml_str)?;
-
-        assert_eq!(
-            requirements.apps,
-            Some(AppsRequirementsToml {
-                apps: BTreeMap::from([(
-                    "connector_123123".to_string(),
-                    AppRequirementToml {
-                        enabled: Some(false),
-                        tools: None,
-                    },
-                )]),
-            })
-        );
-        Ok(())
-    }
-
-    #[test]
-    fn deserialize_apps_tool_requirements() -> Result<()> {
-        let toml_str = r#"
-            [apps.connector_123123.tools."calendar/list_events"]
-            approval_mode = "approve"
-        "#;
-        let requirements: ConfigRequirementsToml = from_str(toml_str)?;
-
-        assert_eq!(
-            requirements.apps,
-            Some(AppsRequirementsToml {
-                apps: BTreeMap::from([(
-                    "connector_123123".to_string(),
-                    AppRequirementToml {
-                        enabled: None,
-                        tools: Some(AppToolsRequirementsToml {
-                            tools: BTreeMap::from([(
-                                "calendar/list_events".to_string(),
-                                AppToolRequirementToml {
-                                    approval_mode: Some(AppToolApproval::Approve),
-                                    analytics_result_source: None,
-                                },
-                            )]),
-                        }),
-                    },
-                )]),
-            })
-        );
-        Ok(())
-    }
-
-    #[test]
-    fn app_tool_result_source_requirements_parse_and_merge() -> Result<()> {
-        let rule = r#"
-            [apps.connector_123123.tools."messages/search"]
-            analytics_result_source = { format = "detailed_message_search_v1", type = "message_room" }
-            "#;
-        let requirements: ConfigRequirementsToml = from_str(rule)?;
-        assert!(!requirements.is_empty());
-        let source = requirements.apps.expect("apps should be present");
-
-        for higher_rule in [
-            None,
-            Some(("unsupported", "other_resource")),
-            Some(("detailed_message_search_v1", "other_resource")),
-        ] {
-            let mut merged = source.clone();
-            merged
-                .apps
-                .get_mut("connector_123123")
-                .expect("app should be present")
-                .tools
-                .as_mut()
-                .expect("tools should be present")
-                .tools
-                .get_mut("messages/search")
-                .expect("tool should be present")
-                .analytics_result_source = higher_rule.map(|(format, source_type)| {
-                from_str(&format!("format = {format:?}\ntype = {source_type:?}"))
-                    .expect("complete source rule should parse, including unknown formats")
-            });
-            let expected = if higher_rule.is_none() {
-                source.clone()
-            } else {
-                merged.clone()
-            };
-
-            merge_app_requirements_descending(&mut merged, source.clone());
-
-            assert_eq!(merged, expected);
-        }
-
-        for incomplete_rule in [
-            r#"format = "detailed_message_search_v1""#,
-            r#"type = "message_room""#,
-        ] {
-            assert!(from_str::<AppToolResultSourceRequirementToml>(incomplete_rule).is_err());
-        }
-        Ok(())
-    }
-
-    fn apps_requirements(entries: &[(&str, Option<bool>)]) -> AppsRequirementsToml {
-        AppsRequirementsToml {
-            apps: entries
-                .iter()
-                .map(|(app_id, enabled)| {
-                    (
-                        (*app_id).to_string(),
-                        AppRequirementToml {
-                            enabled: *enabled,
-                            tools: None,
-                        },
-                    )
-                })
-                .collect(),
-        }
-    }
-
-    fn app_tool_requirements(
-        app_id: &str,
-        tool_name: &str,
-        approval_mode: AppToolApproval,
-    ) -> AppsRequirementsToml {
-        AppsRequirementsToml {
-            apps: BTreeMap::from([(
-                app_id.to_string(),
-                AppRequirementToml {
-                    enabled: None,
-                    tools: Some(AppToolsRequirementsToml {
-                        tools: BTreeMap::from([(
-                            tool_name.to_string(),
-                            AppToolRequirementToml {
-                                approval_mode: Some(approval_mode),
-                                analytics_result_source: None,
-                            },
-                        )]),
-                    }),
-                },
-            )]),
-        }
-    }
-
-    #[test]
-    fn merge_app_requirements_descending_unions_distinct_apps() {
-        let mut merged = apps_requirements(&[("connector_high", Some(false))]);
-        let lower = apps_requirements(&[("connector_low", Some(true))]);
-
-        merge_app_requirements_descending(&mut merged, lower);
-
-        assert_eq!(
-            merged,
-            apps_requirements(&[
-                ("connector_high", Some(false)),
-                ("connector_low", Some(true))
-            ]),
-        );
-    }
-
-    #[test]
-    fn merge_app_requirements_descending_prefers_false_from_lower_precedence() {
-        let mut merged = apps_requirements(&[("connector_123123", Some(true))]);
-        let lower = apps_requirements(&[("connector_123123", Some(false))]);
-
-        merge_app_requirements_descending(&mut merged, lower);
-
-        assert_eq!(
-            merged,
-            apps_requirements(&[("connector_123123", Some(false))]),
-        );
-    }
-
-    #[test]
-    fn merge_app_requirements_descending_keeps_higher_true_when_lower_is_unset() {
-        let mut merged = apps_requirements(&[("connector_123123", Some(true))]);
-        let lower = apps_requirements(&[("connector_123123", None)]);
-
-        merge_app_requirements_descending(&mut merged, lower);
-
-        assert_eq!(
-            merged,
-            apps_requirements(&[("connector_123123", Some(true))]),
-        );
-    }
-
-    #[test]
-    fn merge_app_requirements_descending_uses_lower_value_when_higher_missing() {
-        let mut merged = apps_requirements(&[]);
-        let lower = apps_requirements(&[("connector_123123", Some(true))]);
-
-        merge_app_requirements_descending(&mut merged, lower);
-
-        assert_eq!(
-            merged,
-            apps_requirements(&[("connector_123123", Some(true))]),
-        );
-    }
-
-    #[test]
-    fn merge_app_requirements_descending_preserves_higher_false_when_lower_missing_app() {
-        let mut merged = apps_requirements(&[("connector_123123", Some(false))]);
-        let lower = apps_requirements(&[]);
-
-        merge_app_requirements_descending(&mut merged, lower);
-
-        assert_eq!(
-            merged,
-            apps_requirements(&[("connector_123123", Some(false))]),
-        );
-    }
-
-    #[test]
-    fn merge_app_requirements_descending_preserves_higher_tool_approval_mode() {
-        let mut merged = app_tool_requirements(
-            "connector_123123",
-            "calendar/list_events",
-            AppToolApproval::Approve,
-        );
-        let lower = app_tool_requirements(
-            "connector_123123",
-            "calendar/list_events",
-            AppToolApproval::Prompt,
-        );
-
-        merge_app_requirements_descending(&mut merged, lower);
-
-        assert_eq!(
-            merged,
-            app_tool_requirements(
-                "connector_123123",
-                "calendar/list_events",
-                AppToolApproval::Approve,
-            )
-        );
-    }
-
-    #[test]
-    fn merge_app_requirements_descending_uses_lower_tool_approval_when_higher_missing() {
-        let mut merged = apps_requirements(&[("connector_123123", None)]);
-        let lower = app_tool_requirements(
-            "connector_123123",
-            "calendar/list_events",
-            AppToolApproval::Approve,
-        );
-
-        merge_app_requirements_descending(&mut merged, lower);
-
-        assert_eq!(
-            merged,
-            app_tool_requirements(
-                "connector_123123",
-                "calendar/list_events",
-                AppToolApproval::Approve,
-            )
-        );
-    }
-
-    #[test]
-    fn merge_unset_fields_merges_apps_across_sources_with_enabled_evaluation() {
-        let higher_source = RequirementSource::LegacyManagedConfigTomlFromMdm;
-        let lower_source = RequirementSource::MdmManagedPreferences {
-            domain: "com.openai.codex".to_string(),
-            key: "requirements_toml_base64".to_string(),
-        };
-        let mut target = ConfigRequirementsWithSources::default();
-
-        target.merge_unset_fields(
-            higher_source.clone(),
-            ConfigRequirementsToml {
-                apps: Some(apps_requirements(&[
-                    ("connector_high", Some(true)),
-                    ("connector_shared", Some(true)),
-                ])),
-                ..Default::default()
-            },
-        );
-        target.merge_unset_fields(
-            lower_source,
-            ConfigRequirementsToml {
-                apps: Some(apps_requirements(&[
-                    ("connector_low", Some(false)),
-                    ("connector_shared", Some(false)),
-                ])),
-                ..Default::default()
-            },
-        );
-
-        let apps = target.apps.expect("apps should be present");
-        assert_eq!(
-            apps.value,
-            apps_requirements(&[
-                ("connector_high", Some(true)),
-                ("connector_low", Some(false)),
-                ("connector_shared", Some(false)),
-            ])
-        );
-        assert_eq!(apps.source, higher_source);
-    }
-
-    #[test]
-    fn merge_unset_fields_apps_empty_higher_source_does_not_block_lower_disables() {
-        let mut target = ConfigRequirementsWithSources::default();
-
-        target.merge_unset_fields(
-            RequirementSource::LegacyManagedConfigTomlFromMdm,
-            ConfigRequirementsToml {
-                apps: Some(apps_requirements(&[])),
-                ..Default::default()
-            },
-        );
-        target.merge_unset_fields(
-            RequirementSource::LegacyManagedConfigTomlFromMdm,
-            ConfigRequirementsToml {
-                apps: Some(apps_requirements(&[("connector_123123", Some(false))])),
-                ..Default::default()
-            },
-        );
-
-        assert_eq!(
-            target.apps.map(|apps| apps.value),
-            Some(apps_requirements(&[("connector_123123", Some(false))])),
-        );
     }
 
     #[test]
@@ -5080,119 +4479,6 @@ command = "python3 /enterprise/hooks/pre.py"
         };
 
         assert_eq!(server_name, "broken_rule");
-        assert_eq!(requirement_source, RequirementSource::Unknown);
-        assert!(reason.contains("invalid regex `[`"), "{reason}");
-        Ok(())
-    }
-
-    #[test]
-    fn deserialize_plugin_mcp_server_requirements() -> Result<()> {
-        let toml_str = r#"
-            [plugins."sample@test".mcp_servers.sample.identity]
-            command = "sample-mcp"
-
-            [plugins."remote@test".mcp_servers.remote.identity]
-            url = "https://example.com/mcp"
-        "#;
-        let requirements: ConfigRequirements =
-            with_unknown_source(from_str(toml_str)?).try_into()?;
-
-        assert_eq!(
-            requirements.plugins,
-            Some(Sourced::new(
-                BTreeMap::from([
-                    (
-                        "remote@test".to_string(),
-                        PluginRequirementsToml {
-                            mcp_servers: Some(BTreeMap::from([(
-                                "remote".to_string(),
-                                McpServerRequirement::Identity {
-                                    identity: McpServerIdentity::Url {
-                                        url: "https://example.com/mcp".to_string(),
-                                    },
-                                },
-                            )])),
-                        },
-                    ),
-                    (
-                        "sample@test".to_string(),
-                        PluginRequirementsToml {
-                            mcp_servers: Some(BTreeMap::from([(
-                                "sample".to_string(),
-                                McpServerRequirement::Identity {
-                                    identity: McpServerIdentity::Command {
-                                        command: "sample-mcp".to_string(),
-                                    },
-                                },
-                            )])),
-                        },
-                    ),
-                ]),
-                RequirementSource::Unknown,
-            ))
-        );
-        Ok(())
-    }
-
-    #[test]
-    fn deserialize_plugin_mcp_server_matcher_requirement() -> Result<()> {
-        let toml_str = r#"
-            [plugins."sample@test".mcp_servers.internal_proxy.identity]
-            command = { executable = "company-cli", args = [
-                { match = "exact", value = "mcp" },
-                { match = "regex", expression = '^https://[a-z]+\.example\.com$' },
-            ] }
-        "#;
-        let requirements: ConfigRequirements =
-            with_unknown_source(from_str(toml_str)?).try_into()?;
-
-        assert_eq!(
-            requirements.plugins,
-            Some(Sourced::new(
-                BTreeMap::from([(
-                    "sample@test".to_string(),
-                    PluginRequirementsToml {
-                        mcp_servers: Some(BTreeMap::from([(
-                            "internal_proxy".to_string(),
-                            McpServerRequirement::Command(McpServerCommandMatcher {
-                                executable: "company-cli".to_string(),
-                                args: vec![
-                                    McpServerValueMatcher::Exact {
-                                        value: "mcp".to_string(),
-                                    },
-                                    McpServerValueMatcher::Regex {
-                                        expression: r"^https://[a-z]+\.example\.com$".to_string(),
-                                    },
-                                ],
-                            }),
-                        )])),
-                    },
-                )]),
-                RequirementSource::Unknown,
-            ))
-        );
-        Ok(())
-    }
-
-    #[test]
-    fn invalid_plugin_mcp_server_regex_reports_plugin_and_server_name() -> Result<()> {
-        let toml_str = r#"
-            [plugins."sample@test".mcp_servers.broken_rule.identity]
-            url = { match = "regex", expression = "[" }
-        "#;
-
-        let err = ConfigRequirements::try_from(with_unknown_source(from_str(toml_str)?))
-            .expect_err("invalid plugin MCP regex should fail requirements normalization");
-        let ConstraintError::McpServerRequirementParse {
-            server_name,
-            requirement_source,
-            reason,
-        } = err
-        else {
-            panic!("unexpected error: {err:?}");
-        };
-
-        assert_eq!(server_name, "sample@test/broken_rule");
         assert_eq!(requirement_source, RequirementSource::Unknown);
         assert!(reason.contains("invalid regex `[`"), "{reason}");
         Ok(())

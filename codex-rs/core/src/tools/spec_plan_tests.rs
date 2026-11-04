@@ -25,8 +25,6 @@ use codex_protocol::openai_models::WebSearchToolType;
 use codex_protocol::protocol::MultiAgentVersion;
 use codex_protocol::protocol::SessionSource;
 use codex_protocol::protocol::SubAgentSource;
-use codex_tools::DiscoverablePluginInfo;
-use codex_tools::DiscoverableTool;
 use codex_tools::ResponsesApiNamespaceTool;
 use codex_tools::ResponsesApiTool;
 use codex_tools::ToolCall as ExtensionToolCall;
@@ -61,6 +59,54 @@ use crate::tools::spec_plan::append_source_tools;
 use crate::tools::spec_plan::build_core_tool_registry;
 
 const MULTI_AGENT_V2_NAMESPACE: &str = "collaboration";
+
+fn dynamic_tool(namespace: Option<&str>, name: &str, defer_loading: bool) -> DynamicToolSpec {
+    let function = codex_protocol::dynamic_tools::DynamicToolFunctionSpec {
+        name: name.to_string(),
+        description: format!("{name} dynamic tool"),
+        input_schema: json!({
+            "type": "object",
+            "properties": {},
+            "additionalProperties": false,
+        }),
+        defer_loading,
+    };
+    match namespace {
+        Some(namespace) => {
+            DynamicToolSpec::Namespace(codex_protocol::dynamic_tools::DynamicToolNamespaceSpec {
+                name: namespace.to_string(),
+                description: format!("{namespace} dynamic tools"),
+                tools: vec![
+                    codex_protocol::dynamic_tools::DynamicToolNamespaceTool::Function(function),
+                ],
+            })
+        }
+        None => DynamicToolSpec::Function(function),
+    }
+}
+
+fn has_parameter(spec: &ToolSpec, parameter_name: &str) -> bool {
+    serde_json::to_value(spec)
+        .expect("tool spec should serialize")
+        .pointer(&format!("/parameters/properties/{parameter_name}"))
+        .is_some()
+}
+
+fn has_windows_shell_guidance(spec: &ToolSpec) -> bool {
+    let ToolSpec::Function(tool) = spec else {
+        return false;
+    };
+    tool.description.contains("Windows safety rules:")
+}
+
+fn apply_patch_accepts_environment_id(spec: &ToolSpec) -> bool {
+    match spec {
+        ToolSpec::Freeform(tool) if tool.name == "apply_patch" => {
+            tool.format.definition.contains("Environment ID")
+        }
+        _ => false,
+    }
+}
 
 #[derive(Default)]
 struct ToolPlanInputs {
@@ -292,7 +338,7 @@ fn set_web_search_mode(turn: &mut TurnContext, mode: WebSearchMode) {
 
 fn use_chatgpt_auth(turn: &mut TurnContext) {
     turn.auth_manager = Some(AuthManager::from_auth_for_testing(
-        CodexAuth::create_dummy_chatgpt_auth_for_testing(),
+        CodexAuth::from_api_key("test-api-key"),
     ));
     turn.provider = create_model_provider(
         turn.config.model_provider.clone(),
@@ -413,7 +459,6 @@ fn mcp_tool(server: &str, namespace: &str, name: &str) -> ToolInfo {
         openai_file_input_optional_fields: Default::default(),
         connector_id: None,
         connector_name: None,
-        plugin_display_names: Vec::new(),
     }
 }
 
@@ -431,69 +476,6 @@ fn mcp_runtime(
         exposure,
         native_review: Default::default(),
         model_spec: None,
-    }
-}
-
-fn dynamic_tool(namespace: Option<&str>, name: &str, defer_loading: bool) -> DynamicToolSpec {
-    let function = codex_protocol::dynamic_tools::DynamicToolFunctionSpec {
-        name: name.to_string(),
-        description: format!("{name} dynamic tool"),
-        input_schema: json!({
-            "type": "object",
-            "properties": {},
-            "additionalProperties": false,
-        }),
-        defer_loading,
-    };
-    match namespace {
-        Some(namespace) => {
-            DynamicToolSpec::Namespace(codex_protocol::dynamic_tools::DynamicToolNamespaceSpec {
-                name: namespace.to_string(),
-                description: format!("{namespace} dynamic tools"),
-                tools: vec![
-                    codex_protocol::dynamic_tools::DynamicToolNamespaceTool::Function(function),
-                ],
-            })
-        }
-        None => DynamicToolSpec::Function(function),
-    }
-}
-
-fn plugin_candidates(presentation: ToolSuggestPresentation) -> ToolSuggestCandidates {
-    ToolSuggestCandidates {
-        tools: vec![DiscoverableTool::Plugin(Box::new(DiscoverablePluginInfo {
-            id: "github@openai-curated-remote".to_string(),
-            remote_plugin_id: None,
-            name: "GitHub".to_string(),
-            description: Some("Work with GitHub repositories".to_string()),
-            has_skills: true,
-            mcp_server_names: Vec::new(),
-            app_connector_ids: Vec::new(),
-        }))],
-        presentation,
-    }
-}
-
-fn has_parameter(spec: &ToolSpec, parameter_name: &str) -> bool {
-    serde_json::to_value(spec)
-        .expect("tool spec should serialize")
-        .pointer(&format!("/parameters/properties/{parameter_name}"))
-        .is_some()
-}
-
-fn has_windows_shell_guidance(spec: &ToolSpec) -> bool {
-    let ToolSpec::Function(tool) = spec else {
-        return false;
-    };
-    tool.description.contains("Windows safety rules:")
-}
-
-fn apply_patch_accepts_environment_id(spec: &ToolSpec) -> bool {
-    match spec {
-        ToolSpec::Freeform(tool) if tool.name == "apply_patch" => {
-            tool.format.definition.contains("Environment ID")
-        }
-        _ => false,
     }
 }
 
@@ -1628,142 +1610,6 @@ async fn tool_search_cache_rebuilds_when_deferred_world_state_changes() {
             "tool search cache should follow the deferred world-state feature"
         );
     }
-}
-
-#[tokio::test]
-async fn request_plugin_install_requires_all_discovery_features() {
-    for disabled_feature in [Feature::ToolSuggest, Feature::Apps, Feature::Plugins] {
-        let plan = probe_with(
-            |turn| {
-                set_features(
-                    turn,
-                    &[Feature::ToolSuggest, Feature::Apps, Feature::Plugins],
-                );
-                set_feature(turn, disabled_feature, /*enabled*/ false);
-            },
-            ToolPlanInputs {
-                tool_suggest_candidates: Some(plugin_candidates(ToolSuggestPresentation::ListTool)),
-                ..ToolPlanInputs::default()
-            },
-        )
-        .await;
-        plan.assert_visible_lacks(&[
-            "list_available_plugins_to_install",
-            "request_plugin_install",
-        ]);
-    }
-
-    for tool_suggest_candidates in [
-        None,
-        Some(ToolSuggestCandidates {
-            tools: Vec::new(),
-            presentation: ToolSuggestPresentation::RecommendationContext,
-        }),
-    ] {
-        let plan = probe_with(
-            |turn| {
-                set_features(
-                    turn,
-                    &[Feature::ToolSuggest, Feature::Apps, Feature::Plugins],
-                );
-            },
-            ToolPlanInputs {
-                tool_suggest_candidates,
-                ..ToolPlanInputs::default()
-            },
-        )
-        .await;
-        plan.assert_visible_lacks(&[
-            "list_available_plugins_to_install",
-            "request_plugin_install",
-        ]);
-    }
-
-    let enabled = probe_with(
-        |turn| {
-            set_features(
-                turn,
-                &[Feature::ToolSuggest, Feature::Apps, Feature::Plugins],
-            );
-        },
-        ToolPlanInputs {
-            tool_suggest_candidates: Some(plugin_candidates(ToolSuggestPresentation::ListTool)),
-            ..ToolPlanInputs::default()
-        },
-    )
-    .await;
-    enabled.assert_visible_contains(&[
-        "list_available_plugins_to_install",
-        "request_plugin_install",
-    ]);
-}
-
-#[tokio::test]
-async fn request_plugin_install_stays_visible_without_tool_search() {
-    let plan = probe_with(
-        |turn| {
-            update_turn_settings_for_test(turn, |settings| {
-                Arc::make_mut(&mut settings.model_info).supports_search_tool = false;
-            });
-            set_features(
-                turn,
-                &[Feature::ToolSuggest, Feature::Apps, Feature::Plugins],
-            );
-        },
-        ToolPlanInputs {
-            tool_suggest_candidates: Some(plugin_candidates(ToolSuggestPresentation::ListTool)),
-            ..ToolPlanInputs::default()
-        },
-    )
-    .await;
-
-    plan.assert_visible_contains(&[
-        "list_available_plugins_to_install",
-        "request_plugin_install",
-    ]);
-    plan.assert_visible_lacks(&["tool_search"]);
-}
-
-#[tokio::test]
-async fn request_plugin_install_description_requires_exhausting_tool_search() {
-    let plan = probe_with(
-        |turn| {
-            set_features(
-                turn,
-                &[Feature::ToolSuggest, Feature::Apps, Feature::Plugins],
-            );
-        },
-        ToolPlanInputs {
-            tool_suggest_candidates: Some(plugin_candidates(
-                ToolSuggestPresentation::RecommendationContext,
-            )),
-            ..ToolPlanInputs::default()
-        },
-    )
-    .await;
-
-    let request_spec = plan.visible_spec("request_plugin_install");
-    let ToolSpec::Function(ResponsesApiTool {
-        description: request_description,
-        ..
-    }) = request_spec
-    else {
-        panic!("expected request_plugin_install function spec");
-    };
-    assert!(request_description.contains("listed in `<recommended_plugins>`"));
-    assert!(request_description.contains("explicitly asks to use a specific plugin"));
-    assert!(request_description.contains("Tool search has already been exhausted"));
-    assert!(!request_description.contains("`tool_search`"));
-    assert!(request_description.contains("DO NOT call this tool in parallel with other tools"));
-    assert!(!request_description.contains("list_available_plugins_to_install"));
-    assert!(!request_description.contains("github"));
-    assert!(has_parameter(request_spec, "plugin_id"));
-    assert!(has_parameter(request_spec, "suggest_reason"));
-    assert!(!has_parameter(request_spec, "tool_id"));
-    assert!(!has_parameter(request_spec, "tool_type"));
-    assert!(!has_parameter(request_spec, "action_type"));
-    plan.assert_visible_lacks(&["list_available_plugins_to_install"]);
-    plan.assert_registered_lacks(&["list_available_plugins_to_install"]);
 }
 
 #[tokio::test]

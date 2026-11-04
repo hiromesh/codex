@@ -11,14 +11,12 @@ use crate::tools::handlers::DynamicToolHandler;
 use crate::tools::handlers::ExecCommandHandler;
 use crate::tools::handlers::ExecCommandHandlerOptions;
 use crate::tools::handlers::GetContextRemainingHandler;
-use crate::tools::handlers::ListAvailablePluginsToInstallHandler;
 use crate::tools::handlers::ListMcpResourceTemplatesHandler;
 use crate::tools::handlers::ListMcpResourcesHandler;
 use crate::tools::handlers::NewContextWindowHandler;
 use crate::tools::handlers::PlanHandler;
 use crate::tools::handlers::ReadMcpResourceHandler;
 use crate::tools::handlers::RequestPermissionsHandler;
-use crate::tools::handlers::RequestPluginInstallHandler;
 use crate::tools::handlers::RequestUserInputAsyncHandler;
 use crate::tools::handlers::RequestUserInputHandler;
 use crate::tools::handlers::SendMessageToUserAsyncHandler;
@@ -57,11 +55,9 @@ use crate::tools::registry::ToolExposure;
 use crate::tools::registry::ToolRegistry;
 use crate::tools::router::ToolRouter;
 use crate::tools::tool_namespaces_info::collect_tool_namespaces_info;
-use codex_connectors::apps_config_from_layer_stack;
 use codex_extension_api::ExtensionData;
 use codex_features::Feature;
 use codex_features::SleepToolMode;
-use codex_mcp::CODEX_APPS_MCP_SERVER_NAME;
 use codex_prompts::ResolvedModelMessages;
 use codex_protocol::DEFAULT_FUNCTION_NAMESPACE;
 use codex_protocol::config_types::WebSearchMode;
@@ -82,7 +78,6 @@ use codex_tools::ToolExposures;
 use codex_tools::ToolName;
 use codex_tools::ToolSpec;
 use codex_tools::can_request_original_image_detail;
-use codex_tools::collect_request_plugin_install_entries;
 use codex_tools::default_namespace_description;
 use codex_tools::request_user_input_available_modes;
 use std::collections::BTreeMap;
@@ -113,7 +108,6 @@ pub(crate) fn build_tool_router(
     model_info: &ModelInfo,
     environments: &TurnEnvironmentSnapshot,
     mcp: &Arc<codex_mcp::McpBinding>,
-    apps_enabled: bool,
     step_store: &ExtensionData,
     tool_suggest_candidates: Option<&crate::tools::router::ToolSuggestCandidates>,
     dynamic_tools: &[DynamicToolSpec],
@@ -141,19 +135,12 @@ pub(crate) fn build_tool_router(
     let registered_mcp_tools = session.services.mcp_handler_cache.append_mcp_tools(
         mcp,
         &turn_context.config,
-        apps_enabled,
         &mcp.config().mcp_server_catalog,
         model_info.supports_search_tool,
         session.services.mcp_manager.shared_definitions(),
         &mut registry,
     );
-    apply_mcp_tool_exposure_policy(
-        turn_context,
-        model_info,
-        mcp,
-        &registered_mcp_tools,
-        &mut registry,
-    );
+    apply_mcp_tool_exposure_policy(model_info, mcp, &registered_mcp_tools, &mut registry);
     let standalone_web_search_tool = append_extension_tool_executors(
         turn_context,
         model_info,
@@ -178,14 +165,12 @@ pub(crate) fn build_tool_router(
 
 /// Use the effective mode because the model can override the thread's configured mode.
 fn apply_mcp_tool_exposure_policy(
-    turn_context: &TurnContext,
     model_info: &ModelInfo,
     mcp: &codex_mcp::McpBinding,
     registered_mcp_tools: &HashSet<ToolName>,
     registry: &mut ToolRegistry,
 ) {
     let mut omitted_exposures_by_tool = HashMap::new();
-    let apps_config = apps_config_from_layer_stack(&turn_context.config.config_layer_stack);
     for tool in mcp.tools() {
         let tool_name = tool.canonical_tool_name();
         // Disabled, denied, app-only and over-budget MCP tools are absent from this set.
@@ -198,19 +183,12 @@ fn apply_mcp_tool_exposure_policy(
         omitted_exposures_by_tool
             .entry(tool_name)
             .or_insert_with(|| {
-                let connector_omissions = (tool.server_name == CODEX_APPS_MCP_SERVER_NAME)
-                    .then_some(tool.connector_id.as_deref())
-                    .flatten()
-                    .and_then(|id| apps_config.as_ref()?.apps.get(id))
-                    .and_then(|app| app.omit_tools_from.as_deref())
-                    .unwrap_or_default();
                 server
                     .config()
                     .omit_tools_from
                     .as_deref()
                     .unwrap_or_default()
                     .iter()
-                    .chain(connector_omissions)
                     .copied()
                     .collect::<ToolExposures>()
             });
@@ -537,13 +515,6 @@ fn hosted_model_tool_specs(
         specs.push(hosted_web_search_tool);
     }
     specs
-}
-
-pub(crate) fn tool_suggest_enabled(turn_context: &TurnContext) -> bool {
-    let features = turn_context.config.features.get();
-    features.enabled(Feature::ToolSuggest)
-        && features.enabled(Feature::Apps)
-        && features.enabled(Feature::Plugins)
 }
 
 fn multi_agent_v2_enabled(turn_context: &TurnContext) -> bool {
@@ -937,22 +908,6 @@ fn add_core_utility_tools(context: &CoreToolPlanContext<'_>, registry: &mut Tool
         }
     {
         registry.add(SleepHandler);
-    }
-
-    if tool_suggest_enabled(turn_context)
-        && let Some(candidates) = context
-            .tool_suggest_candidates
-            .filter(|candidates| !candidates.tools.is_empty())
-    {
-        if candidates.presentation == crate::tools::router::ToolSuggestPresentation::ListTool {
-            registry.add(ListAvailablePluginsToInstallHandler::new(
-                collect_request_plugin_install_entries(&candidates.tools),
-            ));
-        }
-        registry.add(RequestPluginInstallHandler::new(
-            candidates.tools.clone(),
-            candidates.presentation,
-        ));
     }
 
     if context.model_info.apply_patch_tool_type.is_some() {

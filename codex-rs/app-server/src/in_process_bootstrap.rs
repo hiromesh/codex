@@ -78,13 +78,7 @@ impl EmbeddedNetworkPolicy {
             .http_client_factory()
             .clone()
             .with_network_policy(self.local.policy());
-        let endpoint = codex_backend_client::Client::new(
-            auth.chatgpt_base_url
-                .as_deref()
-                .unwrap_or("https://chatgpt.com/backend-api/"),
-            factory.clone(),
-        )
-        .config_bundle_url();
+        let endpoint = config_bundle_url(auth.chatgpt_base_url.as_deref());
         auth.auth_route_config = codex_login::AuthRouteConfig::from_http_client_factory(
             factory.clone().with_network_policy(
                 self.local
@@ -95,6 +89,25 @@ impl EmbeddedNetworkPolicy {
         .with_local_bootstrap_factory(factory)
         .with_application_network_policy(self.effective.policy());
         auth
+    }
+}
+
+/// Returns the config bundle endpoint for the configured ChatGPT backend base URL.
+pub(crate) fn config_bundle_url(chatgpt_base_url: Option<&str>) -> String {
+    let mut base_url = chatgpt_base_url
+        .unwrap_or("https://chatgpt.com/backend-api/")
+        .trim_end_matches('/')
+        .to_string();
+    if (base_url.starts_with("https://chatgpt.com")
+        || base_url.starts_with("https://chat.openai.com"))
+        && !base_url.contains("/backend-api")
+    {
+        base_url = format!("{base_url}/backend-api");
+    }
+    if base_url.contains("/backend-api") {
+        format!("{base_url}/wham/config/bundle")
+    } else {
+        format!("{base_url}/api/codex/config/bundle")
     }
 }
 

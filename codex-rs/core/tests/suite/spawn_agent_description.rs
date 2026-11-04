@@ -109,7 +109,6 @@ fn test_model_info(
         upgrade: None,
         model_messages: None,
         include_skills_usage_instructions: false,
-        include_plugin_usage_instructions: false,
         include_apps_usage_instructions: false,
         supports_reasoning_summary_parameter: true,
         default_reasoning_summary: ReasoningSummary::Auto,
@@ -219,8 +218,9 @@ pub(super) async fn model_catalog_refresh_requests(
     .await;
 
     let mut builder = test_codex()
-        .with_auth(CodexAuth::create_dummy_chatgpt_auth_for_testing())
+        .with_auth(CodexAuth::from_api_key("test-api-key"))
         .with_model("visible-model")
+        .with_mock_model_catalog(&server)
         .with_config(move |config| {
             config
                 .features

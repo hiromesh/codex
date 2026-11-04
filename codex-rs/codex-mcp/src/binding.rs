@@ -34,7 +34,6 @@ pub struct McpBinding {
     connections: Arc<McpConnectionSet>,
     clients: Arc<McpBindingClients>,
     config: Arc<McpConfig>,
-    plugins_available: bool,
     tools: Arc<[ToolInfo]>,
     calls: HashMap<(String, String), PreparedMcpCall>,
 }
@@ -46,7 +45,6 @@ impl McpBinding {
             Arc::new(McpConnectionSet::empty(config.prefix_mcp_tool_names)),
             Arc::new(McpBindingClients::new(HashMap::new())),
             config,
-            /*plugins_available*/ false,
             Vec::new(),
             HashMap::new(),
         )
@@ -56,15 +54,13 @@ impl McpBinding {
         connections: Arc<McpConnectionSet>,
         clients: Arc<McpBindingClients>,
         config: Arc<McpConfig>,
-        plugins_available: bool,
-        tools: impl Into<Arc<[ToolInfo]>>,
+            tools: impl Into<Arc<[ToolInfo]>>,
         calls: HashMap<(String, String), PreparedMcpCall>,
     ) -> Self {
         Self {
             connections,
             clients,
             config,
-            plugins_available,
             tools: tools.into(),
             calls,
         }
@@ -72,10 +68,6 @@ impl McpBinding {
 
     pub fn config(&self) -> &Arc<McpConfig> {
         &self.config
-    }
-
-    pub fn plugins_available(&self) -> bool {
-        self.plugins_available
     }
 
     /// Returns the frozen model-visible catalog captured for this binding.
@@ -131,9 +123,6 @@ impl McpBinding {
         server: &str,
         params: Option<PaginatedRequestParams>,
     ) -> Result<ListResourceTemplatesResult> {
-        if self.connections.skips_resource_template_listing(server) {
-            return Ok(ListResourceTemplatesResult::with_all_items(Vec::new()));
-        }
         if self.clients.client(server).is_some() {
             self.clients.list_resource_templates(server, params).await
         } else {
@@ -148,9 +137,7 @@ impl McpBinding {
         include_server: impl Fn(&str) -> bool,
     ) -> HashMap<String, Vec<ResourceTemplate>> {
         self.clients
-            .list_all_resource_templates(|server| {
-                include_server(server) && !self.connections.skips_resource_template_listing(server)
-            })
+            .list_all_resource_templates(include_server)
             .await
     }
 
@@ -187,8 +174,6 @@ pub struct PreparedMcpCall {
     tool_info: PreparedToolInfo,
     server_name: String,
     server_metadata: McpServerMetadata,
-    plugin_id: Option<String>,
-    selected_plugin_server: bool,
 }
 
 #[derive(Clone)]
@@ -232,8 +217,6 @@ impl PreparedMcpCall {
         catalog_snapshot: Arc<ToolCatalogSnapshot>,
         tool_info: impl Into<PreparedToolInfo>,
         server_metadata: McpServerMetadata,
-        plugin_id: Option<String>,
-        selected_plugin_server: bool,
     ) -> Option<Self> {
         let tool_info = tool_info.into();
         let server_name = tool_info.get().server_name.clone();
@@ -246,8 +229,6 @@ impl PreparedMcpCall {
             tool_info,
             server_name,
             server_metadata,
-            plugin_id,
-            selected_plugin_server,
         })
     }
 
@@ -318,18 +299,6 @@ impl PreparedMcpCall {
         &self.server_name
     }
 
-    /// Returns whether this call is bound to the host-owned Codex Apps server.
-    pub fn is_host_owned_apps(&self) -> bool {
-        self.config
-            .mcp_server_catalog
-            .server(&self.server_name)
-            .is_some_and(|registration| {
-                registration
-                    .source()
-                    .is_host_owned_apps(&self.server_name, registration.config())
-            })
-    }
-
     pub fn server_origin(&self) -> Option<&str> {
         self.server_metadata
             .origin
@@ -360,14 +329,6 @@ impl PreparedMcpCall {
             .get(self.tool_info().tool.name.as_ref())?
             .output_token_limit
             .map(std::num::NonZeroUsize::get)
-    }
-
-    pub fn plugin_id(&self) -> Option<&str> {
-        self.plugin_id.as_deref()
-    }
-
-    pub fn is_selected_plugin_server(&self) -> bool {
-        self.selected_plugin_server
     }
 
     pub async fn server_supports_sandbox_state_meta_capability(&self) -> Result<bool> {
@@ -410,22 +371,6 @@ impl PreparedMcpCall {
                     let (arguments, meta) = prepare().await?;
                     let timeout_deadline =
                         effective_timeout.map(|timeout| tokio::time::Instant::now() + timeout);
-                    let add_trusted_access_context = self.connections.add_trusted_access_context(
-                        self.tool_info(),
-                        &self.server_metadata,
-                        arguments.as_ref(),
-                        meta,
-                    );
-                    let meta = match effective_timeout.zip(timeout_deadline) {
-                        Some((timeout, deadline)) => {
-                            tokio::time::timeout_at(deadline, add_trusted_access_context)
-                                .await
-                                .map_err(|_| {
-                                    codex_rmcp_client::request_timeout_error("tools/call", timeout)
-                                })?
-                        }
-                        None => add_trusted_access_context.await,
-                    };
                     let remaining_timeout = match effective_timeout.zip(timeout_deadline) {
                         Some((timeout, deadline)) => {
                             let remaining =

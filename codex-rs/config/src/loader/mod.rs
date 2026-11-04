@@ -79,7 +79,6 @@ const SYSTEM_CONFIG_TOML_FILE_UNIX: &str = "/etc/codex/config.toml";
 const PROJECT_LOCAL_CONFIG_DENYLIST: &[&str] = &[
     "openai_base_url",
     "chatgpt_base_url",
-    "apps_mcp_product_sku",
     "responses_api_metadata",
     "model_provider",
     "model_providers",

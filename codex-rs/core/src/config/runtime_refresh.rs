@@ -31,7 +31,6 @@ pub(crate) enum RuntimeConfigRefresh {
 #[serde(default)]
 struct McpRefreshToml {
     features: Option<FeaturesToml>,
-    plugins: codex_config::types::PluginsConfigToml,
 }
 
 impl Config {
@@ -50,23 +49,6 @@ impl Config {
             )?
             .with_user_layer_from(&self.config_layer_stack),
         };
-        if matches!(scope, RuntimeConfigRefresh::Mcp) {
-            let plugins = incoming
-                .config_layer_stack
-                .all_layers_low_to_high()
-                .filter(|layer| {
-                    layer.name == codex_config::ConfigLayerSource::SessionFlags
-                        && !layer.is_disabled()
-                })
-                .filter_map(|layer| layer.config.get("plugins").cloned())
-                .reduce(|mut plugins, overlay| {
-                    codex_config::merge_toml_values(&mut plugins, &overlay);
-                    plugins
-                });
-            if let Some(plugins) = plugins {
-                layers = layers.with_session_plugins(plugins)?;
-            }
-        }
         // User refreshes retain the session's managed configuration.
         layers.ensure_config_server_applied()?;
         let cfg: McpRefreshToml = layers
@@ -198,7 +180,6 @@ impl Config {
         }
         config.config_layer_stack = layers
             .with_mcp_ema_cancellation(self.config_layer_stack.mcp_ema_cancellation().clone());
-        config.plugins = cfg.plugins;
         if enterprise_retired {
             config.disable_mcp_enterprise_auth();
         }

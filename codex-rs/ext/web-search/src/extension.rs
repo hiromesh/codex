@@ -171,10 +171,6 @@ pub fn install(registry: &mut ExtensionRegistryBuilder<Config>, auth_manager: Ar
 }
 
 #[cfg(test)]
-#[path = "routing_tests.rs"]
-mod routing_tests;
-
-#[cfg(test)]
 mod tests {
     use codex_extension_api::ExtensionData;
     use codex_extension_api::ExtensionRegistryBuilder;

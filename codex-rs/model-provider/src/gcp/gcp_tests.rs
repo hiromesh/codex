@@ -1,5 +1,4 @@
 use codex_models_manager::ModelsManagerConfig;
-use codex_protocol::config_types::ModelProviderAuthInfo;
 use codex_protocol::openai_models::ApplyPatchToolType;
 use codex_protocol::openai_models::ModelOrigin;
 use codex_protocol::protocol::MultiAgentVersion;
@@ -128,98 +127,6 @@ async fn configured_project_and_location_build_api_provider() {
             .expect("configured endpoint should build")
             .base_url,
         "https://aiplatform.googleapis.com/v1/projects/configured-project/locations/us-east4/publishers/openai/v1"
-    );
-}
-
-#[tokio::test]
-async fn configured_base_url_bypasses_project_discovery() {
-    let mut provider_info = ModelProviderInfo::create_gcp_provider();
-    provider_info.base_url = Some("https://vertex.example.com/v1".to_string());
-    provider_info.auth = Some(ModelProviderAuthInfo {
-        command: "print-token".to_string(),
-        args: Vec::new(),
-        timeout_ms: std::num::NonZeroU64::new(5_000).expect("timeout should be non-zero"),
-        refresh_interval_ms: 300_000,
-        cwd: std::env::current_dir()
-            .expect("current directory should be available")
-            .try_into()
-            .expect("current directory should be absolute"),
-    });
-    provider_info.project_id = Some("configured-project".to_string());
-    provider_info.location = Some("us-east4".to_string());
-    let provider = GcpModelProvider::new(provider_info, /*auth_manager*/ None);
-
-    assert_eq!(
-        provider
-            .api_provider()
-            .await
-            .expect("configured endpoint should build")
-            .base_url,
-        "https://vertex.example.com/v1"
-    );
-    assert!(
-        provider
-            .auth_manager()
-            .expect("GCP should create a command-backed auth manager")
-            .has_external_auth()
-    );
-}
-
-#[tokio::test]
-async fn credential_files_scope_token_caches_and_refreshes() {
-    let tempdir = tempfile::tempdir().unwrap();
-    let first_file = tempdir.path().join("first credentials.json");
-    let second_file = tempdir.path().join("second credentials.json");
-    std::fs::write(&first_file, "first-token").unwrap();
-    std::fs::write(&second_file, "second-token").unwrap();
-
-    #[cfg(unix)]
-    let (command, args) = (
-        "sh".to_string(),
-        vec![
-            "-c".into(),
-            "cat \"$GOOGLE_APPLICATION_CREDENTIALS\"".into(),
-        ],
-    );
-    let mut first_info = ModelProviderInfo::create_gcp_provider();
-    first_info.auth = Some(ModelProviderAuthInfo {
-        command,
-        args,
-        timeout_ms: std::num::NonZeroU64::new(5_000).unwrap(),
-        refresh_interval_ms: 300_000,
-        cwd: tempdir.path().try_into().unwrap(),
-    });
-    first_info.credential_file = Some(first_file.clone());
-    let mut second_info = first_info.clone();
-    second_info.credential_file = Some(second_file);
-    let first = GcpModelProvider::new(first_info, /*auth_manager*/ None);
-    let second = GcpModelProvider::new(second_info, /*auth_manager*/ None);
-
-    assert_eq!(
-        (first.auth().await, second.auth().await),
-        (
-            Some(CodexAuth::from_api_key("first-token")),
-            Some(CodexAuth::from_api_key("second-token")),
-        ),
-    );
-    std::fs::write(first_file, "refreshed-token").unwrap();
-    assert_eq!(
-        first.auth().await,
-        Some(CodexAuth::from_api_key("first-token"))
-    );
-    first
-        .auth_manager()
-        .unwrap()
-        .unauthorized_recovery()
-        .next()
-        .await
-        .unwrap();
-    assert_eq!(
-        (first.auth().await, second.auth().await),
-        (
-            Some(CodexAuth::from_api_key("refreshed-token")),
-            Some(CodexAuth::from_api_key("second-token")),
-        ),
     );
 }
 

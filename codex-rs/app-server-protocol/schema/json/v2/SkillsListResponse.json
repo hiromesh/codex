@@ -68,7 +68,7 @@
           ]
         },
         "iconLargeUrl": {
-          "description": "Remote large icon URL from the plugin catalog.",
+          "description": "Remote large icon URL.",
           "type": [
             "string",
             "null"
@@ -85,7 +85,7 @@
           ]
         },
         "iconSmallUrl": {
-          "description": "Remote small icon URL from the plugin catalog.",
+          "description": "Remote small icon URL.",
           "type": [
             "string",
             "null"
@@ -133,13 +133,6 @@
         },
         "path": {
           "$ref": "#/definitions/LegacyAppPathString"
-        },
-        "pluginId": {
-          "description": "Owning plugin ID, matching `PluginSummary.id`, when known.",
-          "type": [
-            "string",
-            "null"
-          ]
         },
         "scope": {
           "$ref": "#/definitions/SkillScope"

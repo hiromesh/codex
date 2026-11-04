@@ -12,8 +12,6 @@ use serde_json::json;
 fn command_item(status: CommandExecutionStatus) -> ThreadItemPayload {
     ThreadItemPayload::CommandExecution {
         id: "command".to_string(),
-        plugin_id: None,
-        script_path: None,
         model_context: None,
         sandbox_type: None,
         command: "cargo check".to_string(),
@@ -42,11 +40,7 @@ fn mcp_item(server: &str, id: &str) -> ThreadItemPayload {
         tool: "js".to_string(),
         status: McpToolCallStatus::Completed,
         arguments: json!({"title": format!("Inspect page {id}"), "code": "await cua.getState()"}),
-        app_context: None,
-        mcp_app_resource_uri: None,
-        plugin_id: None,
         read_only_hint: None,
-        mcp_app_ui: None,
         result: Some(Box::new(McpToolCallResult {
             content: vec![json!({"type": "text", "text": format!("Full result for {id}")})],
             structured_content: None,

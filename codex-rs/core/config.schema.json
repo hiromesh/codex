@@ -123,99 +123,6 @@
       },
       "type": "object"
     },
-    "AppConfig": {
-      "additionalProperties": false,
-      "description": "Config values for a single app/connector.",
-      "properties": {
-        "approvals_reviewer": {
-          "allOf": [
-            {
-              "$ref": "#/definitions/ApprovalsReviewer"
-            }
-          ],
-          "description": "Reviewer for approval prompts from this app, overriding the thread default."
-        },
-        "default_tools_approval_mode": {
-          "allOf": [
-            {
-              "$ref": "#/definitions/AppToolApproval"
-            }
-          ],
-          "description": "Approval mode for tools in this app unless a tool override exists."
-        },
-        "default_tools_enabled": {
-          "description": "Whether tools are enabled by default for this app.",
-          "type": "boolean"
-        },
-        "destructive_enabled": {
-          "description": "Whether tools with `destructive_hint = true` are allowed for this app.",
-          "type": "boolean"
-        },
-        "enabled": {
-          "default": true,
-          "description": "When `false`, Codex does not surface this app.",
-          "type": "boolean"
-        },
-        "links": {
-          "allOf": [
-            {
-              "$ref": "#/definitions/AppLinksConfig"
-            }
-          ],
-          "description": "Per-account approval settings keyed by link ID."
-        },
-        "omit_tools_from": {
-          "description": "Model-facing surfaces from which this connector's tools must be omitted, in addition to any server-level omissions. `None` leaves lower-priority configuration unchanged; an empty list clears connector-level omissions.",
-          "items": {
-            "$ref": "#/definitions/ToolExposureSurface"
-          },
-          "type": "array"
-        },
-        "open_world_enabled": {
-          "description": "Whether tools with `open_world_hint = true` are allowed for this app.",
-          "type": "boolean"
-        },
-        "tools": {
-          "allOf": [
-            {
-              "$ref": "#/definitions/AppToolsConfig"
-            }
-          ],
-          "description": "Per-tool settings for this app."
-        }
-      },
-      "type": "object"
-    },
-    "AppLinkConfig": {
-      "additionalProperties": false,
-      "description": "Approval settings for a connected account within an app.",
-      "properties": {
-        "approvals_reviewer": {
-          "allOf": [
-            {
-              "$ref": "#/definitions/ApprovalsReviewer"
-            }
-          ],
-          "description": "Reviewer for approval prompts from this account, overriding the app default."
-        },
-        "default_tools_approval_mode": {
-          "allOf": [
-            {
-              "$ref": "#/definitions/AppToolApproval"
-            }
-          ],
-          "description": "Approval mode for this account unless a tool override exists."
-        }
-      },
-      "type": "object"
-    },
-    "AppLinksConfig": {
-      "additionalProperties": {
-        "$ref": "#/definitions/AppLinkConfig"
-      },
-      "description": "Account settings for a single app.",
-      "type": "object"
-    },
     "AppToolApproval": {
       "enum": [
         "auto",
@@ -225,32 +132,6 @@
       ],
       "type": "string"
     },
-    "AppToolConfig": {
-      "additionalProperties": false,
-      "description": "Per-tool settings for a single app tool.",
-      "properties": {
-        "approval_mode": {
-          "allOf": [
-            {
-              "$ref": "#/definitions/AppToolApproval"
-            }
-          ],
-          "description": "Approval mode for this tool."
-        },
-        "enabled": {
-          "description": "Whether this tool is enabled. `Some(true)` explicitly allows this tool.",
-          "type": "boolean"
-        }
-      },
-      "type": "object"
-    },
-    "AppToolsConfig": {
-      "additionalProperties": {
-        "$ref": "#/definitions/AppToolConfig"
-      },
-      "description": "Tool settings for a single app.",
-      "type": "object"
-    },
     "ApprovalsReviewer": {
       "description": "Configures who approval requests are routed to for review. Examples include sandbox escapes, blocked network access, MCP approval prompts, and ARC escalations. Defaults to `user`. `auto_review` uses a carefully prompted subagent to gather relevant context and apply a risk-based decision framework before approving or denying the request. The legacy value `guardian_subagent` is accepted for compatibility.",
       "enum": [
@@ -259,59 +140,6 @@
         "guardian_subagent"
       ],
       "type": "string"
-    },
-    "AppsConfigToml": {
-      "additionalProperties": {
-        "$ref": "#/definitions/AppConfig"
-      },
-      "description": "App/connector settings loaded from `config.toml`.",
-      "properties": {
-        "_default": {
-          "allOf": [
-            {
-              "$ref": "#/definitions/AppsDefaultConfig"
-            }
-          ],
-          "description": "Default settings for all apps."
-        }
-      },
-      "type": "object"
-    },
-    "AppsDefaultConfig": {
-      "additionalProperties": false,
-      "description": "Default settings that apply to all apps.",
-      "properties": {
-        "approvals_reviewer": {
-          "allOf": [
-            {
-              "$ref": "#/definitions/ApprovalsReviewer"
-            }
-          ],
-          "description": "Reviewer for approval prompts unless overridden by per-app settings."
-        },
-        "default_tools_approval_mode": {
-          "allOf": [
-            {
-              "$ref": "#/definitions/AppToolApproval"
-            }
-          ],
-          "description": "Approval mode for tools unless overridden by per-app or per-tool settings."
-        },
-        "destructive_enabled": {
-          "description": "Whether tools with `destructive_hint = true` are allowed by default.",
-          "type": "boolean"
-        },
-        "enabled": {
-          "default": true,
-          "description": "When `false`, apps are disabled unless overridden by per-app settings.",
-          "type": "boolean"
-        },
-        "open_world_enabled": {
-          "description": "Whether tools with `open_world_hint = true` are allowed by default.",
-          "type": "boolean"
-        }
-      },
-      "type": "object"
     },
     "AskForApproval": {
       "description": "Determines the conditions under which the user is consulted to approve running the command proposed by Codex.",
@@ -756,31 +584,6 @@
             "apply_patch_streaming_events": {
               "type": "boolean"
             },
-            "apps": {
-              "type": "boolean"
-            },
-            "apps_early_resource_discovery": {
-              "type": "boolean"
-            },
-            "apps_mcp_path_override": {
-              "anyOf": [
-                {
-                  "type": "boolean"
-                },
-                {
-                  "additionalProperties": false,
-                  "properties": {
-                    "enabled": {
-                      "type": "boolean"
-                    },
-                    "path": {
-                      "type": "string"
-                    }
-                  },
-                  "type": "object"
-                }
-              ]
-            },
             "async_compaction": {
               "$ref": "#/definitions/FeatureToml_for_AsyncCompactionConfigToml"
             },
@@ -788,9 +591,6 @@
               "type": "boolean"
             },
             "background_paginated_rollout_migration": {
-              "type": "boolean"
-            },
-            "bedrock_setup_wizard": {
               "type": "boolean"
             },
             "browser_annotation_api": {
@@ -809,9 +609,6 @@
               "type": "boolean"
             },
             "cli_daybreak": {
-              "type": "boolean"
-            },
-            "codex_apps_mcp_2026_07_28": {
               "type": "boolean"
             },
             "codex_git_commit": {
@@ -833,9 +630,6 @@
               "type": "boolean"
             },
             "concurrent_reasoning_summaries": {
-              "type": "boolean"
-            },
-            "connectors": {
               "type": "boolean"
             },
             "content_item_kinds": {
@@ -874,9 +668,6 @@
             "enable_fanout": {
               "type": "boolean"
             },
-            "enable_mcp_apps": {
-              "type": "boolean"
-            },
             "enable_request_compression": {
               "type": "boolean"
             },
@@ -904,40 +695,19 @@
             "fast_mode": {
               "type": "boolean"
             },
-            "gcp_setup_wizard": {
-              "type": "boolean"
-            },
             "goals": {
               "type": "boolean"
             },
             "guardian_approval": {
               "type": "boolean"
             },
-            "guardian_conversation_history_tools": {
-              "type": "boolean"
-            },
-            "guardian_enhanced_node_repl_transcripts": {
-              "type": "boolean"
-            },
-            "guardian_ext": {
-              "type": "boolean"
-            },
             "guardian_native_multi_agent_history": {
-              "type": "boolean"
-            },
-            "guardian_node_repl_transcript_images": {
-              "type": "boolean"
-            },
-            "guardian_recorded_items": {
               "type": "boolean"
             },
             "guardian_reuse_parent_compaction": {
               "type": "boolean"
             },
             "guardian_root_handoff_context": {
-              "type": "boolean"
-            },
-            "guardian_trust_orchestrator_connectors": {
               "type": "boolean"
             },
             "hooks": {
@@ -1051,16 +821,7 @@
             "personality": {
               "type": "boolean"
             },
-            "plugin_discovery_prefetch": {
-              "type": "boolean"
-            },
-            "plugin_hooks": {
-              "type": "boolean"
-            },
             "plugin_sharing": {
-              "type": "boolean"
-            },
-            "plugins": {
               "type": "boolean"
             },
             "powershell_shell_version": {
@@ -1078,13 +839,7 @@
             "reasoning_effort_override": {
               "type": "boolean"
             },
-            "recommended_plugins": {
-              "type": "boolean"
-            },
             "remote_compaction_v2": {
-              "type": "boolean"
-            },
-            "remote_control": {
               "type": "boolean"
             },
             "remote_models": {
@@ -1148,9 +903,6 @@
               "type": "boolean"
             },
             "shell_zsh_fork": {
-              "type": "boolean"
-            },
-            "simplified_selection_hints": {
               "type": "boolean"
             },
             "skill_catalog_deltas": {
@@ -1305,9 +1057,6 @@
             }
           },
           "type": "object"
-        },
-        "include_apps_instructions": {
-          "type": "boolean"
         },
         "include_collaboration_mode_instructions": {
           "type": "boolean"
@@ -2204,56 +1953,6 @@
       "description": "One action binding value in config.\n\nThis accepts either:\n\n1. A single key or chord string (`\"ctrl-a\"` or `\"ctrl-x ctrl-s\"`). 2. A list of alternative bindings (`[\"ctrl-a\", \"ctrl-x ctrl-s\"]`).\n\nAn empty list explicitly unbinds the action in that scope. Because an explicit empty list is still a configured value, runtime resolution must not fall through to global or built-in defaults for that action."
     },
     "LegacyAppPathString": {
-      "type": "string"
-    },
-    "MarketplaceConfig": {
-      "additionalProperties": false,
-      "properties": {
-        "last_revision": {
-          "default": null,
-          "description": "Git revision Codex last successfully activated for this marketplace.",
-          "type": "string"
-        },
-        "last_updated": {
-          "default": null,
-          "description": "Last time Codex successfully added or refreshed this marketplace.",
-          "type": "string"
-        },
-        "ref": {
-          "default": null,
-          "description": "Git ref to check out when `source_type` is `git`.",
-          "type": "string"
-        },
-        "source": {
-          "default": null,
-          "description": "Source location used when the marketplace was added.",
-          "type": "string"
-        },
-        "source_type": {
-          "allOf": [
-            {
-              "$ref": "#/definitions/MarketplaceSourceType"
-            }
-          ],
-          "default": null,
-          "description": "Source kind used to install this marketplace."
-        },
-        "sparse_paths": {
-          "default": null,
-          "description": "Sparse checkout paths used when `source_type` is `git`.",
-          "items": {
-            "type": "string"
-          },
-          "type": "array"
-        }
-      },
-      "type": "object"
-    },
-    "MarketplaceSourceType": {
-      "enum": [
-        "git",
-        "local"
-      ],
       "type": "string"
     },
     "MatcherGroup": {
@@ -3239,10 +2938,6 @@
           "description": "Tracks whether the user has acknowledged the full access warning prompt.",
           "type": "boolean"
         },
-        "hide_gov_cloud_guidance": {
-          "description": "Tracks whether the user has acknowledged the AWS GovCloud guidance.",
-          "type": "boolean"
-        },
         "hide_gpt-5.1-codex-max_migration_prompt": {
           "description": "Tracks whether the user has seen the gpt-5.1-codex-max migration prompt",
           "type": "boolean"
@@ -3600,111 +3295,6 @@
         "pragmatic"
       ],
       "type": "string"
-    },
-    "PluginConfig": {
-      "additionalProperties": false,
-      "properties": {
-        "apps": {
-          "additionalProperties": {
-            "$ref": "#/definitions/AppConfig"
-          },
-          "description": "Connector-wide app settings keyed by connector ID. Ignored when this plugin is disabled by configuration. Explicit top-level app fields win.",
-          "type": "object"
-        },
-        "auto_provision": {
-          "description": "Provisioning metadata. Omission does not request provisioning. Only applies with `remote_plugin_id` and Plugin Service availability to the requesting user at provisioning time. Effective enablement, trusted provisioning policy, and authentication and authorization restrictions still apply. This value is not trusted authorization and does not trigger provisioning.",
-          "type": "boolean"
-        },
-        "enabled": {
-          "description": "Explicit activation override. Omission inherits the installed-plugin default.",
-          "type": "boolean"
-        },
-        "mcp_servers": {
-          "additionalProperties": {
-            "$ref": "#/definitions/PluginMcpServerConfig"
-          },
-          "description": "Per-MCP-server policy overlays for MCP servers contributed by this plugin.",
-          "type": "object"
-        },
-        "release_id": {
-          "description": "Release identifier used to pin the remote plugin to a specific release. Omission leaves release selection unchanged. Core stores this metadata without selecting or fetching a release.",
-          "type": "string"
-        },
-        "remote_plugin_id": {
-          "description": "Stable, unique identifier of a ChatGPT-hosted remote plugin. Availability to the requesting user is determined by Plugin Service at provisioning time.",
-          "type": "string"
-        }
-      },
-      "type": "object"
-    },
-    "PluginMcpServerConfig": {
-      "additionalProperties": false,
-      "description": "Policy settings for a plugin-provided MCP server.\n\nThis intentionally excludes transport settings: plugin manifests own how the MCP server is launched, while host config owns enablement, auth, and tool policy.",
-      "properties": {
-        "default_tools_approval_mode": {
-          "allOf": [
-            {
-              "$ref": "#/definitions/AppToolApproval"
-            }
-          ],
-          "description": "Approval mode for tools in this server unless a tool override exists."
-        },
-        "disabled_tools": {
-          "description": "Explicit deny-list of tools. These tools are removed after applying `enabled_tools`.",
-          "items": {
-            "type": "string"
-          },
-          "type": "array"
-        },
-        "enabled": {
-          "default": true,
-          "description": "When `false`, Codex skips initializing this plugin MCP server.",
-          "type": "boolean"
-        },
-        "enabled_tools": {
-          "description": "Explicit allow-list of tools exposed from this server.",
-          "items": {
-            "type": "string"
-          },
-          "type": "array"
-        },
-        "tools": {
-          "additionalProperties": {
-            "$ref": "#/definitions/McpServerToolConfig"
-          },
-          "description": "Per-tool policy settings keyed by tool name.",
-          "type": "object"
-        }
-      },
-      "type": "object"
-    },
-    "PluginsConfigToml": {
-      "additionalProperties": {
-        "$ref": "#/definitions/PluginConfig"
-      },
-      "description": "Plugin activation and capability settings loaded from configuration layers.",
-      "properties": {
-        "_default": {
-          "allOf": [
-            {
-              "$ref": "#/definitions/PluginsDefaultConfig"
-            }
-          ],
-          "description": "Defaults for installed plugin activation. Omission preserves source enablement. Explicit plugin enablement settings override this default, but cannot enable an installation disabled by its source."
-        }
-      },
-      "type": "object"
-    },
-    "PluginsDefaultConfig": {
-      "additionalProperties": false,
-      "description": "Default activation settings for installed plugins.",
-      "properties": {
-        "enabled": {
-          "default": true,
-          "type": "boolean"
-        }
-      },
-      "type": "object"
     },
     "Preset": {
       "additionalProperties": false,
@@ -4471,8 +4061,7 @@
     },
     "ToolSuggestDiscoverableType": {
       "enum": [
-        "connector",
-        "plugin"
+        "connector"
       ],
       "type": "string"
     },
@@ -6781,19 +6370,6 @@
       ],
       "description": "Configures who approval requests are routed to for review once they have been escalated. This does not disable separate safety checks such as ARC."
     },
-    "apps": {
-      "allOf": [
-        {
-          "$ref": "#/definitions/AppsConfigToml"
-        }
-      ],
-      "default": null,
-      "description": "Settings for app-specific controls."
-    },
-    "apps_mcp_product_sku": {
-      "description": "Optional product SKU forwarded on host-owned Codex Apps MCP requests.",
-      "type": "string"
-    },
     "auto_review": {
       "allOf": [
         {
@@ -6910,31 +6486,6 @@
         "apply_patch_streaming_events": {
           "type": "boolean"
         },
-        "apps": {
-          "type": "boolean"
-        },
-        "apps_early_resource_discovery": {
-          "type": "boolean"
-        },
-        "apps_mcp_path_override": {
-          "anyOf": [
-            {
-              "type": "boolean"
-            },
-            {
-              "additionalProperties": false,
-              "properties": {
-                "enabled": {
-                  "type": "boolean"
-                },
-                "path": {
-                  "type": "string"
-                }
-              },
-              "type": "object"
-            }
-          ]
-        },
         "async_compaction": {
           "$ref": "#/definitions/FeatureToml_for_AsyncCompactionConfigToml"
         },
@@ -6942,9 +6493,6 @@
           "type": "boolean"
         },
         "background_paginated_rollout_migration": {
-          "type": "boolean"
-        },
-        "bedrock_setup_wizard": {
           "type": "boolean"
         },
         "browser_annotation_api": {
@@ -6963,9 +6511,6 @@
           "type": "boolean"
         },
         "cli_daybreak": {
-          "type": "boolean"
-        },
-        "codex_apps_mcp_2026_07_28": {
           "type": "boolean"
         },
         "codex_git_commit": {
@@ -6987,9 +6532,6 @@
           "type": "boolean"
         },
         "concurrent_reasoning_summaries": {
-          "type": "boolean"
-        },
-        "connectors": {
           "type": "boolean"
         },
         "content_item_kinds": {
@@ -7028,9 +6570,6 @@
         "enable_fanout": {
           "type": "boolean"
         },
-        "enable_mcp_apps": {
-          "type": "boolean"
-        },
         "enable_request_compression": {
           "type": "boolean"
         },
@@ -7058,40 +6597,19 @@
         "fast_mode": {
           "type": "boolean"
         },
-        "gcp_setup_wizard": {
-          "type": "boolean"
-        },
         "goals": {
           "type": "boolean"
         },
         "guardian_approval": {
           "type": "boolean"
         },
-        "guardian_conversation_history_tools": {
-          "type": "boolean"
-        },
-        "guardian_enhanced_node_repl_transcripts": {
-          "type": "boolean"
-        },
-        "guardian_ext": {
-          "type": "boolean"
-        },
         "guardian_native_multi_agent_history": {
-          "type": "boolean"
-        },
-        "guardian_node_repl_transcript_images": {
-          "type": "boolean"
-        },
-        "guardian_recorded_items": {
           "type": "boolean"
         },
         "guardian_reuse_parent_compaction": {
           "type": "boolean"
         },
         "guardian_root_handoff_context": {
-          "type": "boolean"
-        },
-        "guardian_trust_orchestrator_connectors": {
           "type": "boolean"
         },
         "hooks": {
@@ -7205,16 +6723,7 @@
         "personality": {
           "type": "boolean"
         },
-        "plugin_discovery_prefetch": {
-          "type": "boolean"
-        },
-        "plugin_hooks": {
-          "type": "boolean"
-        },
         "plugin_sharing": {
-          "type": "boolean"
-        },
-        "plugins": {
           "type": "boolean"
         },
         "powershell_shell_version": {
@@ -7232,13 +6741,7 @@
         "reasoning_effort_override": {
           "type": "boolean"
         },
-        "recommended_plugins": {
-          "type": "boolean"
-        },
         "remote_compaction_v2": {
-          "type": "boolean"
-        },
-        "remote_control": {
           "type": "boolean"
         },
         "remote_models": {
@@ -7302,9 +6805,6 @@
           "type": "boolean"
         },
         "shell_zsh_fork": {
-          "type": "boolean"
-        },
-        "simplified_selection_hints": {
           "type": "boolean"
         },
         "skill_catalog_deltas": {
@@ -7536,10 +7036,6 @@
       ],
       "description": "Lifecycle hooks configured inline in TOML plus user-level overrides."
     },
-    "include_apps_instructions": {
-      "description": "Whether to inject the `<apps_instructions>` developer block.",
-      "type": "boolean"
-    },
     "include_collaboration_mode_instructions": {
       "description": "Whether to inject the `<collaboration_mode>` developer block.",
       "type": "boolean"
@@ -7567,14 +7063,6 @@
         }
       ],
       "description": "Directory for log files. Setting this value explicitly also routes the SQLite logs database here and enables the TUI text log in this directory. When unset, log files use `$CODEX_HOME/log` and SQLite logs use `sqlite_home`. Existing SQLite logs in `sqlite_home` are not migrated automatically. A managed `sqlite_home` requirement keeps SQLite logs in that required directory."
-    },
-    "marketplaces": {
-      "additionalProperties": {
-        "$ref": "#/definitions/MarketplaceConfig"
-      },
-      "default": {},
-      "description": "User-level marketplace entries keyed by marketplace name.",
-      "type": "object"
     },
     "mcp_enterprise_managed_auth": {
       "allOf": [
@@ -7756,15 +7244,6 @@
     },
     "plan_mode_reasoning_effort": {
       "$ref": "#/definitions/ReasoningEffort"
-    },
-    "plugins": {
-      "allOf": [
-        {
-          "$ref": "#/definitions/PluginsConfigToml"
-        }
-      ],
-      "default": {},
-      "description": "Default and per-plugin settings keyed by exact `<plugin>@<marketplace>` IDs."
     },
     "profile": {
       "description": "Profile to use from the `profiles` map.",

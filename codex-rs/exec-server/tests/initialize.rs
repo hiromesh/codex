@@ -24,6 +24,7 @@ use uuid::Uuid;
 #[test_case::test_case(Some("1.2.3-alpha.4"); "packaged")]
 #[test_case::test_case(None; "without_manifest")]
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+#[serial_test::serial(exec_server_process)]
 async fn exec_server_accepts_initialize(version: Option<&str>) -> anyhow::Result<()> {
     let package = TempDir::new()?;
     let bin_dir = package.path().join("bin");
@@ -105,16 +106,14 @@ async fn exec_server_accepts_initialize(version: Option<&str>) -> anyhow::Result
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+#[serial_test::serial(exec_server_process)]
 async fn discovery_prewarms_before_initialize_and_recovers_without_client_opt_in()
 -> anyhow::Result<()> {
     let codex_home = TempDir::new()?;
-    let discovery_home = {
-        // Fail the scan before startup, without racing the background task.
-        std::fs::write(codex_home.path().join("plugins"), "not a directory")?;
-        codex_home.path().to_path_buf()
-    };
+    let discovery_home = codex_home.path().to_path_buf();
     let user_home = codex_home.path().join("home");
-    std::fs::create_dir_all(user_home.join(".agents/skills"))?;
+    // Fail capability location resolution before startup, without racing the background task.
+    std::fs::write(&user_home, "not a directory")?;
     let stderr_path = codex_home.path().join("executor.log");
     let stderr = std::fs::File::create(&stderr_path)?;
     let helper_paths = common::exec_server::test_codex_helper_paths()?;
@@ -179,7 +178,7 @@ async fn discovery_prewarms_before_initialize_and_recovers_without_client_opt_in
     assert_eq!(id, environment_info_id);
     let info: EnvironmentInfo = serde_json::from_value(result)?;
     // Repair the failed startup fixture; discovery must retry and find the new skill.
-    std::fs::remove_file(discovery_home.join("plugins"))?;
+    std::fs::remove_file(&user_home)?;
     let skill_root = discovery_home.join("skills/recovered");
     std::fs::create_dir_all(&skill_root)?;
     std::fs::write(
@@ -211,6 +210,7 @@ async fn discovery_prewarms_before_initialize_and_recovers_without_client_opt_in
 
 /// Requests retain their wire-order initialization errors even when later handshake messages are pipelined.
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+#[serial_test::serial(exec_server_process)]
 async fn exec_server_rejects_pipelined_requests_before_initialized() -> anyhow::Result<()> {
     let mut server = exec_server_with_env(
         std::iter::empty::<(&str, &str)>(),

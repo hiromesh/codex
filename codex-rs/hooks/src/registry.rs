@@ -94,6 +94,22 @@ impl Hooks {
         )
     }
 
+    /// Restrict this session's hooks to the handlers that may run for memory consolidation.
+    pub fn for_memory_consolidation(&self) -> Self {
+        let mut hooks = self.clone();
+        let handlers = hooks
+            .engine
+            .handlers
+            .iter()
+            .filter(|handler| handler.runs_for_memory_consolidation())
+            .cloned()
+            .collect::<Vec<_>>();
+        if handlers.len() != hooks.engine.handlers.len() {
+            hooks.engine.handlers = Arc::new(handlers);
+        }
+        hooks
+    }
+
     /// Adds only owner-admitted requirements hooks; execution remains scoped to their environment.
     pub fn with_environment_hooks(
         &self,

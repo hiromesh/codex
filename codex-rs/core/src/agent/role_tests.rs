@@ -1,12 +1,10 @@
 use super::*;
 use crate::config::ConfigBuilder;
-use crate::plugins::plugins_manager_for_config;
 use crate::skills_load_input_from_config;
 use codex_config::CloudConfigBundleBindingStatus;
 use codex_config::CloudConfigBundlePolicy;
 use codex_config::CloudConfigBundleSnapshot;
 use codex_config::test_support::CloudConfigBundleFixture;
-use codex_login::test_support::auth_manager_from_optional_auth;
 use codex_protocol::config_types::ServiceTier;
 use codex_protocol::models::BaseInstructionsProvenance;
 use codex_protocol::openai_models::ReasoningEffort;
@@ -476,12 +474,8 @@ notify = ["attacker-command"]
 [features]
 guardian_approval = false
 network_proxy = false
-apps = true
 memory_tool = false
 request_permissions_tool = false
-
-[apps.calendar]
-enabled = true
 
 [mcp_servers.attacker]
 command = "attacker-command"
@@ -548,52 +542,12 @@ command = "attacker-command"
         "approval_policy",
         "sandbox_mode",
         "notify",
-        "apps",
         "mcp_servers",
     ] {
         assert_eq!(
             role_layer.config.get(key),
             None,
             "role must not control {key}"
-        );
-    }
-}
-
-#[tokio::test]
-async fn apply_role_disables_plugins_unless_required_by_managed_policy() {
-    let home = TempDir::new().expect("create temp dir");
-    let role_path =
-        write_role_config(&home, "without-plugins.toml", "[features]\nplugins = false").await;
-
-    for (requirements, expected_enabled) in [("", false), ("[features]\nplugins = true", true)] {
-        let mut config = ConfigBuilder::without_managed_config_for_tests()
-            .codex_home(home.path().to_path_buf())
-            .fallback_cwd(Some(home.path().to_path_buf()))
-            .cli_overrides(vec![(
-                "features.plugins".to_string(),
-                TomlValue::Boolean(true),
-            )])
-            .cloud_config_bundle(
-                CloudConfigBundleFixture::loader_with_enterprise_requirement(requirements),
-            )
-            .build()
-            .await
-            .expect("load parent config");
-        config.agent_roles.insert(
-            "custom".to_string(),
-            AgentRoleConfig {
-                config_file: Some(role_path.clone()),
-                ..Default::default()
-            },
-        );
-
-        apply_role_to_config(&mut config, Some("custom"))
-            .await
-            .expect("role should respect managed feature requirements");
-
-        assert_eq!(
-            config.plugins_config_input().plugins_enabled,
-            expected_enabled
         );
     }
 }
@@ -667,18 +621,9 @@ enabled = false
         .await
         .expect("custom role should apply");
 
-    let plugins_manager = Arc::new(plugins_manager_for_config(
-        &config,
-        auth_manager_from_optional_auth(/*auth*/ None),
-    ));
     let skills_service =
         HostSkillsService::new(home.path().abs(), /*bundled_skills_enabled*/ true);
-    let plugins_input = config.plugins_config_input();
-    let plugin_outcome = plugins_manager.plugins_for_config(&plugins_input).await;
-    let effective_skill_roots = plugin_outcome.effective_plugin_skill_roots();
-    let plugin_skill_snapshots = plugins_manager.plugin_skill_snapshots_for_config(&plugins_input);
-    let skills_input = skills_load_input_from_config(&config, effective_skill_roots)
-        .with_plugin_skill_snapshots(plugin_skill_snapshots);
+    let skills_input = skills_load_input_from_config(&config);
     let snapshot = skills_service
         .snapshot_for_config(
             &skills_input,

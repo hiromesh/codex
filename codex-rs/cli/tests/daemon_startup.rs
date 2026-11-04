@@ -85,14 +85,14 @@ async fn daemon_exclusion_survives_fork_picker() -> Result<()> {
 }
 
 #[tokio::test]
-async fn daemon_auto_start_preserves_bedrock_onboarding() -> Result<()> {
-    daemon_startup("bedrock").await
+async fn daemon_auto_start_preserves_api_key_onboarding() -> Result<()> {
+    daemon_startup("onboarding").await
 }
 
 #[tokio::test]
 #[cfg(unix)]
-async fn bedrock_onboarding_leaves_a_running_daemon_untouched() -> Result<()> {
-    daemon_startup("bedrock-running").await
+async fn api_key_onboarding_leaves_a_running_daemon_untouched() -> Result<()> {
+    daemon_startup("onboarding-running").await
 }
 
 async fn daemon_startup(command: &str) -> Result<()> {
@@ -116,7 +116,7 @@ async fn daemon_startup(command: &str) -> Result<()> {
             .success(),
         "failed to prepare CLI test executable"
     );
-    let bedrock_onboarding = matches!(command, "bedrock" | "bedrock-running");
+    let api_key_onboarding = matches!(command, "onboarding" | "onboarding-running");
     fs::write(
         home.path().join("config.toml"),
         format!(
@@ -130,8 +130,6 @@ async fn daemon_startup(command: &str) -> Result<()> {
          [projects.{}]\ntrust_level = \"{}\"\n",
             if command == "discovered" {
                 "tui.status_line=[\"model\",\"thread-id\",\"thread-name\"]\nfeatures.daemon_auto_start=false"
-            } else if bedrock_onboarding {
-                "features.gcp_setup_wizard=false"
             } else {
                 ""
             },
@@ -147,7 +145,7 @@ async fn daemon_startup(command: &str) -> Result<()> {
     let persisted = command == "mismatch-disable-persisted";
     let disabling = matches!(command, "mismatch-disable" | "mismatch-disable-persisted");
     let restart = command == "mismatch-restart" || disabling;
-    if !bedrock_onboarding {
+    if !api_key_onboarding {
         fs::write(
             home.path().join("auth.json"),
             r#"{"OPENAI_API_KEY":"daemon-startup-test","tokens":null,"last_refresh":null}"#,
@@ -182,7 +180,7 @@ async fn daemon_startup(command: &str) -> Result<()> {
             | "agents-untrusted"
             | "agents-untrusted-new"
             | "discovered"
-            | "bedrock-running"
+            | "onboarding-running"
             | "restrictive-job"
     ) || mismatch
     {
@@ -212,7 +210,7 @@ async fn daemon_startup(command: &str) -> Result<()> {
     }
     let pid_file = home.path().join("app-server-daemon/daemon.pid");
     let result = async {
-        let mut existing_daemon = if matches!(command, "bedrock-running" | "discovered" | "agents-no-daemon")
+        let mut existing_daemon = if matches!(command, "onboarding-running" | "discovered" | "agents-no-daemon")
             || (mismatch && !disabling)
         {
             let started = Command::new(&codex)
@@ -296,9 +294,8 @@ async fn daemon_startup(command: &str) -> Result<()> {
                 steps.push_back(("GPT-5.6-Terra", b"/status\r"));
                 if restart { "Server:Localbackgroundserver" } else { "Model:" }
             }
-        } else if bedrock_onboarding {
-            // With GCP disabled, only Bedrock makes the sign-in menu advertise another provider.
-            "UseanAPIkeyoranotherprovider"
+        } else if api_key_onboarding {
+            "SigninwithanOpenAIAPIkey"
         } else {
             args.extend([command.into(), "--strict-config".into()]);
             if command == "resume" {
@@ -497,7 +494,7 @@ async fn daemon_startup(command: &str) -> Result<()> {
                     } else if elevated_launch {
                         ensure!(!home.path().join("app-server-daemon").exists());
                         ensure!(!home.path().join("packages/app-server-daemon").exists());
-                    } else if bedrock_onboarding || command == "restrictive-job" {
+                    } else if api_key_onboarding || command == "restrictive-job" {
                         ensure!(!pid_file.exists());
                         if command == "restrictive-job" && !elevated {
                             let contents = screen.screen().contents();

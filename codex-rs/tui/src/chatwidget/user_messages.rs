@@ -14,6 +14,7 @@ use std::path::PathBuf;
 use crate::bottom_pane::LocalImageAttachment;
 use crate::bottom_pane::MentionBinding;
 use crate::bottom_pane::QueuedInputAction;
+use crate::mention_codec::TEXT_MENTION_SIGIL;
 use codex_app_server_protocol::ImageReference;
 use codex_app_server_protocol::TextElement as AppServerTextElement;
 use codex_app_server_protocol::UserInput;
@@ -23,8 +24,7 @@ use codex_protocol::models::local_image_label_text;
 use codex_protocol::openai_models::ReasoningEffort as ReasoningEffortConfig;
 use codex_protocol::user_input::ByteRange;
 use codex_protocol::user_input::TextElement;
-use codex_utils_plugins::mention_syntax::PLUGIN_TEXT_MENTION_SIGIL;
-use codex_utils_plugins::mention_syntax::TOOL_MENTION_SIGIL;
+use codex_protocol::mention_syntax::TOOL_MENTION_SIGIL;
 
 use super::ChatWidget;
 use super::StatusSurfaceOverrides;
@@ -620,14 +620,14 @@ pub(crate) fn mention_bindings_from_user_inputs(
                         .unwrap_or(plugin_id)
                         .to_string()
                 } else if path.starts_with("app://") {
-                    codex_connectors::metadata::connector_mention_slug_from_name(name)
+                    name.clone()
                 } else {
                     name.clone()
                 };
                 let sigil = if plugin_id.is_some()
-                    && mention_start(PLUGIN_TEXT_MENTION_SIGIL, &mention).is_some()
+                    && mention_start(TEXT_MENTION_SIGIL, &mention).is_some()
                 {
-                    PLUGIN_TEXT_MENTION_SIGIL
+                    TEXT_MENTION_SIGIL
                 } else {
                     TOOL_MENTION_SIGIL
                 };

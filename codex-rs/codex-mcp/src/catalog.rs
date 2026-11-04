@@ -1,79 +1,18 @@
-use std::cmp::Reverse;
 use std::collections::BTreeMap;
 use std::collections::BTreeSet;
 use std::collections::HashMap;
 
-use codex_config::DEFAULT_MCP_SERVER_ENVIRONMENT_ID;
 use codex_config::McpServerConfig;
 use codex_config::McpServerDisabledReason;
-use codex_config::McpServerIdpOAuthConfig;
-use codex_config::McpServerTransportConfig;
 use codex_config::RequirementSource;
 use codex_protocol::mcp_policy::EnvironmentMcpPolicy;
-use codex_utils_path_uri::PathUri;
 
 use crate::McpProtocolMode;
 use crate::server::McpCredentialPolicy;
 
-/// Plugin identity retained with an MCP registration for tool attribution.
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct McpPluginAttribution {
-    plugin_id: String,
-    display_name: String,
-    agent_plugin: bool,
-    host_root: Option<PathUri>,
-}
-
-impl McpPluginAttribution {
-    pub fn new(plugin_id: String, display_name: String) -> Self {
-        Self {
-            plugin_id,
-            display_name,
-            agent_plugin: false,
-            host_root: None,
-        }
-    }
-
-    pub fn agent_plugin(plugin_id: String, display_name: String) -> Self {
-        Self {
-            plugin_id,
-            display_name,
-            agent_plugin: true,
-            host_root: None,
-        }
-    }
-
-    /// Records the exact host-discovered plugin root.
-    pub fn with_host_root(mut self, host_root: PathUri) -> Self {
-        self.host_root = Some(host_root);
-        self
-    }
-
-    pub fn plugin_id(&self) -> &str {
-        &self.plugin_id
-    }
-
-    pub fn display_name(&self) -> &str {
-        &self.display_name
-    }
-
-    pub fn is_agent_plugin(&self) -> bool {
-        self.agent_plugin
-    }
-
-    /// Returns the host-discovered root captured with this server registration.
-    pub fn host_root(&self) -> Option<&PathUri> {
-        self.host_root.as_ref()
-    }
-}
-
 /// The component that declared an MCP server registration.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum McpServerSource {
-    /// A plugin discovered through the process-wide legacy plugin manager.
-    Plugin(McpPluginAttribution),
-    /// A plugin explicitly selected for this thread through a capability root.
-    SelectedPlugin(McpPluginAttribution),
     Config,
     Compatibility {
         id: String,
@@ -83,27 +22,8 @@ pub enum McpServerSource {
     },
 }
 
-impl McpServerSource {
-    pub fn is_agent_plugin(&self) -> bool {
-        match self {
-            Self::Plugin(attribution) | Self::SelectedPlugin(attribution) => {
-                attribution.is_agent_plugin()
-            }
-            Self::Config | Self::Compatibility { .. } | Self::Extension { .. } => false,
-        }
-    }
-
-    fn disabled_registration_is_name_veto(&self) -> bool {
-        // A selected package's policy applies to its registration, not to a higher runtime source
-        // that happens to use the same logical server name.
-        !matches!(self, Self::SelectedPlugin(_))
-    }
-}
-
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 enum RegistrationPrecedence {
-    Plugin(Reverse<usize>),
-    SelectedPlugin(Reverse<usize>),
     Config,
     Compatibility,
     Extension(usize),
@@ -112,11 +32,9 @@ enum RegistrationPrecedence {
 impl RegistrationPrecedence {
     fn tier(self) -> u8 {
         match self {
-            Self::Plugin(_) => 0,
-            Self::SelectedPlugin(_) => 1,
-            Self::Config => 2,
-            Self::Compatibility => 3,
-            Self::Extension(_) => 4,
+            Self::Config => 0,
+            Self::Compatibility => 1,
+            Self::Extension(_) => 2,
         }
     }
 }
@@ -153,49 +71,6 @@ impl McpServerRegistration {
             config,
             RegistrationPrecedence::Config,
             McpCredentialPolicy::ExecutorOnly,
-        )
-    }
-
-    /// Registers a plugin discovered by the host's process-wide plugin manager.
-    pub fn from_plugin(
-        name: String,
-        attribution: McpPluginAttribution,
-        plugin_order: usize,
-        config: McpServerConfig,
-    ) -> Self {
-        Self::new(
-            name,
-            McpServerSource::Plugin(attribution),
-            config,
-            RegistrationPrecedence::Plugin(Reverse(plugin_order)),
-            McpCredentialPolicy::HostFallbackAllowed,
-        )
-    }
-
-    /// Registers a thread-selected plugin above discovered plugins and below config.
-    /// HTTP credential authority comes from the selected root, not the server's execution environment.
-    pub fn from_selected_plugin(
-        name: String,
-        attribution: McpPluginAttribution,
-        selection_order: usize,
-        source_environment_id: &str,
-        config: McpServerConfig,
-    ) -> Self {
-        let credential_policy = if source_environment_id != DEFAULT_MCP_SERVER_ENVIRONMENT_ID
-            && matches!(
-                &config.transport,
-                McpServerTransportConfig::StreamableHttp { .. }
-            ) {
-            McpCredentialPolicy::ExecutorOnly
-        } else {
-            McpCredentialPolicy::HostFallbackAllowed
-        };
-        Self::new(
-            name,
-            McpServerSource::SelectedPlugin(attribution),
-            config,
-            RegistrationPrecedence::SelectedPlugin(Reverse(selection_order)),
-            credential_policy,
         )
     }
 
@@ -259,8 +134,6 @@ pub enum McpEnvironmentAuthority<'a> {
     Unrestricted,
     /// The owner supplied the final restrictions for this environment.
     Restricted(&'a EnvironmentMcpPolicy),
-    /// An explicitly selected plugin can use its executor without attaching that executor.
-    SelectedPluginsOnly,
     /// The attachment is pending or failed, so its owner policy is not available.
     Unavailable,
 }
@@ -322,16 +195,9 @@ pub struct McpCatalogBuilder {
     actions: Vec<CatalogAction>,
     disabled_server_names: BTreeSet<String>,
     requirements_disabled_server_names: BTreeMap<String, RequirementSource>,
-    ema_idp: Option<McpServerIdpOAuthConfig>,
 }
 
 impl McpCatalogBuilder {
-    /// Enables EMA with the IdP selected from trusted configuration.
-    /// Without this policy, finalization disables EMA registrations.
-    pub fn enable_ema(&mut self, idp: McpServerIdpOAuthConfig) {
-        self.ema_idp = Some(idp);
-    }
-
     pub fn register(&mut self, registration: McpServerRegistration) {
         self.actions
             .push(CatalogAction::Register(Box::new(registration)));
@@ -379,45 +245,16 @@ impl McpCatalogBuilder {
 
             let allowed = match authority_for_environment(&registration.config.environment_id) {
                 McpEnvironmentAuthority::Unrestricted => true,
-                McpEnvironmentAuthority::SelectedPluginsOnly => {
-                    matches!(&registration.source, McpServerSource::SelectedPlugin(_))
-                }
                 McpEnvironmentAuthority::Unavailable => false,
-                McpEnvironmentAuthority::Restricted(policy) => match &registration.source {
-                    McpServerSource::Config
-                    | McpServerSource::Compatibility { .. }
-                    | McpServerSource::Extension { .. } => {
-                        policy.servers.as_ref().is_none_or(|requirements| {
-                            requirements
-                                .get(&registration.name)
-                                .is_some_and(|requirement| {
-                                    registration.config.matches_requirement(requirement)
-                                })
-                        })
-                    }
-                    McpServerSource::Plugin(attribution)
-                    | McpServerSource::SelectedPlugin(attribution) => {
-                        // Empty server policy denies every plugin; otherwise use package policy.
-                        !policy.servers.as_ref().is_some_and(BTreeMap::is_empty)
-                            && policy
-                                .plugins
-                                .as_ref()
-                                .filter(|plugins| {
-                                    plugins.values().any(|plugin| plugin.mcp_servers.is_some())
-                                })
-                                .is_none_or(|plugins| {
-                                    plugins
-                                        .get(attribution.plugin_id())
-                                        .and_then(|plugin| plugin.mcp_servers.as_ref())
-                                        .and_then(|requirements| {
-                                            requirements.get(&registration.name)
-                                        })
-                                        .is_some_and(|requirement| {
-                                            registration.config.matches_requirement(requirement)
-                                        })
-                                })
-                    }
-                },
+                McpEnvironmentAuthority::Restricted(policy) => {
+                    policy.servers.as_ref().is_none_or(|requirements| {
+                        requirements
+                            .get(&registration.name)
+                            .is_some_and(|requirement| {
+                                registration.config.matches_requirement(requirement)
+                            })
+                    })
+                }
             };
 
             if !allowed {
@@ -431,14 +268,6 @@ impl McpCatalogBuilder {
     }
 
     pub fn build(mut self) -> ResolvedMcpCatalog {
-        // Keep source actions unbound so later catalog revisions resolve afresh.
-        for action in &mut self.actions {
-            if let CatalogAction::Register(registration) = action
-                && let Some(oauth) = &mut registration.config.oauth
-            {
-                oauth.ema_registration = None;
-            }
-        }
         // Stable sorting makes action order the tie-breaker when precedence is equal.
         self.actions.sort_by_key(CatalogAction::precedence);
 
@@ -472,22 +301,12 @@ impl McpCatalogBuilder {
 
         let mut disabled_server_names = self.disabled_server_names;
         let mut requirements_disabled_server_names = self.requirements_disabled_server_names;
-        let ema_idp = self.ema_idp;
         let servers = winners
             .into_iter()
             .filter_map(|(name, action)| match action {
                 CatalogAction::Register(registration) => {
                     let mut registration = *registration;
-                    let persist_disabled_name =
-                        registration.source.disabled_registration_is_name_veto()
-                            && !(matches!(
-                                registration.source,
-                                McpServerSource::Plugin(_) | McpServerSource::SelectedPlugin(_)
-                            ) && matches!(
-                                registration.config.auth,
-                                codex_config::McpServerAuth::EmaAuth
-                            ));
-                    if !registration.config.enabled && persist_disabled_name {
+                    if !registration.config.enabled {
                         match &registration.config.disabled_reason {
                             Some(
                                 McpServerDisabledReason::Requirements { source }
@@ -518,12 +337,7 @@ impl McpCatalogBuilder {
                         registration.config.auth,
                         codex_config::McpServerAuth::EmaAuth
                     ) {
-                        let allowed = matches!(&registration.source, McpServerSource::Config)
-                            && ema_idp.as_ref().is_some_and(|idp| {
-                                registration.config.resolve_ema_registration(idp).is_ok()
-                            });
-                        // EMA denial must not become a persistent name veto.
-                        registration.config.enabled &= allowed;
+                        registration.config.enabled = false;
                     }
                     Some((
                         name,
@@ -543,7 +357,6 @@ impl McpCatalogBuilder {
             actions: self.actions,
             disabled_server_names,
             requirements_disabled_server_names,
-            ema_idp,
             servers,
             conflicts,
         }
@@ -583,7 +396,6 @@ pub struct ResolvedMcpCatalog {
     actions: Vec<CatalogAction>,
     disabled_server_names: BTreeSet<String>,
     requirements_disabled_server_names: BTreeMap<String, RequirementSource>,
-    ema_idp: Option<McpServerIdpOAuthConfig>,
     servers: BTreeMap<String, ResolvedMcpServer>,
     conflicts: Vec<McpServerConflict>,
 }
@@ -598,7 +410,6 @@ impl ResolvedMcpCatalog {
             actions: self.actions.clone(),
             disabled_server_names: self.disabled_server_names.clone(),
             requirements_disabled_server_names: self.requirements_disabled_server_names.clone(),
-            ema_idp: self.ema_idp.clone(),
         }
     }
 
@@ -613,12 +424,12 @@ impl ResolvedMcpCatalog {
             .collect()
     }
 
-    /// Returns whether both catalogs have the same winning servers, sources, and EMA policy.
+    /// Returns whether both catalogs have the same winning servers and sources.
     pub fn has_same_servers(&self, other: &Self) -> bool {
-        self.servers == other.servers && self.ema_idp == other.ema_idp
+        self.servers == other.servers
     }
 
-    /// Replaces the resolved server set while preserving known sources and EMA policy.
+    /// Replaces the resolved server set while preserving known sources.
     ///
     /// # Panics
     ///
@@ -627,7 +438,6 @@ impl ResolvedMcpCatalog {
         let mut builder = McpCatalogBuilder {
             disabled_server_names: self.disabled_server_names.clone(),
             requirements_disabled_server_names: self.requirements_disabled_server_names.clone(),
-            ema_idp: self.ema_idp.clone(),
             ..Default::default()
         };
         for (name, config) in servers {
@@ -640,10 +450,6 @@ impl ResolvedMcpCatalog {
                 .expect("materialized MCP server must have a catalog registration");
             let source = previous.source.clone();
             let precedence = match &source {
-                McpServerSource::Plugin(_) => RegistrationPrecedence::Plugin(Reverse(0)),
-                McpServerSource::SelectedPlugin(_) => {
-                    RegistrationPrecedence::SelectedPlugin(Reverse(0))
-                }
                 McpServerSource::Config => RegistrationPrecedence::Config,
                 McpServerSource::Compatibility { .. } => RegistrationPrecedence::Compatibility,
                 McpServerSource::Extension { .. } => RegistrationPrecedence::Extension(0),
@@ -655,29 +461,6 @@ impl ResolvedMcpCatalog {
             builder.register(registration);
         }
         builder.build()
-    }
-
-    /// Returns package attribution for each winning plugin-owned server.
-    pub fn plugin_attributions_by_server_name(&self) -> HashMap<String, McpPluginAttribution> {
-        self.servers
-            .iter()
-            .filter_map(|(name, server)| match server.source() {
-                McpServerSource::Plugin(attribution)
-                | McpServerSource::SelectedPlugin(attribution) => {
-                    Some((name.clone(), attribution.clone()))
-                }
-                McpServerSource::Config
-                | McpServerSource::Compatibility { .. }
-                | McpServerSource::Extension { .. } => None,
-            })
-            .collect()
-    }
-
-    /// Returns the names of winning servers supplied by thread-selected plugins.
-    pub(crate) fn selected_plugin_server_names(&self) -> impl Iterator<Item = &str> {
-        self.servers.iter().filter_map(|(name, server)| {
-            matches!(server.source(), McpServerSource::SelectedPlugin(_)).then_some(name.as_str())
-        })
     }
 
     pub fn conflicts(&self) -> &[McpServerConflict] {

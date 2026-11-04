@@ -18,7 +18,6 @@ pub use auth::ProviderAuthContext;
 pub use auth::ProviderAuthScope;
 pub use auth::ResolvedProviderAuth;
 pub use auth::auth_provider_from_auth;
-pub use auth::auth_provider_from_auth_manager;
 pub use auth::unauthenticated_auth_provider;
 pub use bearer_auth_provider::BearerAuthProvider;
 pub use bearer_auth_provider::BearerAuthProvider as CoreAuthProvider;
@@ -44,7 +43,3 @@ pub use provider::provider_uses_first_party_auth_path;
 pub use provider::resolve_api_provider;
 
 pub use request_preparation::prepare_provider_request;
-
-#[cfg(test)]
-#[path = "workspace_routing_tests.rs"]
-mod workspace_routing_tests;

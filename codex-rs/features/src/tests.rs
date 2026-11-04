@@ -86,30 +86,6 @@ fn cwd_relative_turn_diffs_is_an_opt_in_map_feature() {
 }
 
 #[test]
-fn codex_apps_mcp_protocol_can_be_enabled_independently_of_generic_mcp() {
-    let features_toml = FeaturesToml::from(BTreeMap::from([
-        (Feature::CodexAppsMcp20260728.key().to_string(), true),
-        (Feature::Mcp20260728.key().to_string(), false),
-    ]));
-    let features = Features::from_sources(
-        FeatureConfigSource {
-            features: Some(&features_toml),
-            ..Default::default()
-        },
-        FeatureConfigSource::default(),
-        FeatureOverrides::default(),
-    );
-
-    assert_eq!(
-        (
-            features.enabled(Feature::CodexAppsMcp20260728),
-            features.enabled(Feature::Mcp20260728),
-        ),
-        (true, false),
-    );
-}
-
-#[test]
 fn default_enabled_features_are_stable() {
     for spec in crate::FEATURES {
         // Instant interrupts are enabled by default while retaining their development stage.
@@ -188,17 +164,6 @@ fn use_legacy_landlock_config_records_deprecation_notice() {
 }
 
 #[test]
-fn remote_control_config_is_ignored() {
-    let mut entries = BTreeMap::new();
-    entries.insert("remote_control".to_string(), true);
-
-    let mut features = Features::with_defaults();
-    features.apply_map(&entries);
-
-    assert_eq!(features.enabled(Feature::RemoteControl), false);
-}
-
-#[test]
 fn telepathy_is_legacy_alias_for_chronicle() {
     assert_eq!(feature_for_key("chronicle"), Some(Feature::Chronicle));
     assert_eq!(feature_for_key("telepathy"), Some(Feature::Chronicle));
@@ -217,19 +182,9 @@ fn codex_hooks_is_legacy_alias_for_hooks() {
 }
 
 #[test]
-fn apps_require_feature_flag_and_chatgpt_auth() {
-    let mut features = Features::with_defaults();
-    assert!(!features.apps_enabled_for_auth(/*has_chatgpt_auth*/ false));
-
-    features.enable(Feature::Apps);
-    assert!(!features.apps_enabled_for_auth(/*has_chatgpt_auth*/ false));
-    assert!(features.apps_enabled_for_auth(/*has_chatgpt_auth*/ true));
-}
-
-#[test]
 fn from_sources_applies_base_profile_and_overrides() {
     let mut base_entries = BTreeMap::new();
-    base_entries.insert("plugins".to_string(), true);
+    base_entries.insert("codex_hooks".to_string(), true);
     let base_features = FeaturesToml {
         entries: base_entries,
         ..Default::default()
@@ -256,7 +211,7 @@ fn from_sources_applies_base_profile_and_overrides() {
         },
     );
 
-    assert_eq!(features.enabled(Feature::Plugins), true);
+    assert_eq!(features.enabled(Feature::CodexHooks), true);
     assert_eq!(features.enabled(Feature::ShellSnapshotV2), true);
     assert_eq!(features.enabled(Feature::ApplyPatchFreeform), false);
     assert_eq!(features.enabled(Feature::WebSearchRequest), false);

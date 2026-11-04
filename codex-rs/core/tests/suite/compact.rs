@@ -288,7 +288,17 @@ fn non_openai_model_provider(server: &MockServer) -> ModelProviderInfo {
         built_in_model_providers(/* openai_base_url */ /*openai_base_url*/ None)["openai"].clone();
     provider.name = "OpenAI (test)".into();
     provider.base_url = Some(format!("{}/v1", server.uri()));
+    provider.model_catalog_url = Some(format!("{}/v1/models", server.uri()).into());
     provider.supports_websockets = false;
+    provider
+}
+
+/// Snapshot fixtures assert bundled model metadata. An explicit provider catalog replaces
+/// the bundled catalog with the hermetic (empty) model response, so these tests must stay
+/// on the default catalog path.
+fn non_openai_model_provider_with_bundled_catalog(server: &MockServer) -> ModelProviderInfo {
+    let mut provider = non_openai_model_provider(server);
+    provider.model_catalog_url = None;
     provider
 }
 
@@ -296,6 +306,7 @@ fn openai_model_provider(server: &MockServer) -> ModelProviderInfo {
     let mut provider =
         built_in_model_providers(/* openai_base_url */ /*openai_base_url*/ None)["openai"].clone();
     provider.base_url = Some(format!("{}/v1", server.uri()));
+    provider.model_catalog_url = Some(format!("{}/v1/models", server.uri()).into());
     provider.supports_websockets = false;
     provider
 }
@@ -1034,7 +1045,7 @@ async fn reasoning_effort_override_remote_v2_compaction_resets_pinned_effort(
     .await;
 
     let test = test_codex()
-        .with_auth(CodexAuth::create_dummy_chatgpt_auth_for_testing())
+        .with_auth(CodexAuth::from_api_key("test-api-key"))
         .with_model_info_override("gpt-5.4", |model| {
             model.use_responses_lite = true;
             model.supports_reasoning_effort_updates = true;
@@ -1186,7 +1197,7 @@ async fn incomplete_response_during_compaction_is_terminal_and_counted(
         let model_provider = provider(&server);
         let test = test_codex()
             .with_model(previous_model)
-            .with_auth(CodexAuth::create_dummy_chatgpt_auth_for_testing())
+            .with_auth(CodexAuth::from_api_key("test-api-key"))
             .with_config(move |config| {
                 config.model_provider = model_provider;
                 config.model_catalog = Some(ModelsResponse {
@@ -2618,7 +2629,7 @@ async fn pre_sampling_compact_runs_on_switch_to_smaller_context_model() {
 
     let model_provider = non_openai_model_provider(&server);
     let mut builder = test_codex()
-        .with_auth(CodexAuth::create_dummy_chatgpt_auth_for_testing())
+        .with_auth(CodexAuth::from_api_key("test-api-key"))
         .with_model(previous_model)
         .with_config(move |config| {
             config.update_plan_enabled = true;
@@ -2721,7 +2732,7 @@ async fn pre_sampling_compact_runs_when_comp_hash_changes() {
 
     let model_provider = non_openai_model_provider(&server);
     let mut builder = test_codex()
-        .with_auth(CodexAuth::create_dummy_chatgpt_auth_for_testing())
+        .with_auth(CodexAuth::from_api_key("test-api-key"))
         .with_model(previous_model)
         .with_config(move |config| {
             config.model_provider = model_provider;
@@ -2910,7 +2921,7 @@ async fn pre_sampling_compact_falls_back_from_retired_previous_model_after_renam
 
     let model_provider = openai_model_provider(&server);
     let mut initial_builder = test_codex()
-        .with_auth(CodexAuth::create_dummy_chatgpt_auth_for_testing())
+        .with_auth(CodexAuth::from_api_key("test-api-key"))
         .with_model(retired_model)
         .with_config(move |config| {
             config.model_provider = model_provider;
@@ -2953,7 +2964,7 @@ async fn pre_sampling_compact_falls_back_from_retired_previous_model_after_renam
 
     let model_provider = openai_model_provider(&server);
     let mut resumed_builder = test_codex()
-        .with_auth(CodexAuth::create_dummy_chatgpt_auth_for_testing())
+        .with_auth(CodexAuth::from_api_key("test-api-key"))
         .with_model(retired_model)
         .with_config(move |config| {
             config.model_provider = model_provider;
@@ -3049,7 +3060,7 @@ async fn pre_sampling_compact_falls_back_when_previous_model_is_not_found() {
 
     let model_provider = openai_model_provider(&server);
     let mut initial_builder = test_codex()
-        .with_auth(CodexAuth::create_dummy_chatgpt_auth_for_testing())
+        .with_auth(CodexAuth::from_api_key("test-api-key"))
         .with_model(retired_model)
         .with_config(move |config| {
             config.model_provider = model_provider;
@@ -3093,7 +3104,7 @@ async fn pre_sampling_compact_falls_back_when_previous_model_is_not_found() {
     let mut model_provider = openai_model_provider(&server);
     model_provider.stream_max_retries = Some(0);
     let mut resumed_builder = test_codex()
-        .with_auth(CodexAuth::create_dummy_chatgpt_auth_for_testing())
+        .with_auth(CodexAuth::from_api_key("test-api-key"))
         .with_model(retired_model)
         .with_config(move |config| {
             config.model_provider = model_provider;
@@ -3197,7 +3208,7 @@ async fn pre_sampling_compact_falls_back_after_previous_model_invalid_request_on
 
     let model_provider = openai_model_provider(&server);
     let mut builder = test_codex()
-        .with_auth(CodexAuth::create_dummy_chatgpt_auth_for_testing())
+        .with_auth(CodexAuth::from_api_key("test-api-key"))
         .with_model(retired_model)
         .with_config(move |config| {
             config.model_provider_id = provider_id.to_owned();
@@ -3316,7 +3327,7 @@ async fn pre_sampling_compact_falls_back_after_previous_model_stream_retries_are
     let mut model_provider = openai_model_provider(&server);
     model_provider.stream_max_retries = Some(2);
     let mut builder = test_codex()
-        .with_auth(CodexAuth::create_dummy_chatgpt_auth_for_testing())
+        .with_auth(CodexAuth::from_api_key("test-api-key"))
         .with_model(previous_model)
         .with_config(move |config| {
             config.model_provider = model_provider;
@@ -3420,7 +3431,7 @@ async fn pre_sampling_compact_advised_errors_fall_back_then_retry_on_selected_mo
     model_provider.request_max_retries = Some(0);
     model_provider.stream_max_retries = Some(2);
     let test = test_codex()
-        .with_auth(CodexAuth::create_dummy_chatgpt_auth_for_testing())
+        .with_auth(CodexAuth::from_api_key("test-api-key"))
         .with_model(previous_model)
         .with_config(move |config| {
             config.model_provider = model_provider;
@@ -3510,7 +3521,7 @@ async fn manual_remote_compact_advice_respects_retry_limit(max_retries: u64) {
     model_provider.request_max_retries = Some(0);
     model_provider.stream_max_retries = Some(max_retries);
     let test = test_codex()
-        .with_auth(CodexAuth::create_dummy_chatgpt_auth_for_testing())
+        .with_auth(CodexAuth::from_api_key("test-api-key"))
         .with_model("gpt-5.4")
         .with_config(move |config| {
             config.model_provider = model_provider;
@@ -3686,7 +3697,7 @@ async fn pre_sampling_compact_skips_when_either_comp_hash_is_missing() {
 
     let model_provider = non_openai_model_provider(&server);
     let mut builder = test_codex()
-        .with_auth(CodexAuth::create_dummy_chatgpt_auth_for_testing())
+        .with_auth(CodexAuth::from_api_key("test-api-key"))
         .with_model(model_without_hash)
         .with_config(move |config| {
             config.model_provider = model_provider;
@@ -3791,7 +3802,7 @@ async fn body_after_prefix_model_switch_budget_compacts_with_next_model() {
 
     let model_provider = non_openai_model_provider(&server);
     let mut builder = test_codex()
-        .with_auth(CodexAuth::create_dummy_chatgpt_auth_for_testing())
+        .with_auth(CodexAuth::from_api_key("test-api-key"))
         .with_model(previous_model)
         .with_config(move |config| {
             config.model_provider = model_provider;
@@ -3885,7 +3896,7 @@ async fn pre_sampling_compact_runs_after_resume_and_switch_to_smaller_model() {
 
     let model_provider = non_openai_model_provider(&server);
     let mut initial_builder = test_codex()
-        .with_auth(CodexAuth::create_dummy_chatgpt_auth_for_testing())
+        .with_auth(CodexAuth::from_api_key("test-api-key"))
         .with_model(previous_model)
         .with_config(move |config| {
             config.model_provider = model_provider;
@@ -3928,7 +3939,7 @@ async fn pre_sampling_compact_runs_after_resume_and_switch_to_smaller_model() {
 
     let model_provider = non_openai_model_provider(&server);
     let mut resumed_builder = test_codex()
-        .with_auth(CodexAuth::create_dummy_chatgpt_auth_for_testing())
+        .with_auth(CodexAuth::from_api_key("test-api-key"))
         .with_model(previous_model)
         .with_config(move |config| {
             config.model_provider = model_provider;
@@ -4006,7 +4017,7 @@ async fn pre_sampling_compact_recovers_comp_hash_after_resume() {
 
     let model_provider = non_openai_model_provider(&server);
     let mut initial_builder = test_codex()
-        .with_auth(CodexAuth::create_dummy_chatgpt_auth_for_testing())
+        .with_auth(CodexAuth::from_api_key("test-api-key"))
         .with_model(previous_model)
         .with_config(move |config| {
             config.model_provider = model_provider;
@@ -4059,7 +4070,7 @@ async fn pre_sampling_compact_recovers_comp_hash_after_resume() {
 
     let model_provider = non_openai_model_provider(&server);
     let mut resumed_builder = test_codex()
-        .with_auth(CodexAuth::create_dummy_chatgpt_auth_for_testing())
+        .with_auth(CodexAuth::from_api_key("test-api-key"))
         .with_model(previous_model)
         .with_config(move |config| {
             config.model_provider = model_provider;
@@ -4133,7 +4144,7 @@ async fn pre_sampling_compact_skips_missing_comp_hash_after_resume() {
 
     let model_provider = non_openai_model_provider(&server);
     let mut initial_builder = test_codex()
-        .with_auth(CodexAuth::create_dummy_chatgpt_auth_for_testing())
+        .with_auth(CodexAuth::from_api_key("test-api-key"))
         .with_model(previous_model)
         .with_config(move |config| {
             config.model_provider = model_provider;
@@ -4184,7 +4195,7 @@ async fn pre_sampling_compact_skips_missing_comp_hash_after_resume() {
 
     let model_provider = non_openai_model_provider(&server);
     let mut resumed_builder = test_codex()
-        .with_auth(CodexAuth::create_dummy_chatgpt_auth_for_testing())
+        .with_auth(CodexAuth::from_api_key("test-api-key"))
         .with_model(previous_model)
         .with_config(move |config| {
             config.model_provider = model_provider;
@@ -4574,7 +4585,7 @@ async fn manual_compact_twice_preserves_latest_user_messages() {
     )
     .await;
 
-    let model_provider = non_openai_model_provider(&server);
+    let model_provider = non_openai_model_provider_with_bundled_catalog(&server);
 
     let mut builder = test_codex().with_config(move |config| {
         config.update_plan_enabled = true;
@@ -5097,7 +5108,7 @@ async fn snapshot_request_shape_mid_turn_continuation_compaction() {
     let auto_compact_mock = mount_sse_once(&server, auto_compact_turn).await;
     let post_auto_compact_mock = mount_sse_once(&server, post_auto_compact_turn).await;
 
-    let model_provider = non_openai_model_provider(&server);
+    let model_provider = non_openai_model_provider_with_bundled_catalog(&server);
 
     let mut builder = test_codex().with_config(move |config| {
         config.update_plan_enabled = true;
@@ -5528,7 +5539,7 @@ async fn auto_compact_accounts_for_encrypted_reasoning(continuation: ContinueThr
 
     let builder = || {
         test_codex()
-            .with_auth(CodexAuth::create_dummy_chatgpt_auth_for_testing())
+            .with_auth(CodexAuth::from_api_key("test-api-key"))
             .with_model_info_override("gpt-5.5", |model| {
                 model.use_responses_lite = true;
             })
@@ -5628,7 +5639,7 @@ async fn auto_compact_accounts_for_unreported_reasoning(
     ]));
     let request_log = mount_sse_sequence(&server, responses).await;
     let test = test_codex()
-        .with_auth(CodexAuth::create_dummy_chatgpt_auth_for_testing())
+        .with_auth(CodexAuth::from_api_key("test-api-key"))
         .with_model_info_override("gpt-5.5", move |model| {
             model.use_responses_lite = use_responses_lite;
         })
@@ -5683,7 +5694,7 @@ async fn snapshot_request_shape_pre_turn_compaction_including_incoming_user_mess
     ]);
     let request_log = mount_sse_sequence(&server, vec![sse1, sse2, sse3, sse4]).await;
 
-    let model_provider = non_openai_model_provider(&server);
+    let model_provider = non_openai_model_provider_with_bundled_catalog(&server);
     let codex = test_codex()
         .with_config(move |config| {
             config.update_plan_enabled = true;
@@ -5804,7 +5815,7 @@ async fn snapshot_request_shape_pre_turn_compaction_strips_incoming_model_switch
 
     let model_provider = non_openai_model_provider(&server);
     let test = test_codex()
-        .with_auth(CodexAuth::create_dummy_chatgpt_auth_for_testing())
+        .with_auth(CodexAuth::from_api_key("test-api-key"))
         .with_model_info_override(previous_model, |_| {})
         .with_config(move |config| {
             config.update_plan_enabled = true;
@@ -5901,7 +5912,7 @@ async fn snapshot_request_shape_pre_turn_compaction_context_window_exceeded() {
     );
     let request_log = mount_sse_sequence(&server, responses).await;
 
-    let mut model_provider = non_openai_model_provider(&server);
+    let mut model_provider = non_openai_model_provider_with_bundled_catalog(&server);
     model_provider.stream_max_retries = Some(0);
     let codex = test_codex()
         .with_config(move |config| {
@@ -5977,7 +5988,7 @@ async fn snapshot_request_shape_manual_compact_without_previous_user_messages() 
     ]);
     let request_log = mount_sse_sequence(&server, vec![compact_turn, follow_up_turn]).await;
 
-    let model_provider = non_openai_model_provider(&server);
+    let model_provider = non_openai_model_provider_with_bundled_catalog(&server);
     let codex = test_codex()
         .with_config(move |config| {
             config.update_plan_enabled = true;
@@ -6206,7 +6217,7 @@ async fn remote_v2_compaction_refreshes_instructions_and_preserves_them_on_cold_
     let mut builder = test_codex()
         .with_home(Arc::clone(&home))
         .with_model_info_override("gpt-5.5", |model| model.use_responses_lite = true)
-        .with_auth(CodexAuth::create_dummy_chatgpt_auth_for_testing());
+        .with_auth(CodexAuth::from_api_key("test-api-key"));
     let test = builder.build(&server).await?;
 
     // Materialize the old snapshot, rewrite the selected file in place, and compact remotely.
@@ -6266,7 +6277,7 @@ async fn remote_v2_compaction_refreshes_instructions_and_preserves_them_on_cold_
     let mut resume_builder = test_codex()
         .with_home(Arc::clone(&home))
         .with_model_info_override("gpt-5.5", |model| model.use_responses_lite = true)
-        .with_auth(CodexAuth::create_dummy_chatgpt_auth_for_testing())
+        .with_auth(CodexAuth::from_api_key("test-api-key"))
         .with_config(move |config| config.cwd = resumed_cwd);
     let resumed = resume_builder
         .resume(&server, Arc::clone(&home), rollout_path)

@@ -31,7 +31,6 @@ use codex_extension_api::FunctionCallError;
 use codex_extension_api::NoopTurnItemEmitter;
 use codex_extension_api::PreviousWorldStateSection;
 use codex_extension_api::RenderedWorldStateFragment;
-use codex_extension_api::SelectedPluginSnapshot;
 use codex_extension_api::SkillInvocationInput;
 use codex_extension_api::SkillInvocationKind;
 use codex_extension_api::ThreadStartInput;
@@ -150,10 +149,6 @@ async fn prepared_world_state(
     let snapshots = input
         .step_store
         .get::<Vec<codex_exec_server::ExecutorCapabilityDiscoveryV2Snapshot>>();
-    let selected_plugins = input
-        .step_store
-        .get::<SelectedPluginSnapshot>()
-        .unwrap_or_default();
     prepare_step(
         registry,
         codex_extension_api::StepPreparationInput {
@@ -161,7 +156,6 @@ async fn prepared_world_state(
             ready_selected_capability_roots,
             executor_capability_discovery: discovery.as_deref(),
             executor_capability_discovery_v2: snapshots.as_deref().map(Vec::as_slice),
-            selected_plugins: &selected_plugins,
             session_store: input.session_store,
             thread_store: input.thread_store,
             turn_store: input.turn_store,
@@ -198,14 +192,9 @@ async fn prepared_turn_input(
     let snapshots = input
         .step_store
         .get::<Vec<codex_exec_server::ExecutorCapabilityDiscoveryV2Snapshot>>();
-    let selected_plugins = input
-        .step_store
-        .get::<SelectedPluginSnapshot>()
-        .unwrap_or_default();
     prepare_step(
         registry,
         codex_extension_api::StepPreparationInput {
-            selected_plugins: &selected_plugins,
             turn_id: &input.turn_id,
             ready_selected_capability_roots: &roots,
             executor_capability_discovery: discovery.as_deref(),
@@ -344,8 +333,6 @@ async fn installed_extension_uses_host_service_snapshot() -> TestResult {
         policy: None,
         path_to_skills_md: PathUri::from_abs_path(&skill_path),
         scope: SkillScope::User,
-        plugin_id: None,
-        remote_plugin_id: None,
     });
     let loaded_skills = Arc::new(outcome);
     let skill_prompt_path = skill_path_string.replace('\\', "/");
@@ -426,8 +413,6 @@ async fn host_world_state_records_catalog_metrics_on_publish_and_change() -> Tes
         policy: None,
         path_to_skills_md: PathUri::from_abs_path(&skill_path),
         scope: SkillScope::User,
-        plugin_id: None,
-        remote_plugin_id: None,
     });
     let turn_store = ExtensionData::new("turn-1");
     turn_store.insert(HostSkillsSnapshot::new(Arc::new(outcome.clone())));
@@ -500,8 +485,6 @@ async fn host_world_state_records_catalog_metrics_on_publish_and_change() -> Tes
         policy: None,
         path_to_skills_md: PathUri::from_abs_path(&second_skill_path),
         scope: SkillScope::User,
-        plugin_id: None,
-        remote_plugin_id: None,
     });
     turn_store.insert(HostSkillsSnapshot::new(Arc::new(outcome)));
     let sections = prepared_world_state(
@@ -557,8 +540,6 @@ async fn persisted_host_snapshot_deduplicates_warning_after_reinitialization() -
         policy: None,
         path_to_skills_md: PathUri::from_abs_path(&skill_path),
         scope: SkillScope::User,
-        plugin_id: None,
-        remote_plugin_id: None,
     });
     let host_snapshot = HostSkillsSnapshot::new(Arc::new(outcome));
 
@@ -683,7 +664,6 @@ async fn executor_cloud_and_host_share_catalog_world_state_flow() -> TestResult 
                 "cloud/cloud-skill",
                 "skill://cloud/cloud-skill/SKILL.md",
             )
-            .with_remote_plugin_id(Some("shared-plugin".to_string())),
         ))
         .with_host_provider(provider(
             test_entry(
@@ -693,7 +673,6 @@ async fn executor_cloud_and_host_share_catalog_world_state_flow() -> TestResult 
                 "/skills/host-skill/SKILL.md",
             )
             .with_display_path("/skills/host-skill/SKILL.md")
-            .with_remote_plugin_id(Some("shared-plugin".to_string())),
         ));
     let mut builder = ExtensionRegistryBuilder::new();
     install_with_providers(&mut builder, providers, skills_extension_config);
@@ -1482,9 +1461,7 @@ async fn selected_executor_catalog_caches_root_selections_per_turn_and_reuses_di
         vec![Ok(Arc::new(CapabilityRootDiscovery {
             id: "lint-fix".to_string(),
             path: PathUri::parse("file:///skills/lint-fix")?,
-            plugin: None,
             skills: Vec::new(),
-            namespace_manifests: Vec::new(),
             warnings: Vec::new(),
             error: None,
         }))],
@@ -3270,7 +3247,7 @@ async fn host_catalog_compacts_shared_paths_under_budget_pressure() -> TestResul
     service.set_extra_roots(vec![root]);
     let snapshot = service
         .snapshot_for_config(
-            &HostSkillsLoadInput::new(codex_home, Vec::new(), config_layer_stack),
+            &HostSkillsLoadInput::new(codex_home, config_layer_stack),
             Some(Arc::clone(&LOCAL_FS)),
         )
         .await;
@@ -3659,12 +3636,6 @@ fn read_request_keys(
         .unwrap_or_else(std::sync::PoisonError::into_inner)
         .clone()
 }
-
-#[path = "skills_extension/merge_catalog_tests.rs"]
-mod merge_catalog_tests;
-
-#[path = "skills_extension/discovery_v2_tests.rs"]
-mod discovery_v2_tests;
 
 #[tokio::test]
 async fn shared_catalog_keeps_captured_executor_and_separates_bindings_in_one_turn() -> TestResult {

@@ -1,27 +1,11 @@
-use std::path::Path;
-use std::sync::Arc;
-use std::sync::atomic::AtomicUsize;
-use std::sync::atomic::Ordering;
-
 use anyhow::Result;
-use app_test_support::ChatGptAuthFixture;
-use app_test_support::write_chatgpt_auth;
-use codex_config::types::AuthCredentialsStoreMode;
-use codex_login::CODEX_ACCESS_TOKEN_ENV_VAR;
-use codex_login::REVOKE_TOKEN_URL_OVERRIDE_ENV_VAR;
 use codex_protocol::shell_environment::OPENAI_FEDERATION_RULE_ID_ENV_VAR;
 use codex_protocol::shell_environment::OPENAI_IDENTITY_TOKEN_FILE_ENV_VAR;
 use predicates::str::contains;
 use pretty_assertions::assert_eq;
 use serde_json::Value;
-use serde_json::json;
+use std::path::Path;
 use tempfile::TempDir;
-use wiremock::Mock;
-use wiremock::MockServer;
-use wiremock::ResponseTemplate;
-use wiremock::matchers::header;
-use wiremock::matchers::method;
-use wiremock::matchers::path;
 
 fn codex_command(codex_home: &Path) -> Result<assert_cmd::Command> {
     let mut cmd = assert_cmd::Command::new(codex_utils_cargo_bin::cargo_bin("codex")?);
@@ -69,7 +53,6 @@ fn login_with_api_key_reads_stdin_and_writes_auth_json() -> Result<()> {
     assert!(auth.get("agent_identity").is_none());
 
     let status = codex_command(codex_home.path())?
-        .env_remove(CODEX_ACCESS_TOKEN_ENV_VAR)
         .env_remove(OPENAI_FEDERATION_RULE_ID_ENV_VAR)
         .env_remove(OPENAI_IDENTITY_TOKEN_FILE_ENV_VAR)
         .args(["login", "status"])
@@ -147,128 +130,5 @@ fn login_status_reports_auth_storage_errors() -> Result<()> {
         .failure()
         .stderr(contains("Error checking login status:"));
 
-    Ok(())
-}
-
-#[tokio::test]
-async fn logout_survives_enterprise_cleanup_failure_with_xaa_disabled() -> Result<()> {
-    let server = MockServer::start().await;
-    Mock::given(path("/backend-api/wham/config/bundle"))
-        .respond_with(ResponseTemplate::new(200).set_body_json(json!({
-            "config_toml": {"enterprise_managed": []},
-            "requirements_toml": {"enterprise_managed": []},
-        })))
-        .mount(&server)
-        .await;
-    Mock::given(method("POST"))
-        .and(path("/oauth/revoke"))
-        .respond_with(ResponseTemplate::new(200))
-        .expect(1)
-        .mount(&server)
-        .await;
-    let home = TempDir::new()?;
-    std::fs::write(
-        home.path().join("config.toml"),
-        format!(
-            "cli_auth_credentials_store = \"file\"\nchatgpt_base_url = \"{}/backend-api\"\n[features]\nuse_xaa = false\n[mcp_enterprise_managed_auth.idp]\nissuer = \"https://idp.example\"\nclient_id = \"enterprise-client\"\n[mcp_servers.enterprise]\nurl = \"https://resource.example/mcp\"\nauth = \"ema_auth\"\nbearer_token_env_var = \"UNUSED_TOKEN\"\n",
-            server.uri()
-        ),
-    )?;
-    write_chatgpt_auth(
-        home.path(),
-        ChatGptAuthFixture::new("account-access")
-            .account_id("workspace")
-            .chatgpt_user_id("user"),
-        AuthCredentialsStoreMode::File,
-    )?;
-    // Fail before touching the real keyring; the subprocess owns this isolated home.
-    std::fs::write(home.path().join("mcp-oauth-locks"), "not a directory")?;
-    for enabled in [false, true] {
-        codex_command(home.path())?
-            .current_dir(home.path())
-            .env("NO_PROXY", "127.0.0.1,localhost")
-            .env("no_proxy", "127.0.0.1,localhost")
-            .env_remove("CODEX_API_KEY")
-            .env_remove("OPENAI_API_KEY")
-            .env_remove(CODEX_ACCESS_TOKEN_ENV_VAR)
-            .args([
-                "-c",
-                &format!("features.use_xaa={enabled}"),
-                "mcp",
-                "logout",
-                "enterprise",
-            ])
-            .assert()
-            .failure()
-            .stderr(contains("failed to delete enterprise authorization"));
-        assert!(home.path().join("auth.json").exists());
-    }
-    codex_command(home.path())?
-        .current_dir(home.path())
-        .env("NO_PROXY", "127.0.0.1,localhost")
-        .env("no_proxy", "127.0.0.1,localhost")
-        .env(
-            REVOKE_TOKEN_URL_OVERRIDE_ENV_VAR,
-            format!("{}/oauth/revoke", server.uri()),
-        )
-        .env_remove("CODEX_API_KEY")
-        .env_remove("OPENAI_API_KEY")
-        .env_remove(CODEX_ACCESS_TOKEN_ENV_VAR)
-        .args(["logout"])
-        .assert()
-        .success()
-        .stderr(contains("continuing account logout"))
-        .stderr(contains("Successfully logged out"));
-    assert!(!home.path().join("auth.json").exists());
-    Ok(())
-}
-
-#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn debug_prompt_input_follows_authenticated_attribution_setting() -> Result<()> {
-    let server = MockServer::start().await;
-    let request_count = Arc::new(AtomicUsize::new(0));
-    Mock::given(method("GET"))
-        .and(path("/backend-api/wham/settings/user"))
-        .and(header("chatgpt-account-id", "workspace-123"))
-        .respond_with(move |_request: &wiremock::Request| {
-            ResponseTemplate::new(200).set_body_json(json!({
-                "commit_attribution_enabled": request_count.fetch_add(1, Ordering::SeqCst) == 0,
-            }))
-        })
-        .expect(2)
-        .mount(&server)
-        .await;
-    let codex_home = TempDir::new()?;
-    std::fs::write(
-        codex_home.path().join("config.toml"),
-        format!(
-            "cli_auth_credentials_store = \"file\"\nchatgpt_base_url = \"{}/backend-api\"\n",
-            server.uri()
-        ),
-    )?;
-    write_chatgpt_auth(
-        codex_home.path(),
-        ChatGptAuthFixture::new("chatgpt-token")
-            .account_id("workspace-123")
-            .plan_type("enterprise"),
-        AuthCredentialsStoreMode::File,
-    )?;
-    for enabled in [true, false] {
-        let output = codex_command(codex_home.path())?
-            .env("NO_PROXY", "127.0.0.1,localhost")
-            .env("no_proxy", "127.0.0.1,localhost")
-            .env_remove("CODEX_ACCESS_TOKEN")
-            .env_remove("OPENAI_API_KEY")
-            .args(["debug", "prompt-input"])
-            .output()?;
-        assert!(output.status.success());
-        let prompt = String::from_utf8(output.stdout)?;
-        assert_eq!(
-            prompt.contains("Co-authored-by: Codex <noreply@openai.com>"),
-            enabled
-        );
-        assert!(!prompt.contains("attribution is disabled for the current workspace"));
-    }
-    server.verify().await;
     Ok(())
 }

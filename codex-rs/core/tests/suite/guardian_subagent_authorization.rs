@@ -594,9 +594,10 @@ async fn run_guardian_subagent_review(
                 ..
             } => {
                 call_id == MESSAGE_CALL_ID
-                    && output.body.to_text().is_some_and(|text| {
-                        text.starts_with("aborted by user")
-                    })
+                    && output
+                        .body
+                        .to_text()
+                        .is_some_and(|text| text.starts_with("aborted by user"))
             }
             _ => false,
         }));

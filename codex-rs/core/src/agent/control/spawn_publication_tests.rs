@@ -115,7 +115,6 @@ async fn publication_harness(
         &harness.config,
         harness.manager.auth_manager(),
         harness.manager.get_models_manager(),
-        crate::CodexAppsToolsCache::default(),
         SessionSource::Exec,
         harness.manager.environment_manager(),
         empty_extension_registry(),

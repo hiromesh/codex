@@ -1,4 +1,3 @@
-
 use anyhow::Ok;
 use codex_config::test_support::CloudConfigBundleFixture;
 use codex_features::Feature;

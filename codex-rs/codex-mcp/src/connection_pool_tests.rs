@@ -149,9 +149,6 @@ pub(crate) fn key(context: &McpRuntimeContext, config: &McpServerConfig) -> Conn
     ConnectionKey {
         server_name: "test_server".to_string(),
         identity: reusable_server_identity("test_server", config, context),
-        account: ConnectorRuntimeContextKey::personal(
-            /*account_id*/ None, /*chatgpt_user_id*/ None,
-        ),
         auth_state: None,
         startup_timeout: Duration::from_secs(30),
         catalog_item_limit: 100,
@@ -218,16 +215,13 @@ pub(crate) fn startup(
                     .await?;
                 let (tools, meta) = list_tools_for_client_uncached(
                     "test_server",
-                    /*is_codex_apps_mcp_server*/ false,
-                    "test",
                     &client.client,
                     /*timeout*/ None,
                     /*catalog_item_limit*/ 100,
                     /*server_instructions*/ None,
                 )
                 .await?;
-                client.tool_catalog =
-                    Arc::new(ClientToolCatalog::new(tools, meta, /*updates*/ None));
+                client.tool_catalog = Arc::new(ClientToolCatalog::new(tools, meta));
                 client.connection_sharing = sharing;
                 Ok(client)
             }
@@ -509,8 +503,6 @@ async fn shared_startup_survives_first_chat_cancellation_and_rejects_released_bi
             default_tools_approval_mode: None,
             tool_approval_modes: Default::default(),
         },
-        /*plugin_id*/ None,
-        /*selected_plugin_server*/ false,
     )
     .unwrap();
     let bindings = McpBindingClients::new(HashMap::from([(
@@ -694,7 +686,7 @@ async fn callback_during_startup_releases_waiting_chats_without_sharing_authorit
 #[tokio::test]
 async fn connection_key_changes_with_the_owner_but_survives_credential_refresh() {
     let manager =
-        AuthManager::from_auth_for_testing(CodexAuth::create_dummy_chatgpt_auth_for_testing());
+        AuthManager::from_auth_for_testing(CodexAuth::from_api_key("test-api-key"));
     let mut original = key(&context(), &config());
     original.auth_state = Some((manager, AuthChangeState::default()));
     let mut refreshed = original.clone();
@@ -764,14 +756,10 @@ async fn new_chat_relists_tools_without_invalidating_or_waiting_for_existing_cal
         );
         tokio::time::timeout(
             Duration::from_secs(1),
-            second.tool_catalog.refresh(
-                || async { Ok((vec![create_test_tool("test_server", "refreshed")], None, ())) },
-                |_, _, ()| {},
-            ),
+            second.tool_catalog.read(|snapshot| snapshot.revision),
         )
         .await
-        .expect("one chat's refresh must not wait for another chat's calls")
-        .unwrap();
+        .expect("one chat's catalog must not wait for another chat's calls");
         assert_eq!(
             first
                 .tool_catalog

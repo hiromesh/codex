@@ -35,7 +35,6 @@ use crate::request_processors::McpEventStreams;
 use crate::request_processors::McpRequestProcessor;
 use crate::request_processors::ProcessExecRequestProcessor;
 use crate::request_processors::ProjectRequestProcessor;
-use crate::request_processors::RemoteControlRequestProcessor;
 use crate::request_processors::SearchRequestProcessor;
 use crate::request_processors::ThreadGoalRequestProcessor;
 use crate::request_processors::ThreadQueueRequestProcessor;
@@ -51,7 +50,6 @@ use crate::startup_warnings::StartupWarnings;
 use crate::thread_state::ConnectionCapabilities;
 use crate::thread_state::ThreadStateManager;
 use crate::transport::AppServerTransport;
-use crate::transport::RemoteControlHandle;
 use codex_analytics::AnalyticsEventsClient;
 use codex_analytics::AppServerRpcTransport;
 use codex_app_server_protocol::ClientNotification;
@@ -152,7 +150,6 @@ pub(crate) struct MessageProcessor {
     initialize_processor: InitializeRequestProcessor,
     mcp_processor: McpRequestProcessor,
     project_processor: ProjectRequestProcessor,
-    pub(super) remote_control_processor: RemoteControlRequestProcessor,
     search_processor: SearchRequestProcessor,
     thread_goal_processor: ThreadGoalRequestProcessor,
     thread_queue_processor: ThreadQueueRequestProcessor,
@@ -256,7 +253,6 @@ pub(crate) struct MessageProcessorArgs {
     pub(crate) auth_manager: Arc<AuthManager>,
     pub(crate) installation_id: String,
     pub(crate) rpc_transport: AppServerRpcTransport,
-    pub(crate) remote_control_handle: Option<RemoteControlHandle>,
 }
 
 impl MessageProcessor {
@@ -281,12 +277,7 @@ impl MessageProcessor {
             auth_manager,
             installation_id,
             rpc_transport,
-            remote_control_handle,
         } = args;
-        // Startup credential reads must not open a browser before initialize selects the policy.
-        let gateway_login_control =
-            codex_login::GatewayLoginControl::for_runtime(&auth_manager.runtime_config());
-        gateway_login_control.require_explicit_login();
         let thread_state_manager = ThreadStateManager::new();
         // The thread store is intentionally process-scoped. Config reloads can
         // affect per-thread behavior, but they must not move newly started,
@@ -328,7 +319,6 @@ impl MessageProcessor {
                 config.as_ref(),
                 auth_manager.clone(),
                 codex_core::build_models_manager(config.as_ref(), auth_manager.clone()),
-                codex_core::CodexAppsToolsCache::default(),
                 session_source,
                 environment_manager,
                 thread_extensions(
@@ -439,7 +429,6 @@ impl MessageProcessor {
             config_manager.clone(),
             account_processor.clone(),
         );
-        let remote_control_processor = RemoteControlRequestProcessor::new(remote_control_handle);
         let search_processor = SearchRequestProcessor::new(outgoing.clone());
         let thread_goal_processor = ThreadGoalRequestProcessor::new(
             Arc::clone(&thread_manager),
@@ -494,7 +483,6 @@ impl MessageProcessor {
             Arc::clone(&skills_watcher),
         );
         let initialize_processor = InitializeRequestProcessor::new(
-            gateway_login_control,
             outgoing.clone(),
             analytics_events_client.clone(),
             Arc::clone(&config),
@@ -526,7 +514,6 @@ impl MessageProcessor {
             initialize_processor,
             mcp_processor,
             project_processor,
-            remote_control_processor,
             search_processor,
             thread_goal_processor,
             thread_queue_processor,
@@ -537,7 +524,6 @@ impl MessageProcessor {
     }
 
     pub(crate) fn clear_runtime_references(&self) {
-        self.account_processor.clear_external_auth();
         self.models_refresh_worker.shutdown();
         self.skills_watcher.shutdown();
     }
@@ -733,8 +719,6 @@ impl MessageProcessor {
         connection_id: ConnectionId,
         request_attestation: bool,
     ) {
-        self.account_processor
-            .notify_workspace_routing_to_connection(connection_id);
         self.thread_processor
             .connection_initialized(
                 connection_id,
@@ -774,10 +758,6 @@ impl MessageProcessor {
         self.thread_processor.drain_background_tasks().await;
     }
 
-    pub(crate) async fn cancel_active_login(&self) {
-        self.account_processor.cancel_active_login().await;
-    }
-
     pub(crate) async fn clear_all_thread_listeners(&self) {
         self.thread_processor.clear_all_thread_listeners().await;
     }
@@ -793,8 +773,6 @@ impl MessageProcessor {
     ) {
         session_state.disconnect.cancel();
         session_state.rpc_gate.close().await;
-        self.account_processor
-            .gateway_connection_closed(connection_id);
         self.request_serialization_queues.discard_closed().await;
         session_state.mcp_event_streams.clear().await;
         if timeout(
@@ -1046,46 +1024,6 @@ impl MessageProcessor {
                     .experimental_feature_enablement_set(request_id.clone(), params)
                     .await
             }
-            ClientRequest::RemoteControlEnable { params, .. } => self
-                .remote_control_processor
-                .enable(
-                    params.is_some_and(|params| params.ephemeral),
-                    app_server_client_name.as_deref(),
-                )
-                .await
-                .map(|response| Some(response.into())),
-            ClientRequest::RemoteControlDisable { params, .. } => self
-                .remote_control_processor
-                .disable(
-                    params.is_some_and(|params| params.ephemeral),
-                    app_server_client_name.as_deref(),
-                )
-                .await
-                .map(|response| Some(response.into())),
-            ClientRequest::RemoteControlStatusRead { .. } => self
-                .remote_control_processor
-                .status_read()
-                .map(|response| Some(response.into())),
-            ClientRequest::RemoteControlPairingStart { params, .. } => self
-                .remote_control_processor
-                .pairing_start(params, app_server_client_name.as_deref())
-                .await
-                .map(|response| Some(response.into())),
-            ClientRequest::RemoteControlPairingStatus { params, .. } => self
-                .remote_control_processor
-                .pairing_status(params)
-                .await
-                .map(|response| Some(response.into())),
-            ClientRequest::RemoteControlClientsList { params, .. } => self
-                .remote_control_processor
-                .clients_list(params)
-                .await
-                .map(|response| Some(response.into())),
-            ClientRequest::RemoteControlClientsRevoke { params, .. } => self
-                .remote_control_processor
-                .clients_revoke(params)
-                .await
-                .map(|response| Some(response.into())),
             ClientRequest::ConfigRequirementsRead { params: _, .. } => self
                 .config_processor
                 .config_requirements_read()
@@ -1577,22 +1515,10 @@ impl MessageProcessor {
             ClientRequest::BedrockCheckGovCloudRequirements { .. } => Err(invalid_request(
                 "Amazon Bedrock setup is no longer supported.",
             )),
-            ClientRequest::GatewayOAuthRead { .. } => Err(invalid_request(
-                "Gateway OAuth is no longer supported.",
-            )),
-            ClientRequest::GatewayOAuthLogin { .. } => Err(invalid_request(
-                "Gateway OAuth is no longer supported.",
-            )),
-            ClientRequest::GatewayOAuthCancel { .. } => Err(invalid_request(
-                "Gateway OAuth is no longer supported.",
-            )),
             ClientRequest::LogoutAccount { .. } => {
                 self.account_processor
                     .logout_account(request_id.clone())
                     .await
-            }
-            ClientRequest::CancelLoginAccount { params, .. } => {
-                self.account_processor.cancel_login_account(params).await
             }
             ClientRequest::GetAccount { params, .. } => {
                 self.account_processor.get_account(params).await
@@ -1600,6 +1526,27 @@ impl MessageProcessor {
             ClientRequest::GetAuthStatus { params, .. } => {
                 self.account_processor.get_auth_status(params).await
             }
+            ClientRequest::AccountSessionsList { .. } => Err(invalid_request(
+                "Account sessions are not supported with API key authentication.",
+            )),
+            ClientRequest::AccountSessionsSwitch { .. } => Err(invalid_request(
+                "Account sessions are not supported with API key authentication.",
+            )),
+            ClientRequest::GetAccountRateLimits { .. } => Err(invalid_request(
+                "Account rate limits are not supported with API key authentication.",
+            )),
+            ClientRequest::ConsumeAccountRateLimitResetCredit { .. } => Err(invalid_request(
+                "Rate limit reset credits are not supported with API key authentication.",
+            )),
+            ClientRequest::GetAccountTokenUsage { .. } => Err(invalid_request(
+                "Account token usage is not available with API key authentication.",
+            )),
+            ClientRequest::GetWorkspaceMessages { .. } => Err(invalid_request(
+                "Workspace messages are not supported with API key authentication.",
+            )),
+            ClientRequest::SendAddCreditsNudgeEmail { .. } => Err(invalid_request(
+                "Add-credits nudges are not supported with API key authentication.",
+            )),
             ClientRequest::GitDiffToRemote { params, .. } => {
                 self.git_processor.git_diff_to_remote(params).await
             }

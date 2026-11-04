@@ -233,8 +233,6 @@ async fn parse_skill_file(
         policy,
         path_to_skills_md: path_uri.clone(),
         scope,
-        plugin_id: None,
-        remote_plugin_id: None,
     })
 }
 
@@ -261,11 +259,3 @@ async fn canonicalize_for_skill_identity(
         .and_then(|path| path.to_abs_path())
         .unwrap_or_else(|_| path.clone())
 }
-
-#[cfg(test)]
-#[path = "host_tests.rs"]
-mod tests;
-
-#[cfg(all(test, unix))]
-#[path = "host_io_tests.rs"]
-mod io_tests;

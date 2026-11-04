@@ -5,7 +5,6 @@ use crate::analytics_utils::analytics_events_client_from_config;
 use crate::config_manager::ConfigManager;
 use crate::outgoing_message::ConnectionId;
 use crate::outgoing_message::OutgoingMessageSender;
-use crate::plugin_config_reload::PluginStartupConfig;
 use crate::transport::AppServerTransport;
 use anyhow::Result;
 use app_test_support::create_mock_responses_server_repeating_assistant;
@@ -278,8 +277,6 @@ pub(super) async fn build_test_processor(
         auth_manager,
         installation_id: "11111111-1111-4111-8111-111111111111".to_string(),
         rpc_transport: AppServerRpcTransport::Stdio,
-        remote_control_handle: None,
-        plugin_startup_tasks: Some(PluginStartupConfig::Current),
     }));
     (processor, outgoing_rx)
 }
@@ -674,7 +671,6 @@ async fn turn_start_jsonrpc_span_parents_core_turn_spans() -> Result<()> {
             ClientRequest::TurnStart {
                 request_id: RequestId::Integer(3),
                 params: TurnStartParams {
-                    disabled_plugin_ids: None,
                     environments: None,
                     thread_id,
                     client_user_message_id: None,

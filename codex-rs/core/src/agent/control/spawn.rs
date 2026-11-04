@@ -641,7 +641,7 @@ impl LocalAgentControl {
                 &config,
             )
             .await;
-        let product_sku = config.apps_mcp_product_sku.clone();
+        let product_sku: Option<String> = None;
         if let Some(session_source) = session_source.as_ref() {
             self.ensure_execution_capacity(multi_agent_version, session_source)?;
         }
@@ -683,20 +683,6 @@ impl LocalAgentControl {
                     .await
             }
         };
-        // Omitted plugin choices follow the parent even when no history is copied.
-        // Explicit choices, including an empty list, belong to the spawning turn.
-        let mut disabled_plugin_ids = options.disabled_plugin_ids.clone();
-        if disabled_plugin_ids.is_none()
-            && let Some(parent_thread_id) = parent_thread_id
-            && let Ok(parent_thread) = state.get_thread(parent_thread_id).await
-        {
-            disabled_plugin_ids = Some(
-                parent_thread
-                    .thread_settings_snapshot()
-                    .await
-                    .disabled_plugin_ids,
-            );
-        }
         let inherited_exec_policy =
             inherited_exec_policy_for_source(&state, session_source.as_ref(), &config).await;
         let (session_source, mut agent_metadata) = match session_source {
@@ -732,7 +718,6 @@ impl LocalAgentControl {
                 .as_ref()
                 .map(TurnEnvironmentSnapshot::inheritable_requests),
             inherited_environments,
-            disabled_plugin_ids,
             ..StartThreadOptions::new(config.clone())
         };
         let fork_context = match (session_source, options.fork_mode.as_ref()) {

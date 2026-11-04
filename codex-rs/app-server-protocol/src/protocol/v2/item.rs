@@ -29,8 +29,6 @@ use codex_protocol::items::CollabAgentTool as CoreCollabAgentTool;
 use codex_protocol::items::CollabAgentToolCallStatus as CoreCollabAgentToolCallStatus;
 use codex_protocol::items::CommandExecutionStatus as CoreCommandExecutionStatus;
 use codex_protocol::items::DynamicToolCallStatus as CoreDynamicToolCallStatus;
-pub use codex_protocol::items::McpAppDisplayMode;
-pub use codex_protocol::items::McpAppUi;
 use codex_protocol::items::McpToolCallStatus as CoreMcpToolCallStatus;
 use codex_protocol::items::TurnItem as CoreTurnItem;
 use codex_protocol::memory_citation::MemoryCitation as CoreMemoryCitation;
@@ -357,12 +355,6 @@ pub enum ThreadItemPayload {
         #[ts(skip)]
         model_context: Option<codex_protocol::items::ModelInvocationContext>,
         id: String,
-        /// Trusted first-party plugin id when this command resolves to one plugin script.
-        #[serde(default)]
-        plugin_id: Option<String>,
-        /// Safe plugin-relative path when this command resolves to one plugin script.
-        #[serde(default)]
-        script_path: Option<String>,
         /// The command to be executed.
         command: String,
         /// The command's working directory.
@@ -399,14 +391,6 @@ pub enum ThreadItemPayload {
         tool: String,
         status: McpToolCallStatus,
         arguments: JsonValue,
-        app_context: Option<McpToolCallAppContext>,
-        #[serde(default, skip_serializing_if = "Option::is_none")]
-        #[ts(optional)]
-        /// Legacy compatibility field; prefer `mcpAppUi.resourceUri` when available.
-        mcp_app_resource_uri: Option<String>,
-        /// Presentation captured from the invoked descriptor; absent in older history.
-        mcp_app_ui: Option<McpAppUi>,
-        plugin_id: Option<String>,
         read_only_hint: Option<bool>,
         result: Option<Box<McpToolCallResult>>,
         error: Option<McpToolCallError>,
@@ -488,17 +472,6 @@ pub enum ThreadItemPayload {
     ContextCompaction {
         id: String,
     },
-}
-
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, JsonSchema, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(rename_all = "camelCase", export_to = "v2/")]
-pub struct McpToolCallAppContext {
-    pub connector_id: String,
-    pub link_id: Option<String>,
-    pub resource_uri: Option<String>,
-    pub app_name: Option<String>,
-    pub action_name: Option<String>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, JsonSchema, TS)]
@@ -689,8 +662,6 @@ pub struct GuardianNetworkAccessReviewAction {
 pub struct GuardianMcpToolCallReviewAction {
     pub server: String,
     pub tool_name: String,
-    pub connector_id: Option<String>,
-    pub connector_name: Option<String>,
     pub tool_title: Option<String>,
 }
 
@@ -750,8 +721,6 @@ pub enum GuardianApprovalReviewAction {
     McpToolCall {
         server: String,
         tool_name: String,
-        connector_id: Option<String>,
-        connector_name: Option<String>,
         tool_title: Option<String>,
     },
     #[serde(rename_all = "camelCase")]
@@ -813,14 +782,11 @@ impl From<CoreGuardianAssessmentAction> for GuardianApprovalReviewAction {
             CoreGuardianAssessmentAction::McpToolCall {
                 server,
                 tool_name,
-                connector_id,
-                connector_name,
                 tool_title,
+                ..
             } => Self::McpToolCall {
                 server,
                 tool_name,
-                connector_id,
-                connector_name,
                 tool_title,
             },
             CoreGuardianAssessmentAction::RequestPermissions {
@@ -889,14 +855,10 @@ impl TryFrom<GuardianApprovalReviewAction> for CoreGuardianAssessmentAction {
             GuardianApprovalReviewAction::McpToolCall {
                 server,
                 tool_name,
-                connector_id,
-                connector_name,
                 tool_title,
             } => Self::McpToolCall {
                 server,
                 tool_name,
-                connector_id,
-                connector_name,
                 tool_title,
             },
             GuardianApprovalReviewAction::RequestPermissions {
@@ -985,8 +947,6 @@ impl From<CoreTurnItem> for ThreadItemPayload {
                     id: command.id,
                     model_context: command.model_context,
                     sandbox_type: command.sandbox_type,
-                    plugin_id: command.plugin_id,
-                    script_path: command.script_path,
                     command: presentation.command,
                     cwd: command.cwd.clone().into(),
                     process_id: command.process_id,
@@ -1088,16 +1048,6 @@ impl From<CoreTurnItem> for ThreadItemPayload {
                     tool: mcp.tool,
                     status: McpToolCallStatus::from(mcp.status),
                     arguments: mcp.arguments,
-                    app_context: mcp.connector_id.map(|connector_id| McpToolCallAppContext {
-                        connector_id,
-                        link_id: mcp.link_id,
-                        resource_uri: mcp.mcp_app_resource_uri.clone(),
-                        app_name: mcp.app_name,
-                        action_name: mcp.action_name,
-                    }),
-                    mcp_app_resource_uri: mcp.mcp_app_resource_uri,
-                    mcp_app_ui: mcp.mcp_app_ui,
-                    plugin_id: mcp.plugin_id,
                     read_only_hint: mcp.read_only_hint,
                     result: mcp.result.map(McpToolCallResult::from).map(Box::new),
                     error: mcp.error.map(McpToolCallError::from),

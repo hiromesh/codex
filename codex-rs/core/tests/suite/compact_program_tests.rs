@@ -115,7 +115,7 @@ async fn model_switch_program_pair(
         openai_model_provider(&server)
     };
     let mut builder = test_codex()
-        .with_auth(CodexAuth::create_dummy_chatgpt_auth_for_testing())
+        .with_auth(CodexAuth::from_api_key("test-api-key"))
         .with_model(previous_model)
         .with_config(move |config| {
             config.model_catalog = Some(models.clone());
@@ -405,7 +405,7 @@ async fn api_key_resume_compaction_retries_current_program(
     let mut provider = openai_model_provider(&server);
     provider.stream_max_retries = Some(0);
     let mut builder = test_codex()
-        .with_auth(CodexAuth::create_dummy_chatgpt_auth_for_testing())
+        .with_auth(CodexAuth::from_api_key("test-api-key"))
         .with_model(previous_model)
         .with_config(move |config| {
             config.model_catalog = Some(initial_models.clone());

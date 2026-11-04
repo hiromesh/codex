@@ -128,8 +128,9 @@ async fn catalog_and_model_changes_preserve_the_window_base(
     let models = vec![managed_model(MODEL, ORIGINAL)];
     responses::mount_models_once_with_etag(&server, ModelsResponse { models }, "\"v1\"").await;
     let test = test_codex()
-        .with_auth(CodexAuth::create_dummy_chatgpt_auth_for_testing())
+        .with_auth(CodexAuth::from_api_key("test-api-key"))
         .with_model(MODEL)
+        .with_mock_model_catalog(&server)
         .with_config(move |config| {
             config.base_instructions = custom_instructions.map(str::to_string);
             if incremental_tools {

@@ -201,17 +201,7 @@ impl ChatWidget {
             mcp_startup_allow_terminal_only_next_round: false,
             mcp_startup_pending_next_round: HashMap::new(),
             mcp_startup_pending_next_round_saw_starting: false,
-            connectors: ConnectorsState::default(),
             ide_context: IdeContextState::default(),
-            plugins_cache: PluginsCacheState::default(),
-            plugins_fetch_state: PluginListFetchState::default(),
-            plugin_remote_sections_loading: false,
-            plugin_remote_sections_loaded: false,
-            plugin_remote_section_errors: Vec::new(),
-            plugin_install_apps_needing_auth: Vec::new(),
-            plugin_install_auth_flow: None,
-            plugins_active_tab_id: None,
-            newly_installed_marketplace_tab_id: None,
             interrupts: InterruptManager::new(),
             reasoning_buffer: String::new(),
             reasoning_header: None,
@@ -318,14 +308,10 @@ impl ChatWidget {
             .set_collaboration_modes_enabled(/*enabled*/ true);
         widget.sync_service_tier_commands();
         widget.sync_worktrees_enabled();
-        widget.sync_plugins_command_enabled();
         widget.sync_goal_command_enabled();
         widget.sync_mentions_v2_enabled();
         widget.update_collaboration_mode_indicator();
 
-        widget
-            .bottom_pane
-            .set_connectors_enabled(widget.connectors_enabled());
         widget
             .bottom_pane
             .set_token_activity_command_enabled(widget.has_codex_backend_auth);

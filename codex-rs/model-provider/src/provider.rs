@@ -18,7 +18,6 @@ use codex_models_manager::manager::OpenAiModelsManager;
 use codex_models_manager::manager::SharedModelsManager;
 use codex_models_manager::manager::StaticModelsManager;
 use codex_protocol::account::ProviderAccount;
-use codex_protocol::auth::RefreshTokenFailedError;
 use codex_protocol::error::CodexErr;
 use codex_protocol::openai_models::ModelsResponse;
 
@@ -62,16 +61,12 @@ pub struct ProviderAuthRecoveryMessages {
 /// Error returned when a provider cannot construct its app-visible account state.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ProviderAccountError {
-    MissingChatgptAccountDetails,
     UnsupportedBedrockApiKeyAuth,
 }
 
 impl fmt::Display for ProviderAccountError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::MissingChatgptAccountDetails => {
-                write!(f, "plan type is required for chatgpt authentication")
-            }
             Self::UnsupportedBedrockApiKeyAuth => {
                 write!(
                     f,
@@ -246,33 +241,6 @@ pub trait ModelProvider: fmt::Debug + Send + Sync {
     ) -> ModelProviderFuture<'a, codex_protocol::error::Result<ResolvedResponsesProvider>> {
         Box::pin(async move {
             let mut redirect_policy = ClientRedirectPolicy::Default;
-            if provider_uses_first_party_auth_path(self.info())
-                && self.info().supports_codex_backend_routes()
-                && let Some(auth) = auth.filter(|auth| auth.is_chatgpt_auth())
-                && let Some(auth_manager) = self.auth_manager()
-            {
-                let mut previously_routed = routing_context.previously_routed.lock().await;
-                if let Some(routing) = auth_manager
-                    .workspace_routing(
-                        auth,
-                        WorkspaceRoutingRequest {
-                            provider_base_url: provider.base_url.clone(),
-                            chatgpt_base_url: routing_context.chatgpt_base_url.clone(),
-                            previously_routed: *previously_routed,
-                            session: routing_context.session.clone(),
-                        },
-                    )
-                    .await
-                    .map_err(|error| match error.downcast::<RefreshTokenFailedError>() {
-                        Ok(rejection) => CodexErr::RefreshTokenFailed(rejection),
-                        Err(error) => error.into(),
-                    })?
-                {
-                    crate::workspace_routing::apply_workspace_routing(&mut provider, routing)?;
-                    redirect_policy = ClientRedirectPolicy::Reject;
-                    *previously_routed = true;
-                }
-            }
             Ok(ResolvedResponsesProvider {
                 provider,
                 redirect_policy,
@@ -513,10 +481,7 @@ impl ModelProvider for ConfiguredModelProvider {
     }
 
     fn supports_attestation(&self) -> bool {
-        self.auth_manager
-            .as_ref()
-            .and_then(|auth_manager| auth_manager.auth_cached())
-            .is_some_and(|auth| auth.is_chatgpt_auth())
+        false
     }
 
     fn auth(&self) -> ModelProviderFuture<'_, Option<CodexAuth>> {
@@ -564,36 +529,14 @@ impl ModelProvider for ConfiguredModelProvider {
 
     fn account_state(&self) -> ProviderAccountResult {
         let account = if self.info.requires_openai_auth {
-            self.auth_manager
+            match self
+                .auth_manager
                 .as_ref()
-                .and_then(|auth_manager| {
-                    let auth = auth_manager.auth_cached()?;
-                    if auth_manager.refresh_failure_for_auth(&auth).is_some() {
-                        return None;
-                    }
-                    if matches!(auth, CodexAuth::Headers(_)) {
-                        return None;
-                    }
-                    Some(auth)
-                })
-                .map(|auth| match &auth {
-                    CodexAuth::ApiKey(_) => Ok(ProviderAccount::ApiKey),
-                    CodexAuth::BedrockApiKey(_) | CodexAuth::BedrockAccessKeys(_) => {
-                        Err(ProviderAccountError::UnsupportedBedrockApiKeyAuth)
-                    }
-                    CodexAuth::Chatgpt(_)
-                    | CodexAuth::ChatgptAuthTokens(_)
-                    | CodexAuth::Headers(_)
-                    | CodexAuth::PersonalAccessToken(_) => {
-                        let email = auth.get_account_email();
-                        let plan_type = auth.account_plan_type();
-
-                        plan_type
-                            .map(|plan_type| ProviderAccount::Chatgpt { email, plan_type })
-                            .ok_or(ProviderAccountError::MissingChatgptAccountDetails)
-                    }
-                })
-                .transpose()?
+                .and_then(|manager| manager.auth_cached())
+            {
+                Some(_) => Some(ProviderAccount::ApiKey),
+                None => None,
+            }
         } else {
             None
         };
@@ -630,18 +573,14 @@ impl ModelProvider for ConfiguredModelProvider {
 
 #[cfg(test)]
 mod tests {
-    use std::num::NonZeroU64;
     use std::sync::atomic::AtomicUsize;
     use std::sync::atomic::Ordering;
 
     use codex_http_client::HttpClientFactory;
     use codex_http_client::OutboundProxyPolicy;
-    use codex_login::auth::BedrockApiKeyAuth;
     use codex_model_provider_info::WireApi;
     use codex_model_provider_info::create_oss_provider_with_base_url;
     use codex_models_manager::manager::RefreshStrategy;
-    use codex_protocol::account::PlanType;
-    use codex_protocol::config_types::ModelProviderAuthInfo;
     use codex_protocol::openai_models::ModelInfo;
     use codex_protocol::openai_models::ModelsResponse;
     use pretty_assertions::assert_eq;
@@ -654,23 +593,6 @@ mod tests {
     use wiremock::matchers::path;
 
     use super::*;
-
-    fn provider_info_with_command_auth() -> ModelProviderInfo {
-        ModelProviderInfo {
-            auth: Some(ModelProviderAuthInfo {
-                command: "print-token".to_string(),
-                args: Vec::new(),
-                timeout_ms: NonZeroU64::new(5_000).expect("timeout should be non-zero"),
-                refresh_interval_ms: 300_000,
-                cwd: std::env::current_dir()
-                    .expect("current dir should be available")
-                    .try_into()
-                    .expect("current dir should be absolute"),
-            }),
-            requires_openai_auth: false,
-            ..ModelProviderInfo::create_openai_provider(/*base_url*/ None)
-        }
-    }
 
     fn test_codex_home() -> std::path::PathBuf {
         std::env::temp_dir().join(format!("codex-model-provider-test-{}", std::process::id()))
@@ -728,13 +650,6 @@ mod tests {
             "experimental_supported_tools": [],
         }))
         .expect("valid model")
-    }
-
-    fn bedrock_api_key_auth() -> CodexAuth {
-        CodexAuth::BedrockApiKey(BedrockApiKeyAuth {
-            api_key: "bedrock-api-key-test".to_string(),
-            region: "us-east-1".to_string(),
-        })
     }
 
     #[tokio::test]
@@ -826,21 +741,6 @@ mod tests {
         );
 
         assert_eq!(provider.approval_review_preferred_model(), "gpt-5.6-luna");
-    }
-
-    #[test]
-    fn configured_provider_uses_default_approval_review_model_with_chatgpt_auth() {
-        let provider = create_model_provider(
-            ModelProviderInfo::create_openai_provider(/*base_url*/ None),
-            Some(AuthManager::from_auth_for_testing(
-                CodexAuth::create_dummy_chatgpt_auth_for_testing(),
-            )),
-        );
-
-        assert_eq!(
-            provider.approval_review_preferred_model(),
-            DEFAULT_APPROVAL_REVIEW_PREFERRED_MODEL
-        );
     }
 
     struct RotatingAuth(AtomicUsize);
@@ -955,20 +855,6 @@ mod tests {
     }
 
     #[test]
-    fn create_model_provider_builds_command_auth_manager_without_base_manager() {
-        let provider = create_model_provider(
-            provider_info_with_command_auth(),
-            /*auth_manager*/ None,
-        );
-
-        let auth_manager = provider
-            .auth_manager()
-            .expect("command auth provider should have an auth manager");
-
-        assert!(auth_manager.has_external_auth());
-    }
-
-    #[test]
     fn openai_provider_returns_unauthenticated_openai_account_state() {
         let provider = create_model_provider(
             ModelProviderInfo::create_openai_provider(/*base_url*/ None),
@@ -999,40 +885,6 @@ mod tests {
                 account: Some(ProviderAccount::ApiKey),
                 requires_openai_auth: true,
             })
-        );
-    }
-
-    #[test]
-    fn openai_provider_returns_chatgpt_account_state_without_email() {
-        let provider = create_model_provider(
-            ModelProviderInfo::create_openai_provider(/*base_url*/ None),
-            Some(AuthManager::from_auth_for_testing(
-                CodexAuth::create_dummy_chatgpt_auth_for_testing(),
-            )),
-        );
-
-        assert_eq!(
-            provider.account_state(),
-            Ok(ProviderAccountState {
-                account: Some(ProviderAccount::Chatgpt {
-                    email: None,
-                    plan_type: PlanType::Unknown,
-                }),
-                requires_openai_auth: true,
-            })
-        );
-    }
-
-    #[test]
-    fn openai_provider_rejects_bedrock_api_key_account_state() {
-        let provider = create_model_provider(
-            ModelProviderInfo::create_openai_provider(/*base_url*/ None),
-            Some(AuthManager::from_auth_for_testing(bedrock_api_key_auth())),
-        );
-
-        assert_eq!(
-            provider.account_state(),
-            Err(ProviderAccountError::UnsupportedBedrockApiKeyAuth)
         );
     }
 
@@ -1086,7 +938,7 @@ mod tests {
         )]));
         for auth in [
             None,
-            Some(CodexAuth::create_dummy_chatgpt_auth_for_testing()),
+            Some(CodexAuth::from_api_key("sk-test")),
         ] {
             // Disabled discovery must ignore the catalog cached by the enabled run.
             for enabled in [true, false] {

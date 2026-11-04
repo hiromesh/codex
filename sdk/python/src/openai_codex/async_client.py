@@ -15,7 +15,6 @@ from .client import CodexClient, CodexConfig
 from .generated.v2_all import (
     AccountLoginCompletedNotification,
     AgentMessageDeltaNotification,
-    CancelLoginAccountResponse,
     GetAccountParams as V2GetAccountParams,
     GetAccountResponse,
     LoginAccountParams as V2LoginAccountParams,
@@ -150,10 +149,6 @@ class AsyncCodexClient:
     ) -> LoginAccountResponse:
         """Start one account login attempt through the wrapped sync client."""
         return await self._call_sync(self._sync.account_login_start, params)
-
-    async def account_login_cancel(self, login_id: str) -> CancelLoginAccountResponse:
-        """Cancel one active account login attempt through the wrapped sync client."""
-        return await self._call_sync(self._sync.account_login_cancel, login_id)
 
     async def account_read(
         self,

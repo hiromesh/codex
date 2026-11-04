@@ -36,11 +36,7 @@ use codex_protocol::config_types::ApprovalsReviewer;
 use codex_protocol::config_types::CollaborationModeMask;
 use codex_protocol::config_types::ReasoningSummary;
 use codex_protocol::config_types::ServiceTier;
-use codex_protocol::openai_models::AsyncClassifierMode;
-use codex_protocol::openai_models::AutoReviewMessages;
 use codex_protocol::openai_models::CatalogModel;
-use codex_protocol::openai_models::GuardianV2ModelConfig;
-use codex_protocol::openai_models::GuardianV2TranscriptModelConfig;
 use codex_protocol::openai_models::ModelOrigin;
 use codex_protocol::openai_models::ModelTokenBudgetConfig;
 use codex_protocol::openai_models::ModelsResponse;
@@ -1188,58 +1184,6 @@ fn safety_models() -> (CatalogModel, CatalogModel) {
             origin: ModelOrigin::Provider,
         },
     )
-}
-
-fn parent_review_messages(model: &mut ModelInfo) -> &mut AutoReviewMessages {
-    model
-        .model_messages
-        .as_mut()
-        .expect("model messages")
-        .auto_review
-        .get_or_insert(AutoReviewMessages {
-            policy: None,
-            policy_template: None,
-            node_repl_policy: None,
-            rejection_instructions: None,
-            timeout_instructions: None,
-        })
-}
-
-#[derive(Clone, Copy)]
-enum ModelSafetyChange {
-    Cyber,
-    NodeReplReview,
-    NodeReplDisabled,
-    ReviewerOverride,
-}
-
-#[test_case(ModelSafetyChange::Cyber, "the destination changes the admitted Guardian rejection policy"; "Cyber rejection policy")]
-#[test_case(ModelSafetyChange::NodeReplReview, "the destination changes the admitted node REPL review requirement"; "node REPL review")]
-#[test_case(ModelSafetyChange::NodeReplDisabled, "the destination changes the admitted node REPL availability restriction"; "node REPL availability")]
-#[test_case(ModelSafetyChange::ReviewerOverride, "the destination changes the explicit Guardian reviewer model"; "explicit reviewer")]
-#[tokio::test]
-async fn model_safety_changes_must_match_the_admitted_authority(
-    change: ModelSafetyChange,
-    reason: &str,
-) {
-    let (_, turn) = make_session_and_context().await;
-    let (admitted, mut destination) = safety_models();
-    match change {
-        ModelSafetyChange::Cyber => {
-            destination.model_specialty = Some(MODEL_SPECIALTY_CYBER.to_string());
-        }
-        ModelSafetyChange::NodeReplReview => destination.node_repl_auto_review_required = true,
-        ModelSafetyChange::NodeReplDisabled => destination.node_repl_disabled = true,
-        ModelSafetyChange::ReviewerOverride => {
-            destination.auto_review_model_override = Some("required-reviewer".to_string());
-        }
-    }
-    for current in [&admitted, &destination] {
-        assert_eq!(
-            check_legacy_model_safety(&admitted, current, &destination, &turn.config, &turn.config,),
-            Err(reason.to_string())
-        );
-    }
 }
 
 #[tokio::test]

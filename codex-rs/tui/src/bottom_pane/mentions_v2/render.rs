@@ -75,7 +75,7 @@ pub(super) fn render_popup(
     };
     for (offset, line) in [
         Line::from("Mentions".bold()),
-        Line::from("Files, directories, plugins, skills and tasks".dim()),
+        Line::from("Files, directories, skills and tasks".dim()),
     ]
     .into_iter()
     .take(usize::from(header.height))
@@ -276,7 +276,6 @@ fn primary_spans(row: &SearchResult, base_style: Style) -> Vec<Span<'static>> {
 
     let mut spans = Vec::with_capacity(row.display_name.len());
     let name_style = match row.mention_type {
-        MentionType::Plugin => base_style.fg(crate::style::accent_color()),
         MentionType::Skill => base_style.dim(),
         MentionType::Task => base_style.cyan(),
         MentionType::File | MentionType::Directory => base_style,

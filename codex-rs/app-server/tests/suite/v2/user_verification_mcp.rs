@@ -13,7 +13,7 @@ use codex_extension_api::ExtensionRegistryBuilder;
 use codex_extension_api::McpServerContribution;
 use codex_extension_api::McpServerContributionContext;
 use codex_extension_api::McpServerContributor;
-use codex_mcp::CODEX_APPS_MCP_SERVER_NAME;
+use codex_login::CodexAuth;
 use codex_protocol::approvals::ElicitationRequest;
 use codex_protocol::mcp::ClientMcpExtensions;
 use codex_protocol::mcp::OPENAI_ELICITATION_EXTENSION_ID;
@@ -22,8 +22,8 @@ use codex_protocol::protocol::AskForApproval;
 use codex_protocol::protocol::ElicitationAction;
 use codex_protocol::protocol::EventMsg;
 use codex_protocol::protocol::Op;
-use core_test_support::apps_test_server::apps_enabled_builder;
 use core_test_support::responses::start_mock_server;
+use core_test_support::test_codex::test_codex;
 use core_test_support::wait_for_event;
 use pretty_assertions::assert_eq;
 use rmcp::ServerHandler;
@@ -47,6 +47,8 @@ use tokio::sync::Mutex;
 use tokio::time::timeout;
 use tokio_util::task::AbortOnDropHandle;
 
+const VERIFICATION_MCP_SERVER_NAME: &str = "user_verification";
+
 #[derive(Clone)]
 struct VerificationServer {
     response: Arc<Mutex<Option<Value>>>,
@@ -64,9 +66,9 @@ impl McpServerContributor<Config> for HostedVerificationServer {
         _context: McpServerContributionContext<'a, Config>,
     ) -> ExtensionFuture<'a, Vec<McpServerContribution>> {
         Box::pin(async move {
-            vec![McpServerContribution::HostedApps {
+            vec![McpServerContribution::Set {
+                name: VERIFICATION_MCP_SERVER_NAME.to_string(),
                 config: Box::new(self.0.clone()),
-                protocol_mode: None,
             }]
         })
     }
@@ -136,7 +138,8 @@ async fn user_verification_mcp_round_trip_requires_proof_in_full_access() -> Res
         "url": format!("{base_url}/api/codex/ps/mcp"),
     }))?;
     extensions.mcp_server_contributor(Arc::new(HostedVerificationServer(plugin_service_config)));
-    let test = apps_enabled_builder(base_url)
+    let test = test_codex()
+        .with_auth(CodexAuth::from_api_key("test-key"))
         .with_extensions(Arc::new(extensions.build()))
         .with_config(|config| {
             config.permissions.approval_policy = Constrained::allow_any(AskForApproval::Never);
@@ -165,7 +168,7 @@ async fn user_verification_mcp_round_trip_requires_proof_in_full_access() -> Res
     let call = AbortOnDropHandle::new(tokio::spawn(async move {
         caller
             .call_mcp_tool(
-                CODEX_APPS_MCP_SERVER_NAME,
+                VERIFICATION_MCP_SERVER_NAME,
                 "verify_action",
                 /*arguments*/ None,
                 /*meta*/ None,
@@ -179,7 +182,7 @@ async fn user_verification_mcp_round_trip_requires_proof_in_full_access() -> Res
     else {
         unreachable!()
     };
-    assert_eq!(request.server_name, CODEX_APPS_MCP_SERVER_NAME);
+    assert_eq!(request.server_name, VERIFICATION_MCP_SERVER_NAME);
     assert_eq!(
         request.request,
         ElicitationRequest::UserVerification {

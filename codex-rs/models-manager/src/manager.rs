@@ -216,10 +216,7 @@ pub trait ModelsManager: fmt::Debug + Send + Sync {
         remote_models.sort_by_key(|model| model.priority);
 
         let mut presets: Vec<ModelPreset> = remote_models.into_iter().map(Into::into).collect();
-        let uses_codex_backend = self
-            .auth_manager()
-            .is_some_and(AuthManager::current_auth_uses_codex_backend);
-        presets = ModelPreset::filter_by_auth(presets, uses_codex_backend);
+        presets = ModelPreset::filter_by_auth(presets, /*uses_codex_backend*/ false);
 
         ModelPreset::mark_default_by_picker_visibility(&mut presets);
 
@@ -675,8 +672,7 @@ impl OpenAiModelsManager {
                 let access_denied = matches!(error.http_status_code_value(), Some(401 | 403));
                 let credentials_rejected = matches!(
                     error.details(),
-                    CodexErrorDetails::RefreshTokenFailed(_)
-                        | CodexErrorDetails::GatewayLoginRequired(_)
+                    CodexErrorDetails::GatewayLoginRequired(_)
                 );
 
                 if is_provider_catalog && (access_denied || credentials_rejected) {
@@ -779,12 +775,7 @@ impl OpenAiModelsManager {
             .models
             .iter()
             .any(|model| model.visibility == ModelVisibility::List)
-            && (self.supports_api_key_discovery()
-                || self.auth_manager.as_ref().is_some_and(|auth_manager| {
-                    auth_manager
-                        .auth_mode()
-                        .is_some_and(AuthMode::has_chatgpt_account)
-                }));
+            && self.supports_api_key_discovery();
         if !remote_only && let Some(mut models) = self.catalog_source.fallback_models() {
             for model in std::mem::take(&mut entry.models) {
                 if let Some(index) = models

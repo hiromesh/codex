@@ -30,10 +30,6 @@ pub enum McpApprovalCancellationReason {
 }
 
 pub const SOURCE_KEY: &str = "source";
-pub const SOURCE_CONNECTOR: &str = "connector";
-pub const CONNECTOR_ID_KEY: &str = "connector_id";
-pub const CONNECTOR_NAME_KEY: &str = "connector_name";
-pub const CONNECTOR_DESCRIPTION_KEY: &str = "connector_description";
 pub const TOOL_NAME_KEY: &str = "tool_name";
 pub const TOOL_ANNOTATIONS_KEY: &str = "tool_annotations";
 pub const TOOL_TITLE_KEY: &str = "tool_title";

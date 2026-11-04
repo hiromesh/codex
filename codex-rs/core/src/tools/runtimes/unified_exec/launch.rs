@@ -22,32 +22,11 @@ pub(super) async fn with_launch_failure_events(
     let Err(ToolError::Rejected(message)) = &result else {
         return result;
     };
-    let plugin_attribution = if req.turn_environment.environment.is_remote() {
-        let file_system = req
-            .turn_environment
-            .environment
-            .get_filesystem_without_reconnect();
-        ctx.step_context
-            .turn
-            .plugin_attribution_for_executor_command(
-                &req.resolved.command,
-                &req.cwd,
-                file_system.as_ref(),
-            )
-            .await
-    } else {
-        req.cwd.to_abs_path().ok().and_then(|cwd| {
-            ctx.step_context
-                .turn
-                .plugin_attribution_for_command(&req.resolved.command, &cwd)
-        })
-    };
     let emitter = ToolEmitter::unified_exec(
         &req.resolved.command,
         req.cwd.clone(),
         ExecCommandSource::UnifiedExecStartup,
         /*process_id*/ None,
-        plugin_attribution,
     );
     let session = Arc::clone(&ctx.session);
     let step_context = Arc::clone(&ctx.step_context);

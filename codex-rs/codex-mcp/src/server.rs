@@ -20,7 +20,6 @@ use codex_rmcp_client::McpOAuthRefreshMode;
 use codex_rmcp_client::McpProtocolMode;
 use codex_rmcp_client::StoredOAuthCredentialSnapshot;
 use codex_rmcp_client::StoredOAuthTokens;
-use codex_utils_path_uri::PathUri;
 use rmcp::model::ElicitationCapability;
 use tracing::warn;
 
@@ -39,7 +38,6 @@ pub(crate) enum McpCredentialPolicy {
 pub struct EffectiveMcpServer {
     config: McpServerConfig,
     credential_policy: McpCredentialPolicy,
-    agent_plugin: bool,
     requires_read_only_mcp_tools: bool,
 }
 
@@ -56,18 +54,12 @@ impl EffectiveMcpServer {
         Self {
             config,
             credential_policy,
-            agent_plugin: false,
             requires_read_only_mcp_tools: false,
         }
     }
 
     pub(crate) fn credential_policy(&self) -> McpCredentialPolicy {
         self.credential_policy
-    }
-
-    pub fn with_agent_plugin(mut self, agent_plugin: bool) -> Self {
-        self.agent_plugin = agent_plugin;
-        self
     }
 
     pub(crate) fn with_read_only_mcp_tools(mut self, requires_read_only_mcp_tools: bool) -> Self {
@@ -85,15 +77,13 @@ impl EffectiveMcpServer {
 
     /// Checks whether Core can discover the protocol of a local stdio server.
     ///
-    /// Servers with runtime or enterprise-managed credentials need that chat's
-    /// authentication state.
+    /// Servers with runtime credentials need that chat's authentication state.
     pub(crate) fn can_discover_local_stdio(
         &self,
         runtime_auth_provider: Option<&SharedAuthProvider>,
     ) -> bool {
         self.config.is_local_environment()
             && runtime_auth_provider.is_none()
-            && !matches!(self.config.auth, McpServerAuth::EmaAuth)
             && self
                 .stdio_protocol_mode(McpProtocolMode::DiscoverLocalStdio)
                 .is_some()
@@ -116,10 +106,6 @@ impl EffectiveMcpServer {
 
     pub fn required(&self) -> bool {
         self.config.required
-    }
-
-    pub fn is_agent_plugin(&self) -> bool {
-        self.agent_plugin
     }
 }
 
@@ -163,7 +149,6 @@ pub(crate) struct McpServerConnectionIdentity {
     pub(crate) credential_policy: McpCredentialPolicy,
     transport: McpServerTransportConfig,
     environment_id: String,
-    host_plugin_root: Option<PathUri>,
     oauth_store: Option<(OAuthCredentialsStoreMode, AuthKeyringBackendKind)>,
     oauth_refresh_mode: Option<McpOAuthRefreshMode>,
     oauth_config: Option<McpServerOAuthConfig>,
@@ -176,7 +161,6 @@ pub(crate) struct McpServerConnectionIdentity {
     runtime_auth_token: Option<String>,
     client_elicitation_capability: ElicitationCapability,
     client_mcp_extensions: ClientMcpExtensions,
-    agent_plugin: bool,
     requires_read_only_mcp_tools: bool,
 }
 
@@ -185,7 +169,6 @@ impl McpServerConnectionIdentity {
     pub(crate) fn new(
         server_name: &str,
         server: &EffectiveMcpServer,
-        host_plugin_root: Option<&PathUri>,
         store_mode: OAuthCredentialsStoreMode,
         keyring_backend_kind: AuthKeyringBackendKind,
         oauth_refresh_mode: McpOAuthRefreshMode,
@@ -204,7 +187,6 @@ impl McpServerConnectionIdentity {
                 .all(|byte| byte == b'\t' || (byte >= b' ' && byte != 0x7f))
         };
         let stored_oauth_url = if runtime_auth_provider.is_none()
-            && !matches!(config.auth, McpServerAuth::EmaAuth)
             && (!matches!(config.auth, McpServerAuth::ChatGpt) || config.is_local_environment())
         {
             match &config.transport {
@@ -287,7 +269,6 @@ impl McpServerConnectionIdentity {
             credential_policy: server.credential_policy(),
             transport: config.transport.clone(),
             environment_id: config.environment_id.clone(),
-            host_plugin_root: host_plugin_root.cloned(),
             oauth_store: stored_oauth_url
                 .is_some()
                 .then_some((store_mode, keyring_backend_kind)),
@@ -302,7 +283,6 @@ impl McpServerConnectionIdentity {
             runtime_auth_token,
             client_elicitation_capability,
             client_mcp_extensions,
-            agent_plugin: server.is_agent_plugin(),
             requires_read_only_mcp_tools: server.requires_read_only_mcp_tools(),
         }
     }
@@ -311,8 +291,6 @@ impl McpServerConnectionIdentity {
         let same_runtime_auth = match (&self.runtime_auth, &other.runtime_auth) {
             (Some(left), Some(right)) => {
                 left == right
-                    && left.get_account_id() == right.get_account_id()
-                    && left.get_chatgpt_user_id() == right.get_chatgpt_user_id()
                     && left.is_fedramp_account() == right.is_fedramp_account()
             }
             (None, None) => true,
@@ -322,7 +300,6 @@ impl McpServerConnectionIdentity {
             && self.credential_policy == other.credential_policy
             && self.transport == other.transport
             && self.environment_id == other.environment_id
-            && self.host_plugin_root == other.host_plugin_root
             && self.oauth_store == other.oauth_store
             && self.oauth_refresh_mode == other.oauth_refresh_mode
             // Callback settings only affect a future login, not the live connection.
@@ -337,7 +314,6 @@ impl McpServerConnectionIdentity {
             && self.runtime_auth_token == other.runtime_auth_token
             && self.client_elicitation_capability == other.client_elicitation_capability
             && self.client_mcp_extensions == other.client_mcp_extensions
-            && self.agent_plugin == other.agent_plugin
             && self.requires_read_only_mcp_tools == other.requires_read_only_mcp_tools
     }
 

@@ -15,7 +15,6 @@ fn thread_settings_for_test(
     codex_app_server_protocol::ThreadSettingsUpdatedNotification {
         thread_id: thread_id.to_string(),
         thread_settings: codex_app_server_protocol::ThreadSettings {
-            disabled_plugin_ids: Vec::new(),
             cwd: test_path_buf("/tmp/thread-settings").abs(),
             approval_policy: AskForApproval::OnRequest,
             approvals_reviewer: codex_app_server_protocol::ApprovalsReviewer::AutoReview,
@@ -683,19 +682,12 @@ async fn thread_settings_updated_updates_visible_state_without_transcript() {
     let (mut chat, mut rx, _op_rx) = make_chatwidget_manual(Some("gpt-5.2")).await;
     set_chatgpt_auth(&mut chat);
     set_fast_mode_test_catalog(&mut chat);
-    chat.set_feature_enabled(Feature::Apps, /*enabled*/ true);
     let thread_id = ThreadId::new();
     let mut session = configured_thread_session(thread_id);
     session.cwd = test_path_buf("/tmp/original-workspace").abs();
     chat.handle_thread_session(session);
     chat.config.permissions.approval_policy =
         Constrained::allow_only(AskForApproval::Never.to_core());
-    let previous_generation = chat.connector_scope_generation();
-    let old_app = serde_json::from_str(r#"{"id":"old","name":"Old","isAccessible":true}"#)
-        .expect("valid app");
-    chat.connectors.mention_snapshot = Some(crate::app_event::ConnectorsSnapshot {
-        connectors: vec![old_app],
-    });
     let _ = drain_insert_history(&mut rx);
 
     chat.handle_server_notification(
@@ -703,9 +695,6 @@ async fn thread_settings_updated_updates_visible_state_without_transcript() {
         /*replay_kind*/ None,
     );
 
-    assert_ne!(chat.connector_scope_generation(), previous_generation);
-    assert!(chat.connectors_for_mentions().is_none());
-    assert!(chat.connectors.mention_refresh_in_flight);
     assert_eq!(chat.current_model(), "gpt-5.4");
     assert_eq!(
         chat.current_reasoning_effort(),
@@ -1309,8 +1298,6 @@ async fn live_app_server_command_execution_strips_shell_wrapper() {
                 command: command.clone(),
                 cwd: test_path_buf("/tmp").abs().into(),
                 process_id: None,
-                plugin_id: None,
-                script_path: None,
                 source: AppServerCommandExecutionSource::UserShell,
                 status: AppServerCommandExecutionStatus::InProgress,
                 command_actions: vec![AppServerCommandAction::Unknown {
@@ -1335,8 +1322,6 @@ async fn live_app_server_command_execution_strips_shell_wrapper() {
                 command,
                 cwd: test_path_buf("/tmp").abs().into(),
                 process_id: None,
-                plugin_id: None,
-                script_path: None,
                 source: AppServerCommandExecutionSource::UserShell,
                 status: AppServerCommandExecutionStatus::Completed,
                 command_actions: vec![AppServerCommandAction::Unknown {

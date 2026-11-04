@@ -1,4 +1,3 @@
-
 use codex_core::TurnInputRequest;
 
 use codex_protocol::models::ImageReference;

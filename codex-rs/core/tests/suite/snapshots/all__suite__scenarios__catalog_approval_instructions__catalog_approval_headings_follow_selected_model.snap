@@ -1,6 +1,5 @@
 ---
 source: core/tests/suite/scenarios_catalog_approval_instructions_tests.rs
-assertion_line: 138
 expression: "context_snapshot::format_request_history_snapshot(\"Catalog permission-request and automatic-review headings follow the selected model. The switch appends new developer instructions after the prior reply and before the next user message; an unchanged follow-up preserves the full history without repeating instructions.\",\n&requests, &ContextSnapshotOptions::default().include_request_settings(),)"
 ---
 Scenario: Catalog permission-request and automatic-review headings follow the selected model. The switch appends new developer instructions after the prior reply and before the next user message; an unchanged follow-up preserves the full history without repeating instructions.
@@ -16,14 +15,14 @@ Settings:
   stream: true
   tool_choice: "auto"
 -- request 1 (turn) --
-00:additional_tools/developer (2; hash=23179252be1abe5f):
+00:additional_tools/developer (2; hash=73e15779150660c7):
         - namespace/functions; hash=9962be1e4c2d492b
           - function/exec_command
           - function/write_stdin
           - function/request_user_input
           - function/request_permissions
           - function/view_image
-        - namespace/multi_agent_v1: Tools for spawning and managing sub-agents.; hash=c826e5b07fd2820f
+        - namespace/multi_agent_v1: Tools for spawning and managing sub-agents.; hash=d920ce21924ad9e3
           - function/close_agent
           - function/resume_agent
           - function/send_input
@@ -64,14 +63,14 @@ Settings:
 Settings: relative to window 1
   model: "catalog-approval-headings-b"
 -- request 2 (turn) --
-00:additional_tools/developer (2; hash=23179252be1abe5f):
+00:additional_tools/developer (2; hash=73e15779150660c7):
         - namespace/functions; hash=9962be1e4c2d492b
           - function/exec_command
           - function/write_stdin
           - function/request_user_input
           - function/request_permissions
           - function/view_image
-        - namespace/multi_agent_v1: Tools for spawning and managing sub-agents.; hash=c826e5b07fd2820f
+        - namespace/multi_agent_v1: Tools for spawning and managing sub-agents.; hash=d920ce21924ad9e3
           - function/close_agent
           - function/resume_agent
           - function/send_input

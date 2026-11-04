@@ -314,7 +314,9 @@ async fn remote_board_effective_permissions_and_denials() -> anyhow::Result<()> 
         } else {
             result.clone()
         };
-        let output = last.function_call_output_text(call_id).context("tool output")?;
+        let output = last
+            .function_call_output_text(call_id)
+            .context("tool output")?;
         assert_eq!(
             serde_json::from_str::<Value>(&output)?,
             expected,

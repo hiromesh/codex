@@ -33,7 +33,7 @@ impl Drop for StartupProcesses {
 async fn shell_snapshot_preserves_successful_startup_output_and_services(
     shell: &str,
 ) -> Result<()> {
-    let context = create_process_context(/*use_remote*/ false).await?;
+    let context = create_process_context().await?;
     let home = TempDir::new()?;
     let _service = StartupProcesses(home.path().join("service-pid"));
     std::fs::write(
@@ -116,7 +116,7 @@ async fn shell_snapshot_concurrent_replays_keep_independent_readers(
         eprintln!("skipping sandbox test: {warning}");
         return Ok(());
     }
-    let context = if sandbox_mode == SnapshotSandbox::WorkspaceWrite {
+    let context = if use_sandbox {
         let (exe, linux_sandbox) = current_test_binary_helper_paths()?;
         let environment = Environment::create(
             /*exec_server_url*/ None,
@@ -127,10 +127,9 @@ async fn shell_snapshot_concurrent_replays_keep_independent_readers(
         )?;
         ProcessContext {
             backend: environment.get_exec_backend(),
-            _server: None,
         }
     } else {
-        create_process_context(deny_fd_path).await?
+        create_process_context().await?
     };
     let home = TempDir::new()?;
     let cwd = PathUri::from_host_native_path(home.path())?;

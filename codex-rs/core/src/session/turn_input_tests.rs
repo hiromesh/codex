@@ -701,7 +701,6 @@ async fn start_only_accepts_user_input_in_plan_mode() {
         let mut state = session.state.lock().await;
         Arc::make_mut(&mut state.session_configuration.step_settings).collaboration_mode =
             collaboration_mode;
-        state.merge_connector_selection(["calendar".to_string()]);
     }
 
     let submission = submit_start_only(
@@ -716,14 +715,6 @@ async fn start_only_accepts_user_input_in_plan_mode() {
     )
     .await;
     assert!(matches!(submission, TurnInputSubmission::Started { .. }));
-    assert!(
-        session
-            .state
-            .lock()
-            .await
-            .get_connector_selection()
-            .is_empty()
-    );
 
     session.abort_all_tasks(TurnAbortReason::Interrupted).await;
 }

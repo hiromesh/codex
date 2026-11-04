@@ -8,12 +8,11 @@ Scenario: Persisted deferred tools remain unchanged after resuming the thread.
 -- request 1 (items; Before resume) --
 00:message/developer:
     <MODEL_INSTRUCTIONS>
-01:message/developer[3]:
+01:message/developer[2]:
     [01] <PERMISSIONS_INSTRUCTIONS>
-    [02] <APPS_INSTRUCTIONS>
-    [03] <tools>
+    [02] <tools>
         Deferred tool namespaces:
-        - mcp__codex_apps__calendar: Plan events and manage your calendar.
+        - mcp__codex_apps: Plan events and manage your calendar.
         </tools>
 02:message/user:
     <ENVIRONMENT_CONTEXT>
@@ -24,12 +23,11 @@ Scenario: Persisted deferred tools remain unchanged after resuming the thread.
 -- request 2 (items; After resume) --
 00:message/developer:
     <MODEL_INSTRUCTIONS>
-01:message/developer[3]:
+01:message/developer[2]:
     [01] <PERMISSIONS_INSTRUCTIONS>
-    [02] <APPS_INSTRUCTIONS>
-    [03] <tools>
+    [02] <tools>
         Deferred tool namespaces:
-        - mcp__codex_apps__calendar: Plan events and manage your calendar.
+        - mcp__codex_apps: Plan events and manage your calendar.
         </tools>
 02:message/user:
     <ENVIRONMENT_CONTEXT>

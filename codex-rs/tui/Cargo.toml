@@ -33,12 +33,9 @@ codex-app-server-client = { workspace = true }
 codex-app-server-daemon = { workspace = true }
 codex-app-server-protocol = { workspace = true }
 codex-arg0 = { workspace = true }
-codex-backend-client = { workspace = true }
 codex-install-context = { workspace = true }
 codex-config = { workspace = true }
 codex-context-fragments = { workspace = true }
-codex-connectors = { workspace = true }
-codex-core-plugins = { workspace = true }
 codex-history = { workspace = true }
 codex-exec-server = { workspace = true }
 codex-features = { workspace = true }
@@ -53,7 +50,6 @@ codex-model-provider = { workspace = true }
 codex-model-provider-info = { workspace = true }
 codex-models-manager = { workspace = true }
 codex-otel = { workspace = true }
-codex-plugin = { workspace = true }
 codex-protocol = { workspace = true }
 futures = { workspace = true }
 codex-rollout = { workspace = true }
@@ -72,7 +68,6 @@ codex-utils-home-dir = { workspace = true }
 codex-utils-oss = { workspace = true }
 codex-utils-path = { workspace = true }
 codex-utils-path-uri = { workspace = true }
-codex-utils-plugins = { workspace = true }
 codex-utils-sandbox-summary = { workspace = true }
 codex-utils-sleep-inhibitor = { workspace = true }
 codex-utils-string = { workspace = true }

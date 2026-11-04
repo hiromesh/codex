@@ -371,8 +371,7 @@ enabled = false
 
         let current_config = thread.config().await;
         let refresh_config = load_refresh_config(&current_config, &config_manager).await?;
-        let mut actual = refresh_config.mcp_servers.get().clone();
-        actual.remove(codex_mcp::CODEX_APPS_MCP_SERVER_NAME);
+        let actual = refresh_config.mcp_servers.get().clone();
         let expected = serde_json::from_value::<HashMap<String, McpServerConfig>>(json!({
             "global": {
                 "command": "global-mcp",
@@ -535,7 +534,6 @@ enabled = false
                 &good_config,
                 auth_manager.clone(),
                 codex_core::build_models_manager(&good_config, auth_manager.clone()),
-                codex_core::CodexAppsToolsCache::default(),
                 SessionSource::Exec,
                 Arc::clone(&environment_manager),
                 thread_extensions(

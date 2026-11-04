@@ -141,7 +141,6 @@ fn test_model_info(
         upgrade: None,
         model_messages: None,
         include_skills_usage_instructions: false,
-        include_plugin_usage_instructions: false,
         include_apps_usage_instructions: false,
         supports_reasoning_summary_parameter: true,
         default_reasoning_summary: ReasoningSummary::Auto,
@@ -871,7 +870,8 @@ async fn model_change_projects_media_without_changing_live_or_replayed_history(
     .await;
 
     let mut builder = test_codex()
-        .with_auth(CodexAuth::create_dummy_chatgpt_auth_for_testing())
+        .with_auth(CodexAuth::from_api_key("test-api-key"))
+        .with_mock_model_catalog(&server)
         .with_config(move |config| {
             config.model = Some(text_model_slug.to_string());
             config
@@ -1052,7 +1052,6 @@ async fn model_switch_to_smaller_model_updates_token_context_window() -> Result<
         upgrade: None,
         model_messages: None,
         include_skills_usage_instructions: false,
-        include_plugin_usage_instructions: false,
         include_apps_usage_instructions: false,
         supports_reasoning_summary_parameter: true,
         default_reasoning_summary: ReasoningSummary::Auto,
@@ -1100,7 +1099,8 @@ async fn model_switch_to_smaller_model_updates_token_context_window() -> Result<
     .await;
 
     let mut builder = test_codex()
-        .with_auth(CodexAuth::create_dummy_chatgpt_auth_for_testing())
+        .with_auth(CodexAuth::from_api_key("test-api-key"))
+        .with_mock_model_catalog(&server)
         .with_config(|config| {
             config.model = Some(large_model_slug.to_string());
         });

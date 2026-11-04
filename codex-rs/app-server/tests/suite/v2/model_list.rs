@@ -2,9 +2,8 @@ use std::time::Duration;
 
 use anyhow::Error;
 use anyhow::Result;
-use app_test_support::ChatGptAuthFixture;
 use app_test_support::TestAppServer;
-use app_test_support::write_chatgpt_auth;
+use app_test_support::write_api_key_auth;
 use app_test_support::write_models_cache;
 use codex_app_server_protocol::ClientRequest;
 use codex_app_server_protocol::ExperimentalFeatureEnablementSetParams;
@@ -313,13 +312,9 @@ async fn list_models_includes_hidden_models() -> Result<()> {
     Ok(())
 }
 
-#[test_case("chatgpt-access-token", None; "chatgpt")]
-#[test_case("test-api-key", Some("test-api-key"); "api key")]
 #[tokio::test]
-async fn list_models_uses_remote_catalog_as_source_of_truth(
-    bearer_token: &str,
-    api_key: Option<&str>,
-) -> Result<()> {
+async fn list_models_uses_remote_catalog_as_source_of_truth() -> Result<()> {
+    let bearer_token = "test-api-key";
     let server = MockServer::start().await;
     let remote_models = [
         (
@@ -400,20 +395,7 @@ model_catalog_url = "{server_uri}/v1/models"
 "#
         ),
     )?;
-    if let Some(api_key) = api_key {
-        login_with_api_key(
-            codex_home.path(),
-            api_key,
-            AuthCredentialsStoreMode::File,
-            AuthKeyringBackendKind::default(),
-        )?;
-    } else {
-        write_chatgpt_auth(
-            codex_home.path(),
-            ChatGptAuthFixture::new(bearer_token).plan_type("pro"),
-            AuthCredentialsStoreMode::File,
-        )?;
-    }
+    write_api_key_auth(codex_home.path(), bearer_token)?;
 
     let mut mcp = TestAppServer::builder()
         .with_codex_home(codex_home.path())

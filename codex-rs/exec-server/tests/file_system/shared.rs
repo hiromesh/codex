@@ -73,7 +73,6 @@ fn sandbox_context_from_profile_preserves_workspace_write_read_only_subpaths() -
 }
 
 #[test_case(FileSystemImplementation::Local ; "local")]
-#[test_case(FileSystemImplementation::Remote ; "remote")]
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn file_system_get_metadata_reports_files_and_directories(
     implementation: FileSystemImplementation,
@@ -134,10 +133,7 @@ async fn file_system_get_metadata_reports_files_and_directories(
 
 #[test_case(FileSystemImplementation::Local, true, false ; "local_follow")]
 #[test_case(FileSystemImplementation::Local, false, false ; "local_no_follow")]
-#[test_case(FileSystemImplementation::Remote, true, false ; "remote_follow")]
-#[test_case(FileSystemImplementation::Remote, false, false ; "remote_no_follow")]
 #[cfg_attr(target_os = "linux", test_case(FileSystemImplementation::Local, false, true ; "local_sandboxed_no_follow"))]
-#[cfg_attr(target_os = "linux", test_case(FileSystemImplementation::Remote, false, true ; "remote_sandboxed_no_follow"))]
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn file_system_create_directory_creates_nested_directories(
     implementation: FileSystemImplementation,
@@ -170,10 +166,7 @@ async fn file_system_create_directory_creates_nested_directories(
 
 #[test_case(FileSystemImplementation::Local, true, false ; "local_follow")]
 #[test_case(FileSystemImplementation::Local, false, false ; "local_no_follow")]
-#[test_case(FileSystemImplementation::Remote, true, false ; "remote_follow")]
-#[test_case(FileSystemImplementation::Remote, false, false ; "remote_no_follow")]
 #[cfg_attr(target_os = "linux", test_case(FileSystemImplementation::Local, false, true ; "local_sandboxed_no_follow"))]
-#[cfg_attr(target_os = "linux", test_case(FileSystemImplementation::Remote, false, true ; "remote_sandboxed_no_follow"))]
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn file_system_write_file_writes_bytes(
     implementation: FileSystemImplementation,
@@ -238,7 +231,6 @@ fn path_uri_join_and_parent_preserve_lexical_paths() -> Result<()> {
 }
 
 #[test_case(FileSystemImplementation::Local ; "local")]
-#[test_case(FileSystemImplementation::Remote ; "remote")]
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn file_system_read_file_returns_bytes(
     implementation: FileSystemImplementation,
@@ -264,7 +256,6 @@ async fn file_system_read_file_returns_bytes(
 }
 
 #[test_case(FileSystemImplementation::Local ; "local")]
-#[test_case(FileSystemImplementation::Remote ; "remote")]
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn file_system_read_file_stream_returns_bounded_chunks(
     implementation: FileSystemImplementation,
@@ -307,7 +298,6 @@ async fn file_system_read_file_stream_returns_bounded_chunks(
 }
 
 #[test_case(FileSystemImplementation::Local ; "local")]
-#[test_case(FileSystemImplementation::Remote ; "remote")]
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn file_system_read_file_text_returns_string(
     implementation: FileSystemImplementation,
@@ -339,7 +329,6 @@ async fn file_system_read_file_text_returns_string(
 }
 
 #[test_case(FileSystemImplementation::Local ; "local")]
-#[test_case(FileSystemImplementation::Remote ; "remote")]
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn file_system_copy_copies_file(implementation: FileSystemImplementation) -> Result<()> {
     let context = create_file_system_context(implementation).await?;
@@ -365,7 +354,6 @@ async fn file_system_copy_copies_file(implementation: FileSystemImplementation) 
 }
 
 #[test_case(FileSystemImplementation::Local ; "local")]
-#[test_case(FileSystemImplementation::Remote ; "remote")]
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn file_system_copy_copies_directory_recursively(
     implementation: FileSystemImplementation,
@@ -399,7 +387,6 @@ async fn file_system_copy_copies_directory_recursively(
 }
 
 #[test_case(FileSystemImplementation::Local ; "local")]
-#[test_case(FileSystemImplementation::Remote ; "remote")]
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn file_system_read_directory_lists_entries(
     implementation: FileSystemImplementation,
@@ -440,7 +427,6 @@ async fn file_system_read_directory_lists_entries(
 }
 
 #[test_case(FileSystemImplementation::Local ; "local")]
-#[test_case(FileSystemImplementation::Remote ; "remote")]
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn file_system_walk_returns_a_bounded_tree(
     implementation: FileSystemImplementation,
@@ -578,7 +564,6 @@ async fn file_system_walk_returns_a_bounded_tree(
 }
 
 #[test_case(FileSystemImplementation::Local ; "local")]
-#[test_case(FileSystemImplementation::Remote ; "remote")]
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn file_system_walk_handles_invalid_roots_and_limits(
     implementation: FileSystemImplementation,
@@ -661,7 +646,6 @@ async fn file_system_walk_handles_invalid_roots_and_limits(
 }
 
 #[test_case(FileSystemImplementation::Local ; "local")]
-#[test_case(FileSystemImplementation::Remote ; "remote")]
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn file_system_walk_honors_read_sandbox(
     implementation: FileSystemImplementation,
@@ -706,7 +690,6 @@ async fn file_system_walk_honors_read_sandbox(
 }
 
 #[test_case(FileSystemImplementation::Local ; "local")]
-#[test_case(FileSystemImplementation::Remote ; "remote")]
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn file_system_remove_removes_directory(
     implementation: FileSystemImplementation,
@@ -736,9 +719,7 @@ async fn file_system_remove_removes_directory(
 }
 
 #[test_case(FileSystemImplementation::Local, false ; "local")]
-#[test_case(FileSystemImplementation::Remote, false ; "remote")]
 #[cfg_attr(target_os = "linux", test_case(FileSystemImplementation::Local, true ; "local_sandboxed"))]
-#[cfg_attr(target_os = "linux", test_case(FileSystemImplementation::Remote, true ; "remote_sandboxed"))]
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn file_system_remove_no_follow_removes_file_and_empty_directory(
     implementation: FileSystemImplementation,
@@ -783,7 +764,6 @@ async fn file_system_remove_no_follow_removes_file_and_empty_directory(
 }
 
 #[test_case(FileSystemImplementation::Local ; "local")]
-#[test_case(FileSystemImplementation::Remote ; "remote")]
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn file_system_write_file_reports_missing_parent(
     implementation: FileSystemImplementation,
@@ -817,7 +797,6 @@ async fn file_system_write_file_reports_missing_parent(
 }
 
 #[test_case(FileSystemImplementation::Local ; "local")]
-#[test_case(FileSystemImplementation::Remote ; "remote")]
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn file_system_copy_rejects_directory_without_recursive(
     implementation: FileSystemImplementation,
@@ -848,7 +827,6 @@ async fn file_system_copy_rejects_directory_without_recursive(
 }
 
 #[test_case(FileSystemImplementation::Local ; "local")]
-#[test_case(FileSystemImplementation::Remote ; "remote")]
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn file_system_sandboxed_metadata_and_read_allow_readable_root(
     implementation: FileSystemImplementation,
@@ -1038,7 +1016,6 @@ async fn file_system_full_disk_read_skips_sandbox_only_for_reads() -> Result<()>
 }
 
 #[test_case(FileSystemImplementation::Local ; "local")]
-#[test_case(FileSystemImplementation::Remote ; "remote")]
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn full_disk_reads_reject_foreign_permission_paths(
     implementation: FileSystemImplementation,
@@ -1098,7 +1075,6 @@ async fn full_disk_reads_reject_foreign_permission_paths(
 /// A stream already opened under one environment remains usable after its accessor is dropped;
 /// cache keys still distinguish a new filesystem or changed captured permissions.
 #[test_case(FileSystemImplementation::Local ; "local")]
-#[test_case(FileSystemImplementation::Remote ; "remote")]
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn environment_accessor_stream_outlives_permissions_snapshot(
     implementation: FileSystemImplementation,
@@ -1326,7 +1302,6 @@ pub(crate) async fn assert_sandboxed_canonicalize_resolves_directory_alias(
 
 /// Verifies that effective additional permissions extend a read-only sandbox with a writable root.
 #[test_case(FileSystemImplementation::Local ; "local")]
-#[test_case(FileSystemImplementation::Remote ; "remote")]
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn file_system_sandboxed_write_allows_additional_write_root(
     implementation: FileSystemImplementation,
@@ -1379,7 +1354,6 @@ async fn file_system_sandboxed_write_allows_additional_write_root(
 }
 
 #[test_case(FileSystemImplementation::Local ; "local")]
-#[test_case(FileSystemImplementation::Remote ; "remote")]
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn file_system_copy_rejects_copying_directory_into_descendant(
     implementation: FileSystemImplementation,

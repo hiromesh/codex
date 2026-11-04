@@ -20,9 +20,10 @@ async fn mismatched_and_legacy_cache_entries_fetch_the_current_catalog() {
             cache.clone(),
             endpoint.clone(),
             Some(AuthManager::from_auth_for_testing(
-                CodexAuth::create_dummy_chatgpt_auth_for_testing(),
+                CodexAuth::from_api_key("sk-test"),
             )),
         );
+    manager.set_api_key_model_discovery_enabled(/*enabled*/ true);
         assert_eq!(
             manager
                 .raw_model_catalog(

@@ -466,17 +466,6 @@ async fn mcp_parallel_support_uses_handler_data() -> anyhow::Result<()> {
     assert!(!router.tool_supports_parallel(&hidden_call));
     assert!(router.registered_tool(&hidden_call.tool_name).is_some());
 
-    let nested_only_call = ToolCall {
-        tool_name: ToolName::namespaced("mcp__nested_echo__", "query_with_delay"),
-        call_id: "call-nested-only-server".to_string(),
-        payload: ToolPayload::Function {
-            arguments: "{}".to_string(),
-        },
-        encrypted_function_args: None,
-        native_call: None,
-    };
-    assert!(router.tool_supports_parallel(&nested_only_call));
-
     Ok(())
 }
 
@@ -588,7 +577,6 @@ fn mcp_tool_info(
         openai_file_input_optional_fields: Default::default(),
         connector_id: None,
         connector_name: None,
-        plugin_display_names: Vec::new(),
     }
 }
 

@@ -96,8 +96,6 @@ fn guardian_stdin_reviews_preserve_parent_command_history() {
     let cwd = PathUri::parse("file:///home/alice/repo").expect("valid cwd URI");
     let begin = ExecCommandBeginEvent {
         call_id: "terminal-command".into(),
-        plugin_id: None,
-        script_path: None,
         process_id: Some("42".into()),
         turn_id: "turn-1".into(),
         started_at_ms: 1_000,
@@ -140,8 +138,6 @@ fn guardian_stdin_reviews_preserve_parent_command_history() {
         model_context: None,
         id: "review-stdin".into(),
         target_item_id: Some("terminal-command".into()),
-        plugin_id: None,
-        script_path: None,
         turn_id: "turn-2".into(),
         started_at_ms: 2_000,
         completed_at_ms: None,

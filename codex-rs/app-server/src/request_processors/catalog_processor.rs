@@ -63,7 +63,6 @@ fn skills_to_info(
                 path: skill.path_to_skills_md.clone().into(),
                 scope: skill.scope.into(),
                 enabled,
-                plugin_id: skill.plugin_id.clone(),
             }
         })
         .collect()
@@ -96,7 +95,6 @@ fn hooks_to_info(hooks: &[codex_hooks::HookListEntry]) -> Vec<HookMetadata> {
                 additional_context_limit: hook.additional_context_limit,
                 source_path: hook.source_path.clone(),
                 source: hook.source.into(),
-                plugin_id: hook.plugin_id.clone(),
                 environment_id: hook.environment_id.clone(),
                 display_order: hook.display_order,
                 enabled: hook.enabled,
@@ -184,39 +182,10 @@ impl CatalogRequestProcessor {
             .current()
             .await
             .map_err(|err| config_load_error(&err))?;
-        // Gate the same provider used by the catalog, including when its model cache is warm.
-        // Resolving credentials may refresh them, but explicit host policy prevents browser login.
-        if let Some(gateway) = codex_model_provider::create_model_provider(
-            config.model_provider.clone(),
-            Some(self.thread_manager.auth_manager()),
-        )
-        .gateway_auth_manager()
-        .map_err(|error| internal_error(error.to_string()))?
-        {
-            // Refreshing credentials can contact the gateway before the catalog's own check.
-            self.config_manager
-                .check_thread_model_provider(&config)
-                .await
-                .map_err(|err| config_load_error(&err))?;
-            if gateway.resolve_access_token().await.is_err() {
-                let current = self
-                    .config_manager
-                    .load_latest_config(/*fallback_cwd*/ None)
-                    .await
-                    .map_err(|err| config_load_error(&err))?;
-                // Configuration edits without an account transition still require a restart to refresh the model catalog.
-                if current.model_provider_id != config.model_provider_id
-                    || current.model_provider != config.model_provider
-                {
-                    return Err(invalid_request(
-                        "Model provider settings changed. Restart Codex to apply them, then retry fetching the model list",
-                    ));
-                }
-                return Err(invalid_request(
-                    "Gateway sign-in required or unavailable. Complete gateway sign-in and retry fetching the model list",
-                ));
-            }
-        }
+        self.config_manager
+            .check_thread_model_provider(&config)
+            .await
+            .map_err(|err| config_load_error(&err))?;
         self.list_models(params, config, models_manager)
             .await
             .map(|response| Some(response.into()))
@@ -536,9 +505,7 @@ impl CatalogRequestProcessor {
         };
 
         let skills_service = self.thread_manager.skills_service();
-        let plugins_manager = self.thread_manager.plugins_manager();
         if force_reload {
-            plugins_manager.clear_cache();
             skills_service.clear_cache();
         }
         let fs = self
@@ -551,7 +518,6 @@ impl CatalogRequestProcessor {
             .map(|(index, cwd)| {
                 let fs = fs.clone();
                 let skills_request = &skills_request;
-                let plugins_manager = Arc::clone(&plugins_manager);
                 async move {
                     let config = match self.load_latest_config(Some(cwd.clone())).await {
                         Ok(resolved) => resolved,
@@ -651,7 +617,6 @@ impl CatalogRequestProcessor {
             cwds
         };
 
-        let plugins_manager = self.thread_manager.plugins_manager();
         let mut data = Vec::new();
         for cwd in cwds {
             let config = match self
@@ -679,22 +644,10 @@ impl CatalogRequestProcessor {
                 }
             };
             let hooks_enabled = config.features.enabled(Feature::CodexHooks);
-            let plugin_hooks = if hooks_enabled && config.features.enabled(Feature::Plugins) {
-                let plugins_input = config.plugins_config_input();
-                let plugin_outcome = plugins_manager.plugins_for_config(&plugins_input).await;
-                codex_core_plugins::PluginHookLoadOutcome {
-                    hook_sources: plugin_outcome.effective_plugin_hook_sources(),
-                    hook_load_warnings: plugin_outcome.effective_plugin_hook_warnings(),
-                }
-            } else {
-                codex_core_plugins::PluginHookLoadOutcome::default()
-            };
             let hooks_config = codex_hooks::HooksConfig {
                 feature_enabled: hooks_enabled,
                 bypass_hook_trust: config.bypass_hook_trust,
                 config_layer_stack: Some(config.config_layer_stack),
-                plugin_hook_sources: plugin_hooks.hook_sources,
-                plugin_hook_load_warnings: plugin_hooks.hook_load_warnings,
                 ..Default::default()
             };
             let hooks = tokio::task::spawn_blocking(move || codex_hooks::list_hooks(hooks_config))
@@ -739,7 +692,6 @@ impl CatalogRequestProcessor {
             .apply()
             .await
             .map(|()| {
-                self.thread_manager.plugins_manager().clear_cache();
                 self.thread_manager.skills_service().clear_cache();
                 SkillsConfigWriteResponse {
                     effective_enabled: enabled,

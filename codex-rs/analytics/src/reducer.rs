@@ -3,10 +3,7 @@ use crate::accepted_lines::accepted_line_counts_from_unified_diff;
 use crate::accepted_lines::accepted_line_fingerprint_event_requests;
 use crate::accepted_lines::accepted_line_repo_hash_for_cwd;
 use crate::events::AppServerRpcTransport;
-use crate::events::CodexAppMentionedEventRequest;
 use crate::events::CodexAppServerClientMetadata;
-use crate::events::CodexAppUsedEventRequest;
-use crate::events::CodexAppUsedMetadata;
 use crate::events::CodexCollabAgentToolCallEventParams;
 use crate::events::CodexCollabAgentToolCallEventRequest;
 use crate::events::CodexCommandExecutionEventParams;
@@ -59,7 +56,6 @@ use crate::events::ToolItemFailureKind;
 use crate::events::ToolItemTerminalStatus;
 use crate::events::TrackEventRequest;
 use crate::events::WebSearchActionKind;
-use crate::events::codex_app_metadata;
 use crate::events::codex_artifact_operation_event_request;
 use crate::events::codex_compaction_event_params;
 use crate::events::codex_goal_event_params;
@@ -68,8 +64,6 @@ use crate::events::subagent_source_name;
 use crate::events::subagent_thread_started_event_request;
 use crate::facts::AnalyticsFact;
 use crate::facts::AnalyticsJsonRpcError;
-use crate::facts::AppMentionedInput;
-use crate::facts::AppUsedInput;
 use crate::facts::ArtifactOperationInput;
 use crate::facts::CodeModeToolCallFact;
 use crate::facts::CodeModeToolCallStatus;
@@ -715,12 +709,6 @@ impl AnalyticsReducer {
                 }
                 CustomAnalyticsFact::SkillInvoked(input) => {
                     self.ingest_skill_invoked(input, out).await;
-                }
-                CustomAnalyticsFact::AppMentioned(input) => {
-                    self.ingest_app_mentioned(input, out);
-                }
-                CustomAnalyticsFact::AppUsed(input) => {
-                    self.ingest_app_used(input, out);
                 }
                 CustomAnalyticsFact::McpToolCallElicitation(input) => {
                     let McpToolCallElicitation {
@@ -1378,33 +1366,6 @@ impl AnalyticsReducer {
                 },
             ));
         }
-    }
-
-    fn ingest_app_mentioned(&mut self, input: AppMentionedInput, out: &mut Vec<TrackEventRequest>) {
-        let AppMentionedInput { tracking, mentions } = input;
-        out.extend(mentions.into_iter().map(|mention| {
-            let event_params = codex_app_metadata(&tracking, mention);
-            TrackEventRequest::AppMentioned(CodexAppMentionedEventRequest {
-                event_type: "codex_app_mentioned",
-                event_params,
-            })
-        }));
-    }
-
-    fn ingest_app_used(&mut self, input: AppUsedInput, out: &mut Vec<TrackEventRequest>) {
-        let AppUsedInput {
-            tracking,
-            app,
-            elicitation_type,
-        } = input;
-        let event_params = CodexAppUsedMetadata {
-            app: codex_app_metadata(&tracking, app),
-            elicitation_type,
-        };
-        out.push(TrackEventRequest::AppUsed(CodexAppUsedEventRequest {
-            event_type: "codex_app_used",
-            event_params,
-        }));
     }
 
     fn ingest_hook_run(&mut self, input: HookRunInput, out: &mut Vec<TrackEventRequest>) {
@@ -2605,23 +2566,10 @@ pub(crate) fn tracked_tool_item_id(item: &ThreadItemPayload) -> Option<&str> {
 }
 
 fn cua_mcp_tool_identity(item: &ThreadItemPayload) -> Option<(&str, &str, Option<&str>)> {
-    let ThreadItemPayload::McpToolCall {
-        server,
-        tool,
-        app_context,
-        ..
-    } = item
-    else {
+    let ThreadItemPayload::McpToolCall { server, tool, .. } = item else {
         return None;
     };
-    let connector_id = app_context
-        .as_ref()
-        .map(|app_context| app_context.connector_id.as_str());
-    (tool == "js" && is_node_repl_backed_connector(server, connector_id)).then_some((
-        server,
-        tool,
-        connector_id,
-    ))
+    (tool == "js" && is_node_repl_backed_connector(server, None)).then_some((server, tool, None))
 }
 
 fn tool_event_base_mut(event: &mut TrackEventRequest) -> Option<&mut CodexToolItemEventBase> {
@@ -2834,7 +2782,6 @@ fn tool_item_event(input: ToolItemEventInput<'_>) -> Option<TrackEventRequest> {
             status,
             error,
             duration_ms,
-            app_context,
             ..
         } => {
             let (terminal_status, failure_kind) = mcp_tool_call_outcome(status)?;
@@ -2865,9 +2812,7 @@ fn tool_item_event(input: ToolItemEventInput<'_>) -> Option<TrackEventRequest> {
                         mcp_server_name: server.clone(),
                         mcp_tool_name: tool.clone(),
                         mcp_error_present: error.is_some(),
-                        connector_id: app_context
-                            .as_ref()
-                            .map(|app_context| app_context.connector_id.clone()),
+                        connector_id: None,
                         elicitation_type,
                     },
                 },
@@ -3092,9 +3037,6 @@ fn tool_item_base(
         tool_event_type: None,
         started_at_ms: context.started_at_ms,
         completed_at_ms: context.completed_at_ms,
-        // duration_ms reflects item lifecycle observed by app-server. For web
-        // search and image generation in particular, that can be narrower than
-        // full upstream execution time.
         duration_ms: observed_duration_ms(context.started_at_ms, context.completed_at_ms),
         execution_duration_ms: outcome.execution_duration_ms,
         review_count: review_summary.review_count,
@@ -3848,10 +3790,6 @@ mod tests {
                             tool: "tool".to_string(),
                             status: McpToolCallStatus::Failed,
                             arguments: serde_json::json!({}),
-                            app_context: None,
-                            mcp_app_resource_uri: None,
-                            mcp_app_ui: None,
-                            plugin_id: None,
                             read_only_hint: None,
                             result: None,
                             error: None,
@@ -3947,22 +3885,4 @@ mod tests {
         ));
     }
 
-    #[test]
-    fn command_execution_script_paths_reject_unsafe_values() {
-        assert_eq!(
-            safe_plugin_relative_script_path(
-                Some("sample@openai-curated"),
-                Some("/home/user/.codex/plugins/cache/openai-curated/sample/scripts/run.py"),
-            ),
-            None
-        );
-        assert_eq!(
-            safe_plugin_relative_script_path(Some("sample@openai-curated"), Some("scripts/run.py"),),
-            Some("scripts/run.py".to_string())
-        );
-        assert_eq!(
-            safe_plugin_relative_script_path(/*plugin_id*/ None, Some("scripts/run.py"),),
-            None
-        );
-    }
 }

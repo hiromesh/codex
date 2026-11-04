@@ -8,8 +8,6 @@ use std::time::Duration;
 use std::time::Instant;
 
 use crate::tools::handlers::PreparedPermissionRequest;
-use codex_core_plugins::PluginCommandAttribution;
-use codex_plugin::PluginId;
 use codex_protocol::approvals::ExecApprovalKind;
 use codex_protocol::protocol::ReviewDecision;
 use codex_protocol::request_permissions::PermissionGrantScope;
@@ -77,11 +75,6 @@ async fn command_approval_holds_an_elicitation_until_response(capture: bool, pro
     let mut pause_state = session.subscribe_elicitation_pause_state();
     #[allow(deprecated)]
     let cwd = turn_context.cwd.clone();
-    let plugin_attribution = PluginCommandAttribution {
-        plugin_id: PluginId::parse("sample@openai-curated").expect("valid plugin id"),
-        normalized_relative_path: "scripts/run.py".to_string(),
-    };
-
     let request = tokio::spawn({
         let prompt_id = prompt_id.to_owned();
         let session = session.clone();
@@ -104,18 +97,15 @@ async fn command_approval_holds_an_elicitation_until_response(capture: bool, pro
                     /*proposed_execpolicy_amendment*/ None,
                     /*additional_permissions*/ None,
                     /*available_decisions*/ None,
-                    /*plugin_attribution_override*/ Some(plugin_attribution),
                 )
                 .await
         }
     });
 
     let event = events.recv().await.expect("approval event");
-    let codex_protocol::protocol::EventMsg::ExecApprovalRequest(event) = event.msg else {
+    let codex_protocol::protocol::EventMsg::ExecApprovalRequest(_event) = event.msg else {
         panic!("expected command approval event");
     };
-    assert_eq!(event.plugin_id.as_deref(), Some("sample@openai-curated"));
-    assert_eq!(event.script_path.as_deref(), Some("scripts/run.py"));
     wait_until_held(&mut pause_state).await;
     session
         .notify_approval(prompt_id, ReviewDecision::Approved)

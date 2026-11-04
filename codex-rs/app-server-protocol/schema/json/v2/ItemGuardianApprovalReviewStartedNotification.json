@@ -461,18 +461,6 @@
         },
         {
           "properties": {
-            "connectorId": {
-              "type": [
-                "string",
-                "null"
-              ]
-            },
-            "connectorName": {
-              "type": [
-                "string",
-                "null"
-              ]
-            },
             "server": {
               "type": "string"
             },

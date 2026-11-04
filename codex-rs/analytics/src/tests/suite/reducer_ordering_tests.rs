@@ -2,33 +2,24 @@
 
 use crate::events::TrackEventRequest;
 use crate::facts::AnalyticsFact;
-use crate::facts::AppInvocation;
-use crate::facts::AppMentionedInput;
-use crate::facts::AppUsedInput;
 use crate::facts::CodeModeToolCallFact;
 use crate::facts::CodeModeToolCallStatus;
 use crate::facts::ControlToolCallFact;
 use crate::facts::ControlToolCallStatus;
 use crate::facts::CustomAnalyticsFact;
-use crate::facts::ElicitationType;
-use crate::facts::InvocationType;
-use crate::facts::PluginUsedInput;
 use crate::facts::TurnProfileFact;
 use crate::facts::TurnResolvedConfigFact;
 use crate::reducer::AnalyticsReducer;
-use crate::tests::support::TEST_PRODUCT_CLIENT_ID;
 use crate::tests::support::ingest_code_mode_facts;
 use crate::tests::support::ingest_completed_command_execution_item;
 use crate::tests::support::ingest_initialize;
 use crate::tests::support::ingest_review_prerequisites;
 use crate::tests::support::ingest_turn_prerequisites;
 use crate::tests::support::sample_command_execution_item;
-use crate::tests::support::sample_plugin_metadata;
 use crate::tests::support::sample_turn_completed_notification;
 use crate::tests::support::sample_turn_profile;
 use crate::tests::support::sample_turn_resolved_config;
 use crate::tests::support::sample_turn_start_response;
-use crate::tests::support::test_tracking_context;
 use crate::tests::support::test_turn_metadata;
 use codex_app_server_protocol::ClientRequest;
 use codex_app_server_protocol::ClientResponsePayload;
@@ -44,74 +35,6 @@ use codex_app_server_protocol::TurnStatus as AppServerTurnStatus;
 use pretty_assertions::assert_eq;
 use serde_json::json;
 
-#[tokio::test]
-async fn stateless_app_and_plugin_facts_preserve_arrival_order() {
-    let mut reducer = AnalyticsReducer::default();
-    let mut events = Vec::new();
-    let tracking = test_tracking_context("thread-1", "turn-1");
-
-    for fact in [
-        CustomAnalyticsFact::AppMentioned(AppMentionedInput {
-            tracking: tracking.clone(),
-            mentions: vec![AppInvocation {
-                connector_id: Some("calendar".to_string()),
-                app_name: Some("Calendar".to_string()),
-                invocation_type: Some(InvocationType::Explicit),
-            }],
-        }),
-        CustomAnalyticsFact::AppUsed(AppUsedInput {
-            tracking: tracking.clone(),
-            app: AppInvocation {
-                connector_id: Some("drive".to_string()),
-                app_name: Some("Drive".to_string()),
-                invocation_type: Some(InvocationType::Implicit),
-            },
-            elicitation_type: Some(ElicitationType::AuthOrLink),
-        }),
-        CustomAnalyticsFact::PluginUsed(PluginUsedInput {
-            tracking,
-            plugin: sample_plugin_metadata(),
-        }),
-    ] {
-        reducer
-            .ingest(AnalyticsFact::Custom(fact), &mut events)
-            .await;
-    }
-
-    let [
-        TrackEventRequest::AppMentioned(mention),
-        TrackEventRequest::AppUsed(usage),
-        TrackEventRequest::PluginUsed(plugin),
-    ] = events.as_slice()
-    else {
-        panic!("expected app mention, app usage, and plugin usage in arrival order");
-    };
-    assert_eq!(
-        [
-            (
-                mention.event_type,
-                mention.event_params.product_client_id.as_deref()
-            ),
-            (
-                usage.event_type,
-                usage.event_params.app.product_client_id.as_deref()
-            ),
-            (
-                plugin.event_type,
-                plugin.event_params.plugin.product_client_id.as_deref()
-            ),
-        ],
-        [
-            ("codex_app_mentioned", Some(TEST_PRODUCT_CLIENT_ID)),
-            ("codex_app_used", Some(TEST_PRODUCT_CLIENT_ID)),
-            ("codex_plugin_used", Some(TEST_PRODUCT_CLIENT_ID)),
-        ]
-    );
-    assert_eq!(
-        usage.event_params.elicitation_type,
-        Some(ElicitationType::AuthOrLink)
-    );
-}
 
 #[tokio::test]
 async fn unrelated_client_requests_are_ignored_by_reducer() {

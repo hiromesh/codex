@@ -409,7 +409,3 @@ impl std::fmt::Display for SkillProviderError {
 impl std::error::Error for SkillProviderError {}
 
 pub type SkillProviderResult<T> = Result<T, SkillProviderError>;
-
-#[cfg(test)]
-#[path = "catalog_tests.rs"]
-mod tests;

@@ -77,8 +77,6 @@ async fn first_request_item_types_roles_and_content_annotations() -> Result<()> 
                 model_context: None,
                 id: "guardian-review".to_string(),
                 target_item_id: None,
-                plugin_id: None,
-                script_path: None,
                 turn_id: "guardian-turn".to_string(),
                 started_at_ms: 0,
                 completed_at_ms: Some(1),
@@ -90,8 +88,6 @@ async fn first_request_item_types_roles_and_content_annotations() -> Result<()> 
                 action: GuardianAssessmentAction::McpToolCall {
                     server: "example".to_string(),
                     tool_name: "write".to_string(),
-                    connector_id: None,
-                    connector_name: None,
                     tool_title: None,
                 },
             },
@@ -160,8 +156,7 @@ async fn first_request_item_types_roles_and_content_annotations() -> Result<()> 
             "type": "mcp_tool_call",
             "server": "example",
             "tool_name": "write",
-            "connector_id": null,
-            "connector_name": null,
+            // Connector attribution is gone, so connector_id/connector_name are omitted.
             "tool_title": null,
         },
         "outcome": "allowed",

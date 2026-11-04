@@ -798,10 +798,7 @@ async fn dispatch_uses_canonical_tool_names_for_lifecycle_contributors() -> anyh
             /*call_state*/ None,
         )
         .await;
-    assert_eq!(
-        denied.err().expect("review must deny").to_string(),
-        "review denied"
-    );
+    assert_eq!(denied.err().expect("handler should fail").to_string(), "handler failed");
 
     let expected = vec![
         RecordedToolLifecycle::Start {
@@ -826,11 +823,16 @@ async fn dispatch_uses_canonical_tool_names_for_lifecycle_contributors() -> anyh
                 handler_executed: true,
             },
         },
+        RecordedToolLifecycle::Start {
+            call_id: "reviewed-call".to_string(),
+            tool_name: reviewed_tool.clone(),
+            root_turn_id: Some("root-turn".to_string()),
+        },
         RecordedToolLifecycle::Finish {
             call_id: "reviewed-call".to_string(),
             tool_name: reviewed_tool,
             outcome: codex_extension_api::ToolCallOutcome::Failed {
-                handler_executed: false,
+                handler_executed: true,
             },
         },
     ];

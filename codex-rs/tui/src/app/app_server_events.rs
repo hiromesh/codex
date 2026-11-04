@@ -7,15 +7,12 @@ use super::app_server_event_targets::ServerNotificationThreadTarget;
 use super::app_server_event_targets::server_notification_thread_target;
 use super::app_server_event_targets::server_request_thread_id;
 use super::app_server_requests::BufferedServerRequest;
-use crate::app_command::AppCommand;
 use crate::app_event::AppEvent;
 use crate::app_event::RateLimitRefreshOrigin;
-use crate::app_info::app_info_from_api;
 use crate::app_server_session::AppServerSession;
 use crate::app_server_session::status_account_display_from_auth_mode;
 use codex_app_server_client::AppServerEvent;
 use codex_app_server_client::TypedRequestError;
-use codex_app_server_protocol::AuthMode;
 use codex_app_server_protocol::ClientRequest;
 use codex_app_server_protocol::JSONRPCErrorError;
 use codex_app_server_protocol::RateLimitReachedType;
@@ -394,74 +391,17 @@ impl App {
                 // the newly authenticated identity, even when both accounts share one thread.
                 self.last_thread_usage_status_cell = None;
                 self.pending_thread_usage_history_refresh = false;
-                let has_codex_backend_auth = matches!(
-                    notification.auth_mode,
-                    Some(
-                        AuthMode::Chatgpt
-                            | AuthMode::ChatgptAuthTokens
-                            | AuthMode::AgentIdentity
-                            | AuthMode::PersonalAccessToken
-                    )
-                );
                 let account_display = status_account_display_from_auth_mode(
                     notification.auth_mode,
                     notification.plan_type,
                 );
-                let has_chatgpt_account = notification
-                    .auth_mode
-                    .is_some_and(AuthMode::has_chatgpt_account);
                 self.account_email_request_id = None;
                 self.chat_widget.update_account_state(
                     account_display,
                     notification.plan_type,
-                    has_chatgpt_account,
-                    has_codex_backend_auth,
+                    /*has_chatgpt_account*/ false,
+                    /*has_codex_backend_auth*/ false,
                 );
-                if self.chat_widget.has_chatgpt_account() {
-                    self.refresh_account_email(app_server_client);
-                    crate::security_setup::prefetch(
-                        &self.config,
-                        app_server_client,
-                        self.app_event_tx.clone(),
-                        self.chat_widget.security_setup_request_id,
-                    );
-                }
-                return;
-            }
-            ServerNotification::ExternalAgentConfigImportCompleted(notification) => {
-                let should_report_completion = app_server_client
-                    .consume_external_agent_config_import_completion(&notification.import_id);
-                if !app_server_client.uses_remote_workspace()
-                    && let Err(err) = self.refresh_in_memory_config_from_disk().await
-                {
-                    tracing::warn!(
-                        error = %err,
-                        "failed to refresh config after external agent config import"
-                    );
-                }
-                let cwd = self.chat_widget.config_ref().cwd.to_path_buf();
-                self.chat_widget.refresh_plugin_mentions();
-                self.chat_widget.submit_op(AppCommand::reload_user_config());
-                self.fetch_plugins_list(app_server_client, cwd);
-                if should_report_completion {
-                    self.chat_widget.add_plain_history_lines(
-                        crate::external_agent_config_migration::flow::external_agent_config_migration_finished_lines(notification),
-                    );
-                }
-                return;
-            }
-            ServerNotification::AppListUpdated(notification) => {
-                if self.current_displayed_thread_id().is_some() {
-                    self.chat_widget
-                        .refresh_connector_directory_after_notification(
-                            notification
-                                .data
-                                .iter()
-                                .cloned()
-                                .map(app_info_from_api)
-                                .collect(),
-                        );
-                }
                 return;
             }
             _ => {}

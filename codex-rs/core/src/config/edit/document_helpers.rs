@@ -268,7 +268,6 @@ pub(super) fn parse_tool_suggest_disabled_tool(
     let table = value.as_inline_table()?;
     let kind = match table.get("type").and_then(TomlValue::as_str) {
         Some("connector") => ToolSuggestDiscoverableType::Connector,
-        Some("plugin") => ToolSuggestDiscoverableType::Plugin,
         _ => return None,
     };
     let id = table.get("id").and_then(TomlValue::as_str)?;
@@ -283,7 +282,6 @@ pub(super) fn parse_tool_suggest_disabled_tool_table(
 ) -> Option<ToolSuggestDisabledTool> {
     let kind = match table.get("type").and_then(TomlItem::as_str) {
         Some("connector") => ToolSuggestDiscoverableType::Connector,
-        Some("plugin") => ToolSuggestDiscoverableType::Plugin,
         _ => return None,
     };
     let id = table.get("id").and_then(TomlItem::as_str)?;
@@ -303,7 +301,6 @@ pub(super) fn tool_suggest_disabled_tools_value(
             "type",
             match disabled_tool.kind {
                 ToolSuggestDiscoverableType::Connector => "connector",
-                ToolSuggestDiscoverableType::Plugin => "plugin",
             }
             .into(),
         );

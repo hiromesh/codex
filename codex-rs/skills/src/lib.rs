@@ -8,7 +8,6 @@ mod name_counts;
 mod parser;
 mod selection;
 
-pub use interface::SkillInterfaceAssetPolicy;
 pub use interface::SkillInterfaceFile;
 pub use interface::resolve_skill_interface;
 pub use invocation::ImplicitSkillAccess;
@@ -29,7 +28,6 @@ pub use mentions::app_id_from_path;
 pub use mentions::extract_tool_mentions;
 pub use mentions::extract_tool_mentions_with_sigil;
 pub use mentions::normalize_skill_path;
-pub use mentions::plugin_config_name_from_path;
 pub use mentions::tool_kind_for_path;
 pub use metadata::ParsedSkillMetadata;
 pub use metadata::parse_skill_metadata;

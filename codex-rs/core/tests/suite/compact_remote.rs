@@ -12,13 +12,7 @@ use codex_history::CodexHarnessMetadata;
 use codex_history::InitialHistory;
 use codex_history::RolloutItem;
 use codex_login::CodexAuth;
-use codex_login::auth::BedrockApiKeyAuth;
-use codex_model_provider_info::AMAZON_BEDROCK_GPT_5_5_MODEL_ID;
-use codex_model_provider_info::AMAZON_BEDROCK_PROVIDER_ID;
-use codex_model_provider_info::GCP_PROVIDER_ID;
-use codex_model_provider_info::ModelProviderInfo;
 use codex_protocol::AgentPath;
-use codex_protocol::config_types::ReasoningSummary;
 use codex_protocol::models::ContentItem;
 use codex_protocol::models::ImageReference;
 use codex_protocol::models::ResponseItem;
@@ -49,8 +43,6 @@ use test_case::test_case;
 use tokio::time::Duration;
 use wiremock::ResponseTemplate;
 
-use super::client::ProviderAuthCommandFixture;
-
 #[path = "compact_remote_trimming.rs"]
 mod trimming;
 
@@ -73,23 +65,6 @@ async fn wait_for_turn_complete(codex: &codex_core::CodexThread) {
         REMOTE_COMPACT_TURN_COMPLETE_TIMEOUT,
     )
     .await;
-}
-
-fn amazon_bedrock_test_codex() -> TestCodexBuilder {
-    let auth = CodexAuth::BedrockApiKey(BedrockApiKeyAuth {
-        api_key: "bedrock-test-api-key".to_string(),
-        region: "us-east-1".to_string(),
-    });
-    test_codex()
-        .with_auth(auth)
-        .with_model(AMAZON_BEDROCK_GPT_5_5_MODEL_ID)
-        .with_config(|config| {
-            config.model_provider = ModelProviderInfo {
-                base_url: config.model_provider.base_url.clone(),
-                ..ModelProviderInfo::create_amazon_bedrock_provider(/*aws*/ None)
-            };
-            config.model_provider_id = AMAZON_BEDROCK_PROVIDER_ID.to_string();
-        })
 }
 
 fn is_retained_user_message(item: &ResponseItem, retained_text: &str) -> bool {
@@ -190,7 +165,7 @@ async fn remote_compact_v2_retains_metadata_from_resumed_history() -> Result<()>
     )
     .await;
 
-    let builder = || test_codex().with_auth(CodexAuth::create_dummy_chatgpt_auth_for_testing());
+    let builder = || test_codex().with_auth(CodexAuth::from_api_key("test-api-key"));
     let initial = builder()
         .with_pre_build_hook(|home| {
             fs::write(
@@ -246,7 +221,7 @@ async fn remote_compact_v2_retains_only_client_developer_messages_when_enabled(
 
     let harness = TestCodexHarness::with_auto_env_builder(
         test_codex()
-            .with_auth(CodexAuth::create_dummy_chatgpt_auth_for_testing())
+            .with_auth(CodexAuth::from_api_key("test-api-key"))
             .with_config(move |config| {
                 if enabled {
                     config
@@ -335,7 +310,7 @@ async fn remote_compact_v2_records_usage_before_output_validation() -> Result<()
 
     let harness = TestCodexHarness::with_auto_env_builder(
         test_codex()
-            .with_auth(CodexAuth::create_dummy_chatgpt_auth_for_testing())
+            .with_auth(CodexAuth::from_api_key("test-api-key"))
             .with_config(|config| {
                 config.model_auto_compact_token_limit = Some(200);
             }),
@@ -424,131 +399,6 @@ async fn remote_compact_v2_records_usage_before_output_validation() -> Result<()
     Ok(())
 }
 
-enum CompactionProvider {
-    AmazonBedrock,
-    Gcp,
-}
-
-#[test_case(CompactionProvider::AmazonBedrock; "bedrock")]
-#[test_case(CompactionProvider::Gcp; "gcp")]
-#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn provider_automatic_compaction_uses_v2_responses_endpoint(
-    provider: CompactionProvider,
-) -> Result<()> {
-    skip_if_no_network!(Ok(()));
-
-    let server = responses::start_mock_server().await;
-    let auth_fixture;
-    let (builder, expected_model, expected_path, expected_auth) = match provider {
-        CompactionProvider::AmazonBedrock => (
-            amazon_bedrock_test_codex(),
-            AMAZON_BEDROCK_GPT_5_5_MODEL_ID,
-            "/v1/responses",
-            "Bearer bedrock-test-api-key",
-        ),
-        CompactionProvider::Gcp => {
-            auth_fixture = ProviderAuthCommandFixture::new(&["vertex-access-token"])?;
-            let mut provider = ModelProviderInfo::create_gcp_provider();
-            provider.base_url = Some(format!(
-                "{}/v1/projects/example-project/locations/global/publishers/openai/v1",
-                server.uri()
-            ));
-            provider.auth = Some(auth_fixture.auth());
-            (
-                test_codex()
-                    .with_model("gpt-6.1-sol")
-                    .with_config(move |config| {
-                        config.model_provider_id = GCP_PROVIDER_ID.to_string();
-                        config.model_provider = provider;
-                        config.model_reasoning_summary = Some(ReasoningSummary::Detailed);
-                        config
-                            .features
-                            .enable(Feature::RemoteCompactionV2)
-                            .expect("test config should allow feature update");
-                    }),
-                "gpt-6.1-sol",
-                "/v1/projects/example-project/locations/global/publishers/openai/v1/responses",
-                "Bearer vertex-access-token",
-            )
-        }
-    };
-    let test = builder
-        .with_config(|config| {
-            config.model_auto_compact_token_limit = Some(200);
-        })
-        .build_with_auto_env(&server)
-        .await?;
-    let response_mock = responses::mount_sse_sequence(
-        &server,
-        vec![
-            sse(vec![
-                responses::ev_assistant_message("message-1", "before automatic compaction"),
-                responses::ev_completed_with_tokens("response-1", /*total_tokens*/ 500),
-            ]),
-            sse(vec![
-                json!({
-                    "type": "response.output_item.done",
-                    "item": {
-                        "type": "compaction",
-                        "encrypted_content": "PROVIDER_AUTOMATIC_REMOTE_COMPACTED_SUMMARY",
-                    }
-                }),
-                responses::ev_completed("response-compact"),
-            ]),
-            sse(vec![
-                responses::ev_assistant_message("message-2", "after automatic compaction"),
-                responses::ev_completed("response-2"),
-            ]),
-        ],
-    )
-    .await;
-
-    test.submit_turn("before automatic compact").await?;
-    test.submit_turn("after automatic compact").await?;
-
-    let response_requests = response_mock.requests();
-    assert_eq!(response_requests.len(), 3);
-    assert!(
-        response_requests
-            .iter()
-            .all(|request| request.path() == expected_path)
-    );
-    let compact_request = &response_requests[1];
-    assert_eq!(
-        compact_request.header("authorization").as_deref(),
-        Some(expected_auth)
-    );
-    match provider {
-        CompactionProvider::AmazonBedrock => assert_eq!(
-            compact_request
-                .header("x-amzn-mantle-client-agent")
-                .as_deref(),
-            Some("codex")
-        ),
-        CompactionProvider::Gcp => {
-            for request in &response_requests {
-                assert_eq!(request.body_json()["reasoning"].get("summary"), None);
-                assert_eq!(
-                    request.header("x-openai-internal-codex-responses-lite"),
-                    None
-                );
-                assert!(request.inputs_of_type("additional_tools").is_empty());
-            }
-        }
-    }
-    assert_eq!(compact_request.body_json()["model"], expected_model);
-    assert_eq!(
-        compact_request.inputs_of_type("compaction_trigger").len(),
-        1
-    );
-    assert!(response_requests[2].input().iter().any(|item| {
-        item["type"] == "compaction"
-            && item["encrypted_content"] == "PROVIDER_AUTOMATIC_REMOTE_COMPACTED_SUMMARY"
-    }));
-
-    Ok(())
-}
-
 #[test_case(None, "image_url"; "default_trims_images")]
 #[test_case(Some(false), "image_url"; "disabled_preserves_images")]
 #[test_case(None, "file_id"; "default_trims_file_images")]
@@ -562,7 +412,7 @@ async fn remote_compact_v2_charges_retained_images_to_token_budget(
 
     let harness = TestCodexHarness::with_auto_env_builder(
         test_codex()
-            .with_auth(CodexAuth::create_dummy_chatgpt_auth_for_testing())
+            .with_auth(CodexAuth::from_api_key("test-api-key"))
             .with_config(move |config| {
                 let _ = config.features.enable(Feature::UnifiedImageBudget);
                 if let Some(enabled) = image_budget_enabled {
@@ -747,7 +597,7 @@ async fn remote_compact_v2_reuses_compaction_trigger_for_followups() -> Result<(
     skip_if_no_network!(Ok(()));
 
     let harness = TestCodexHarness::with_builder(
-        test_codex().with_auth(CodexAuth::create_dummy_chatgpt_auth_for_testing()),
+        test_codex().with_auth(CodexAuth::from_api_key("test-api-key")),
     )
     .await?;
     let image_url = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR4nGNgYAAAAAMAASsJTYQAAAAASUVORK5CYII=";
@@ -1124,7 +974,7 @@ async fn remote_compact_v2_retries_failures_with_stream_retry_budget() -> Result
     let harness = TestCodexHarness::with_builder(
         test_codex()
             .with_history_mode(ThreadHistoryMode::Paginated)
-            .with_auth(CodexAuth::create_dummy_chatgpt_auth_for_testing())
+            .with_auth(CodexAuth::from_api_key("test-api-key"))
             .with_config(|config| {
                 config.model_provider.request_max_retries = Some(0);
                 config.model_provider.stream_max_retries = Some(2);
@@ -1243,7 +1093,7 @@ async fn remote_compact_v2_rewrites_multiple_trailing_function_call_outputs(
     let harness = TestCodexHarness::with_builder(
         test_codex()
             .with_extensions(Arc::new(extensions.build()))
-            .with_auth(CodexAuth::create_dummy_chatgpt_auth_for_testing())
+            .with_auth(CodexAuth::from_api_key("test-api-key"))
             .with_config(|config| {
                 config.model_context_window = Some(2_000);
                 config.model_auto_compact_token_limit = Some(200_000);
@@ -1373,7 +1223,7 @@ async fn remote_mid_turn_compact_v2_sends_turn_state_over_http() -> Result<()> {
 
     let harness = TestCodexHarness::with_builder(
         test_codex()
-            .with_auth(CodexAuth::create_dummy_chatgpt_auth_for_testing())
+            .with_auth(CodexAuth::from_api_key("test-api-key"))
             .with_config(|config| {
                 config.model_auto_compact_token_limit = Some(200);
             }),
@@ -1501,7 +1351,7 @@ async fn remote_mid_turn_compact_v2_sends_turn_state_over_websocket() -> Result<
     ]])
     .await;
     let mut builder = test_codex()
-        .with_auth(CodexAuth::create_dummy_chatgpt_auth_for_testing())
+        .with_auth(CodexAuth::from_api_key("test-api-key"))
         .with_config(|config| {
             config.model_auto_compact_token_limit = Some(200);
         });

@@ -126,10 +126,6 @@ impl ChatWidget {
             self.refresh_effective_service_tier();
             self.refresh_model_dependent_surfaces();
         }
-        if feature == Feature::Plugins {
-            self.sync_plugins_command_enabled();
-            self.refresh_plugin_mentions();
-        }
         if feature == Feature::Goals {
             self.sync_goal_command_enabled();
             if !enabled {
@@ -246,7 +242,6 @@ impl ChatWidget {
             || status_account_display == Some(StatusAccountDisplay::ApiKey);
         self.invalidate_permission_discovery();
         self.permission_discovery = None;
-        self.invalidate_connector_scope();
         self.clear_pending_rate_limit_reset_requests();
         self.clear_backend_banner();
         self.luna_reserve_notice_account_id = None;
@@ -281,9 +276,6 @@ impl ChatWidget {
         }
         self.set_daybreak_enabled(self.daybreak_enabled);
         self.has_codex_backend_auth = has_codex_backend_auth;
-        self.bottom_pane
-            .set_connectors_enabled(self.connectors_enabled());
-        self.refresh_connector_mentions(/*force_refresh*/ false);
         self.bottom_pane
             .set_token_activity_command_enabled(has_codex_backend_auth);
         self.refresh_status_surfaces();
@@ -337,11 +329,6 @@ impl ChatWidget {
     pub(super) fn sync_worktrees_enabled(&mut self) {
         self.bottom_pane
             .set_worktrees_enabled(self.local_worktree_operations);
-    }
-
-    pub(super) fn sync_plugins_command_enabled(&mut self) {
-        self.bottom_pane
-            .set_plugins_command_enabled(self.config.features.enabled(Feature::Plugins));
     }
 
     pub(super) fn sync_goal_command_enabled(&mut self) {
@@ -544,11 +531,8 @@ impl ChatWidget {
         self.refresh_status_surfaces();
         self.sync_service_tier_commands();
         if cwd_changed {
-            self.invalidate_connector_scope();
             self.refresh_skills_for_current_cwd(/*force_reload*/ true);
-            self.refresh_connector_mentions(/*force_refresh*/ false);
         }
-        self.refresh_plugin_mentions();
         self.request_redraw();
     }
 

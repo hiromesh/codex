@@ -76,10 +76,7 @@ impl OpenAiModelsEndpoint {
     }
 
     async fn uses_codex_backend(&self) -> bool {
-        self.auth()
-            .await
-            .as_ref()
-            .is_some_and(CodexAuth::uses_codex_backend)
+        false
     }
 
     async fn list_models(
@@ -114,8 +111,6 @@ impl OpenAiModelsEndpoint {
             || auth.as_ref().is_some_and(CodexAuth::is_api_key_auth)
         {
             "api_key"
-        } else if auth.is_some() {
-            "chatgpt"
         } else {
             "none"
         };
@@ -416,12 +411,9 @@ impl RequestTelemetry for ModelsRequestTelemetry {
 mod timeout_tests;
 
 #[cfg(test)]
-#[path = "models_originator_tests.rs"]
-mod originator_tests;
 
 #[cfg(test)]
 mod tests {
-    use std::num::NonZeroU64;
     use std::sync::Mutex;
 
     use super::*;
@@ -434,7 +426,6 @@ mod tests {
     use codex_models_manager::manager::OpenAiModelsManager;
     use codex_models_manager::manager::RefreshStrategy;
     use codex_models_manager::model_info::model_info_from_slug;
-    use codex_protocol::config_types::ModelProviderAuthInfo;
     use codex_protocol::openai_models::ModelVisibility;
     use codex_protocol::openai_models::ModelsResponse;
     use pretty_assertions::assert_eq;
@@ -580,12 +571,6 @@ mod tests {
             ),
             (
                 "provider-key",
-                Some(CodexAuth::create_dummy_chatgpt_auth_for_testing()),
-                CHATGPT_CODEX_BASE_URL,
-                CHATGPT_CODEX_BASE_URL,
-            ),
-            (
-                "provider-key",
                 Some(CodexAuth::from_api_key("sk-proj-fedramp-ambient-key")),
                 CHATGPT_CODEX_BASE_URL,
                 "https://api.openai.com/v1",
@@ -599,12 +584,6 @@ mod tests {
             (
                 "sk-svcacct-fedramp-provider-key",
                 Some(CodexAuth::from_api_key("legacy-ambient-key")),
-                "https://gov.chatgpt.com/backend-api/codex",
-                "https://gov.api.openai.com/v1",
-            ),
-            (
-                "sk-proj-fedramp-provider-key",
-                Some(CodexAuth::create_dummy_chatgpt_auth_for_testing()),
                 "https://gov.chatgpt.com/backend-api/codex",
                 "https://gov.api.openai.com/v1",
             ),
@@ -643,40 +622,6 @@ mod tests {
                 inference_url
             );
         }
-    }
-
-    fn provider_info_with_command_auth() -> ModelProviderInfo {
-        ModelProviderInfo {
-            auth: Some(ModelProviderAuthInfo {
-                command: "print-token".to_string(),
-                args: Vec::new(),
-                timeout_ms: NonZeroU64::new(5_000).expect("timeout should be non-zero"),
-                refresh_interval_ms: 300_000,
-                cwd: std::env::current_dir()
-                    .expect("current dir should be available")
-                    .try_into()
-                    .expect("current dir should be absolute"),
-            }),
-            requires_openai_auth: false,
-            ..ModelProviderInfo::create_openai_provider(/*base_url*/ None)
-        }
-    }
-
-    #[test]
-    fn command_auth_provider_reports_command_auth_without_cached_auth() {
-        let endpoint = OpenAiModelsEndpoint::new(
-            provider_info_with_command_auth(),
-            /*auth_manager*/ None,
-        );
-
-        assert!(endpoint.has_command_auth());
-        let auth = CodexAuth::from_api_key("sk-proj-fedramp-command-key");
-        assert_eq!(
-            resolve_api_provider(&endpoint.provider_info, Some(&auth))
-                .unwrap()
-                .base_url,
-            "https://api.openai.com/v1"
-        );
     }
 
     #[test]
@@ -796,102 +741,8 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn command_auth_refresh_fetches_a_catalog_for_the_current_credentials() {
-        use codex_models_manager::manager::ModelsManager;
-        use codex_models_manager::manager::OpenAiModelsManager;
-        use codex_models_manager::manager::RefreshStrategy;
-
-        let server = MockServer::start().await;
-        let auth = AuthManager::from_auth_for_testing(CodexAuth::from_api_key("initial"));
-        auth.set_external_auth(Arc::new(RotatingAuth(std::sync::atomic::AtomicUsize::new(
-            0,
-        ))))
-        .await
-        .unwrap();
-        let model = model_info_from_slug("command-auth-model");
-        Mock::given(method("GET"))
-            .and(path("/models"))
-            .respond_with(ResponseTemplate::new(200).set_body_json(ModelsResponse {
-                models: vec![model.clone()],
-            }))
-            .expect(/*r*/ 3)
-            .mount(&server)
-            .await;
-        let mut provider = provider_info_with_command_auth();
-        provider.base_url = Some(server.uri());
-        // Keep this test independent of the residency override exercised in parallel.
-        provider.http_headers = Some(std::collections::HashMap::from([(
-            RESIDENCY_HEADER_NAME.to_string(),
-            "us".into(),
-        )]));
-        let manager = OpenAiModelsManager::new_without_cache(
-            Arc::new(OpenAiModelsEndpoint::new(provider, Some(auth.clone()))),
-            Some(auth.clone()),
-        );
-        let catalog = manager
-            .raw_model_catalog(
-                RefreshStrategy::OnlineIfUncached,
-                HttpClientFactory::new(OutboundProxyPolicy::ReqwestDefault),
-            )
-            .await;
-        assert_eq!(
-            catalog
-                .models
-                .iter()
-                .find(|candidate| candidate.slug == model.slug),
-            Some(&model)
-        );
-        // The cached identity still matches here; resolving command auth must
-        // detect the next token before deciding whether a refresh is needed.
-        manager
-            .refresh_after_auth_change(HttpClientFactory::new(OutboundProxyPolicy::ReqwestDefault))
-            .await;
-        assert_eq!(manager.get_remote_models().await, catalog.models);
-        auth.auth().await;
-        let bundled = codex_models_manager::bundled_models_response().unwrap();
-        assert_eq!(manager.get_remote_models().await, bundled.models);
-        assert_eq!(manager.try_get_remote_models().unwrap(), bundled.models);
-        assert_eq!(
-            manager
-                .get_model_info(&model.slug, &Default::default())
-                .await,
-            codex_models_manager::CatalogModel {
-                model: model_info_from_slug(&model.slug).into(),
-                origin: codex_models_manager::ModelOrigin::Synthetic,
-            }
-        );
-        assert_eq!(
-            manager
-                .raw_model_catalog(
-                    RefreshStrategy::Offline,
-                    HttpClientFactory::new(OutboundProxyPolicy::ReqwestDefault),
-                )
-                .await,
-            bundled
-        );
-        assert_eq!(
-            manager
-                .raw_model_catalog(
-                    RefreshStrategy::OnlineIfUncached,
-                    HttpClientFactory::new(OutboundProxyPolicy::ReqwestDefault),
-                )
-                .await,
-            catalog
-        );
-        let requests = server.received_requests().await.unwrap();
-        assert_eq!(
-            requests
-                .iter()
-                .map(|request| request.headers["authorization"].to_str().unwrap())
-                .collect::<Vec<_>>(),
-            vec!["Bearer token-2", "Bearer token-5", "Bearer token-9"]
-        );
-    }
-
-    #[tokio::test]
     async fn explicit_catalog_reuses_auth_headers_and_query_parameters() {
         for auth in [
-            CodexAuth::create_dummy_chatgpt_auth_for_testing(),
             CodexAuth::from_api_key("test-key"),
             CodexAuth::from_api_key("sk-proj-fedramp-synthetic-test-key"),
             CodexAuth::from_api_key("sk-svcacct-fedramp-synthetic-test-key"),

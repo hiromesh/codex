@@ -44,10 +44,6 @@ use codex_app_server_protocol::TurnStartedNotification;
 use codex_app_server_protocol::TurnStatus as AppServerTurnStatus;
 use codex_app_server_protocol::UserInput;
 use codex_login::default_client::DEFAULT_ORIGINATOR;
-use codex_plugin::AppConnectorId;
-use codex_plugin::PluginCapabilitySummary;
-use codex_plugin::PluginId;
-use codex_plugin::PluginTelemetryMetadata;
 use codex_protocol::config_types::ApprovalsReviewer;
 use codex_protocol::config_types::ModeKind;
 use codex_protocol::models::PermissionProfile as CorePermissionProfile;
@@ -145,7 +141,6 @@ pub(super) fn sample_thread_start_response(
     model: &str,
 ) -> ClientResponsePayload {
     ClientResponsePayload::ThreadStart(ThreadStartResponse {
-        disabled_plugin_ids: Vec::new(),
         thread: sample_thread_with_metadata(
             thread_id,
             ephemeral,
@@ -211,7 +206,6 @@ pub(super) fn sample_thread_resume_response_with_source(
     parent_thread_id: Option<String>,
 ) -> ClientResponsePayload {
     ClientResponsePayload::ThreadResume(ThreadResumeResponse {
-        disabled_plugin_ids: Vec::new(),
         thread: sample_thread_with_metadata(
             thread_id,
             ephemeral,
@@ -348,7 +342,6 @@ pub(super) fn sample_turn_resolved_config(
         turn_id: turn_id.to_string(),
         thread_id: thread_id.to_string(),
         turn_metadata: test_turn_metadata(/*root_turn_id*/ None),
-        active_plugin_ids_at_turn_start: None,
         num_input_images: 1,
         submission_type: None,
         ephemeral: false,
@@ -657,8 +650,6 @@ pub(super) fn sample_command_execution_item_with_id(
         model_context: None,
         sandbox_type: None,
         id: id.to_string(),
-        plugin_id: None,
-        script_path: None,
         command: "echo hi".to_string(),
         cwd: test_path_buf("/tmp").abs().into(),
         process_id: Some("pid-1".to_string()),
@@ -683,24 +674,5 @@ pub(super) async fn ingest_code_mode_facts(
                 events,
             )
             .await;
-    }
-}
-
-pub(super) fn sample_plugin_metadata() -> PluginTelemetryMetadata {
-    PluginTelemetryMetadata {
-        plugin_id: Some(PluginId::parse("sample@test").expect("valid plugin id")),
-        remote_plugin_id: None,
-        capability_summary: Some(PluginCapabilitySummary {
-            config_name: "sample@test".to_string(),
-            display_name: "sample".to_string(),
-            plugin_namespace: None,
-            description: None,
-            has_skills: true,
-            mcp_server_names: vec!["mcp-1".to_string(), "mcp-2".to_string()],
-            app_connector_ids: vec![
-                AppConnectorId("calendar".to_string()),
-                AppConnectorId("drive".to_string()),
-            ],
-        }),
     }
 }

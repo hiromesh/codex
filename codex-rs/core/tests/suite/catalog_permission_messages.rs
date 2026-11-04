@@ -80,7 +80,8 @@ async fn catalog_permission_message_loaded_from_remote_models_is_sent(
     )
     .await;
     let mut builder = test_codex()
-        .with_auth(CodexAuth::create_dummy_chatgpt_auth_for_testing())
+        .with_auth(CodexAuth::from_api_key("test-api-key"))
+        .with_mock_model_catalog(&server)
         .with_config(|config| {
             config.permissions.approval_policy = Constrained::allow_any(AskForApproval::OnRequest);
             let rules_dir = config.codex_home.join("rules");

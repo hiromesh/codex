@@ -37,7 +37,7 @@ const SIDE_SLASH_COMMAND_UNAVAILABLE_HINT: &str =
     "Press Ctrl+C to return to the main thread first.";
 const GOAL_USAGE_HINT: &str = "Example: /goal improve benchmark coverage";
 const RAW_USAGE: &str = "Usage: /raw [on|off]";
-const USAGE_CHATGPT_LOGIN_REQUIRED: &str = "Sign in with ChatGPT to use /usage.";
+const USAGE_LOGIN_REQUIRED: &str = "Sign in with an API key to use /usage.";
 
 impl ChatWidget {
     /// Dispatch a bare slash command and record its staged local-history entry.
@@ -201,7 +201,7 @@ impl ChatWidget {
                 }
                 if !self.daybreak_enabled {
                     if !self.daybreak_account_eligible() {
-                        self.add_error_message("Daybreak requires the OpenAI provider with either ChatGPT sign-in or an API key with Daybreak support enabled.".into());
+                        self.add_error_message("Daybreak requires the OpenAI provider with an API key that has Daybreak support enabled.".into());
                         return;
                     }
                     if !crate::daybreak::available(&self.model_catalog.models) {
@@ -475,10 +475,6 @@ impl ChatWidget {
             SlashCommand::Skills => {
                 self.open_skills_menu();
             }
-            SlashCommand::Import => {
-                self.app_event_tx
-                    .send(AppEvent::OpenExternalAgentConfigMigration);
-            }
             SlashCommand::Hooks => {
                 self.add_hooks_output();
             }
@@ -548,12 +544,6 @@ impl ChatWidget {
             }
             SlashCommand::Mcp => {
                 self.add_mcp_output(McpServerStatusDetail::ToolsAndAuthOnly);
-            }
-            SlashCommand::Apps => {
-                self.add_connectors_output();
-            }
-            SlashCommand::Plugins => {
-                self.add_plugins_output();
             }
             SlashCommand::Rollout => {
                 if let Some(path) = self.rollout_path() {
@@ -1159,8 +1149,6 @@ impl ChatWidget {
     pub(super) fn builtin_command_flags(&self) -> BuiltinCommandFlags {
         BuiltinCommandFlags {
             collaboration_modes_enabled: self.collaboration_modes_enabled(),
-            connectors_enabled: self.connectors_enabled(),
-            plugins_command_enabled: self.config.features.enabled(Feature::Plugins),
             token_activity_command_enabled: self.has_codex_backend_auth,
             goal_command_enabled: self.config.features.enabled(Feature::Goals),
             service_tier_commands_enabled: !self.current_model_service_tier_commands().is_empty(),
@@ -1174,7 +1162,7 @@ impl ChatWidget {
         if self.has_codex_backend_auth {
             return true;
         }
-        self.add_error_message(USAGE_CHATGPT_LOGIN_REQUIRED.to_string());
+        self.add_error_message(USAGE_LOGIN_REQUIRED.to_string());
         false
     }
 
@@ -1194,8 +1182,6 @@ impl ChatWidget {
             | SlashCommand::MemoryDrop
             | SlashCommand::MemoryUpdate
             | SlashCommand::Mcp
-            | SlashCommand::Apps
-            | SlashCommand::Plugins
             | SlashCommand::Rollout
             | SlashCommand::Copy
             | SlashCommand::Raw
@@ -1247,7 +1233,6 @@ impl ChatWidget {
             | SlashCommand::Logout
             | SlashCommand::Mention
             | SlashCommand::Skills
-            | SlashCommand::Import
             | SlashCommand::Hooks
             | SlashCommand::Title
             | SlashCommand::Statusline

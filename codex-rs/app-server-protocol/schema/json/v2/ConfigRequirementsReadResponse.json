@@ -401,12 +401,6 @@
             "null"
           ]
         },
-        "allowRemoteControl": {
-          "type": [
-            "boolean",
-            "null"
-          ]
-        },
         "allowedApprovalPolicies": {
           "items": {
             "$ref": "#/definitions/AskForApproval"

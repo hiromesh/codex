@@ -71,7 +71,6 @@ async fn prepare_spawn_inputs(
         initial_history,
         history_mode,
         dynamic_tools,
-        disabled_plugin_ids: options.disabled_plugin_ids,
         client_mcp_extensions: parent.session.services.client_mcp_extensions.clone(),
         prompt_cache_key: parent
             .session

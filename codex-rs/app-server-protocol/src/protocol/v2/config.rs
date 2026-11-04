@@ -4,14 +4,12 @@ use super::AskForApproval;
 use super::BrowserUseConfig;
 use super::ComputerUseConfig;
 use super::SandboxMode;
-use super::shared::default_enabled;
 use crate::JsonSchema;
 use crate::TS;
 use codex_experimental_api_macros::ExperimentalApi;
 use codex_protocol::config_types::AutoCompactTokenLimitScope;
 use codex_protocol::config_types::ForcedLoginMethod;
 use codex_protocol::config_types::ReasoningSummary;
-use codex_protocol::config_types::ToolExposureSurface;
 use codex_protocol::config_types::Verbosity;
 use codex_protocol::config_types::WebSearchMode;
 use codex_protocol::config_types::WebSearchToolConfig;
@@ -171,92 +169,6 @@ pub struct AnalyticsConfig {
     pub additional: HashMap<String, JsonValue>,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq, JsonSchema, TS)]
-#[serde(rename_all = "snake_case")]
-#[ts(export_to = "v2/")]
-pub enum AppToolApproval {
-    Auto,
-    Prompt,
-    Writes,
-    Approve,
-}
-
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, JsonSchema, TS)]
-#[serde(rename_all = "snake_case")]
-#[ts(export_to = "v2/")]
-pub struct AppsDefaultConfig {
-    #[serde(default = "default_enabled")]
-    pub enabled: bool,
-    pub approvals_reviewer: Option<ApprovalsReviewer>,
-    #[serde(default = "default_enabled")]
-    pub destructive_enabled: bool,
-    #[serde(default = "default_enabled")]
-    pub open_world_enabled: bool,
-    pub default_tools_approval_mode: Option<AppToolApproval>,
-}
-
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, JsonSchema, TS)]
-#[serde(rename_all = "snake_case")]
-#[ts(export_to = "v2/")]
-pub struct AppToolConfig {
-    pub enabled: Option<bool>,
-    pub approval_mode: Option<AppToolApproval>,
-}
-
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, JsonSchema, TS)]
-#[serde(rename_all = "snake_case")]
-#[ts(export_to = "v2/")]
-pub struct AppToolsConfig {
-    #[serde(default, flatten)]
-    pub tools: HashMap<String, AppToolConfig>,
-}
-
-/// Approval settings for a connected account within an app.
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, JsonSchema, TS)]
-#[serde(rename_all = "snake_case")]
-#[ts(export_to = "v2/")]
-pub struct AppLinkConfig {
-    pub approvals_reviewer: Option<ApprovalsReviewer>,
-    pub default_tools_approval_mode: Option<AppToolApproval>,
-}
-
-/// Account settings for a single app.
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, JsonSchema, TS)]
-#[serde(rename_all = "snake_case")]
-#[ts(export_to = "v2/")]
-pub struct AppLinksConfig {
-    #[serde(default, flatten)]
-    pub links: HashMap<String, AppLinkConfig>,
-}
-
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, JsonSchema, TS)]
-#[serde(rename_all = "snake_case")]
-#[ts(export_to = "v2/")]
-pub struct AppConfig {
-    #[serde(default = "default_enabled")]
-    pub enabled: bool,
-    /// Additional model-facing surfaces omitted for this connector's tools.
-    pub omit_tools_from: Option<Vec<ToolExposureSurface>>,
-    pub approvals_reviewer: Option<ApprovalsReviewer>,
-    pub destructive_enabled: Option<bool>,
-    pub open_world_enabled: Option<bool>,
-    pub default_tools_approval_mode: Option<AppToolApproval>,
-    pub default_tools_enabled: Option<bool>,
-    pub tools: Option<AppToolsConfig>,
-    /// Per-account approval settings keyed by link ID.
-    pub links: Option<AppLinksConfig>,
-}
-
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, JsonSchema, TS)]
-#[serde(rename_all = "snake_case")]
-#[ts(export_to = "v2/")]
-pub struct AppsConfig {
-    #[serde(default, rename = "_default")]
-    pub default: Option<AppsDefaultConfig>,
-    #[serde(default, flatten)]
-    pub apps: HashMap<String, AppConfig>,
-}
-
 /// Backward-compatible API shape for ChatGPT workspace login restrictions.
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, JsonSchema, TS)]
 #[serde(untagged)]
@@ -305,9 +217,6 @@ pub struct Config {
     pub model_verbosity: Option<Verbosity>,
     pub service_tier: Option<String>,
     pub analytics: Option<AnalyticsConfig>,
-    #[experimental("config/read.apps")]
-    #[serde(default)]
-    pub apps: Option<AppsConfig>,
     pub browser_use: Option<BrowserUseConfig>,
     pub computer_use: Option<ComputerUseConfig>,
     pub desktop: Option<HashMap<String, JsonValue>>,
@@ -432,7 +341,6 @@ pub struct ConfigRequirements {
     pub allow_managed_hooks_only: Option<bool>,
     pub allow_browser_and_computer_use: Option<bool>,
     pub allow_appshots: Option<bool>,
-    pub allow_remote_control: Option<bool>,
     pub computer_use: Option<ComputerUseRequirements>,
     pub browser_use: Option<BrowserUseRequirements>,
     pub in_app_browser: Option<InAppBrowserRequirements>,

@@ -4,7 +4,6 @@ use crate::TS;
 use crate::protocol::common::AuthMode;
 use codex_experimental_api_macros::ExperimentalApi;
 use codex_protocol::account::PlanType;
-use codex_protocol::account::ProviderAccount;
 use codex_protocol::protocol::CreditsSnapshot as CoreCreditsSnapshot;
 use codex_protocol::protocol::RateLimitReachedType as CoreRateLimitReachedType;
 use codex_protocol::protocol::RateLimitSnapshot as CoreRateLimitSnapshot;
@@ -13,7 +12,6 @@ use codex_protocol::protocol::SpendControlLimitSnapshot as CoreSpendControlLimit
 use serde::Deserialize;
 use serde::Serialize;
 use std::collections::HashMap;
-use std::fmt;
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, JsonSchema, TS)]
 #[serde(tag = "type", rename_all = "camelCase")]
@@ -23,50 +21,6 @@ pub enum Account {
     #[serde(rename = "apiKey", rename_all = "camelCase")]
     #[ts(rename = "apiKey", rename_all = "camelCase")]
     ApiKey {},
-
-    #[serde(rename = "chatgpt", rename_all = "camelCase")]
-    #[ts(rename = "chatgpt", rename_all = "camelCase")]
-    Chatgpt {
-        #[schemars(
-            required,
-            schema_with = "crate::protocol::serde_helpers::nullable_string_schema"
-        )]
-        email: Option<String>,
-        plan_type: PlanType,
-        /// Display name of the selected ChatGPT workspace, when available.
-        workspace_name: Option<String>,
-    },
-
-    #[serde(rename = "amazonBedrock", rename_all = "camelCase")]
-    #[ts(rename = "amazonBedrock", rename_all = "camelCase")]
-    AmazonBedrock {
-        #[serde(default)]
-        uses_codex_managed_credentials: bool,
-    },
-
-    /// Google Cloud Vertex AI with externally managed credentials.
-    #[serde(rename = "gcp", rename_all = "camelCase")]
-    #[ts(rename = "gcp", rename_all = "camelCase")]
-    Gcp {},
-}
-
-impl From<ProviderAccount> for Account {
-    fn from(account: ProviderAccount) -> Self {
-        match account {
-            ProviderAccount::ApiKey => Self::ApiKey {},
-            ProviderAccount::Chatgpt { email, plan_type } => Self::Chatgpt {
-                email,
-                plan_type,
-                workspace_name: None,
-            },
-            ProviderAccount::AmazonBedrock {
-                uses_codex_managed_credentials,
-            } => Self::AmazonBedrock {
-                uses_codex_managed_credentials,
-            },
-            ProviderAccount::Gcp => Self::Gcp {},
-        }
-    }
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, JsonSchema, TS, ExperimentalApi)]
@@ -81,64 +35,6 @@ pub enum LoginAccountParams {
         #[ts(rename = "apiKey")]
         api_key: String,
     },
-    #[serde(rename = "chatgpt", rename_all = "camelCase")]
-    #[ts(rename = "chatgpt", rename_all = "camelCase")]
-    Chatgpt {
-        #[serde(default, skip_serializing_if = "std::ops::Not::not")]
-        codex_streamlined_login: bool,
-        #[serde(default, skip_serializing_if = "std::ops::Not::not")]
-        use_hosted_login_success_page: bool,
-        #[serde(default)]
-        #[ts(optional = nullable)]
-        app_brand: Option<LoginAppBrand>,
-    },
-    #[serde(rename = "chatgptDeviceCode")]
-    #[ts(rename = "chatgptDeviceCode")]
-    ChatgptDeviceCode,
-    /// [UNSTABLE] FOR OPENAI INTERNAL USE ONLY - DO NOT USE.
-    /// The access token must contain the same scopes that Codex-managed ChatGPT auth tokens have.
-    #[experimental("account/login/start.chatgptAuthTokens")]
-    #[serde(rename = "chatgptAuthTokens", rename_all = "camelCase")]
-    #[ts(rename = "chatgptAuthTokens", rename_all = "camelCase")]
-    ChatgptAuthTokens {
-        /// Access token (JWT) supplied by the client.
-        /// This token is used for backend API requests and email extraction.
-        access_token: String,
-        /// Workspace/account identifier supplied by the client.
-        chatgpt_account_id: String,
-        /// Optional plan type supplied by the client.
-        ///
-        /// When `null`, Codex attempts to derive the plan type from access-token
-        /// claims. If unavailable, the plan defaults to `unknown`.
-        #[ts(optional = nullable)]
-        chatgpt_plan_type: Option<String>,
-    },
-    /// [UNSTABLE] Managed Amazon Bedrock login is experimental.
-    #[experimental("account/login/start.amazonBedrock")]
-    #[serde(rename = "amazonBedrock", rename_all = "camelCase")]
-    #[ts(rename = "amazonBedrock", rename_all = "camelCase")]
-    AmazonBedrock { api_key: String, region: String },
-    /// [UNSTABLE] Managed Amazon Bedrock AWS access key login is experimental.
-    #[experimental("account/login/start.amazonBedrockAccessKeys")]
-    #[serde(rename = "amazonBedrockAccessKeys", rename_all = "camelCase")]
-    #[ts(rename = "amazonBedrockAccessKeys", rename_all = "camelCase")]
-    AmazonBedrockAccessKeys {
-        access_key_id: String,
-        secret_access_key: String,
-        #[ts(optional = nullable)]
-        session_token: Option<String>,
-        region: String,
-    },
-}
-
-#[derive(Serialize, Deserialize, Debug, Default, Clone, Copy, PartialEq, Eq, JsonSchema, TS)]
-#[serde(rename_all = "lowercase")]
-#[ts(rename_all = "lowercase")]
-#[ts(export_to = "v2/")]
-pub enum LoginAppBrand {
-    #[default]
-    Codex,
-    Chatgpt,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, JsonSchema, TS)]
@@ -149,55 +45,6 @@ pub enum LoginAccountResponse {
     #[serde(rename = "apiKey", rename_all = "camelCase")]
     #[ts(rename = "apiKey", rename_all = "camelCase")]
     ApiKey {},
-    #[serde(rename = "chatgpt", rename_all = "camelCase")]
-    #[ts(rename = "chatgpt", rename_all = "camelCase")]
-    Chatgpt {
-        // Use plain String for identifiers to avoid TS/JSON Schema quirks around uuid-specific types.
-        // Convert to/from UUIDs at the application layer as needed.
-        login_id: String,
-        /// URL the client should open in a browser to initiate the OAuth flow.
-        auth_url: String,
-    },
-    #[serde(rename = "chatgptDeviceCode", rename_all = "camelCase")]
-    #[ts(rename = "chatgptDeviceCode", rename_all = "camelCase")]
-    ChatgptDeviceCode {
-        // Use plain String for identifiers to avoid TS/JSON Schema quirks around uuid-specific types.
-        // Convert to/from UUIDs at the application layer as needed.
-        login_id: String,
-        /// URL the client should open in a browser to complete device code authorization.
-        verification_url: String,
-        /// One-time code the user must enter after signing in.
-        user_code: String,
-    },
-    #[serde(rename = "chatgptAuthTokens", rename_all = "camelCase")]
-    #[ts(rename = "chatgptAuthTokens", rename_all = "camelCase")]
-    ChatgptAuthTokens {},
-    #[serde(rename = "amazonBedrock", rename_all = "camelCase")]
-    #[ts(rename = "amazonBedrock", rename_all = "camelCase")]
-    AmazonBedrock {},
-}
-
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, JsonSchema, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export_to = "v2/")]
-pub struct CancelLoginAccountParams {
-    pub login_id: String,
-}
-
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, JsonSchema, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(rename_all = "camelCase")]
-#[ts(export_to = "v2/")]
-pub enum CancelLoginAccountStatus {
-    Canceled,
-    NotFound,
-}
-
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, JsonSchema, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export_to = "v2/")]
-pub struct CancelLoginAccountResponse {
-    pub status: CancelLoginAccountStatus,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, JsonSchema, TS)]
@@ -294,49 +141,6 @@ pub enum AccountSessionWorkspaceKind {
 #[serde(rename_all = "camelCase")]
 #[ts(export_to = "v2/")]
 pub struct LogoutAccountResponse {}
-
-#[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq, JsonSchema, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export_to = "v2/")]
-pub enum ChatgptAuthTokensRefreshReason {
-    /// Codex attempted a backend request and received `401 Unauthorized`.
-    Unauthorized,
-}
-
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, JsonSchema, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export_to = "v2/")]
-pub struct ChatgptAuthTokensRefreshParams {
-    pub reason: ChatgptAuthTokensRefreshReason,
-    /// Workspace/account identifier that Codex was previously using.
-    ///
-    /// Clients that manage multiple accounts/workspaces can use this as a hint
-    /// to refresh the token for the correct workspace.
-    ///
-    /// This may be `null` when the prior auth state did not include a workspace
-    /// identifier (`chatgpt_account_id`).
-    #[ts(optional = nullable)]
-    pub previous_account_id: Option<String>,
-}
-
-#[derive(Serialize, Deserialize, Clone, PartialEq, JsonSchema, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export_to = "v2/")]
-pub struct ChatgptAuthTokensRefreshResponse {
-    pub access_token: String,
-    pub chatgpt_account_id: String,
-    pub chatgpt_plan_type: Option<String>,
-}
-
-impl fmt::Debug for ChatgptAuthTokensRefreshResponse {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("ChatgptAuthTokensRefreshResponse")
-            .field("access_token", &"<redacted>")
-            .field("chatgpt_account_id", &self.chatgpt_account_id)
-            .field("chatgpt_plan_type", &self.chatgpt_plan_type)
-            .finish()
-    }
-}
 
 /// Usage-read capabilities of the requesting client, never inferred from its experiment arm.
 #[derive(Serialize, Deserialize, Debug, Clone, Default, PartialEq, JsonSchema, TS)]
@@ -619,62 +423,6 @@ pub struct AccountUpdatedNotification {
     pub auth_mode: Option<AuthMode>,
     pub plan_type: Option<PlanType>,
 }
-
-#[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq, JsonSchema, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export_to = "v2/", rename_all = "camelCase")]
-pub enum GatewayOAuthStatus {
-    NotReady,
-    Started,
-    Succeeded,
-    Failed,
-}
-
-#[derive(Serialize, Deserialize, Clone, PartialEq, Eq, JsonSchema, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export_to = "v2/")]
-pub struct GatewayOAuthChangedNotification {
-    /// Authorization handoff, sent only to the connection that started login.
-    pub auth_url: Option<String>,
-    pub provider_id: String,
-    pub status: GatewayOAuthStatus,
-    pub error: Option<String>,
-}
-
-impl std::fmt::Debug for GatewayOAuthChangedNotification {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("GatewayOAuthChangedNotification")
-            .field("auth_url", &self.auth_url.as_ref().map(|_| "[REDACTED]"))
-            .field("provider_id", &self.provider_id)
-            .field("status", &self.status)
-            .field("error", &self.error)
-            .finish()
-    }
-}
-
-/// Current effective gateway policy and credential readiness; never contains credentials.
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, JsonSchema, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export_to = "v2/")]
-pub struct GatewayOAuthReadResponse {
-    pub provider_id: String,
-    pub provider_name: String,
-    /// Whether the selected provider uses gateway OAuth, even when already signed in.
-    pub required: bool,
-    /// Null when the effective provider does not use gateway OAuth.
-    pub status: Option<GatewayOAuthStatus>,
-    pub error: Option<String>,
-}
-
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, JsonSchema, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export_to = "v2/")]
-pub struct GatewayOAuthLoginResponse {}
-
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, JsonSchema, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export_to = "v2/")]
-pub struct GatewayOAuthCancelResponse {}
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, JsonSchema, TS)]
 #[serde(rename_all = "camelCase")]

@@ -6,11 +6,11 @@ use pretty_assertions::assert_eq;
 fn rows() -> Vec<SearchResult> {
     let mut rows = (0..10)
         .map(|index| SearchResult {
-            display_name: format!("Plugin {index:02}"),
+            display_name: format!("Skill {index:02}"),
             description: Some("Tools and workflows".to_string()),
-            mention_type: MentionType::Plugin,
+            mention_type: MentionType::Skill,
             selection: Selection::Tool {
-                insert_text: format!("plugin-{index}"),
+                insert_text: format!("skill-{index}"),
                 path: None,
             },
             match_indices: Some(vec![0]),

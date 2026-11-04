@@ -8,7 +8,6 @@ pub use shutdown::AgentTreeShutdownFailureReason;
 pub use shutdown::AgentTreeShutdownReport;
 pub(crate) use shutdown::thread_store_error_kind;
 
-use crate::CodexAppsToolsCache;
 use crate::CodexThreadSettingsOverrides;
 use crate::agent::AgentStatus;
 use crate::agent::LocalAgentControl;
@@ -47,7 +46,6 @@ use codex_app_server_protocol::ThreadHistoryBuilder;
 use codex_app_server_protocol::TurnStatus;
 use codex_attachment_store::AttachmentStore;
 use codex_attachment_store::InlineAttachmentStore;
-use codex_core_plugins::PluginsManager;
 use codex_exec_server::EnvironmentManager;
 use codex_execpolicy::Policy;
 use codex_execpolicy::RequirementsExecPolicy;
@@ -333,8 +331,6 @@ pub struct StartThreadOptions {
     pub client_mcp_extensions: ClientMcpExtensions,
     /// Thread ID reserved before startup so the caller can associate host-owned state with it.
     pub reserved_thread_id: Option<ThreadId>,
-    /// Initial thread-owned plugin selection; omission restores persisted settings.
-    pub disabled_plugin_ids: Option<Vec<String>>,
 }
 
 /// A private, non-sharing provider also detaches a resumed root from its previous live provider.
@@ -396,7 +392,6 @@ impl StartThreadOptions {
             turn_extension_init: ExtensionDataInit::default(),
             client_mcp_extensions: ClientMcpExtensions::default(),
             reserved_thread_id: None,
-            disabled_plugin_ids: None,
         }
     }
 }
@@ -527,7 +522,6 @@ pub(crate) struct ThreadManagerState {
     environment_manager: Arc<EnvironmentManager>,
     starting_mcp_runtimes: std::sync::Mutex<Vec<std::sync::Weak<AtomicBool>>>,
     skills_service: Arc<HostSkillsService>,
-    plugins_manager: Arc<PluginsManager>,
     mcp_manager: Arc<McpManager>,
     pub(crate) extensions: Arc<ExtensionRegistry<Config>>,
     user_instructions_provider: Arc<dyn UserInstructionsProvider>,
@@ -642,7 +636,6 @@ impl ThreadManager {
         config: &Config,
         auth_manager: Arc<AuthManager>,
         models_manager: SharedModelsManager,
-        codex_apps_tools_cache: CodexAppsToolsCache,
         session_source: SessionSource,
         environment_manager: Arc<EnvironmentManager>,
         extensions: Arc<ExtensionRegistry<Config>>,
@@ -663,17 +656,7 @@ impl ThreadManager {
             config.bundled_skills_enabled(),
             restriction_product,
         ));
-        let plugins_manager = Arc::new(PluginsManager::new_with_options(
-            codex_home.to_path_buf(),
-            restriction_product,
-            Arc::clone(&auth_manager),
-            skills_service.clone(),
-        ));
-        let mcp_manager = Arc::new(McpManager::new_with_extensions(
-            Arc::clone(&plugins_manager),
-            Arc::clone(&extensions),
-            codex_apps_tools_cache,
-        ));
+        let mcp_manager = Arc::new(McpManager::new_with_extensions(Arc::clone(&extensions)));
         Self {
             state: Arc::new(ThreadManagerState {
                 threads: Arc::new(RwLock::new(HashMap::new())),
@@ -686,7 +669,6 @@ impl ThreadManager {
                 environment_manager,
                 starting_mcp_runtimes: std::sync::Mutex::new(Vec::new()),
                 skills_service,
-                plugins_manager,
                 mcp_manager,
                 extensions,
                 user_instructions_provider,
@@ -801,13 +783,7 @@ impl ThreadManager {
             /*bundled_skills_enabled*/ true,
             restriction_product,
         ));
-        let plugins_manager = Arc::new(PluginsManager::new_with_options(
-            codex_home.clone(),
-            restriction_product,
-            Arc::clone(&auth_manager),
-            skills_service.clone(),
-        ));
-        let mcp_manager = Arc::new(McpManager::new(Arc::clone(&plugins_manager)));
+        let mcp_manager = Arc::new(McpManager::new());
         // This test constructor has no Config input. Tests that need a non-local
         // process store should construct ThreadManager::new with an explicit store.
         let thread_store: Arc<dyn ThreadStore> = Arc::new(LocalThreadStore::new(
@@ -832,7 +808,6 @@ impl ThreadManager {
                 environment_manager,
                 starting_mcp_runtimes: std::sync::Mutex::new(Vec::new()),
                 skills_service,
-                plugins_manager,
                 mcp_manager,
                 extensions: empty_extension_registry(),
                 user_instructions_provider: Arc::new(
@@ -864,10 +839,6 @@ impl ThreadManager {
 
     pub fn skills_service(&self) -> Arc<HostSkillsService> {
         self.state.skills_service.clone()
-    }
-
-    pub fn plugins_manager(&self) -> Arc<PluginsManager> {
-        self.state.plugins_manager.clone()
     }
 
     pub fn mcp_manager(&self) -> Arc<McpManager> {
@@ -1564,7 +1535,6 @@ impl ThreadManager {
                 environments: Some(settings.environments.into_requests().environment_requests),
                 inherited_environments: Some(environments),
                 client_mcp_extensions: parent.client_mcp_extensions(),
-                disabled_plugin_ids: Some(settings.disabled_plugin_ids),
                 thread_extension_init,
                 turn_extension_init: settings.turn_extension_init,
                 ..StartThreadOptions::new(config)
@@ -2261,7 +2231,6 @@ impl ThreadManagerState {
             turn_extension_init,
             client_mcp_extensions,
             mut reserved_thread_id,
-            disabled_plugin_ids,
         } = options;
         if resume_preparation.is_some()
             && (config.ephemeral || !matches!(&initial_history, InitialHistory::Resumed(_)))
@@ -2476,11 +2445,7 @@ impl ThreadManagerState {
                 .get::<codex_extension_api::IsolatedSessionExtensions<Config>>()
                 .map(|extensions| Arc::clone(&extensions.0))
                 .unwrap_or_else(empty_extension_registry);
-            let mcp_manager = McpManager::new_with_extensions(
-                Arc::clone(&self.plugins_manager),
-                Arc::clone(&extensions),
-                CodexAppsToolsCache::default(),
-            );
+            let mcp_manager = McpManager::new_with_extensions(Arc::clone(&extensions));
             (extensions, Arc::new(mcp_manager))
         } else {
             (Arc::clone(&self.extensions), Arc::clone(&self.mcp_manager))
@@ -2511,13 +2476,11 @@ impl ThreadManagerState {
             git_root_discovery: Arc::clone(&self.git_root_discovery),
             environment_manager: Arc::clone(&self.environment_manager),
             skills_service: Arc::clone(&self.skills_service),
-            plugins_manager: Arc::clone(&self.plugins_manager),
             mcp_manager,
             extensions,
             conversation_history: initial_history,
             resume_preparation,
             history_initialization: startup_context.history_initialization,
-            disabled_plugin_ids,
             requested_history_mode: history_mode,
             fork_persistence,
             // Keep only the manager registration internal. The session and its saved

@@ -823,6 +823,5 @@ fn create_config_toml_with_thread_store(
         .with_root_config(&format!(
             "experimental_thread_store = {{ type = \"in_memory\", id = \"{store_id}\" }}"
         ))
-        .disable_feature(Feature::Plugins)
         .write(codex_home)
 }

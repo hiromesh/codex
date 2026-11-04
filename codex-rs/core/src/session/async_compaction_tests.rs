@@ -23,7 +23,7 @@ async fn cancelled_turn_skips_launch_but_preserves_existing_work(trigger: Compac
     let server_uri = server.uri();
     let (sess, turn, _events) =
         crate::session::tests::make_session_and_context_with_auth_and_config_and_rx(
-            CodexAuth::create_dummy_chatgpt_auth_for_testing(),
+            CodexAuth::from_api_key("test-api-key"),
             Vec::new(),
             move |config| {
                 config.model = Some("gpt-5.2".to_string());

@@ -78,7 +78,6 @@ async fn async_question_answers_preserve_ambiguous_skill_selection_and_dismiss_r
         path: test_path_buf("/tmp/route/SKILL.md").abs().into(),
         scope: crate::test_support::skill_scope_repo(),
         enabled: true,
-        plugin_id: None,
     };
     let mut duplicate = skill.clone();
     duplicate.path = test_path_buf("/tmp/other-route/SKILL.md").abs().into();

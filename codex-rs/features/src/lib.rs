@@ -28,7 +28,6 @@ pub use feature_configs::NetworkProxyModeToml;
 pub use feature_configs::NetworkProxyUnixSocketPermissionToml;
 pub use feature_configs::NonPrefixedMcpToolNamesConfigToml;
 pub use feature_configs::RemoteMessageBoardConfigToml;
-use feature_configs::RemovedAppsMcpPathOverrideConfigToml;
 pub use feature_configs::RolloutBudgetConfigToml;
 pub use feature_configs::SleepToolConfigToml;
 pub use feature_configs::SleepToolMode;
@@ -232,28 +231,18 @@ pub enum Feature {
     MultiAgentMode,
     /// Removed compatibility flag for the deleted agent-job tools.
     SpawnCsv,
-    /// Enable apps.
-    Apps,
     /// Route first-party ChatGPT requests through PSP.
     Psp,
-    /// Enable MCP apps.
-    EnableMcpApps,
     /// Enable MCP protocol version 2026-07-28 support.
     Mcp20260728,
     /// Honor ordinary MCP server tool-list notifications within a turn.
     McpToolListChanged,
     /// Discover and share eligible local stdio connections across chats.
     McpConnectionSharing,
-    /// Enable MCP protocol version 2026-07-28 for the host-owned Codex Apps server.
-    CodexAppsMcp20260728,
-    /// Let host-owned Apps catalog reads overlap the initial tool inventory.
-    AppsEarlyResourceDiscovery,
     /// Let RMCP coordinate OAuth refresh through the configured credential store.
     McpOAuthRefreshCoordination,
     /// Enable enterprise refresh-token authorization for configured MCP resources.
     UseXaa,
-    /// Removed compatibility flag for the legacy Apps MCP path override.
-    AppsMcpPathOverride,
     /// Removed compatibility flag retained as a no-op now that tool_search is always enabled.
     ToolSearch,
     /// Removed compatibility flag. MCP tools are always deferred when tool_search is available.
@@ -272,20 +261,12 @@ pub enum Feature {
     NonPrefixedMcpToolNames,
     /// Enable discoverable tool suggestions for apps.
     ToolSuggest,
-    /// Include recommended plugins in model-visible context.
-    RecommendedPlugins,
-    /// Enable plugins.
-    Plugins,
-    /// Use concise developer hints for explicitly selected plugins.
-    SimplifiedSelectionHints,
     /// Discover selected-root plugin and skill manifests through one high-level exec-server RPC.
     ExecutorCapabilityDiscovery,
     /// Acquire V2 executor inventories without publishing or activating their capabilities.
     ExecutorCapabilityDiscoveryV2,
     /// Skip host skill snapshots when no registered contributor requires them.
     SkipHostSkillDiscovery,
-    /// Removed compatibility flag for plugin-bundled lifecycle hooks.
-    PluginHooks,
     /// Allow the in-app browser pane in desktop apps.
     ///
     /// Requirements-only gate: this should be set from requirements, not user config.
@@ -325,9 +306,6 @@ pub enum Feature {
     ComputerUse,
     /// Enable the PS-backed remote plugin catalog.
     RemotePlugin,
-    /// Prefetch the plugin directory, featured plugins, and recommendations at app-server startup.
-    /// Inventory-only hosts can disable this. Legacy suggestions read the cached directory.
-    PluginDiscoveryPrefetch,
     /// Enable remote plugin sharing flows.
     PluginSharing,
     /// Removed compatibility flag retained as a no-op.
@@ -366,8 +344,6 @@ pub enum Feature {
     SendMessageToUserAsync,
     /// Enable automatic review for approval prompts.
     GuardianApproval,
-    /// Forward private reviewer items and interruptions to raw-event observers.
-    GuardianRecordedItems,
     /// Reuse encrypted parent compaction when restarting Guardian review sessions.
     /// When disabled, retain an independent review transcript across parent compaction.
     GuardianReuseParentCompaction,
@@ -375,16 +351,6 @@ pub enum Feature {
     GuardianRootHandoffContext,
     /// Review state-changing MAv2 calls and preserve native calls in Guardian history.
     GuardianNativeMultiAgentHistory,
-    /// Include completed node_repl or cua_repl Code Mode responses in Guardian reviews.
-    GuardianEnhancedNodeReplTranscripts,
-    /// Include completed node_repl or cua_repl Code Mode response images in Guardian reviews.
-    GuardianNodeReplTranscriptImages,
-    /// Trust connector identities from the plugin service orchestrator in Guardian V2.
-    GuardianTrustOrchestratorConnectors,
-    /// Give Guardian access to the root conversation's message history tools.
-    GuardianConversationHistoryTools,
-    /// Removed compatibility flag for the unused Guardian extension prototype.
-    GuardianExt,
     /// Enable persisted thread goals and automatic goal continuation.
     Goals,
     /// Add current context-window metadata to model-visible context.
@@ -403,10 +369,6 @@ pub enum Feature {
     ToolCallMcpElicitation,
     /// Prompt Codex Apps connector auth failures through MCP URL elicitations.
     AuthElicitation,
-    /// Offer Amazon Bedrock setup during TUI sign-in onboarding.
-    BedrockSetupWizard,
-    /// Offer Google Cloud Vertex AI setup during TUI sign-in onboarding.
-    GcpSetupWizard,
     /// Removed compatibility flag retained as a no-op.
     Personality,
     /// Enable native artifact tools.
@@ -465,8 +427,6 @@ pub enum Feature {
     /// Enable collaboration modes (Plan, Default).
     /// Kept for config backward compatibility; behavior is always collaboration-modes-enabled.
     CollaborationModes,
-    /// Removed compatibility flag for the deleted remote control feature.
-    RemoteControl,
     /// Removed compatibility flag retained as a no-op so old wrappers can
     /// still pass `--enable image_detail_original`.
     ImageDetailOriginal,
@@ -572,16 +532,6 @@ impl Features {
     /// Returns whether persistent execution is enabled for the selected effort.
     pub fn persistent_execution_enabled(&self, reasoning_effort: Option<&ReasoningEffort>) -> bool {
         reasoning_effort == Some(&ReasoningEffort::Persistent)
-    }
-
-    pub fn apps_enabled_for_auth(&self, has_chatgpt_auth: bool) -> bool {
-        self.enabled(Feature::Apps) && has_chatgpt_auth
-    }
-
-    pub fn plugin_recommendations_enabled(&self) -> bool {
-        self.enabled(Feature::Apps)
-            && self.enabled(Feature::Plugins)
-            && (self.enabled(Feature::ToolSuggest) || self.enabled(Feature::RecommendedPlugins))
     }
 
     pub fn use_legacy_landlock(&self) -> bool {
@@ -856,9 +806,7 @@ pub struct FeaturesToml {
     pub current_time_reminder: Option<FeatureToml<CurrentTimeReminderConfigToml>>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub sleep_tool: Option<FeatureToml<SleepToolConfigToml>>,
-    #[serde(default, rename = "apps_mcp_path_override", skip_serializing)]
-    #[schemars(skip)]
-    removed_apps_mcp_path_override: Option<FeatureToml<RemovedAppsMcpPathOverrideConfigToml>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub network_proxy: Option<FeatureToml<NetworkProxyConfigToml>>,
     /// Boolean feature toggles keyed by canonical or legacy feature name.
     #[serde(flatten)]
@@ -1445,20 +1393,8 @@ pub const FEATURES: &[FeatureSpec] = &[
         default_enabled: false,
     },
     FeatureSpec {
-        id: Feature::Apps,
-        key: "apps",
-        stage: Stage::Stable,
-        default_enabled: true,
-    },
-    FeatureSpec {
         id: Feature::Psp,
         key: "psp",
-        stage: Stage::UnderDevelopment,
-        default_enabled: false,
-    },
-    FeatureSpec {
-        id: Feature::EnableMcpApps,
-        key: "enable_mcp_apps",
         stage: Stage::UnderDevelopment,
         default_enabled: false,
     },
@@ -1481,18 +1417,6 @@ pub const FEATURES: &[FeatureSpec] = &[
         default_enabled: false,
     },
     FeatureSpec {
-        id: Feature::AppsEarlyResourceDiscovery,
-        key: "apps_early_resource_discovery",
-        stage: Stage::UnderDevelopment,
-        default_enabled: false,
-    },
-    FeatureSpec {
-        id: Feature::CodexAppsMcp20260728,
-        key: "codex_apps_mcp_2026_07_28",
-        stage: Stage::UnderDevelopment,
-        default_enabled: false,
-    },
-    FeatureSpec {
         id: Feature::McpOAuthRefreshCoordination,
         key: "mcp_oauth_refresh_coordination",
         stage: Stage::Stable,
@@ -1502,12 +1426,6 @@ pub const FEATURES: &[FeatureSpec] = &[
         id: Feature::UseXaa,
         key: "use_xaa",
         stage: Stage::UnderDevelopment,
-        default_enabled: false,
-    },
-    FeatureSpec {
-        id: Feature::AppsMcpPathOverride,
-        key: "apps_mcp_path_override",
-        stage: Stage::Removed,
         default_enabled: false,
     },
     FeatureSpec {
@@ -1571,24 +1489,6 @@ pub const FEATURES: &[FeatureSpec] = &[
         default_enabled: true,
     },
     FeatureSpec {
-        id: Feature::RecommendedPlugins,
-        key: "recommended_plugins",
-        stage: Stage::Stable,
-        default_enabled: false,
-    },
-    FeatureSpec {
-        id: Feature::Plugins,
-        key: "plugins",
-        stage: Stage::Stable,
-        default_enabled: true,
-    },
-    FeatureSpec {
-        id: Feature::SimplifiedSelectionHints,
-        key: "simplified_selection_hints",
-        stage: Stage::UnderDevelopment,
-        default_enabled: false,
-    },
-    FeatureSpec {
         id: Feature::ExecutorCapabilityDiscovery,
         key: "executor_capability_discovery",
         stage: Stage::UnderDevelopment,
@@ -1604,12 +1504,6 @@ pub const FEATURES: &[FeatureSpec] = &[
         id: Feature::SkipHostSkillDiscovery,
         key: "skip_host_skill_discovery",
         stage: Stage::UnderDevelopment,
-        default_enabled: false,
-    },
-    FeatureSpec {
-        id: Feature::PluginHooks,
-        key: "plugin_hooks",
-        stage: Stage::Removed,
         default_enabled: false,
     },
     FeatureSpec {
@@ -1669,12 +1563,6 @@ pub const FEATURES: &[FeatureSpec] = &[
     FeatureSpec {
         id: Feature::RemotePlugin,
         key: "remote_plugin",
-        stage: Stage::Stable,
-        default_enabled: true,
-    },
-    FeatureSpec {
-        id: Feature::PluginDiscoveryPrefetch,
-        key: "plugin_discovery_prefetch",
         stage: Stage::Stable,
         default_enabled: true,
     },
@@ -1805,12 +1693,6 @@ pub const FEATURES: &[FeatureSpec] = &[
         default_enabled: true,
     },
     FeatureSpec {
-        id: Feature::GuardianRecordedItems,
-        key: "guardian_recorded_items",
-        stage: Stage::UnderDevelopment,
-        default_enabled: false,
-    },
-    FeatureSpec {
         id: Feature::GuardianReuseParentCompaction,
         key: "guardian_reuse_parent_compaction",
         stage: Stage::Stable,
@@ -1826,36 +1708,6 @@ pub const FEATURES: &[FeatureSpec] = &[
         id: Feature::GuardianNativeMultiAgentHistory,
         key: "guardian_native_multi_agent_history",
         stage: Stage::UnderDevelopment,
-        default_enabled: false,
-    },
-    FeatureSpec {
-        id: Feature::GuardianEnhancedNodeReplTranscripts,
-        key: "guardian_enhanced_node_repl_transcripts",
-        stage: Stage::UnderDevelopment,
-        default_enabled: false,
-    },
-    FeatureSpec {
-        id: Feature::GuardianNodeReplTranscriptImages,
-        key: "guardian_node_repl_transcript_images",
-        stage: Stage::UnderDevelopment,
-        default_enabled: false,
-    },
-    FeatureSpec {
-        id: Feature::GuardianTrustOrchestratorConnectors,
-        key: "guardian_trust_orchestrator_connectors",
-        stage: Stage::UnderDevelopment,
-        default_enabled: false,
-    },
-    FeatureSpec {
-        id: Feature::GuardianConversationHistoryTools,
-        key: "guardian_conversation_history_tools",
-        stage: Stage::UnderDevelopment,
-        default_enabled: false,
-    },
-    FeatureSpec {
-        id: Feature::GuardianExt,
-        key: "guardian_ext",
-        stage: Stage::Removed,
         default_enabled: false,
     },
     FeatureSpec {
@@ -1919,18 +1771,6 @@ pub const FEATURES: &[FeatureSpec] = &[
         default_enabled: true,
     },
     FeatureSpec {
-        id: Feature::BedrockSetupWizard,
-        key: "bedrock_setup_wizard",
-        stage: Stage::Stable,
-        default_enabled: true,
-    },
-    FeatureSpec {
-        id: Feature::GcpSetupWizard,
-        key: "gcp_setup_wizard",
-        stage: Stage::Stable,
-        default_enabled: false,
-    },
-    FeatureSpec {
         id: Feature::Personality,
         key: "personality",
         stage: Stage::Removed,
@@ -1958,12 +1798,6 @@ pub const FEATURES: &[FeatureSpec] = &[
         id: Feature::StepModelSwitching,
         key: "step_model_switching",
         stage: Stage::UnderDevelopment,
-        default_enabled: false,
-    },
-    FeatureSpec {
-        id: Feature::RemoteControl,
-        key: "remote_control",
-        stage: Stage::Removed,
         default_enabled: false,
     },
     FeatureSpec {

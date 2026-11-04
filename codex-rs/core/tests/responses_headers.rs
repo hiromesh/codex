@@ -547,12 +547,13 @@ async fn responses_stream_includes_turn_metadata_header_for_git_workspace_e2e() 
             .expect("request body should include x-codex-turn-metadata"),
     )
     .expect("body x-codex-turn-metadata should be valid JSON");
+    // Analytics is disabled in this build even when the config opts in.
     assert_eq!(
         (
             initial_parsed["analytics_enabled"].as_bool(),
             body_metadata["analytics_enabled"].as_bool(),
         ),
-        (Some(true), Some(true)),
+        (Some(false), Some(false)),
     );
     assert_eq!(
         body_metadata

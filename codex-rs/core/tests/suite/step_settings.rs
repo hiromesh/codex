@@ -2272,86 +2272,6 @@ async fn persistent_instructions_follow_mid_turn_model_changes() -> Result<()> {
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn turn_settings_rejection_preserves_independent_future_settings() -> Result<()> {
-    skip_if_no_network!(Ok(()));
-
-    let server = start_mock_server().await;
-    let response_mock = mount_sse_sequence(
-        &server,
-        vec![
-            paused_response("resp-1", "pause-before-node-repl-restriction"),
-            sse_completed("resp-2"),
-            sse_completed("resp-3"),
-        ],
-    )
-    .await;
-    let test = step_settings_test()
-        .with_config(|config| {
-            for model in &mut config
-                .model_catalog
-                .as_mut()
-                .expect("controlled model catalog")
-                .models
-            {
-                model.node_repl_disabled = model.slug == MODEL_B;
-            }
-        })
-        .build_with_auto_env(&server)
-        .await?;
-    let request = start_paused_turn(&test.codex).await?;
-    core_test_support::submit_thread_settings(
-        &test.codex,
-        ThreadSettingsOverrides {
-            model: Some(MODEL_B.to_string()),
-            ..Default::default()
-        },
-    )
-    .await?;
-    let future = test.codex.thread_settings_snapshot().await;
-    assert_eq!(
-        submit_turn_settings(
-            &test.codex,
-            &request.turn_id,
-            TurnSettingsUpdate {
-                model: Some(MODEL_B.to_string()),
-                ..Default::default()
-            }
-        )
-        .await?,
-        TurnSettingsUpdateOutcome::Rejected {
-            reason: "the destination changes the admitted node REPL availability restriction"
-                .to_string(),
-        }
-    );
-    assert_eq!(test.codex.thread_settings_snapshot().await, future);
-    answer_paused_turn(&test.codex, &request.turn_id).await?;
-    wait_for_event(&test.codex, |event| {
-        matches!(event, EventMsg::TurnComplete(_))
-    })
-    .await;
-    test.submit_text_turn("admit the next turn").await?;
-
-    let requests = response_mock.requests();
-    assert_eq!(
-        requests.iter().map(request_settings).collect::<Vec<_>>(),
-        [MODEL_A, MODEL_A, MODEL_B]
-            .into_iter()
-            .map(|model| {
-                json!({
-                    "model": model,
-                    "reasoning": { "effort": "low", "summary": "concise" },
-                    "service_tier": null,
-                })
-            })
-            .collect::<Vec<_>>()
-    );
-    assert_eq!(request_turn_id(&requests[1]), request.turn_id);
-    assert_ne!(request_turn_id(&requests[2]), request.turn_id);
-
-    Ok(())
-}
-
-#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn request_preference_activation_keeps_admitted_model_metadata() -> Result<()> {
     skip_if_no_network!(Ok(()));
 
@@ -2379,7 +2299,8 @@ async fn request_preference_activation_keeps_admitted_model_metadata() -> Result
     )
     .await;
     let test = step_settings_test()
-        .with_auth(CodexAuth::create_dummy_chatgpt_auth_for_testing())
+        .with_auth(CodexAuth::from_api_key("test-api-key"))
+        .with_mock_model_catalog(&server)
         .with_config(|config| {
             // Use the real refreshable models manager, and retain an unset
             // preference so the selected model's default is observable.

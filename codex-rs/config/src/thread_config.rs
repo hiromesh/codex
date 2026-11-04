@@ -222,7 +222,7 @@ mod tests {
             ThreadConfigSource::Session(SessionThreadConfig {
                 model_provider: Some("local".to_string()),
                 model_providers: HashMap::from([("local".to_string(), test_provider("local"))]),
-                features: BTreeMap::from([("plugins".to_string(), false)]),
+                features: BTreeMap::new(),
             }),
             ThreadConfigSource::User(UserThreadConfig::default()),
         ]);
@@ -241,7 +241,7 @@ mod tests {
                 ThreadConfigSource::Session(SessionThreadConfig {
                     model_provider: Some("local".to_string()),
                     model_providers: HashMap::from([("local".to_string(), test_provider("local"))]),
-                    features: BTreeMap::from([("plugins".to_string(), false)]),
+                    features: BTreeMap::new(),
                 }),
                 ThreadConfigSource::User(UserThreadConfig::default()),
             ]
@@ -255,7 +255,7 @@ mod tests {
             ThreadConfigSource::Session(SessionThreadConfig {
                 model_provider: Some("local".to_string()),
                 model_providers: HashMap::from([("local".to_string(), test_provider("local"))]),
-                features: BTreeMap::from([("plugins".to_string(), false)]),
+                features: BTreeMap::new(),
             }),
         ]);
         let layers = loader
@@ -285,9 +285,6 @@ mod tests {
                     requires_openai_auth = false
                     supports_websockets = true
                     supports_standalone_web_search = true
-
-                    [features]
-                    plugins = false
                 }
                 .into()
             )]

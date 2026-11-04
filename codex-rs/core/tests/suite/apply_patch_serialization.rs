@@ -1,4 +1,3 @@
-
 use anyhow::Result;
 use codex_protocol::models::PermissionProfile;
 use core_test_support::assert_regex_match;

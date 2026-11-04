@@ -28,14 +28,12 @@ impl<'a> ToolMentions<'a> {
 pub enum ToolMentionKind {
     App,
     Mcp,
-    Plugin,
     Skill,
     Other,
 }
 
 const APP_PATH_PREFIX: &str = "app://";
 const MCP_PATH_PREFIX: &str = "mcp://";
-const PLUGIN_PATH_PREFIX: &str = "plugin://";
 const SKILL_PATH_PREFIX: &str = "skill://";
 const SKILL_FILENAME: &str = "SKILL.md";
 const TOOL_MENTION_SIGIL: char = '$';
@@ -45,8 +43,6 @@ pub fn tool_kind_for_path(path: &str) -> ToolMentionKind {
         ToolMentionKind::App
     } else if path.starts_with(MCP_PATH_PREFIX) {
         ToolMentionKind::Mcp
-    } else if path.starts_with(PLUGIN_PATH_PREFIX) {
-        ToolMentionKind::Plugin
     } else if path.starts_with(SKILL_PATH_PREFIX) || is_skill_filename(path) {
         ToolMentionKind::Skill
     } else {
@@ -61,14 +57,6 @@ fn is_skill_filename(path: &str) -> bool {
 
 pub fn app_id_from_path(path: &str) -> Option<&str> {
     path.strip_prefix(APP_PATH_PREFIX)
-        .filter(|value| !value.is_empty())
-}
-
-/// Desktop app/browser mentions append `?app=...` or `?browserFamily=...`.
-/// Ignore these targeting parameters when matching the plugin ID.
-pub fn plugin_config_name_from_path(path: &str) -> Option<&str> {
-    path.strip_prefix(PLUGIN_PATH_PREFIX)
-        .and_then(|value| value.split('?').next())
         .filter(|value| !value.is_empty())
 }
 
@@ -101,7 +89,7 @@ pub fn extract_tool_mentions_with_sigil(text: &str, sigil: char) -> ToolMentions
             if !is_common_env_var(name) {
                 if !matches!(
                     tool_kind_for_path(path),
-                    ToolMentionKind::App | ToolMentionKind::Mcp | ToolMentionKind::Plugin
+                    ToolMentionKind::App | ToolMentionKind::Mcp
                 ) {
                     mentioned_names.insert(name);
                 }

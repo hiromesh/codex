@@ -27,7 +27,6 @@ use codex_app_server_protocol::CommandExecutionStatus;
 use codex_app_server_protocol::DynamicToolCallStatus;
 use codex_app_server_protocol::ItemCompletedNotification;
 use codex_app_server_protocol::ItemStartedNotification;
-use codex_app_server_protocol::McpToolCallAppContext;
 use codex_app_server_protocol::McpToolCallStatus;
 use codex_app_server_protocol::PatchApplyStatus;
 use codex_app_server_protocol::ServerNotification;
@@ -102,10 +101,6 @@ fn turn_event_serializes_expected_shape() {
             thread_id: "thread-2".to_string(),
             session_id: "session-thread-2".to_string(),
             turn_id: "turn-2".to_string(),
-            active_plugin_ids_at_turn_start: Some(vec![
-                "plugins~Plugin_example".to_string(),
-                "test@marketplace".to_string(),
-            ]),
             root_turn_id: Some("turn-2".to_string()),
             turn_trigger: Some("user".to_string()),
             codex_turn_source: Some("composer".to_string()),
@@ -193,7 +188,6 @@ fn turn_event_serializes_expected_shape() {
                 "thread_id": "thread-2",
                 "session_id": "session-thread-2",
                 "turn_id": "turn-2",
-                "active_plugin_ids_at_turn_start": ["plugins~Plugin_example", "test@marketplace"],
                 "root_turn_id": "turn-2",
                 "turn_trigger": "user",
                 "codex_turn_source": "composer",
@@ -279,62 +273,6 @@ fn turn_event_serializes_expected_shape() {
     .expect("parse expected turn event");
 
     assert_eq!(payload, expected);
-}
-
-#[tokio::test]
-async fn turn_event_preserves_first_received_plugin_inventory() {
-    for plugin_ids in [
-        None,
-        Some(vec![]),
-        Some(vec!["initial@marketplace".to_string()]),
-    ] {
-        let mut reducer = AnalyticsReducer::default();
-        let mut out = Vec::new();
-        ingest_turn_prerequisites(
-            &mut reducer,
-            &mut out,
-            /*include_initialize*/ true,
-            /*include_resolved_config*/ false,
-            /*include_started*/ true,
-            /*include_token_usage*/ false,
-        )
-        .await;
-
-        let config = TurnResolvedConfigFact {
-            active_plugin_ids_at_turn_start: plugin_ids.clone(),
-            ..sample_turn_resolved_config("thread-2", "turn-2")
-        };
-        let later_config = TurnResolvedConfigFact {
-            active_plugin_ids_at_turn_start: Some(vec!["later@marketplace".to_string()]),
-            is_first_turn: false,
-            ..config.clone()
-        };
-        for fact in [
-            AnalyticsFact::Custom(CustomAnalyticsFact::TurnResolvedConfig(Box::new(config))),
-            AnalyticsFact::Custom(CustomAnalyticsFact::TurnResolvedConfig(Box::new(
-                later_config,
-            ))),
-            AnalyticsFact::Notification(Box::new(sample_turn_completed_notification(
-                "thread-2",
-                "turn-2",
-                AppServerTurnStatus::Completed,
-                /*codex_error_info*/ None,
-            ))),
-        ] {
-            reducer.ingest(fact, &mut out).await;
-        }
-
-        let [TrackEventRequest::TurnEvent(event)] = out.as_slice() else {
-            panic!("expected one turn event");
-        };
-        assert_eq!(
-            (
-                &event.event_params.active_plugin_ids_at_turn_start,
-                event.event_params.is_first_turn,
-            ),
-            (&plugin_ids, false),
-        );
-    }
 }
 
 #[tokio::test]
@@ -467,16 +405,6 @@ async fn turn_event_counts_completed_tool_items() {
         tool: "search".to_string(),
         status,
         arguments: json!({}),
-        app_context: Some(McpToolCallAppContext {
-            connector_id: "connector-test".to_string(),
-            link_id: None,
-            resource_uri: None,
-            app_name: None,
-            action_name: None,
-        }),
-        mcp_app_resource_uri: None,
-        mcp_app_ui: None,
-        plugin_id: Some("sample@test".to_string()),
         read_only_hint: None,
         result: None,
         error: None,
@@ -636,11 +564,7 @@ async fn turn_event_counts_completed_tool_items() {
         .find(|event| matches!(event, TrackEventRequest::McpToolCall(_)))
         .expect("MCP tool call event should be emitted");
     let payload = serde_json::to_value(mcp_tool_call_event).expect("serialize MCP tool call event");
-    assert_eq!(payload["event_params"]["plugin_id"], json!("sample@test"));
-    assert_eq!(
-        payload["event_params"]["connector_id"],
-        json!("connector-test")
-    );
+    assert_eq!(payload["event_params"]["connector_id"], json!(null));
 
     reducer
         .ingest(

@@ -9,8 +9,7 @@ use codex_extension_api::ExtensionRegistry;
 use codex_extension_api::ExtensionRegistryBuilder;
 use codex_features::Feature;
 use codex_login::CodexAuth;
-use codex_login::auth::BedrockApiKeyAuth;
-use codex_mcp::CODEX_APPS_MCP_SERVER_NAME;
+const CODEX_APPS_MCP_SERVER_NAME: &str = "codex_apps";
 use codex_protocol::config_types::WebSearchMode;
 use codex_protocol::models::ImageDetail;
 use codex_protocol::models::ImageReference;
@@ -20,8 +19,8 @@ use codex_protocol::protocol::Op;
 use codex_protocol::user_input::UserInput;
 use codex_web_search_extension::install as install_web_search_extension;
 use core_test_support::apps_test_server::AppsTestServer;
-use core_test_support::apps_test_server::SEARCH_CALENDAR_CREATE_TOOL;
-use core_test_support::apps_test_server::SEARCH_CALENDAR_NAMESPACE;
+use core_test_support::apps_test_server::CALENDAR_CREATE_EVENT_TOOL_NAME;
+use core_test_support::apps_test_server::CODEX_APPS_TOOL_NAMESPACE;
 use core_test_support::apps_test_server::apps_enabled_builder;
 use core_test_support::responses;
 use core_test_support::skip_if_no_network;
@@ -246,13 +245,13 @@ async fn responses_lite_includes_tool_namespaces_info_when_enabled() -> Result<(
             .as_str()
             .context("Responses request should include turn metadata")?,
     )?;
-    let calendar = &turn_metadata["tool_namespaces_info"][SEARCH_CALENDAR_NAMESPACE];
+    let calendar = &turn_metadata["tool_namespaces_info"][CODEX_APPS_TOOL_NAMESPACE];
 
-    assert_eq!(calendar["name"], SEARCH_CALENDAR_NAMESPACE);
+    assert_eq!(calendar["name"], CODEX_APPS_TOOL_NAMESPACE);
     assert_eq!(
-        calendar["functions"][SEARCH_CALENDAR_CREATE_TOOL],
+        calendar["functions"][CALENDAR_CREATE_EVENT_TOOL_NAME],
         serde_json::json!({
-            "name": SEARCH_CALENDAR_CREATE_TOOL,
+            "name": CALENDAR_CREATE_EVENT_TOOL_NAME,
             "direct": true,
             "deferred": false,
             "source": {
@@ -356,7 +355,7 @@ async fn responses_lite_uses_standalone_web_search() -> Result<()> {
     )
     .await;
 
-    let auth = CodexAuth::create_dummy_chatgpt_auth_for_testing();
+    let auth = CodexAuth::from_api_key("test-api-key");
     let extensions = responses_extensions(&auth);
 
     let mut builder = test_codex()
@@ -458,57 +457,6 @@ async fn responses_lite_does_not_expose_disabled_standalone_web_search_for_opted
         /*expect_web_run*/ false,
     )
     .await
-}
-
-#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn responses_lite_does_not_expose_standalone_web_search_for_bedrock_provider() -> Result<()> {
-    skip_if_no_network!(Ok(()));
-
-    let server = responses::start_mock_server().await;
-    let response_mock = responses::mount_sse_once(
-        &server,
-        responses::sse(vec![
-            responses::ev_response_created("resp-1"),
-            responses::ev_completed("resp-1"),
-        ]),
-    )
-    .await;
-
-    let auth = CodexAuth::BedrockApiKey(BedrockApiKeyAuth {
-        api_key: "dummy".to_string(),
-        region: "us-east-1".to_string(),
-    });
-    let extensions = responses_extensions(&auth);
-    let mut builder = test_codex()
-        .with_auth(auth)
-        .with_extensions(extensions)
-        .with_model_info_override("gpt-5.4", |model_info| {
-            model_info.use_responses_lite = true;
-        })
-        .with_config(|config| {
-            configure_responses_tools(config);
-            config.model_provider.name = "Amazon Bedrock".to_string();
-            config.model_provider.requires_openai_auth = false;
-            config.model_provider.http_headers = None;
-            config.model_provider.supports_standalone_web_search = false;
-        });
-    let test = builder.build(&server).await?;
-
-    test.submit_turn("Use standalone web search").await?;
-
-    let request = response_mock.single_request();
-    assert_eq!(
-        request.header(RESPONSES_LITE_HEADER).as_deref(),
-        Some("true")
-    );
-    let body = request.body_json();
-    assert!(body.get("tools").is_none());
-    assert!(!request.has_content_kinds(&["model.base_instructions"]));
-    let tools = additional_tools(&body)?;
-    assert!(!has_namespaced_tool(tools, "web", "run"));
-    assert!(!has_hosted_tool(tools, "web_search"));
-
-    Ok(())
 }
 
 async fn assert_responses_lite_custom_provider_web_search(
@@ -643,7 +591,7 @@ async fn responses_lite_omits_hosted_tools_without_standalone_extensions() -> Re
     .await;
 
     let mut builder = test_codex()
-        .with_auth(CodexAuth::create_dummy_chatgpt_auth_for_testing())
+        .with_auth(CodexAuth::from_api_key("test-api-key"))
         .with_model_info_override("gpt-5.4", |model_info| {
             model_info.use_responses_lite = true;
             configure_image_capable_model(model_info);

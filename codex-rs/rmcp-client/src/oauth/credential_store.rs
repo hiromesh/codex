@@ -342,12 +342,9 @@ impl<K: KeyringStore + Clone + 'static> CredentialStore for OAuthCredentialStore
                 let mut retired = expected.clone();
                 retired.token_response.0.set_refresh_token(None);
                 *inner.last_credentials.lock().await = Some(retired.clone());
-                if inner.store.backend == Backend::Keyring(AuthKeyringBackendKind::Direct)
-                    && !inner.server_name.starts_with("ema-idp:")
-                {
+                if inner.store.backend == Backend::Keyring(AuthKeyringBackendKind::Direct) {
                     // Ordinary direct-keyring entries are shared across CODEX_HOMEs, but their
                     // refresh locks are not. Do not risk overwriting another home's newer login.
-                    // Enterprise entries include the home in their key and remain protected.
                     warn!(
                         server_name = %inner.server_name,
                         "rejected MCP OAuth refresh token retired only in this connection; shared direct-keyring storage lacks cross-home coordination"

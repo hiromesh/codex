@@ -51,12 +51,6 @@ pub const FS_REMOVE_METHOD: &str = "fs/remove";
 pub const FS_COPY_METHOD: &str = "fs/copy";
 /// Discovers capability manifests below selected roots using executor-local filesystem access.
 pub const CAPABILITY_ROOTS_DISCOVER_METHOD: &str = "capabilityRoots/discoverV1";
-/// Ordered plugin manifest paths recognized beneath a plugin root.
-pub const DISCOVERABLE_PLUGIN_MANIFEST_PATHS: &[&str] = &[
-    ".codex-plugin/plugin.json",
-    ".claude-plugin/plugin.json",
-    ".cursor-plugin/plugin.json",
-];
 /// JSON-RPC request method for executor-side HTTP requests.
 pub const HTTP_REQUEST_METHOD: &str = "http/request";
 /// JSON-RPC notification method for streamed executor HTTP response bodies.
@@ -913,7 +907,7 @@ pub struct WireFsCopyParams {
 #[serde(rename_all = "camelCase")]
 pub struct FsCopyResponse {}
 
-/// Roots to inspect for plugin and skill capability manifests.
+/// Roots to inspect for skill capability manifests.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CapabilityRootsDiscoverParams {
@@ -1034,21 +1028,6 @@ pub struct CapabilityTextFile {
     pub contents: String,
 }
 
-/// Plugin files declared directly by a selected root.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct DiscoveredPluginFiles {
-    pub manifest: CapabilityTextFile,
-    /// MCP declarations from a selected file, including the conventional `.mcp.json` fallback.
-    /// V2 also materializes inline declarations, using the manifest as the source path.
-    /// V1 leaves inline declarations only in `manifest`.
-    #[serde(default)]
-    pub mcp_config: Option<CapabilityTextFile>,
-    /// File-backed connector declarations.
-    #[serde(default)]
-    pub apps_config: Option<CapabilityTextFile>,
-}
-
 /// A skill instructions file and its optional sibling metadata.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -1067,12 +1046,7 @@ pub struct CapabilityRootDiscovery {
     pub id: String,
     pub path: PathUri,
     #[serde(default)]
-    pub plugin: Option<DiscoveredPluginFiles>,
-    #[serde(default)]
     pub skills: Vec<DiscoveredSkillFiles>,
-    /// Plugin manifests found while scanning the root, used to namespace nested skills.
-    #[serde(default)]
-    pub namespace_manifests: Vec<CapabilityTextFile>,
     #[serde(default)]
     pub warnings: Vec<String>,
     #[serde(default)]
@@ -1647,7 +1621,6 @@ mod tests {
                     "sandboxedFileStreaming": false,
                     "fileWriteStreaming": false,
                     "shellSnapshotV2": false,
-                    "windowsMxc": false,
                 });
                 expected_wire
                     .as_object_mut()
@@ -1712,7 +1685,6 @@ mod tests {
                 "sandboxedFileStreaming": false,
                 "fileWriteStreaming": false,
                 "shellSnapshotV2": false,
-                "windowsMxc": false,
             },
         });
         let info: EnvironmentInfo = serde_json::from_value(expected.clone())

@@ -202,7 +202,7 @@ impl ResolvedOAuthCredentialStore {
     ///
     /// File and Secrets keep one exclusive aggregate lock across the comparison and write,
     /// including against legacy writers that do not take the caller's refresh guard. Direct
-    /// keyring callers must hold that guard and use a home-scoped enterprise credential.
+    /// keyring callers must hold that guard.
     pub(crate) fn retire_refresh_token_if_matches<K: KeyringStore + Clone + 'static>(
         self,
         keyring_store: &K,

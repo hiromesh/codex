@@ -64,7 +64,7 @@ async fn turn_start_refreshes_dirty_mcp_reuses_clean_runtime_and_cancels_discove
         .new_startup_prewarm_turn_with_sub_id(INITIAL_SUBMIT_ID.to_owned())
         .await;
     session
-        .mcp_runtime_for_step(&prewarm, &[], &[], &HashSet::new())
+        .mcp_runtime_for_step(&prewarm, &[], &[])
         .await;
     let initial_key = recorder.client.cache_key();
 
@@ -112,7 +112,7 @@ async fn turn_start_refreshes_dirty_mcp_reuses_clean_runtime_and_cancels_discove
             );
             // Prewarm must also skip discovery while a regular turn is active.
             session
-                .mcp_runtime_for_step(&prewarm, &[], &[], &HashSet::new())
+                .mcp_runtime_for_step(&prewarm, &[], &[])
                 .await;
         }
         let (cancellation_token, done) = {

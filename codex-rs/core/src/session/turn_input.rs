@@ -607,7 +607,6 @@ async fn start_if_idle(
     let sender_messages = capture_sender_user_messages(session, &mut input).await;
     match kind {
         TurnStartKind::User => {
-            session.clear_connector_selection().await;
             task_input.push(
                 pending_turn_input(
                     session,

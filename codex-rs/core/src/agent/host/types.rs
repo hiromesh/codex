@@ -43,7 +43,6 @@ pub struct PreparedChildContext {
     pub exec_policy_source_requirements: Option<Arc<RequirementsExecPolicy>>,
     /// Current tool declarations a fresh child can inherit. The host supplies their execution route.
     pub dynamic_tools: Vec<DynamicToolSpec>,
-    pub disabled_plugin_ids: Vec<String>,
 }
 
 pub(crate) struct PreparedChildInheritance {

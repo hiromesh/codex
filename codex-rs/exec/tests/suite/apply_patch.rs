@@ -352,9 +352,7 @@ async fn test_apply_patch_freeform_tool() -> anyhow::Result<()> {
 async fn shutdown_flushes_completed_turn_and_file_diff() -> anyhow::Result<()> {
     use codex_login::AuthDotJson;
     use codex_login::AuthKeyringBackendKind;
-    use codex_login::TokenData;
     use codex_login::save_auth;
-    use codex_login::token_data::IdTokenInfo;
     use codex_protocol::auth::AuthMode;
     use core_test_support::skip_if_no_network;
     use core_test_support::test_codex_exec::test_codex_exec;
@@ -394,24 +392,8 @@ async fn shutdown_flushes_completed_turn_and_file_diff() -> anyhow::Result<()> {
     save_auth(
         test.home_path(),
         &AuthDotJson {
-            auth_mode: Some(AuthMode::Chatgpt),
-            openai_api_key: None,
-            tokens: Some(TokenData {
-                id_token: IdTokenInfo {
-                    raw_jwt: "header.eyJhbGciOiJub25lIn0.eyJzdWIiOiJ1c2VyLTEyMyJ9.".to_string(),
-                    ..Default::default()
-                },
-                access_token: "test-access-token".to_string(),
-                refresh_token: "test-refresh-token".to_string(),
-                oauth_provenance: None,
-                login_owner_id: None,
-                account_id: None,
-            }),
-            last_refresh: None,
-            agent_identity: None,
-            personal_access_token: None,
-            bedrock_api_key: None,
-            bedrock_access_keys: None,
+            auth_mode: Some(AuthMode::ApiKey),
+            openai_api_key: Some("sk-test".to_string()),
         },
         codex_login::AuthCredentialsStoreMode::File,
         AuthKeyringBackendKind::default(),

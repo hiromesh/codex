@@ -1,6 +1,5 @@
 use anyhow::Context;
 use anyhow::Result;
-use app_test_support::ChatGptAuthFixture;
 use app_test_support::MockResponsesConfig;
 use app_test_support::TestAppServer;
 use app_test_support::create_apply_patch_sse_response;
@@ -13,7 +12,8 @@ use app_test_support::create_mock_responses_server_sequence;
 use app_test_support::create_mock_responses_server_sequence_unchecked;
 use app_test_support::create_request_user_input_sse_response;
 use app_test_support::format_with_current_shell_display;
-use app_test_support::write_chatgpt_auth;
+use app_test_support::mount_plain_mcp_server;
+use app_test_support::write_api_key_auth;
 use app_test_support::write_mock_responses_config_toml_with_chatgpt_base_url;
 use app_test_support::write_models_cache;
 use app_test_support::write_models_cache_with_models;
@@ -77,7 +77,6 @@ use codex_app_server_protocol::WarningNotification;
 use codex_core::test_support::all_model_presets;
 use codex_exec_server::LOCAL_ENVIRONMENT_ID;
 use codex_features::Feature;
-use codex_login::AuthCredentialsStoreMode;
 use codex_models_manager::model_info::model_info_from_slug;
 use codex_protocol::config_types::CollaborationMode;
 use codex_protocol::config_types::ModeKind;
@@ -91,9 +90,6 @@ use codex_protocol::openai_models::ReasoningEffort;
 use codex_protocol::protocol::MULTI_AGENT_MODE_OPEN_TAG;
 use codex_protocol::user_input::MAX_USER_INPUT_TEXT_CHARS;
 use codex_utils_absolute_path::test_support::PathExt;
-use core_test_support::apps_test_server::AppsTestServer;
-use core_test_support::apps_test_server::SEARCH_CALENDAR_LIST_TOOL;
-use core_test_support::apps_test_server::SEARCH_CALENDAR_NAMESPACE;
 use core_test_support::responses;
 use core_test_support::skip_if_no_network;
 use core_test_support::skip_if_remote;
@@ -108,12 +104,7 @@ use tempfile::TempDir;
 use test_case::test_case;
 use tokio::sync::oneshot;
 use tokio::time::timeout;
-use wiremock::Mock;
-use wiremock::Request;
 use wiremock::ResponseTemplate;
-use wiremock::matchers::body_partial_json;
-use wiremock::matchers::method;
-use wiremock::matchers::path;
 
 use super::analytics::mount_analytics_capture;
 use super::analytics::wait_for_analytics_event;
@@ -369,8 +360,8 @@ async fn tool_call_metadata_stays_out_of_raw_response_item_notifications(
             responses::ev_response_created("resp-1"),
             responses::ev_function_call_with_namespace(
                 "mcp-call",
-                SEARCH_CALENDAR_NAMESPACE,
-                SEARCH_CALENDAR_LIST_TOOL,
+                "mcp__calendar",
+                "calendar_list_events",
                 &arguments.to_string(),
             ),
             responses::ev_completed("resp-1"),
@@ -379,54 +370,38 @@ async fn tool_call_metadata_stays_out_of_raw_response_item_notifications(
     ];
     let server = responses::start_mock_server().await;
     let model = responses::mount_sse_sequence(&server, responses).await;
-    let apps = AppsTestServer::mount(&server).await?;
+    let mcp_server = mount_plain_mcp_server(&server, "/mcp").await;
+    mcp_server.control.set_tools(vec![json!({
+        "name": "calendar_list_events",
+        "description": "List calendar events.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {"query": {"type": "string"}},
+            "additionalProperties": false
+        },
+        "annotations": {"readOnlyHint": true},
+    })]);
     let tool_result = json!({
         "content": [{"type": "text", "text": "Calendar result"}],
         "_meta": result_metadata,
         "isError": false,
     });
-    Mock::given(method("POST"))
-        .and(path("/api/codex/ps/mcp"))
-        .and(body_partial_json(json!({
-            "method": "tools/call",
-            "params": {"name": "calendar_list_events", "arguments": arguments},
-        })))
-        .respond_with(move |request: &Request| {
-            let request: Value =
-                serde_json::from_slice(&request.body).expect("valid MCP tool call JSON");
-            ResponseTemplate::new(200).set_body_json(json!({
-                "jsonrpc": "2.0",
-                "id": request["id"],
-                "result": tool_result,
-            }))
-        })
-        .with_priority(/*p*/ 1)
-        .expect(1)
-        .mount(&server)
-        .await;
+    mcp_server.control.set_call_result(tool_result);
     let codex_home = TempDir::new()?;
     let mut config = MockResponsesConfig::new(&server.uri())
         .with_provider_name("OpenAI")
         .with_provider_config("supports_websockets = false")
-        .with_root_config(&format!(
-            "chatgpt_base_url = \"{}\"\ncli_auth_credentials_store = \"file\"",
-            apps.chatgpt_base_url
+        .with_root_config("cli_auth_credentials_store = \"file\"")
+        .with_extra_config(&format!(
+            "[mcp_servers.calendar]\nurl = {:?}",
+            mcp_server.url
         ))
-        .enable_feature(Feature::Apps)
         .enable_feature(Feature::ExecutedToolCallMetadata);
     if let Some(enabled) = analytics_enabled {
         config = config.with_extra_config(&format!("[analytics]\nenabled = {enabled}"));
     }
     config.write(codex_home.path())?;
-    write_chatgpt_auth(
-        codex_home.path(),
-        ChatGptAuthFixture::new("chatgpt-test-token")
-            .account_id("account-123")
-            .chatgpt_account_id("account-123")
-            .chatgpt_user_id("user-123")
-            .email("employee@openai.com"),
-        AuthCredentialsStoreMode::File,
-    )?;
+    write_api_key_auth(codex_home.path(), "sk-test-key")?;
 
     let mut mcp = TestAppServer::builder()
         .with_codex_home(codex_home.path())
@@ -494,7 +469,7 @@ async fn tool_call_metadata_stays_out_of_raw_response_item_notifications(
     assert!(serde_json::to_string(&output["output"])?.contains("Calendar result"));
     assert_eq!(
         output["internal_chat_message_metadata_passthrough"]["executed_tool_calls"],
-        json!([{"name": "mcp__codex_apps__calendar_list_events", "arguments": arguments}]),
+        json!([{"name": "mcp__calendar__calendar_list_events", "arguments": arguments}]),
     );
     assert_eq!(
         output["internal_chat_message_metadata_passthrough"]["tool_calls_complete"],
@@ -677,11 +652,7 @@ async fn turn_start_steers_active_turn_and_returns_active_turn_id() -> Result<()
             server.uri()
         ),
     )?;
-    write_chatgpt_auth(
-        codex_home.path(),
-        ChatGptAuthFixture::new("chatgpt-test-token").plan_type("pro"),
-        AuthCredentialsStoreMode::File,
-    )?;
+    write_api_key_auth(codex_home.path(), "sk-test-key")?;
     let mut mcp = TestAppServer::builder()
         .with_codex_home(codex_home.path())
         .without_managed_config()
@@ -3433,7 +3404,6 @@ async fn turn_start_explicit_local_environment_updates_legacy_cwd_between_turns(
         .request(|request_id| ClientRequest::TurnStart {
             request_id,
             params: TurnStartParams {
-                disabled_plugin_ids: None,
                 environments: None,
                 thread_id: thread.id.clone(),
                 client_user_message_id: None,
@@ -3485,7 +3455,6 @@ async fn turn_start_explicit_local_environment_updates_legacy_cwd_between_turns(
         .request(|request_id| ClientRequest::TurnStart {
             request_id,
             params: TurnStartParams {
-                disabled_plugin_ids: None,
                 environments: Some(vec![TurnEnvironmentParams {
                     environment_id: LOCAL_ENVIRONMENT_ID.to_string(),
                     cwd: second_cwd.abs().into(),
@@ -4189,7 +4158,6 @@ async fn turn_start_streams_apply_patch_change_updates_v2() -> Result<()> {
     let server = create_mock_responses_server_sequence(responses).await;
     MockResponsesConfig::new(&server.uri())
         .enable_feature(Feature::ApplyPatchStreamingEvents)
-        .disable_feature(Feature::Plugins)
         .disable_feature(Feature::RemoteModels)
         .disable_feature(Feature::ShellSnapshot)
         .write(&codex_home)?;
@@ -5594,145 +5562,6 @@ async fn command_execution_notifications_include_process_id(
             "uexec-1"
         );
     }
-
-    Ok(())
-}
-
-#[test_case(CommandExecutionStatus::Completed; "completed")]
-#[test_case(CommandExecutionStatus::Failed; "launch_failure")]
-#[tokio::test]
-async fn command_execution_notifications_include_trusted_plugin_id(
-    expected_status: CommandExecutionStatus,
-) -> Result<()> {
-    skip_if_no_network!(Ok(()));
-
-    let codex_home = TempDir::new()?;
-    let missing_cwd = codex_home.path().join("missing-work-directory");
-    let launch_failed = expected_status == CommandExecutionStatus::Failed;
-    let curated_sha = "0123456789abcdef0123456789abcdef01234567";
-    let plugin_root = codex_home
-        .path()
-        .join("plugins/cache/openai-api-curated/google-calendar/01234567");
-    let script_path = plugin_root.join("scripts/run.sh");
-    let synced_root = codex_home.path().join(".tmp/plugins");
-    for path in [
-        plugin_root.join(".codex-plugin"),
-        script_path
-            .parent()
-            .expect("script path should have parent")
-            .to_path_buf(),
-        synced_root.join(".agents/plugins"),
-    ] {
-        std::fs::create_dir_all(path)?;
-    }
-    std::fs::write(
-        plugin_root.join(".codex-plugin/plugin.json"),
-        r#"{"name":"google-calendar","version":"0.1.0"}"#,
-    )?;
-    std::fs::write(&script_path, "echo hi\n")?;
-    std::fs::write(
-        codex_home.path().join(".tmp/plugins.sha"),
-        format!("{curated_sha}\n"),
-    )?;
-    std::fs::write(
-        synced_root.join(".agents/plugins/api_marketplace.json"),
-        r#"{
-  "name": "openai-api-curated",
-  "plugins": [{
-    "name": "google-calendar",
-    "source": {"source": "local", "path": "./plugins/google-calendar"}
-  }]
-}"#,
-    )?;
-    let responses = vec![
-        create_command_execution_sse_response(
-            vec![
-                "/bin/sh".to_string(),
-                script_path.to_string_lossy().into_owned(),
-            ],
-            launch_failed.then_some(missing_cwd.as_path()),
-            /*timeout_ms*/ None,
-            "plugin-command",
-        )?,
-        create_final_assistant_message_sse_response("done")?,
-    ];
-    let server = create_mock_responses_server_sequence(responses).await;
-    MockResponsesConfig::new(&server.uri())
-        .with_approval_policy("on-request")
-        .with_sandbox_mode("danger-full-access")
-        .enable_feature(Feature::Plugins)
-        .enable_feature(Feature::UnifiedExec)
-        .disable_feature(Feature::RemotePlugin)
-        .disable_feature(Feature::ShellSnapshot)
-        .with_extra_config("[plugins.\"google-calendar@openai-api-curated\"]\nenabled = true")
-        .write(codex_home.path())?;
-
-    let mut mcp = TestAppServer::builder()
-        .with_codex_home(codex_home.path())
-        .build_initialized()
-        .await?;
-    let ThreadStartResponse { thread, .. } = mcp
-        .start_thread(ThreadStartParams {
-            model: Some("mock-model".to_string()),
-            ..Default::default()
-        })
-        .await?;
-    let _: TurnStartResponse = mcp
-        .request(|request_id| ClientRequest::TurnStart {
-            request_id,
-            params: TurnStartParams {
-                thread_id: thread.id,
-                input: vec![V2UserInput::Text {
-                    text: "run a plugin command".to_string(),
-                    text_elements: Vec::new(),
-                }],
-                sandbox_policy: Some(codex_app_server_protocol::SandboxPolicy::DangerFullAccess),
-                ..Default::default()
-            },
-        })
-        .await?;
-
-    for method in ["item/started", "item/completed"] {
-        let status = timeout(DEFAULT_READ_TIMEOUT, async {
-            loop {
-                let notification = mcp.read_stream_until_notification_message(method).await?;
-                let params = notification.params.expect("item notification params");
-                let item_json = params.get("item").expect("item notification item").clone();
-                let item = serde_json::from_value::<ThreadItemPayload>(item_json.clone())?;
-                if let ThreadItemPayload::CommandExecution { status, .. } = item {
-                    let emitted_script_path = item_json
-                        .get("scriptPath")
-                        .and_then(serde_json::Value::as_str)
-                        .expect("command execution item should include scriptPath");
-                    assert_eq!(
-                        (item_json["pluginId"].as_str(), emitted_script_path),
-                        (Some("google-calendar@openai-api-curated"), "scripts/run.sh")
-                    );
-                    assert!(
-                        !emitted_script_path.contains(script_path.to_string_lossy().as_ref()),
-                        "scriptPath must not serialize the absolute fixture path"
-                    );
-                    assert!(
-                        !emitted_script_path.contains("plugins/cache"),
-                        "scriptPath must not serialize a plugin cache path"
-                    );
-                    return Ok::<CommandExecutionStatus, anyhow::Error>(status);
-                }
-            }
-        })
-        .await??;
-        if method == "item/started" {
-            assert_eq!(status, CommandExecutionStatus::InProgress);
-        } else {
-            assert_eq!(status, expected_status);
-        }
-    }
-
-    timeout(
-        DEFAULT_READ_TIMEOUT,
-        mcp.read_stream_until_notification_message("turn/completed"),
-    )
-    .await??;
 
     Ok(())
 }

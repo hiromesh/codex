@@ -7,7 +7,7 @@ use super::*;
 
 impl Session {
     pub(crate) fn request_mcp_runtime_refresh(&self) {
-        // Plugin changes can reuse connections but still change their skill resources.
+        // A refreshed MCP runtime can reuse connections while its skill resources changed.
         self.services.mcp_runtime.invalidate_resource_caches();
         self.request_mcp_runtime_reprojection();
     }

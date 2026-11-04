@@ -6,7 +6,6 @@ use codex_exec_server::ReadFileOptions;
 use codex_skills::ParsedSkillMetadata;
 use codex_skills::SkillDependencies;
 use codex_skills::SkillInterface;
-use codex_skills::SkillInterfaceAssetPolicy;
 use codex_skills::SkillParseError;
 use codex_skills::SkillPolicy;
 use codex_skills::parse_skill_metadata;
@@ -91,9 +90,8 @@ pub(super) async fn load_host_skill_metadata(
         dependencies,
         policy,
     } = parsed;
-    let asset_policy = SkillInterfaceAssetPolicy::LocalOnly;
     LoadedSkillMetadata {
-        interface: resolve_skill_interface(interface, &skill_dir, asset_policy),
+        interface: resolve_skill_interface(interface, &skill_dir),
         dependencies,
         policy,
     }

@@ -8,6 +8,7 @@ use chrono::DateTime;
 use chrono::TimeZone;
 use chrono::Utc;
 use codex_core::config::Constrained;
+use codex_features::Feature;
 use codex_login::CodexAuth;
 use codex_models_manager::client_version_to_whole;
 use codex_models_manager::manager::RefreshStrategy;
@@ -73,9 +74,14 @@ async fn guardian_reused_reviewer_avoids_stale_catalog_lookup() -> Result<()> {
         responses::mount_models_once_with_etag(&server, catalog.clone(), ETAG).await;
 
     let mut builder = test_codex()
-        .with_auth(CodexAuth::create_dummy_chatgpt_auth_for_testing())
-        .with_model("gpt-5.5");
+        .with_auth(CodexAuth::from_api_key("test-api-key"))
+        .with_model("gpt-5.5")
+        .with_mock_model_catalog(&server);
     builder = builder.with_config(|config| {
+        config
+            .features
+            .enable(Feature::ApiKeyModelDiscovery)
+            .expect("enable API-key model discovery");
         config.permissions.approval_policy = Constrained::allow_any(AskForApproval::OnRequest);
         config.approvals_reviewer = ApprovalsReviewer::AutoReview;
         config.model_provider.request_max_retries = Some(0);
@@ -169,8 +175,14 @@ async fn renews_cache_ttl_on_matching_models_etag() -> Result<()> {
     )
     .await;
 
-    let mut builder = test_codex().with_auth(CodexAuth::create_dummy_chatgpt_auth_for_testing());
+    let mut builder = test_codex()
+        .with_auth(CodexAuth::from_api_key("test-api-key"))
+        .with_mock_model_catalog(&server);
     builder = builder.with_config(|config| {
+        config
+            .features
+            .enable(Feature::ApiKeyModelDiscovery)
+            .expect("enable API-key model discovery");
         config.model = Some("gpt-5.2".to_string());
         config.model_provider.request_max_retries = Some(0);
         config.model_provider.stream_max_retries = Some(1);
@@ -274,8 +286,14 @@ async fn matching_models_etag_does_not_rewrite_recent_cache() -> Result<()> {
     )
     .await;
 
-    let mut builder = test_codex().with_auth(CodexAuth::create_dummy_chatgpt_auth_for_testing());
+    let mut builder = test_codex()
+        .with_auth(CodexAuth::from_api_key("test-api-key"))
+        .with_mock_model_catalog(&server);
     builder = builder.with_config(|config| {
+        config
+            .features
+            .enable(Feature::ApiKeyModelDiscovery)
+            .expect("enable API-key model discovery");
         config.model = Some("gpt-5.2".to_string());
         config.model_provider.request_max_retries = Some(0);
         config.model_provider.stream_max_retries = Some(1);
@@ -334,8 +352,14 @@ async fn matching_models_etag_renews_cache_after_half_its_lifetime() -> Result<(
     )
     .await;
 
-    let mut builder = test_codex().with_auth(CodexAuth::create_dummy_chatgpt_auth_for_testing());
+    let mut builder = test_codex()
+        .with_auth(CodexAuth::from_api_key("test-api-key"))
+        .with_mock_model_catalog(&server);
     builder = builder.with_config(|config| {
+        config
+            .features
+            .enable(Feature::ApiKeyModelDiscovery)
+            .expect("enable API-key model discovery");
         config.model = Some("gpt-5.2".to_string());
         config.model_provider.request_max_retries = Some(0);
         config.model_provider.stream_max_retries = Some(1);
@@ -394,13 +418,18 @@ async fn uses_cache_when_version_matches() -> Result<()> {
     )
     .await;
 
-    let mut builder = test_codex().with_auth(CodexAuth::create_dummy_chatgpt_auth_for_testing());
+    let mut builder = test_codex()
+        .with_auth(CodexAuth::from_api_key("test-api-key"))
+        .with_mock_model_catalog(&server);
     let identity = codex_model_provider::test_support::models_cache_entry(
-        &codex_model_provider_info::ModelProviderInfo::create_openai_provider(Some(format!(
-            "{}/v1",
-            server.uri()
-        ))),
-        Some(&CodexAuth::create_dummy_chatgpt_auth_for_testing()),
+        &codex_model_provider_info::ModelProviderInfo {
+            model_catalog_url: Some(format!("{}/v1/models", server.uri()).into()),
+            ..codex_model_provider_info::ModelProviderInfo::create_openai_provider(Some(format!(
+                "{}/v1",
+                server.uri()
+            )))
+        },
+        Some(&CodexAuth::from_api_key("test-api-key")),
         Vec::new(),
     )
     .identity;
@@ -426,6 +455,10 @@ async fn uses_cache_when_version_matches() -> Result<()> {
             .expect("write legacy cache");
         })
         .with_config(|config| {
+            config
+                .features
+                .enable(Feature::ApiKeyModelDiscovery)
+                .expect("enable API-key model discovery");
             config.model = Some(VERSIONED_MODEL.to_string());
             config.model_provider.request_max_retries = Some(0);
         });
@@ -469,13 +502,18 @@ async fn refreshes_when_cache_version_missing() -> Result<()> {
     )
     .await;
 
-    let mut builder = test_codex().with_auth(CodexAuth::create_dummy_chatgpt_auth_for_testing());
+    let mut builder = test_codex()
+        .with_auth(CodexAuth::from_api_key("test-api-key"))
+        .with_mock_model_catalog(&server);
     let identity = codex_model_provider::test_support::models_cache_entry(
-        &codex_model_provider_info::ModelProviderInfo::create_openai_provider(Some(format!(
-            "{}/v1",
-            server.uri()
-        ))),
-        Some(&CodexAuth::create_dummy_chatgpt_auth_for_testing()),
+        &codex_model_provider_info::ModelProviderInfo {
+            model_catalog_url: Some(format!("{}/v1/models", server.uri()).into()),
+            ..codex_model_provider_info::ModelProviderInfo::create_openai_provider(Some(format!(
+                "{}/v1",
+                server.uri()
+            )))
+        },
+        Some(&CodexAuth::from_api_key("test-api-key")),
         Vec::new(),
     )
     .identity;
@@ -492,6 +530,10 @@ async fn refreshes_when_cache_version_missing() -> Result<()> {
             write_cache_sync(&cache_path, &cache).expect("write cache");
         })
         .with_config(|config| {
+            config
+                .features
+                .enable(Feature::ApiKeyModelDiscovery)
+                .expect("enable API-key model discovery");
             config.model_provider.request_max_retries = Some(0);
         });
 
@@ -529,13 +571,18 @@ async fn refreshes_when_cache_version_differs() -> Result<()> {
         models_mocks.push(responses::mount_models_once(&server, models_response.clone()).await);
     }
 
-    let mut builder = test_codex().with_auth(CodexAuth::create_dummy_chatgpt_auth_for_testing());
+    let mut builder = test_codex()
+        .with_auth(CodexAuth::from_api_key("test-api-key"))
+        .with_mock_model_catalog(&server);
     let identity = codex_model_provider::test_support::models_cache_entry(
-        &codex_model_provider_info::ModelProviderInfo::create_openai_provider(Some(format!(
-            "{}/v1",
-            server.uri()
-        ))),
-        Some(&CodexAuth::create_dummy_chatgpt_auth_for_testing()),
+        &codex_model_provider_info::ModelProviderInfo {
+            model_catalog_url: Some(format!("{}/v1/models", server.uri()).into()),
+            ..codex_model_provider_info::ModelProviderInfo::create_openai_provider(Some(format!(
+                "{}/v1",
+                server.uri()
+            )))
+        },
+        Some(&CodexAuth::from_api_key("test-api-key")),
         Vec::new(),
     )
     .identity;
@@ -553,6 +600,10 @@ async fn refreshes_when_cache_version_differs() -> Result<()> {
             write_cache_sync(&cache_path, &cache).expect("write cache");
         })
         .with_config(|config| {
+            config
+                .features
+                .enable(Feature::ApiKeyModelDiscovery)
+                .expect("enable API-key model discovery");
             config.model_provider.request_max_retries = Some(0);
         });
 
@@ -658,7 +709,6 @@ fn test_remote_model(slug: &str, priority: i32) -> ModelInfo {
             guardian_v2: None,
         }),
         include_skills_usage_instructions: false,
-        include_plugin_usage_instructions: false,
         include_apps_usage_instructions: false,
         supports_reasoning_summary_parameter: true,
         default_reasoning_summary: ReasoningSummary::Auto,

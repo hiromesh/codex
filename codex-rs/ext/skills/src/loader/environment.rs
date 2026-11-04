@@ -141,7 +141,8 @@ pub async fn load_environment_skills_from_root(
             }
         })
         .buffered(MAX_CONCURRENT_SKILL_LOADS)
-        .collect::<Vec<_>>();
+        .collect::<Vec<_>>()
+        .await;
 
     for (path, result) in skill_results {
         let result = result.and_then(|skill| {

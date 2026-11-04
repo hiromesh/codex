@@ -37,7 +37,14 @@ async fn recover_turn_restores_cyber_access_program_without_making_it_sticky() -
             body: responses::sse(vec![responses::ev_completed("resp-initial")]),
         }]])
         .await;
-    let mut builder = test_codex().with_auth(CodexAuth::create_dummy_chatgpt_auth_for_testing());
+    let mut builder = test_codex()
+        .with_auth(CodexAuth::from_api_key("test-key"))
+        .with_config(|config| {
+            config
+                .features
+                .enable(Feature::ApiKeyCyberAccessPrograms)
+                .expect("enable API-key Cyber access programs");
+        });
     let initial = builder.build_with_streaming_server(&initial_server).await?;
     let TurnInputSubmission::Started { turn_id, .. } = initial
         .codex
@@ -169,15 +176,8 @@ async fn cyber_access_program_custom_provider_requires_capability(
     capability: Option<bool>,
 ) -> Result<()> {
     core_test_support::skip_if_no_network!(Ok(()));
-    for auth in [
-        CodexAuth::from_api_key("test-key"),
-        CodexAuth::create_dummy_chatgpt_auth_for_testing(),
-    ] {
-        let expected_authorization = if auth.is_api_key_auth() {
-            "Bearer test-key"
-        } else {
-            "Bearer Access Token"
-        };
+    let auth = CodexAuth::from_api_key("test-key");
+    {
         let server = responses::start_mock_server().await;
         let request = responses::mount_sse_once(
             &server,
@@ -204,7 +204,7 @@ async fn cyber_access_program_custom_provider_requires_capability(
         submit(&test, Some(CyberAccessProgram::DaybreakRed)).await?;
         assert_eq!(
             request.single_request().header("authorization").as_deref(),
-            Some(expected_authorization)
+            Some("Bearer test-key")
         );
         assert_eq!(
             request
@@ -257,9 +257,7 @@ async fn cyber_access_program_custom_provider_preserves_api_key_feature_gate() -
     Ok(())
 }
 
-#[test_case(CodexAuth::create_dummy_chatgpt_auth_for_testing(), "openai"; "chatgpt")]
 #[test_case(CodexAuth::from_api_key("test-api-key"), "openai"; "api_key")]
-#[test_case(CodexAuth::create_dummy_chatgpt_auth_for_testing(), "proxy"; "custom_chatgpt")]
 #[test_case(CodexAuth::from_api_key("test-api-key"), "proxy"; "custom_api_key")]
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn cyber_access_program_survives_mid_turn_remote_compaction_v2(
@@ -379,9 +377,13 @@ async fn cyber_access_program_is_inherited_by_child_turns() -> Result<()> {
         )
         .await;
         let test = test_codex()
-            .with_auth(CodexAuth::create_dummy_chatgpt_auth_for_testing())
+            .with_auth(CodexAuth::from_api_key("test-key"))
             .with_model(if is_v2 { "gpt-5.6-sol" } else { "gpt-5.1" })
             .with_config(move |config| {
+                config
+                    .features
+                    .enable(Feature::ApiKeyCyberAccessPrograms)
+                    .expect("enable API-key Cyber access programs");
                 config
                     .features
                     .enable(Feature::Collab)
@@ -485,9 +487,7 @@ async fn cyber_access_program_is_inherited_by_child_turns() -> Result<()> {
     Ok(())
 }
 
-#[test_case(CodexAuth::create_dummy_chatgpt_auth_for_testing(), "openai"; "chatgpt")]
 #[test_case(CodexAuth::from_api_key("test-api-key"), "openai"; "api_key")]
-#[test_case(CodexAuth::create_dummy_chatgpt_auth_for_testing(), "proxy"; "custom_chatgpt")]
 #[test_case(CodexAuth::from_api_key("test-api-key"), "proxy"; "custom_api_key")]
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn cyber_access_program_changes_on_one_websocket_with_response_reuse(

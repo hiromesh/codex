@@ -1,3 +1,5 @@
+const CODEX_APPS_MCP_SERVER_NAME: &str = "codex_apps";
+
 mod aliases;
 pub mod catalog;
 mod catalog_delta;

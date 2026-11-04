@@ -1,4 +1,3 @@
-
 use anyhow::Context;
 use base64::Engine;
 use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
@@ -1640,7 +1639,6 @@ async fn view_image_tool_returns_unsupported_message_for_text_only_model() -> an
         upgrade: None,
         model_messages: None,
         include_skills_usage_instructions: false,
-        include_plugin_usage_instructions: false,
         include_apps_usage_instructions: false,
         supports_reasoning_summary_parameter: true,
         default_reasoning_summary: ReasoningSummary::Auto,
@@ -1667,7 +1665,8 @@ async fn view_image_tool_returns_unsupported_message_for_text_only_model() -> an
     .await;
 
     let mut builder = test_codex()
-        .with_auth(CodexAuth::create_dummy_chatgpt_auth_for_testing())
+        .with_auth(CodexAuth::from_api_key("test-api-key"))
+        .with_mock_model_catalog(&server)
         .with_config(|config| {
             config.model = Some(model_slug.to_string());
         });

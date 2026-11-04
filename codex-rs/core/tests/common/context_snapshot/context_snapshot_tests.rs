@@ -786,9 +786,9 @@ fn normalization_labels_distinct_working_directories_and_retains_permissions() {
 #[test]
 fn skill_paths_are_stable_across_hosts_without_rewriting_uris() {
     let path =
-        "<skill>\n<path>/tmp/fixture/plugins/cache/test/agenda/SKILL.md</path>\nAgenda\n</skill>";
+        "<skill>\n<path>/tmp/fixture/skills/agenda/SKILL.md</path>\nAgenda\n</skill>";
     let windows =
-        "<skill>\n<path>C:\\Temp\\plugins\\cache\\test\\agenda\\SKILL.md</path>\nAgenda\n</skill>";
+        "<skill>\n<path>C:\\Temp\\skills\\agenda\\SKILL.md</path>\nAgenda\n</skill>";
     let render = |text| {
         render_test_items(
             &[

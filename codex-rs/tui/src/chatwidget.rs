@@ -80,7 +80,6 @@ use crate::token_usage::TokenUsageInfo;
 use crate::version::CODEX_CLI_VERSION;
 use codex_app_server_protocol::AddCreditsNudgeCreditType;
 use codex_app_server_protocol::AddCreditsNudgeEmailStatus;
-use codex_app_server_protocol::AppSummary;
 use codex_app_server_protocol::CodexErrorInfo as AppServerCodexErrorInfo;
 use codex_app_server_protocol::CollabAgentTool;
 use codex_app_server_protocol::CollabAgentToolCallStatus;
@@ -120,7 +119,6 @@ use codex_config::Constrained;
 use codex_config::ConstraintResult;
 use codex_config::types::ApprovalsReviewer;
 use codex_config::types::Notifications;
-use codex_connectors::AppInfo;
 use codex_features::Feature;
 use codex_git_utils::current_branch_name;
 use codex_git_utils::get_git_repo_root;
@@ -128,7 +126,6 @@ use codex_git_utils::local_git_branches;
 use codex_git_utils::recent_commits;
 use codex_otel::RuntimeMetricsSummary;
 use codex_otel::SessionTelemetry;
-use codex_plugin::PluginCapabilitySummary;
 use codex_protocol::ThreadId;
 use codex_protocol::account::PlanType;
 use codex_protocol::approvals::GuardianAssessmentAction;
@@ -173,7 +170,6 @@ const MEMORIES_DOC_URL: &str = "https://developers.openai.com/codex/memories";
 const PLAN_MODE_REASONING_SCOPE_TITLE: &str = "Apply reasoning change";
 const PLAN_MODE_REASONING_SCOPE_PLAN_ONLY: &str = "Apply to Plan mode override";
 const PLAN_MODE_REASONING_SCOPE_ALL_MODES: &str = "Apply to global default and Plan mode override";
-const CONNECTORS_SELECTION_VIEW_ID: &str = "connectors-selection";
 const PET_SELECTION_LOADING_VIEW_ID: &str = "pet-selection-loading";
 const AMBIENT_PET_WRAP_GAP_COLUMNS: u16 = 2;
 const TUI_STUB_MESSAGE: &str = "Not available in TUI yet.";
@@ -255,13 +251,9 @@ mod activity_groups;
 mod activity_presentation;
 mod command_lifecycle;
 mod config_panel;
-mod connector_mentions;
-mod connectors;
 mod constructor;
 mod dynamic_activity;
 mod empty_state_policy;
-pub(crate) use self::connectors::ConnectorScopeGeneration;
-use self::connectors::ConnectorsState;
 mod exec_state;
 use self::exec_state::RunningCommand;
 use self::exec_state::UnifiedExecProcessSummary;
@@ -311,14 +303,7 @@ mod slash_command_args;
 mod slash_dispatch;
 mod worktree_picker;
 use self::skills::collect_tool_mentions;
-use self::skills::find_app_mentions;
 use self::skills::find_skill_mentions_with_tool_mentions;
-use self::skills::is_app_mentionable;
-mod plugin_catalog;
-mod plugins;
-use self::plugins::PluginInstallAuthFlowState;
-use self::plugins::PluginListFetchState;
-use self::plugins::PluginsCacheState;
 mod plan_implementation;
 use self::plan_implementation::PLAN_IMPLEMENTATION_TITLE;
 mod model_command;
@@ -620,17 +605,7 @@ pub(crate) struct ChatWidget {
     mcp_startup_pending_next_round: HashMap<String, McpStartupStatus>,
     /// Tracks whether the buffered next round has seen any `Starting` update yet.
     mcp_startup_pending_next_round_saw_starting: bool,
-    connectors: ConnectorsState,
     ide_context: IdeContextState,
-    plugins_cache: PluginsCacheState,
-    plugins_fetch_state: PluginListFetchState,
-    plugin_remote_sections_loading: bool,
-    plugin_remote_sections_loaded: bool,
-    plugin_remote_section_errors: Vec<crate::app_event::PluginRemoteSectionError>,
-    plugin_install_apps_needing_auth: Vec<AppSummary>,
-    plugin_install_auth_flow: Option<PluginInstallAuthFlowState>,
-    plugins_active_tab_id: Option<String>,
-    newly_installed_marketplace_tab_id: Option<String>,
     // Queue of interruptive UI events deferred during an active write cycle
     interrupts: InterruptManager,
     // Accumulates the current reasoning block text to extract a header
@@ -984,16 +959,6 @@ impl ChatWidget {
             self.app_event_tx.clone(),
             include_logs,
             feedback_audience,
-        );
-        self.bottom_pane.show_view(Box::new(view));
-        self.request_redraw();
-    }
-
-    pub(crate) fn open_app_link_view(&mut self, params: crate::bottom_pane::AppLinkViewParams) {
-        let view = crate::bottom_pane::AppLinkView::new_with_keymap(
-            params,
-            self.app_event_tx.clone(),
-            self.bottom_pane.list_keymap(),
         );
         self.bottom_pane.show_view(Box::new(view));
         self.request_redraw();
@@ -1482,14 +1447,6 @@ impl ChatWidget {
         );
     }
 
-    fn plugins_for_mentions(&self) -> Option<&[PluginCapabilitySummary]> {
-        if !self.config.features.enabled(Feature::Plugins) {
-            return None;
-        }
-
-        self.bottom_pane.plugins().map(Vec::as_slice)
-    }
-
     /// Build a placeholder header cell while the session is configuring.
     fn placeholder_session_header_cell(config: &Config) -> Box<dyn HistoryCell> {
         Box::new(
@@ -1891,33 +1848,6 @@ impl ChatWidget {
 
     fn on_list_skills(&mut self, ev: SkillsListResponse) {
         self.set_skills_from_response(&ev);
-        self.refresh_plugin_mentions();
-    }
-
-    pub(crate) fn refresh_plugin_mentions(&mut self) {
-        if !self.config.features.enabled(Feature::Plugins) {
-            self.bottom_pane.set_plugin_mentions(/*plugins*/ None);
-            return;
-        }
-
-        self.app_event_tx.send(AppEvent::RefreshPluginMentions);
-    }
-
-    pub(crate) fn on_plugin_mentions_loaded(
-        &mut self,
-        plugins: Option<Vec<PluginCapabilitySummary>>,
-    ) {
-        if self.bottom_pane.plugins() == plugins.as_ref() {
-            return;
-        }
-        self.bottom_pane.set_plugin_mentions(plugins);
-    }
-
-    pub(crate) fn sync_plugin_mentions_config(&mut self, config: &Config) {
-        self.config.features = config.features.clone();
-        self.config.config_layer_stack = config.config_layer_stack.clone();
-        self.config.memories = config.memories.clone();
-        self.sync_mentions_v2_enabled();
     }
 
     pub(crate) fn token_usage(&self) -> TokenUsage {

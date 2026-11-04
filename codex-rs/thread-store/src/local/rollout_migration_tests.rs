@@ -2056,7 +2056,6 @@ async fn migration_compacts_subagent_prefix_and_does_not_project_it() {
             RolloutItem::TurnContext(TurnContextItem {
                 turn_id: Some("child-turn".to_string()),
                 root_turn_id: None,
-                disabled_plugin_ids: None,
                 cwd: serde_json::from_value(json!(home.path())).expect("absolute cwd"),
                 approval_policy: AskForApproval::Never,
                 approvals_reviewer: None,

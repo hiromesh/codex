@@ -106,7 +106,6 @@ fn assert_no_matched_rules_invariant(output_item: &Value) {
 
 #[tokio::test]
 async fn git_status_requires_approval_under_unless_trusted() -> Result<()> {
-
     let server = start_mock_server().await;
     let mut builder = test_codex().with_model("gpt-5.2").with_config(|config| {
         config
@@ -239,7 +238,6 @@ prefix_rule(pattern=["git", "status"], decision="allow")
 
 #[tokio::test]
 async fn granular_complex_forced_rm_denial_explains_why_the_command_was_rejected() -> Result<()> {
-
     let server = start_mock_server().await;
     let mut builder = test_codex();
     let test = builder.build_with_auto_env(&server).await?;
@@ -302,7 +300,6 @@ async fn granular_complex_forced_rm_denial_explains_why_the_command_was_rejected
 
 #[tokio::test]
 async fn granular_complex_forced_rm_requests_approval_when_allowed() -> Result<()> {
-
     let server = start_mock_server().await;
     let mut builder = test_codex();
     let test = builder.build_with_auto_env(&server).await?;
@@ -378,7 +375,6 @@ async fn granular_complex_forced_rm_requests_approval_when_allowed() -> Result<(
 #[tokio::test]
 async fn deeply_nested_forced_rm_is_rejected_before_execution_when_approvals_are_disabled()
 -> Result<()> {
-
     let server = start_mock_server().await;
     let mut builder = test_codex();
     let test = builder.build_with_auto_env(&server).await?;
@@ -606,7 +602,6 @@ prefix_rules = [{ pattern = [{ token = "touch" }, { token = "denied-marker" }], 
 
 #[tokio::test]
 async fn malformed_custom_rules_preserve_managed_forbidden_prefix() -> Result<()> {
-
     let mut builder = test_codex()
         .with_cloud_config_bundle(
             CloudConfigBundleFixture::loader_with_enterprise_requirement(
@@ -680,7 +675,6 @@ prefix_rules = [
 
 #[tokio::test]
 async fn environment_command_restrictions_override_saved_prefix_approvals() -> Result<()> {
-
     let mut builder = test_codex().with_config(|config| {
         config
             .features
@@ -796,7 +790,6 @@ async fn environment_command_restrictions_override_saved_prefix_approvals() -> R
 
 #[tokio::test]
 async fn environment_command_policy_changes_invalidate_session_approvals() -> Result<()> {
-
     let mut builder = test_codex().with_config(|config| {
         config
             .features

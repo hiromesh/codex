@@ -4,6 +4,46 @@ use super::*;
 use pretty_assertions::assert_eq;
 use tokio::sync::Notify;
 
+
+async fn call_tool(
+    tools: &[Arc<dyn for<'call> codex_extension_api::ToolExecutor<codex_extension_api::ToolCall<'call>>>],
+    name: &str,
+    arguments: serde_json::Value,
+) -> Result<serde_json::Value, FunctionCallError> {
+    let tool = tools
+        .iter()
+        .find(|tool| tool.tool_name().name == name)
+        .ok_or_else(|| FunctionCallError::RespondToModel("missing skill tool".to_string()))?;
+    let access = FileSystemEnvironmentAccessor::unrestricted(&LOCAL_FS);
+    let cwd = PathUri::parse("file:///installed")
+        .map_err(|error| FunctionCallError::RespondToModel(error.to_string()))?;
+    let payload = ToolPayload::Function {
+        arguments: arguments.to_string(),
+    };
+    let result = tool.handle(ToolCall {
+        turn_id: "turn-1".to_string(),
+        call_id: "skill-test".to_string(),
+        tool_name: tool.tool_name(),
+        model: "test".to_string(),
+        codex_turn_metadata: None,
+        truncation_policy: TruncationPolicy::Bytes(10_000),
+        source: ToolCallSource::Direct,
+        conversation_history: ConversationHistory::default(),
+        turn_item_emitter: Arc::new(NoopTurnItemEmitter),
+        attachment_store: Arc::new(InlineAttachmentStore),
+        ephemeral: false,
+        environments: ["env-1", "env-2", "env-3"]
+            .into_iter()
+            .map(|id| codex_extension_api::ToolEnvironment::new(id.to_string(), cwd.clone(), &access))
+            .collect(),
+        payload: payload.clone(),
+    })
+    .await?;
+    result
+        .post_tool_use_response("skill-test", &payload)
+        .ok_or_else(|| FunctionCallError::RespondToModel("missing skill response".to_string()))
+}
+
 struct PausedExecutor {
     entered: Notify,
     resume: Notify,
@@ -138,7 +178,7 @@ async fn config_reload_during_preparation_applies_to_next_step_but_reads_still_c
         vec![(true, true), (false, false)]
     );
     let tools = registry.tool_contributors()[0].tools_for_step(&session, &thread, &step);
-    let result = merge_catalog_tests::call_tool(
+    let result = call_tool(
         &tools,
         "read",
         serde_json::json!({"package": "cloud/demo"}),

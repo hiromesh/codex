@@ -517,11 +517,7 @@ async fn namespaced_custom_tool_call_preserves_namespace_through_dispatch_and_re
         &server,
         sse(vec![
             ev_response_created("resp-5"),
-            ev_custom_tool_call(
-                direct_exec_call_id,
-                "exec",
-                input,
-            ),
+            ev_custom_tool_call(direct_exec_call_id, "exec", input),
             ev_completed("resp-5"),
         ]),
     )

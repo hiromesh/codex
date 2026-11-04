@@ -2,13 +2,7 @@ use anyhow::Result;
 use app_test_support::TestAppServer;
 use app_test_support::test_tmp_path_buf;
 use codex_app_server_protocol::AllowDenyRequirement;
-use codex_app_server_protocol::AppConfig;
-use codex_app_server_protocol::AppLinkConfig;
-use codex_app_server_protocol::AppLinksConfig;
-use codex_app_server_protocol::AppToolApproval;
 use codex_app_server_protocol::ApprovalsReviewer;
-use codex_app_server_protocol::AppsConfig;
-use codex_app_server_protocol::AppsDefaultConfig;
 use codex_app_server_protocol::AskForApproval;
 use codex_app_server_protocol::BrowserUseAccessApprovalLifetime;
 use codex_app_server_protocol::BrowserUseConfig;
@@ -248,13 +242,11 @@ chatgpt_base_url = "https://managed.example/backend-api/"
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn config_requirements_read_includes_remote_control_and_managed_hooks() -> Result<()> {
+async fn config_requirements_read_includes_managed_hooks() -> Result<()> {
     let codex_home = TempDir::new()?;
     std::fs::write(
         codex_home.path().join("requirements.toml"),
-        r#"allow_remote_control = false
-
-[hooks]
+        r#"[hooks]
 
 [[hooks.SessionStart]]
 
@@ -284,7 +276,6 @@ statusMessage = "Scanning file"
     let requirements = response
         .requirements
         .expect("managed requirements should be returned");
-    assert_eq!(requirements.allow_remote_control, Some(false));
     assert_eq!(
         requirements
             .hooks
@@ -1163,218 +1154,6 @@ web_search = true
         timeout(DEFAULT_READ_TIMEOUT, mcp.read_response(request_id)).await??;
 
     assert_eq!(config.tools.expect("tools present").web_search, None,);
-
-    Ok(())
-}
-
-#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn config_read_includes_apps() -> Result<()> {
-    let codex_home = TempDir::new()?;
-    write_config(
-        &codex_home,
-        r#"
-[apps._default]
-approvals_reviewer = "auto_review"
-default_tools_approval_mode = "writes"
-
-[apps.app1]
-enabled = false
-omit_tools_from = ["deferred"]
-approvals_reviewer = "user"
-destructive_enabled = false
-default_tools_approval_mode = "prompt"
-
-[apps.app1.links.link_work]
-approvals_reviewer = "auto_review"
-default_tools_approval_mode = "approve"
-
-[apps.app1.links.link_personal]
-default_tools_approval_mode = "writes"
-
-[apps.app_without_links]
-enabled = true
-
-[apps.app_with_empty_links]
-omit_tools_from = []
-
-[apps.app_with_empty_links.links]
-
-[plugins."sample@test".apps.app1]
-enabled = true
-[plugins."sample@test".apps.app1.tools.list]
-enabled = false
-"#,
-    )?;
-    let codex_home_path = codex_home.path().canonicalize()?;
-    let user_file = AbsolutePathBuf::try_from(codex_home_path.join("config.toml"))?;
-
-    let mut mcp = TestAppServer::builder()
-        .with_codex_home(codex_home.path())
-        .without_auto_env()
-        .build_initialized_with_timeout(DEFAULT_READ_TIMEOUT)
-        .await?;
-
-    let request_id = mcp
-        .send_config_read_request(ConfigReadParams {
-            include_layers: true,
-            cwd: None,
-        })
-        .await?;
-    let response: serde_json::Value =
-        timeout(DEFAULT_READ_TIMEOUT, mcp.read_response(request_id)).await??;
-    assert_eq!(
-        response["config"]["apps"]["app_without_links"].get("links"),
-        Some(&json!(null)),
-    );
-    assert_eq!(
-        response["config"]["apps"]["app_with_empty_links"].get("links"),
-        Some(&json!({})),
-    );
-    let ConfigReadResponse {
-        config,
-        origins,
-        layers,
-    } = serde_json::from_value(response)?;
-
-    assert_eq!(
-        config.apps,
-        Some(AppsConfig {
-            default: Some(AppsDefaultConfig {
-                enabled: true,
-                approvals_reviewer: Some(ApprovalsReviewer::AutoReview),
-                destructive_enabled: true,
-                open_world_enabled: true,
-                default_tools_approval_mode: Some(AppToolApproval::Writes),
-            }),
-            apps: std::collections::HashMap::from([
-                (
-                    "app1".to_string(),
-                    AppConfig {
-                        enabled: false,
-                        omit_tools_from: Some(vec![ToolExposureSurface::Deferred]),
-                        approvals_reviewer: Some(ApprovalsReviewer::User),
-                        destructive_enabled: Some(false),
-                        open_world_enabled: None,
-                        default_tools_approval_mode: Some(AppToolApproval::Prompt),
-                        default_tools_enabled: None,
-                        tools: Some(serde_json::from_value(json!({"list": {"enabled": false}}))?),
-                        links: Some(AppLinksConfig {
-                            links: std::collections::HashMap::from([
-                                (
-                                    "link_work".to_string(),
-                                    AppLinkConfig {
-                                        approvals_reviewer: Some(ApprovalsReviewer::AutoReview),
-                                        default_tools_approval_mode: Some(AppToolApproval::Approve),
-                                    },
-                                ),
-                                (
-                                    "link_personal".to_string(),
-                                    AppLinkConfig {
-                                        approvals_reviewer: None,
-                                        default_tools_approval_mode: Some(AppToolApproval::Writes),
-                                    },
-                                ),
-                            ]),
-                        }),
-                    },
-                ),
-                (
-                    "app_without_links".to_string(),
-                    AppConfig {
-                        enabled: true,
-                        omit_tools_from: None,
-                        approvals_reviewer: None,
-                        destructive_enabled: None,
-                        open_world_enabled: None,
-                        default_tools_approval_mode: None,
-                        default_tools_enabled: None,
-                        tools: None,
-                        links: None,
-                    },
-                ),
-                (
-                    "app_with_empty_links".to_string(),
-                    AppConfig {
-                        enabled: true,
-                        omit_tools_from: Some(vec![]),
-                        approvals_reviewer: None,
-                        destructive_enabled: None,
-                        open_world_enabled: None,
-                        default_tools_approval_mode: None,
-                        default_tools_enabled: None,
-                        tools: None,
-                        links: Some(AppLinksConfig {
-                            links: std::collections::HashMap::new(),
-                        }),
-                    },
-                ),
-            ]),
-        })
-    );
-    assert_eq!(
-        origins
-            .get("apps._default.approvals_reviewer")
-            .expect("origin")
-            .name,
-        ConfigLayerSource::User {
-            file: user_file.clone(),
-            profile: None,
-        }
-    );
-    assert_eq!(
-        origins
-            .get("apps._default.default_tools_approval_mode")
-            .expect("origin")
-            .name,
-        ConfigLayerSource::User {
-            file: user_file.clone(),
-            profile: None,
-        }
-    );
-    assert_eq!(
-        origins.get("apps.app1.enabled").expect("origin").name,
-        ConfigLayerSource::User {
-            file: user_file.clone(),
-            profile: None,
-        }
-    );
-    assert_eq!(
-        origins
-            .get("apps.app1.approvals_reviewer")
-            .expect("origin")
-            .name,
-        ConfigLayerSource::User {
-            file: user_file.clone(),
-            profile: None,
-        }
-    );
-    assert_eq!(
-        origins
-            .get("apps.app1.destructive_enabled")
-            .expect("origin")
-            .name,
-        ConfigLayerSource::User {
-            file: user_file.clone(),
-            profile: None,
-        }
-    );
-    assert_eq!(
-        origins
-            .get("apps.app1.default_tools_approval_mode")
-            .expect("origin")
-            .name,
-        ConfigLayerSource::User {
-            file: user_file.clone(),
-            profile: None,
-        }
-    );
-
-    let layers = layers.expect("layers present");
-    assert_eq!(
-        origins["apps.app1.tools.list.enabled"],
-        origins["plugins.sample@test.apps.app1.tools.list.enabled"],
-    );
-    assert_layers_user_then_optional_system(&layers, user_file)?;
 
     Ok(())
 }

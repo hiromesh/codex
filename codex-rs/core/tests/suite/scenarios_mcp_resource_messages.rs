@@ -115,4 +115,3 @@ async fn mcp_resource_messages() -> Result<()> {
     );
     Ok(())
 }
-

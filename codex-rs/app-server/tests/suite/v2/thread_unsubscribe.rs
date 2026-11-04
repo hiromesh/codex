@@ -2,6 +2,7 @@ use anyhow::Result;
 use app_test_support::MockResponsesConfig;
 use app_test_support::TestAppServer;
 use app_test_support::create_mock_responses_server_repeating_assistant;
+use app_test_support::mount_plain_mcp_server;
 use app_test_support::write_models_cache;
 use codex_app_server_protocol::ClientRequest;
 use codex_app_server_protocol::DynamicToolCallOutputContentItem;
@@ -32,7 +33,6 @@ use codex_app_server_protocol::TurnStartParams;
 use codex_app_server_protocol::TurnStartResponse;
 use codex_app_server_protocol::UserInput as V2UserInput;
 use codex_features::Feature;
-use core_test_support::apps_test_server::AppsTestServer;
 use core_test_support::responses;
 use core_test_support::streaming_sse::StreamingSseChunk;
 use core_test_support::streaming_sse::start_streaming_sse_server;
@@ -623,7 +623,7 @@ async fn wait_for_dynamic_tool_started(
 #[tokio::test]
 async fn v2_child_idle_eviction_preserves_mail_and_followup_context() -> Result<()> {
     let server = responses::start_mock_server().await;
-    let (mcp_server, startup_control) = AppsTestServer::mount_with_startup_control(&server).await?;
+    let mcp_server = mount_plain_mcp_server(&server, "/mcp").await;
     let codex_home = TempDir::new()?;
     let traces = TempDir::new()?;
     MockResponsesConfig::new(&server.uri())
@@ -632,13 +632,13 @@ async fn v2_child_idle_eviction_preserves_mail_and_followup_context() -> Result<
         .with_root_config("thread_unload_delay_secs = 0")
         .with_extra_config(&format!(
             r#"[mcp_servers.fails_once]
-url = "{}/api/codex/ps/mcp"
+url = "{}"
 http_headers = {{ Authorization = "Bearer synthetic-test-token" }}
 required = true
 # No cached tools: the child must initialize instead of taking the lazy startup path.
 enabled_tools = []
 "#,
-            mcp_server.chatgpt_base_url
+            mcp_server.url
         ))
         .write(codex_home.path())?;
     write_models_cache(codex_home.path()).await?;
@@ -780,7 +780,9 @@ enabled_tools = []
                 }
             );
             // Close the failed reload's trace before the follow-up reloads the child.
-            startup_control.fail_next_initialize_attempts(/*attempts*/ 1);
+            mcp_server
+                .control
+                .fail_next_initialize_attempts(/*attempts*/ 1);
             let resume_id = mcp
                 .send_thread_resume_request(ThreadResumeParams {
                     thread_id: child_id.clone(),

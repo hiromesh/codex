@@ -86,7 +86,6 @@ async fn host_spawn_fixture(
     options.history_mode = Some(ThreadHistoryMode::Legacy);
     options.thread_instructions_provider = thread_instructions_provider;
     options.reserved_thread_id = Some(root_id);
-    options.disabled_plugin_ids = Some(vec!["captured-plugin@local".into()]);
     options.dynamic_tools = vec![DynamicToolSpec::Function(DynamicToolFunctionSpec {
         name: "host_spawn".into(),
         description: "Ask the host to start a child from this invocation.".into(),
@@ -200,15 +199,6 @@ async fn same_manager_creation_preserves_live_bindings_and_attachments(
             payload: json!({"number": 123}),
         })
         .await?;
-    // Changing current thread settings must not change the invocation's captured settings.
-    submit_thread_settings(
-        &parent,
-        ThreadSettingsOverrides {
-            disabled_plugin_ids: Some(vec!["later-plugin@local".into()]),
-            ..Default::default()
-        },
-    )
-    .await?;
     provider.set_instructions(Some(Instructions {
         text: UPDATED_RULE.into(),
         source: None,
@@ -218,7 +208,6 @@ async fn same_manager_creation_preserves_live_bindings_and_attachments(
     parent.replace_dynamic_tools(Vec::new()).await?;
     let prepared = parent.prepare_child(&context).await?;
     assert!(prepared.dynamic_tools.is_empty());
-    assert_eq!(prepared.disabled_plugin_ids, captured.disabled_plugin_ids);
     assert_eq!(prepared.thread_instructions.as_deref(), Some(INITIAL_RULE));
     assert_eq!(
         prepared.resolved_permission_profile,
@@ -243,10 +232,6 @@ async fn same_manager_creation_preserves_live_bindings_and_attachments(
         .await?;
     assert_eq!(spawned.config.approval_policy, captured.approval_policy);
     assert_eq!(spawned.config.environments, captured.environments);
-    assert_eq!(
-        spawned.config.disabled_plugin_ids,
-        captured.disabled_plugin_ids
-    );
     let worker = test.thread_manager.get_thread(child_id).await?;
     // A handle cannot be used through a different source runtime.
     assert!(matches!(

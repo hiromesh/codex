@@ -1343,4 +1343,3 @@ async fn macos_unified_exec_uses_shell_snapshot() -> Result<()> {
 
     Ok(())
 }
-

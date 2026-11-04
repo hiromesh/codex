@@ -19,24 +19,14 @@ use codex_app_server_protocol::AddCreditsNudgeEmailStatus;
 use codex_app_server_protocol::ConsumeAccountRateLimitResetCreditResponse;
 use codex_app_server_protocol::DynamicToolCallResponse;
 use codex_app_server_protocol::GetAccountRateLimitsResponse;
-use codex_app_server_protocol::MarketplaceAddResponse;
-use codex_app_server_protocol::MarketplaceRemoveResponse;
-use codex_app_server_protocol::MarketplaceUpgradeResponse;
 use codex_app_server_protocol::McpServerOauthLoginResponse;
 use codex_app_server_protocol::McpServerStatus;
 use codex_app_server_protocol::McpServerStatusDetail;
-use codex_app_server_protocol::PluginInstallResponse;
-use codex_app_server_protocol::PluginListResponse;
-use codex_app_server_protocol::PluginMarketplaceEntry;
-use codex_app_server_protocol::PluginReadParams;
-use codex_app_server_protocol::PluginReadResponse;
-use codex_app_server_protocol::PluginUninstallResponse;
 use codex_app_server_protocol::RequestId as AppServerRequestId;
 use codex_app_server_protocol::SkillsListResponse;
 use codex_app_server_protocol::Thread;
 use codex_app_server_protocol::ThreadGoalStatus;
 use codex_app_server_protocol::ThreadItemsListResponse;
-use codex_connectors::AppInfo;
 use codex_file_search::FileMatch;
 use codex_message_history::HistoryBatchCursor;
 use codex_protocol::ThreadId;
@@ -55,7 +45,6 @@ use crate::bottom_pane::StatusLineItem;
 use crate::bottom_pane::TerminalTitleItem;
 use crate::chatwidget::AstraModelPickerAction;
 use crate::chatwidget::ConfiguredPetLoadGeneration;
-use crate::chatwidget::ConnectorScopeGeneration;
 use crate::chatwidget::ThreadUsageOutcome;
 use crate::chatwidget::UserMessage;
 use crate::experimental_features::FeatureWriteResult;
@@ -63,7 +52,6 @@ use crate::goal_files::GoalDraft;
 use codex_app_server_protocol::AskForApproval;
 use codex_config::types::ApprovalsReviewer;
 use codex_features::Feature;
-use codex_plugin::PluginCapabilitySummary;
 use codex_protocol::config_types::CollaborationModeMask;
 use codex_protocol::models::ActivePermissionProfile;
 
@@ -158,33 +146,6 @@ pub(crate) enum HistoryLookupResponse {
 pub(crate) enum ConsolidationScrollbackReflow {
     IfResizeReflowRan,
     Required,
-}
-
-#[derive(Debug, Clone)]
-pub(crate) struct ConnectorsSnapshot {
-    pub(crate) connectors: Vec<AppInfo>,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) enum PluginLocation {
-    Local { marketplace_path: AbsolutePathBuf },
-    Remote { marketplace_name: String },
-}
-
-impl PluginLocation {
-    pub(crate) fn into_request_params(self) -> (Option<AbsolutePathBuf>, Option<String>) {
-        match self {
-            PluginLocation::Local { marketplace_path } => (Some(marketplace_path), None),
-            PluginLocation::Remote { marketplace_name } => (None, Some(marketplace_name)),
-        }
-    }
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) struct PluginRemoteSectionError {
-    pub(crate) section_id: String,
-    pub(crate) label: String,
-    pub(crate) message: String,
 }
 
 /// Distinguishes why a rate-limit refresh was requested so the completion
@@ -627,9 +588,6 @@ pub(crate) enum AppEvent {
     /// Open the resume picker inside the running TUI session.
     OpenResumePicker,
 
-    /// Open the Claude Code migration picker inside the running TUI session.
-    OpenExternalAgentConfigMigration,
-
     /// Resume a thread by UUID or thread name inside the running TUI session.
     ResumeSessionByIdOrName(String),
 
@@ -829,36 +787,8 @@ pub(crate) enum AppEvent {
         result: Result<AddCreditsNudgeEmailStatus, String>,
     },
 
-    /// Result of prefetching connectors.
-    ConnectorsLoaded {
-        thread_id: Option<ThreadId>,
-        cwd: PathBuf,
-        generation: ConnectorScopeGeneration,
-        result: Result<ConnectorsSnapshot, String>,
-        is_final: bool,
-    },
-
-    /// Thread-scoped installed applications that may actually be mentioned.
-    InstalledConnectorMentionsLoaded {
-        thread_id: Option<ThreadId>,
-        cwd: PathBuf,
-        generation: ConnectorScopeGeneration,
-        result: Result<ConnectorsSnapshot, String>,
-    },
-
     /// Result of computing a `/diff` command.
     DiffResult(PathBuf, String),
-
-    /// Open the app link view in the bottom pane.
-    OpenAppLink {
-        app_id: String,
-        title: String,
-        description: Option<String>,
-        instructions: String,
-        url: String,
-        is_installed: bool,
-        is_enabled: bool,
-    },
 
     /// Open the provided URL in the user's browser.
     OpenUrlInBrowser {
@@ -903,50 +833,9 @@ pub(crate) enum AppEvent {
         result: Result<Option<crate::pets::AmbientPet>, String>,
     },
 
-    /// Refresh app connector state and mention bindings.
-    RefreshConnectors {
-        force_refetch: bool,
-    },
-
-    /// Fetch apps only while the originating account, workspace, and thread remain current.
-    FetchConnectorsList {
-        force_refetch: bool,
-        generation: ConnectorScopeGeneration,
-    },
-
-    /// Refresh callable installed applications without loading the app directory.
-    FetchInstalledConnectorMentions {
-        force_refresh: bool,
-        generation: ConnectorScopeGeneration,
-    },
-
-    /// Fetch plugin marketplace state for the provided working directory.
-    FetchPluginsList {
-        cwd: PathBuf,
-    },
-
     /// Fetch lifecycle hook inventory for the current thread or working directory.
     FetchHooksList {
         target: crate::hooks_rpc::HooksListTarget,
-    },
-
-    /// Result of fetching plugin marketplace state.
-    PluginsLoaded {
-        cwd: PathBuf,
-        result: Result<PluginListResponse, String>,
-    },
-
-    /// Open the plugin list from an already cached response.
-    OpenPluginsList {
-        cwd: PathBuf,
-        response: PluginListResponse,
-    },
-
-    /// Result of explicitly fetching remote-backed plugin sections.
-    PluginRemoteSectionsLoaded {
-        cwd: PathBuf,
-        marketplaces: Vec<PluginMarketplaceEntry>,
-        section_errors: Vec<PluginRemoteSectionError>,
     },
 
     /// Result of fetching lifecycle hook inventory.
@@ -954,161 +843,6 @@ pub(crate) enum AppEvent {
         target: crate::hooks_rpc::HooksListTarget,
         result: Result<codex_app_server_protocol::HooksListEntry, String>,
     },
-
-    /// Open the prompt for adding a marketplace source.
-    OpenMarketplaceAddPrompt,
-
-    /// Replace the plugins popup with a marketplace-add loading state.
-    OpenMarketplaceAddLoading {
-        source: String,
-    },
-
-    /// Add a marketplace from the provided source.
-    FetchMarketplaceAdd {
-        cwd: PathBuf,
-        source: String,
-    },
-
-    /// Result of adding a marketplace.
-    MarketplaceAddLoaded {
-        cwd: PathBuf,
-        source: String,
-        result: Result<MarketplaceAddResponse, String>,
-    },
-
-    /// Open the confirmation prompt for removing a marketplace.
-    OpenMarketplaceRemoveConfirm {
-        marketplace_name: String,
-        marketplace_display_name: String,
-    },
-
-    /// Replace the plugins popup with a marketplace-remove loading state.
-    OpenMarketplaceRemoveLoading {
-        marketplace_display_name: String,
-    },
-
-    /// Remove a marketplace by name.
-    FetchMarketplaceRemove {
-        cwd: PathBuf,
-        marketplace_name: String,
-        marketplace_display_name: String,
-    },
-
-    /// Result of removing a marketplace.
-    MarketplaceRemoveLoaded {
-        cwd: PathBuf,
-        marketplace_name: String,
-        marketplace_display_name: String,
-        result: Result<MarketplaceRemoveResponse, String>,
-    },
-
-    /// Replace the plugins popup with a marketplace-upgrade loading state.
-    OpenMarketplaceUpgradeLoading {
-        marketplace_name: Option<String>,
-    },
-
-    /// Upgrade configured Git marketplaces.
-    FetchMarketplaceUpgrade {
-        cwd: PathBuf,
-        marketplace_name: Option<String>,
-    },
-
-    /// Result of upgrading configured Git marketplaces.
-    MarketplaceUpgradeLoaded {
-        cwd: PathBuf,
-        result: Result<MarketplaceUpgradeResponse, String>,
-    },
-
-    /// Replace the plugins popup with a plugin-detail loading state.
-    OpenPluginDetailLoading {
-        plugin_display_name: String,
-    },
-
-    /// Fetch detail for a specific plugin from a marketplace.
-    FetchPluginDetail {
-        cwd: PathBuf,
-        params: PluginReadParams,
-    },
-
-    /// Result of fetching plugin detail.
-    PluginDetailLoaded {
-        cwd: PathBuf,
-        result: Result<PluginReadResponse, String>,
-    },
-
-    /// Replace the plugins popup with an install loading state.
-    OpenPluginInstallLoading {
-        plugin_display_name: String,
-    },
-
-    /// Replace the plugins popup with an uninstall loading state.
-    OpenPluginUninstallLoading {
-        plugin_display_name: String,
-    },
-
-    /// Install a specific plugin from a marketplace.
-    FetchPluginInstall {
-        cwd: PathBuf,
-        location: PluginLocation,
-        plugin_name: String,
-        plugin_display_name: String,
-    },
-
-    /// Result of installing a plugin.
-    PluginInstallLoaded {
-        cwd: PathBuf,
-        location: PluginLocation,
-        plugin_name: String,
-        plugin_display_name: String,
-        result: Result<PluginInstallResponse, String>,
-    },
-
-    /// Uninstall a specific plugin by canonical plugin id.
-    FetchPluginUninstall {
-        cwd: PathBuf,
-        plugin_id: String,
-        plugin_display_name: String,
-    },
-
-    /// Result of uninstalling a plugin.
-    PluginUninstallLoaded {
-        cwd: PathBuf,
-        plugin_id: String,
-        plugin_display_name: String,
-        result: Result<PluginUninstallResponse, String>,
-    },
-
-    /// Enable or disable an installed plugin.
-    SetPluginEnabled {
-        cwd: PathBuf,
-        plugin_id: String,
-        enabled: bool,
-    },
-
-    /// Result of enabling or disabling a plugin.
-    PluginEnabledSet {
-        cwd: PathBuf,
-        plugin_id: String,
-        enabled: bool,
-        result: Result<(), String>,
-    },
-
-    /// Refresh plugin mention bindings from the current config.
-    RefreshPluginMentions,
-
-    /// Result of refreshing plugin mention bindings.
-    PluginMentionsLoaded {
-        cwd: PathBuf,
-        plugins: Option<Vec<PluginCapabilitySummary>>,
-    },
-
-    /// Advance the post-install plugin app-auth flow.
-    PluginInstallAuthAdvance {
-        refresh_connectors: bool,
-    },
-
-    /// Abandon the post-install plugin app-auth flow.
-    PluginInstallAuthAbandon,
 
     /// Fetch MCP inventory via app-server RPCs and render it into history.
     FetchMcpInventory {
@@ -1407,12 +1141,6 @@ pub(crate) enum AppEvent {
     /// Enable or disable a skill by path.
     SetSkillEnabled {
         path: PathUri,
-        enabled: bool,
-    },
-
-    /// Enable or disable an app by connector ID.
-    SetAppEnabled {
-        id: String,
         enabled: bool,
     },
 

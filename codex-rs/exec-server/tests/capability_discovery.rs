@@ -49,37 +49,8 @@ use fake_bwrap::write_fake_bwrap;
 use pretty_assertions::assert_eq;
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn discovers_a_complete_capability_bundle_in_one_request() -> anyhow::Result<()> {
+async fn discovers_skills_and_metadata_in_one_request() -> anyhow::Result<()> {
     let root = tempfile::tempdir()?;
-    write_file(
-        &root.path().join(".codex-plugin/plugin.json"),
-        r#"{
-  "name": "demo",
-  "interface": {"displayName": "Demo Plugin"},
-  "mcpServers": "./config/mcp.json",
-  "apps": "./config/apps.json"
-}"#,
-    )?;
-    write_file(
-        &root.path().join(".claude-plugin/plugin.json"),
-        r#"{"name":"lower-priority-claude"}"#,
-    )?;
-    write_file(
-        &root.path().join(".cursor-plugin/plugin.json"),
-        r#"{"name":"lower-priority-cursor"}"#,
-    )?;
-    write_file(
-        &root.path().join("config/mcp.json"),
-        r#"{"mcpServers":{"demo":{"command":"demo-server"}}}"#,
-    )?;
-    write_file(
-        &root.path().join("config/apps.json"),
-        r#"{"apps":{"demo":{"connector_id":"connector-demo"}}}"#,
-    )?;
-    write_file(
-        &root.path().join(".app.json"),
-        r#"{"apps":{"fallback":{"id":"connector-fallback"}}}"#,
-    )?;
     write_file(
         &root.path().join("skills/deploy/SKILL.md"),
         "---\nname: deploy\ndescription: Deploy the service.\n---\n\nDeploy instructions.\n",
@@ -89,16 +60,8 @@ async fn discovers_a_complete_capability_bundle_in_one_request() -> anyhow::Resu
         "policy:\n  allow_implicit_invocation: false\n",
     )?;
     write_file(
-        &root.path().join("nested/.claude-plugin/plugin.json"),
-        r#"{"name":"nested"}"#,
-    )?;
-    write_file(
         &root.path().join("nested/skills/audit/SKILL.md"),
         "---\nname: audit\ndescription: Audit the service.\n---\n",
-    )?;
-    write_file(
-        &root.path().join("nested-cursor/.cursor-plugin/plugin.json"),
-        r#"{"name":"cursor-nested"}"#,
     )?;
     write_file(
         &root.path().join("nested-cursor/skills/review/SKILL.md"),
@@ -114,32 +77,6 @@ async fn discovers_a_complete_capability_bundle_in_one_request() -> anyhow::Resu
     assert_eq!(discovery.path, root_uri);
     assert_eq!(discovery.error, None);
     assert_eq!(discovery.warnings, Vec::<String>::new());
-    let plugin = discovery.plugin.as_ref().expect("root plugin");
-    assert_eq!(
-        plugin.manifest.path,
-        root_uri.join(".codex-plugin/plugin.json")?
-    );
-    assert!(plugin.manifest.contents.contains("Demo Plugin"));
-    assert_eq!(
-        plugin.mcp_config.as_ref().map(|file| &file.path),
-        Some(&root_uri.join("config/mcp.json")?)
-    );
-    assert_eq!(
-        plugin.apps_config.as_ref().map(|file| &file.path),
-        Some(&root_uri.join("config/apps.json")?)
-    );
-    assert_eq!(
-        discovery
-            .namespace_manifests
-            .iter()
-            .map(|file| file.path.clone())
-            .collect::<Vec<_>>(),
-        vec![
-            root_uri.join(".codex-plugin/plugin.json")?,
-            root_uri.join("nested/.claude-plugin/plugin.json")?,
-            root_uri.join("nested-cursor/.cursor-plugin/plugin.json")?,
-        ]
-    );
     assert_eq!(
         discovery
             .skills
@@ -160,69 +97,6 @@ async fn discovers_a_complete_capability_bundle_in_one_request() -> anyhow::Resu
                 Some(root_uri.join("skills/deploy/agents/openai.yaml")?),
             ),
         ]
-    );
-
-    // Without an apps declaration, discovery returns the default .app.json.
-    let mut manifest: serde_json::Value = serde_json::from_str(&plugin.manifest.contents)?;
-    manifest
-        .as_object_mut()
-        .ok_or_else(|| anyhow::anyhow!("manifest must be an object"))?
-        .remove("apps");
-    write_file(
-        &root.path().join(".codex-plugin/plugin.json"),
-        &serde_json::to_string(&manifest)?,
-    )?;
-    let fallback = discover_root(&mut server, "demo@1", root_uri.clone()).await?;
-    assert_eq!(fallback.error, None);
-    assert_eq!(fallback.warnings, Vec::<String>::new());
-    let apps = fallback
-        .plugin
-        .and_then(|plugin| plugin.apps_config)
-        .ok_or_else(|| anyhow::anyhow!("missing fallback apps config"))?;
-    assert_eq!(apps.path, root_uri.join(".app.json")?);
-    assert_eq!(
-        apps.contents,
-        r#"{"apps":{"fallback":{"id":"connector-fallback"}}}"#,
-    );
-
-    server.shutdown().await?;
-    Ok(())
-}
-
-#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn discovers_cursor_plugin_without_reading_default_mcp_for_inline_servers()
--> anyhow::Result<()> {
-    let root = tempfile::tempdir()?;
-    write_file(
-        &root.path().join(".cursor-plugin/plugin.json"),
-        r#"{"name":"cursor-demo","mcpServers":{"inline":{"command":"inline"}}}"#,
-    )?;
-    write_file(
-        &root.path().join(".mcp.json"),
-        r#"{"mcpServers":{"should-not-load":{"command":"wrong"}}}"#,
-    )?;
-
-    let mut server = exec_server().await?;
-    initialize(&mut server).await?;
-    let root_uri = PathUri::from_host_native_path(root.path())?;
-    let discovery = discover_root(&mut server, "cursor@1", root_uri.clone()).await?;
-
-    assert_eq!(discovery.error, None);
-    assert_eq!(discovery.warnings, Vec::<String>::new());
-    let plugin = discovery.plugin.expect("cursor plugin");
-    assert_eq!(
-        plugin.manifest.path,
-        root_uri.join(".cursor-plugin/plugin.json")?
-    );
-    assert_eq!(plugin.mcp_config, None);
-    assert_eq!(plugin.apps_config, None);
-    assert_eq!(
-        discovery
-            .namespace_manifests
-            .iter()
-            .map(|manifest| manifest.path.clone())
-            .collect::<Vec<_>>(),
-        vec![root_uri.join(".cursor-plugin/plugin.json")?]
     );
 
     server.shutdown().await?;
@@ -254,7 +128,7 @@ async fn executor_legacy_missing_or_null_sandbox_cwd_keeps_absolute_requests_wor
             FileSystemAccessMode::Write,
         ),
     ]);
-    let mut process_sandbox = FileSystemSandboxContext::from_permission_profile(
+    let process_sandbox = FileSystemSandboxContext::from_permission_profile(
         PermissionProfile::from_runtime_permissions(&process_policy, NetworkSandboxPolicy::Enabled),
         cwd.clone(),
     );
@@ -949,44 +823,32 @@ async fn v2_helper_batches_roots_and_bounds_its_response() -> anyhow::Result<()>
 
     let workspace = tempfile::tempdir()?;
     let mut locations = Vec::new();
-    // Five individually valid configs exceed the shared 4 MiB response budget.
-    let config = serde_json::to_string(&serde_json::json!({"padding": "x".repeat(900 * 1024)}))?;
+    let mut expected_paths = Vec::new();
+    // Five individually valid skill descriptions exceed the shared 4 MiB response budget.
+    let padding = "x".repeat(900 * 1024);
+    let skill = format!("---\nname: deploy\ndescription: {padding}\n---\n");
     for index in 0..5 {
-        let root = workspace.path().join(format!("plugin-{index}"));
-        write_file(
-            &root.join(".codex-plugin/plugin.json"),
-            r#"{"name":"demo"}"#,
-        )?;
-        write_file(&root.join(".mcp.json"), &config)?;
-        write_file(
-            &root.join("skills/deploy/SKILL.md"),
-            "---\nname: deploy\ndescription: Deploy.\n---\n",
-        )?;
+        let root = workspace.path().join(format!("skill-root-{index}"));
+        let path = root.join("skills/deploy/SKILL.md");
+        write_file(&path, &skill)?;
+        if index < 4 {
+            expected_paths.push(PathUri::from_host_native_path(&path)?.to_string());
+        }
         locations.push(serde_json::json!({
             "root": PathUri::from_host_native_path(root)?,
-            "plugin": {
-                "id": format!("plugin-{index}@test"),
-                "version": "local",
-                "remote_plugin_id": null,
-            },
+            "standalone_root_id": format!("skill-root-{index}@test"),
         }));
     }
-    let small_root = workspace.path().join("plugin-small");
+    let small_root = workspace.path().join("skill-root-small");
+    let small_path = small_root.join("skills/deploy/SKILL.md");
     write_file(
-        &small_root.join(".codex-plugin/plugin.json"),
-        r#"{"name":"small"}"#,
-    )?;
-    write_file(
-        &small_root.join("skills/deploy/SKILL.md"),
+        &small_path,
         "---\nname: deploy\ndescription: Deploy.\n---\n",
     )?;
+    expected_paths.push(PathUri::from_host_native_path(&small_path)?.to_string());
     locations.push(serde_json::json!({
         "root": PathUri::from_host_native_path(small_root)?,
-        "plugin": {
-            "id": "plugin-small@test",
-            "version": "local",
-            "remote_plugin_id": null,
-        },
+        "standalone_root_id": "skill-root-small@test",
     }));
     let request = serde_json::json!({
         "operation": "capabilities/loadDiscoveries",
@@ -1023,23 +885,11 @@ async fn v2_helper_batches_roots_and_bounds_its_response() -> anyhow::Result<()>
         serde_json::from_value(wire["payload"]["response"].clone())?;
     assert_eq!(
         response
-            .plugins
+            .skills
             .iter()
-            .map(|plugin| plugin.id.as_str())
+            .map(|skill| skill.path.to_string())
             .collect::<Vec<_>>(),
-        vec![
-            "plugin-0@test",
-            "plugin-1@test",
-            "plugin-2@test",
-            "plugin-3@test",
-            "plugin-small@test",
-        ],
-    );
-    assert!(
-        response
-            .plugins
-            .iter()
-            .all(|plugin| plugin.skills.len() == 1)
+        expected_paths,
     );
     assert_eq!(
         response.warnings,
@@ -1251,14 +1101,6 @@ async fn sandboxed_discovery_follows_only_permitted_external_symlinks() -> anyho
     let root = tempfile::tempdir()?;
     let external = tempfile::tempdir()?;
     write_file(
-        &root.path().join(".codex-plugin/plugin.json"),
-        r#"{"name":"linked-plugin","mcpServers":"./external-mcp.json"}"#,
-    )?;
-    write_file(
-        &external.path().join("mcp.json"),
-        r#"{"mcpServers":{"linked":{"command":"linked-server"}}}"#,
-    )?;
-    write_file(
         &external.path().join("skill/SKILL.md"),
         "---\nname: linked\ndescription: Linked external skill.\n---\n",
     )?;
@@ -1266,10 +1108,6 @@ async fn sandboxed_discovery_follows_only_permitted_external_symlinks() -> anyho
     std::os::unix::fs::symlink(
         external.path().join("skill"),
         root.path().join("skills/linked"),
-    )?;
-    std::os::unix::fs::symlink(
-        external.path().join("mcp.json"),
-        root.path().join("external-mcp.json"),
     )?;
 
     let mut server = exec_server().await?;
@@ -1287,23 +1125,16 @@ async fn sandboxed_discovery_follows_only_permitted_external_symlinks() -> anyho
             "permitted symlinks",
             vec![read_root.clone(), read_external.clone()],
             true,
-            true,
         ),
-        (
-            "denied external root",
-            vec![read_root.clone()],
-            false,
-            false,
-        ),
+        ("denied external root", vec![read_root.clone()], false),
         (
             "denied external skill",
             vec![read_root, read_external, deny_external_skill],
             false,
-            true,
         ),
     ];
 
-    for (scenario, entries, has_skill, has_mcp) in cases {
+    for (scenario, entries, has_skill) in cases {
         let policy = FileSystemSandboxPolicy::restricted(entries);
         let sandbox = FileSystemSandboxContext::from_permission_profile(
             PermissionProfile::from_runtime_permissions(&policy, NetworkSandboxPolicy::Restricted),
@@ -1315,14 +1146,6 @@ async fn sandboxed_discovery_follows_only_permitted_external_symlinks() -> anyho
 
         assert_eq!(discovery.error, None, "{scenario}");
         assert_eq!(discovery.skills.len(), usize::from(has_skill), "{scenario}");
-        assert_eq!(
-            discovery
-                .plugin
-                .and_then(|plugin| plugin.mcp_config)
-                .is_some_and(|config| config.contents.contains("linked-server")),
-            has_mcp,
-            "{scenario}"
-        );
     }
 
     server.shutdown().await?;

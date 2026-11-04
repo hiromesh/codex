@@ -5,7 +5,7 @@ use std::collections::HashMap;
 use std::io::Read;
 use std::path::Path;
 
-use codex_mcp::CODEX_APPS_MCP_SERVER_NAME;
+use crate::CODEX_APPS_MCP_SERVER_NAME;
 use serde::Deserialize;
 
 use super::MAX_SKILL_RESOURCE_CONTENT_BYTES;

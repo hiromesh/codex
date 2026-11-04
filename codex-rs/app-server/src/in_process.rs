@@ -524,7 +524,6 @@ async fn start_uninitialized(mut args: InProcessStartArgs) -> IoResult<InProcess
                 auth_manager,
                 installation_id,
                 rpc_transport: AppServerRpcTransport::InProcess,
-                remote_control_handle: None,
             }));
             let mut thread_created_rx = processor.thread_created_receiver();
             let session = Arc::new(ConnectionSessionState::new(
@@ -603,7 +602,6 @@ async fn start_uninitialized(mut args: InProcessStartArgs) -> IoResult<InProcess
             }
 
             processor.clear_runtime_references();
-            processor.cancel_active_login().await;
             processor
                 .connection_closed(IN_PROCESS_CONNECTION_ID, &session)
                 .await;

@@ -31,7 +31,6 @@ use crate::events::user_prompt_submit::UserPromptSubmitRequest;
 use crate::mcp::HookMcpExecutor;
 use crate::output_spill::AdditionalContextLimit;
 use codex_config::ConfigLayerStack;
-use codex_config::HookHandlerConfig;
 use codex_protocol::protocol::HookEventName;
 use codex_protocol::protocol::HookExecutionMode;
 use codex_protocol::protocol::HookHandlerType;
@@ -40,11 +39,9 @@ use codex_protocol::protocol::HookSource;
 use codex_protocol::protocol::HookTrustStatus;
 use codex_utils_absolute_path::AbsolutePathBuf;
 use codex_utils_path_uri::PathUri;
-use serde_json::Map;
 use serde_json::Value;
 use std::borrow::Cow;
 use std::collections::HashMap;
-use std::collections::HashSet;
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -148,8 +145,7 @@ impl ConfiguredHandler {
         match self.source {
             HookSource::User
             | HookSource::Project
-            | HookSource::SessionFlags
-            | HookSource::Plugin => false,
+            | HookSource::SessionFlags => false,
             HookSource::System
             | HookSource::Mdm
             | HookSource::CloudRequirements
@@ -229,7 +225,6 @@ pub struct HookListEntry {
     pub additional_context_limit: Option<usize>,
     pub source_path: AbsolutePathBuf,
     pub source: HookSource,
-    pub plugin_id: Option<String>,
     /// The owning execution environment, if this hook came from its requirements.
     pub environment_id: Option<String>,
     pub display_order: i64,

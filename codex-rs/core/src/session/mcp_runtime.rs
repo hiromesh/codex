@@ -9,10 +9,8 @@ use super::*;
 use crate::mcp::McpRuntimeProjection;
 use codex_config::McpServerDisabledReason;
 use codex_config::McpServerTransportConfig;
-use codex_mcp::CODEX_APPS_MCP_SERVER_NAME;
 use codex_mcp::ElicitationReviewerHandle;
 use codex_mcp::McpServerRegistration;
-use codex_mcp::McpServerSource;
 use codex_mcp::McpStartupPolicy;
 use codex_mcp::PreparedMcpCall;
 use codex_mcp::ToolInfo;
@@ -28,7 +26,6 @@ pub(super) struct McpDesiredState {
     pub(super) session_source: SessionSource,
     pub(super) environments: TurnEnvironmentSnapshot,
     pub(super) local_process_cwd: PathBuf,
-    pub(super) disabled_plugin_ids: Vec<String>,
 }
 
 impl Session {
@@ -71,12 +68,9 @@ impl Session {
         auth: Option<CodexAuth>,
         environments: TurnEnvironmentSnapshot,
     ) -> McpDesiredState {
-        let (session_configuration, disabled_plugin_ids) = {
+        let session_configuration = {
             let state = self.state.lock().await;
-            (
-                state.session_configuration.clone(),
-                state.active_disabled_plugin_ids.clone(),
-            )
+            state.session_configuration.clone()
         };
         let config =
             self.build_per_turn_config(&session_configuration, environments.local_selection());
@@ -90,7 +84,6 @@ impl Session {
             session_source: session_configuration.session_source,
             environments,
             local_process_cwd,
-            disabled_plugin_ids,
         }
     }
 
@@ -114,7 +107,6 @@ impl Session {
             session_source: session_configuration.session_source.clone(),
             environments: resolved_environments.clone(),
             local_process_cwd,
-            disabled_plugin_ids: session_configuration.disabled_plugin_ids.clone(),
         };
         self.publish_mcp_runtime(
             &desired,
@@ -195,19 +187,13 @@ impl Session {
                         /*inc*/ 1,
                         &[("server_name", name.as_str()), ("outcome", outcome)],
                     );
-                    if name == CODEX_APPS_MCP_SERVER_NAME
-                        || !server.is_local_environment()
+                    if !server.is_local_environment()
                         || projection
                             .config
                             .mcp_server_catalog
                             .server(&name)
                             .is_some_and(|existing| {
                                 existing.config().environment_id != *environment_id
-                                    || !matches!(
-                                        existing.source(),
-                                        McpServerSource::Plugin(_)
-                                            | McpServerSource::SelectedPlugin(_)
-                                    )
                             })
                         || registered.contains(&name)
                     {
@@ -283,7 +269,6 @@ impl Session {
                 mcp_projection,
             )
             .await;
-        let selected_plugins = mcp_projection.selected_plugins.clone();
         let input = self.build_mcp_runtime_input(
             desired,
             mcp_projection,
@@ -293,7 +278,6 @@ impl Session {
         AuthStorageOriginator::from_client_name(&desired.originator)
             .scope(self.services.mcp_runtime.replace(input))
             .await;
-        self.services.thread_extension_data.insert(selected_plugins);
     }
 
     pub(super) fn build_mcp_runtime_input(
@@ -304,14 +288,9 @@ impl Session {
         elicitation_reviewer: Option<ElicitationReviewerHandle>,
     ) -> McpRuntimeInput {
         let auth = desired.auth.clone();
-        let McpRuntimeProjection {
-            mut config,
-            plugins_available,
-            selected_plugins: _,
-        } = mcp_projection;
+        let McpRuntimeProjection { mut config } = mcp_projection;
         config.approval_policy = desired.config.permissions.approval_policy.clone();
         config.permission_profile = desired.config.permissions.effective_permission_profile();
-        config.approvals_reviewer = desired.config.approvals_reviewer;
         config.environment_cwds = desired
             .environments
             .turn_environments()
@@ -326,7 +305,7 @@ impl Session {
             .environment_cwds
             .entry(codex_config::DEFAULT_MCP_SERVER_ENVIRONMENT_ID.to_string())
             .or_insert_with(|| PathUri::from_abs_path(&desired.config.cwd));
-        let mcp_servers = effective_mcp_servers(&config, auth.as_ref());
+        let mcp_servers = effective_mcp_servers(&config);
         config.set_server_permission_profiles(
             &mcp_servers,
             desired.environments.turn_environments().map(|environment| {
@@ -347,16 +326,13 @@ impl Session {
                 McpStartupPolicy::Eager
             },
             config: mcp_config,
-            plugins_available,
             ready_selected_capability_roots: ready_selected_capability_roots.to_vec(),
             mcp_servers,
             submit_id: desired.submit_id.clone(),
             tx_event: Some(self.get_tx_event()),
             startup_cancellation_token: CancellationToken::new(),
             runtime_context,
-            codex_apps_tools_cache: self.services.mcp_manager.codex_apps_tools_cache(),
             tool_catalog_cache: self.services.mcp_manager.tool_catalog_cache(),
-            codex_apps_tools_cache_key: connector_runtime_context_key(auth.as_ref()),
             client_mcp_extensions: self.services.client_mcp_extensions.for_mcp_servers(),
             auth,
             auth_manager: Some(Arc::clone(&self.services.auth_manager)),

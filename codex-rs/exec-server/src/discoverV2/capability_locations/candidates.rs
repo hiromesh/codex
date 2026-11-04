@@ -79,7 +79,6 @@ impl CandidateCapabilityLocations {
                 locations: vec![CapabilityLocation {
                     root: root.path.clone(),
                     standalone_root_id: Some(root.id.clone()),
-                    plugin: None,
                 }],
                 ..Default::default()
             }),

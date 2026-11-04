@@ -16,13 +16,16 @@ Settings:
   text: {"verbosity":"low"}
   tool_choice: "auto"
 -- request 1 (turn) --
-00:additional_tools/developer (2; hash=d56ea226c3637559):
-        - namespace/functions; hash=fada4a476a3754dd
-          - custom/exec
-          - function/wait
+00:additional_tools/developer (2; hash=e18be3e95f2f2e94):
+        - namespace/functions; hash=c8b8fa91706a7620
+          - function/exec_command
+          - function/write_stdin
           - function/request_user_input
           - function/request_user_input_async
-        - namespace/clock: Tools for reading and waiting on time.; hash=f402e8c5e9b5e317
+          - custom/apply_patch
+          - function/view_image
+        - namespace/clock: Tools for reading and waiting on time.; hash=a80435c7a3a3943f
+          - function/curr_time
           - function/sleep
 01:message/developer:
     You are Codex, an agent based on GPT-6. You and the user share one workspace, and your job is to collabo...them until their intended goal is completely handled. [hash=efa50f074efa5803]

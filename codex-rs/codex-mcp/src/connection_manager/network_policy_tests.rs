@@ -121,7 +121,6 @@ async fn tool_calls_deliver_only_negotiated_trusted_network_policy() -> anyhow::
                 MCP_NETWORK_POLICY_META_CAPABILITY.to_string(),
                 json!({"forged": true}),
             )]),
-            "docs",
             catalog.server("docs"),
             provider_available,
             "https://chatgpt.com",
@@ -166,9 +165,7 @@ async fn tool_calls_deliver_only_negotiated_trusted_network_policy() -> anyhow::
         let binding = manager
             .capture_binding_with_metadata(
                 config,
-                /*plugins_available*/ false,
-                /*required_servers*/ &[],
-                /*required_plugins*/ &HashSet::new(),
+                    /*required_servers*/ &[],
             )
             .await;
         let prepared = binding

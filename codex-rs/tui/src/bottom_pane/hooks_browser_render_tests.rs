@@ -61,7 +61,6 @@ fn wrapped_hook_command_preserves_the_complete_url_destination() {
         "path:review",
         HookEventName::PreToolUse,
         HookSource::User,
-        /*plugin_id*/ None,
         &format!("curl {url}"),
         /*enabled*/ true,
         /*is_managed*/ false,

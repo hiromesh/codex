@@ -46,7 +46,6 @@ async fn host_catalog_entries_carry_their_render_metadata() -> Result<(), Box<dy
         )],
         &Semaphore::new(/*permits*/ 1),
         /*restriction_product*/ None,
-        /*plugin_skill_snapshots*/ None,
     )
     .await;
 
@@ -91,7 +90,6 @@ async fn host_catalog_resource_spellings_read_the_discovered_skill()
         )],
         &Semaphore::new(/*permits*/ 1),
         /*restriction_product*/ None,
-        /*plugin_skill_snapshots*/ None,
     )
     .await;
     let catalog = catalog_from_outcome(&outcome);
@@ -148,7 +146,6 @@ async fn host_catalog_preserves_symlinked_skill_discovery_paths()
         )],
         &Semaphore::new(/*permits*/ 1),
         /*restriction_product*/ None,
-        /*plugin_skill_snapshots*/ None,
     )
     .await;
     let catalog = catalog_from_outcome(&outcome);

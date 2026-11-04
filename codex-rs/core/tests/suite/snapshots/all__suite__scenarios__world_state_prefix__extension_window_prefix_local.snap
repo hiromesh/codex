@@ -16,13 +16,16 @@ Settings:
   text: {"verbosity":"low"}
   tool_choice: "auto"
 -- request 1 (turn; Initial policy A) --
-00:additional_tools/developer (3; hash=bf2e30605ff5dc17):
-        - namespace/functions; hash=fada4a476a3754dd
-          - custom/exec
-          - function/wait
+00:additional_tools/developer (3; hash=71a30e0fed498d48):
+        - namespace/functions; hash=c8b8fa91706a7620
+          - function/exec_command
+          - function/write_stdin
           - function/request_user_input
           - function/request_user_input_async
-        - namespace/clock: Tools for reading and waiting on time.; hash=f402e8c5e9b5e317
+          - custom/apply_patch
+          - function/view_image
+        - namespace/clock: Tools for reading and waiting on time.; hash=a80435c7a3a3943f
+          - function/curr_time
           - function/sleep
         - namespace/collaboration: Tools for spawning and managing sub-agents.; hash=2c8d6295978dbe63
           - function/followup_task
@@ -132,13 +135,16 @@ Settings:
 ## Window 2 (after request 4: input diverged at item 02)
 Settings: unavailable (items only)
 -- request 5 (items; Stored replacement before next turn) --
-00:additional_tools/developer (3; hash=bf2e30605ff5dc17):
-        - namespace/functions; hash=fada4a476a3754dd
-          - custom/exec
-          - function/wait
+00:additional_tools/developer (3; hash=71a30e0fed498d48):
+        - namespace/functions; hash=c8b8fa91706a7620
+          - function/exec_command
+          - function/write_stdin
           - function/request_user_input
           - function/request_user_input_async
-        - namespace/clock: Tools for reading and waiting on time.; hash=f402e8c5e9b5e317
+          - custom/apply_patch
+          - function/view_image
+        - namespace/clock: Tools for reading and waiting on time.; hash=a80435c7a3a3943f
+          - function/curr_time
           - function/sleep
         - namespace/collaboration: Tools for spawning and managing sub-agents.; hash=2c8d6295978dbe63
           - function/followup_task
@@ -229,13 +235,16 @@ Settings: unavailable (items only)
 ## Window 3 (after request 5)
 Settings: same as window 1
 -- request 6 (turn; Unchanged policy C after compaction) --
-00:additional_tools/developer (3; hash=bf2e30605ff5dc17):
-        - namespace/functions; hash=fada4a476a3754dd
-          - custom/exec
-          - function/wait
+00:additional_tools/developer (3; hash=71a30e0fed498d48):
+        - namespace/functions; hash=c8b8fa91706a7620
+          - function/exec_command
+          - function/write_stdin
           - function/request_user_input
           - function/request_user_input_async
-        - namespace/clock: Tools for reading and waiting on time.; hash=f402e8c5e9b5e317
+          - custom/apply_patch
+          - function/view_image
+        - namespace/clock: Tools for reading and waiting on time.; hash=a80435c7a3a3943f
+          - function/curr_time
           - function/sleep
         - namespace/collaboration: Tools for spawning and managing sub-agents.; hash=2c8d6295978dbe63
           - function/followup_task

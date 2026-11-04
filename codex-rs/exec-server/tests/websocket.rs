@@ -156,71 +156,8 @@ async fn exec_server_rejects_browser_origin_websocket_handshake() -> anyhow::Res
 
 #[cfg(target_os = "linux")]
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn missing_metadata_watch_invalidates_on_idle_websocket_and_recovery() -> anyhow::Result<()> {
-    let mut server = exec_server().await?;
-    let mut proxy = server.disconnectable_websocket_proxy().await?;
-    let environment = Environment::create_for_tests(Some(proxy.websocket_url().to_owned()))?;
-    let fs = environment.get_filesystem();
-    let repo = tempfile::tempdir()?;
-    let root = AbsolutePathBuf::try_from(repo.path().canonicalize()?)?;
-    let skills = root.join(".agents/skills");
-    let marker = root.join(".git");
-    std::fs::write(&marker, "")?;
-    let watch = || {
-        fs.watch_missing(
-            vec![PathUri::from_abs_path(&skills)],
-            Some(PathUri::from_abs_path(&marker)),
-        )
-    };
-    let superseded = watch().await?.context("first watch")?;
-    let mut invalidated = watch()
-        .await?
-        .context("executor accepted empty observation")?;
-    assert!(superseded.await.is_err());
-    std::fs::write(root.join(".agents-backup"), "")?;
-    assert!(
-        tokio::time::timeout(Duration::from_millis(100), &mut invalidated)
-            .await
-            .is_err()
-    );
-    std::fs::create_dir_all(&skills)?;
-    // The executor pushes this across the already open socket, without another RPC.
-    tokio::time::timeout(Duration::from_secs(5), invalidated).await??;
-    assert!(watch().await?.is_none());
-
-    std::fs::remove_dir(&skills)?;
-    let invalidated = watch().await?.context("watch after deletion")?;
-    std::fs::remove_file(&marker)?;
-    tokio::time::timeout(Duration::from_secs(5), invalidated).await??;
-    assert!(watch().await?.is_none());
-
-    std::fs::write(&marker, "")?;
-    let old = watch().await?.context("watch before disconnect")?;
-    proxy.pause_and_disconnect().await?;
-    assert!(
-        tokio::time::timeout(Duration::from_secs(5), old)
-            .await?
-            .is_err()
-    );
-    std::fs::create_dir(&skills)?;
-    proxy.resume()?;
-    assert!(watch().await?.is_none());
-    std::fs::remove_dir(&skills)?;
-    let new = watch()
-        .await?
-        .context("new watch on recovered connection")?;
-    std::fs::create_dir(&skills)?;
-    tokio::time::timeout(Duration::from_secs(5), new).await??;
-
-    server.shutdown().await?;
-    Ok(())
-}
-
-#[cfg(target_os = "linux")]
-#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn missing_metadata_watch_invalidates_on_possible_casefold_aliases() -> anyhow::Result<()> {
-    let mut server = exec_server().await?;
-    let environment = Environment::create_for_tests(Some(server.websocket_url().to_owned()))?;
+    let environment = Environment::create_for_tests(/*exec_server_url*/ None)?;
     let fs = environment.get_filesystem();
 
     // U+017F (long s) folds to ASCII s in a casefolded ext4 directory.
@@ -246,6 +183,5 @@ async fn missing_metadata_watch_invalidates_on_possible_casefold_aliases() -> an
             .with_context(|| format!("watch missed {created}"))??;
     }
 
-    server.shutdown().await?;
     Ok(())
 }

@@ -33,8 +33,6 @@ fn test_skill_metadata(skill_doc_path: AbsolutePathBuf) -> SkillMetadata {
         policy: None,
         path_to_skills_md: skill_doc_path.into(),
         scope: codex_protocol::protocol::SkillScope::User,
-        plugin_id: None,
-        remote_plugin_id: None,
     }
 }
 

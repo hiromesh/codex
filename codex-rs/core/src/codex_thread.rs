@@ -117,7 +117,6 @@ pub struct ThreadConfigSnapshot {
     pub parent_thread_id: Option<ThreadId>,
     pub thread_source: Option<ThreadSource>,
     pub originator: String,
-    pub disabled_plugin_ids: Vec<String>,
 }
 
 impl ThreadConfigSnapshot {
@@ -168,7 +167,6 @@ pub struct CodexThreadSettingsOverrides {
     pub service_tier: Option<Option<String>>,
     pub collaboration_mode: Option<CollaborationMode>,
     pub personality: Option<Personality>,
-    pub disabled_plugin_ids: Option<Vec<String>>,
 }
 
 /// Result of publishing a loaded configuration snapshot for a thread.
@@ -305,17 +303,6 @@ impl CodexThread {
     /// Returns extension-owned data attached to this thread runtime.
     pub fn thread_extension_data(&self) -> &codex_extension_api::ExtensionData {
         &self.session.services.thread_extension_data
-    }
-
-    /// Returns tools from this thread’s ready, unshared Apps MCP client.
-    /// Returns an empty list if the client is absent, still starting, or uses
-    /// a shared catalog. Does not start or wait for discovery.
-    pub async fn apps_tools_from_mcp_client(&self) -> Vec<codex_mcp::ToolInfo> {
-        self.session
-            .services
-            .mcp_runtime
-            .apps_tools_from_mcp_client()
-            .await
     }
 
     /// Returns data captured by the named running turn, not newer thread settings.
@@ -832,7 +819,6 @@ impl CodexThread {
             service_tier,
             collaboration_mode,
             personality,
-            disabled_plugin_ids,
         } = overrides;
         SessionSettingsUpdate {
             turn_extension_init,
@@ -853,7 +839,6 @@ impl CodexThread {
             sandbox_policy,
             permission_profile,
             active_permission_profile,
-            disabled_plugin_ids,
             ..Default::default()
         }
     }
@@ -1199,8 +1184,7 @@ impl CodexThread {
         self.session.disable_mcp_enterprise_auth().await;
     }
 
-    /// Refresh MCP configuration, managed requirements, and explicit session plugin overrides.
-    /// Omitted session plugins preserve current overrides; an empty map restores inheritance.
+    /// Refresh MCP configuration and managed requirements.
     /// Other session overrides and user settings remain unchanged.
     /// A stale owner requires reloading from the current config before retrying.
     pub async fn refresh_mcp_config(
@@ -1213,13 +1197,6 @@ impl CodexThread {
                 .refresh_mcp_config(expected_config, next_config),
         )
         .await
-    }
-
-    /// Refreshes this thread's Apps tools before returning their runtime state.
-    pub async fn refresh_codex_apps_tools(
-        &self,
-    ) -> anyhow::Result<codex_mcp::CodexAppsToolSnapshot> {
-        self.session.refresh_codex_apps_tools().await
     }
 
     /// Returns the environments configured for future turns.
@@ -1285,25 +1262,9 @@ impl CodexThread {
             .await
     }
 
-    /// Reads an app resource using the current authority of its originating tool call.
-    pub async fn read_mcp_resource_for_call(
-        &self,
-        call_id: &str,
-        uri: &str,
-    ) -> anyhow::Result<serde_json::Value> {
-        self.session.refresh_mcp_if_dirty().await;
-        let result = self
-            .session
-            .services
-            .mcp_runtime
-            .read_resource_for_call(self.session.thread_id, call_id, uri)
-            .await?;
-
-        Ok(serde_json::to_value(result)?)
-    }
-
     pub async fn start_mcp_event_stream(
         &self,
+        server: &str,
         name: &str,
         arguments: serde_json::Value,
         meta: Option<serde_json::Value>,
@@ -1318,7 +1279,7 @@ impl CodexThread {
         let _ = self.session.services.auth_manager.auth().await;
         self.session.refresh_mcp_if_dirty().await;
         codex_mcp::McpResourceClient::new(Arc::clone(&self.session.services.mcp_runtime))
-            .open_event_stream(name, &arguments, meta)
+            .open_event_stream(server, name, &arguments, meta)
             .await
     }
 

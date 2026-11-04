@@ -68,13 +68,9 @@ pub(crate) fn action_summary(action: &GuardianAssessmentAction) -> String {
             format!("network access to {target}")
         }
         GuardianAssessmentAction::McpToolCall {
-            server,
-            tool_name,
-            connector_name,
-            ..
+            server, tool_name, ..
         } => {
-            let label = connector_name.as_deref().unwrap_or(server.as_str());
-            format!("MCP {tool_name} on {label}")
+            format!("MCP {tool_name} on {server}")
         }
         GuardianAssessmentAction::RequestPermissions { reason, .. } => reason
             .as_deref()
@@ -98,8 +94,6 @@ mod tests {
             model_context: None,
             id: format!("review-{id}"),
             target_item_id: None,
-            plugin_id: None,
-            script_path: None,
             turn_id: "turn-1".to_string(),
             started_at_ms: 0,
             completed_at_ms: Some(1),

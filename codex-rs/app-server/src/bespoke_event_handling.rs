@@ -126,8 +126,6 @@ enum CommandExecutionApprovalPresentation {
 #[derive(Debug, PartialEq)]
 struct CommandExecutionCompletionItem {
     model_context: Option<ModelInvocationContext>,
-    plugin_id: Option<String>,
-    script_path: Option<String>,
     command: String,
     cwd: LegacyAppPathString,
     command_actions: Vec<V2ParsedCommand>,
@@ -292,8 +290,6 @@ pub(crate) async fn apply_bespoke_event_handling(
                 Some(ThreadItemPayload::CommandExecution {
                     id,
                     model_context,
-                    plugin_id,
-                    script_path,
                     command,
                     cwd,
                     command_actions,
@@ -302,8 +298,6 @@ pub(crate) async fn apply_bespoke_event_handling(
                     id,
                     CommandExecutionCompletionItem {
                         model_context,
-                        plugin_id,
-                        script_path,
                         command,
                         cwd,
                         command_actions,
@@ -475,8 +469,6 @@ pub(crate) async fn apply_bespoke_event_handling(
                 model_context,
                 kind,
                 call_id,
-                plugin_id,
-                script_path,
                 approval_id,
                 turn_id,
                 environment_id,
@@ -528,8 +520,6 @@ pub(crate) async fn apply_bespoke_event_handling(
             } else {
                 let completion_item = CommandExecutionCompletionItem {
                     model_context,
-                    plugin_id,
-                    script_path,
                     command: command_presentation.command,
                     cwd: cwd.clone(),
                     command_actions: command_presentation.command_actions,
@@ -1286,8 +1276,6 @@ async fn start_command_execution_item(
                 id: item_id,
                 model_context: details.model_context.clone(),
                 sandbox_type: None,
-                plugin_id: details.plugin_id.clone(),
-                script_path: details.script_path.clone(),
                 command: details.command.clone(),
                 cwd: details.cwd.clone(),
                 process_id: None,
@@ -1332,8 +1320,6 @@ async fn complete_command_execution_item(
         id: item_id,
         model_context: completion_item.model_context,
         sandbox_type: None,
-        plugin_id: completion_item.plugin_id,
-        script_path: completion_item.script_path,
         command: completion_item.command,
         cwd: completion_item.cwd,
         process_id: None,
@@ -2101,8 +2087,6 @@ mod tests {
     fn command_execution_completion_item(command: &str) -> CommandExecutionCompletionItem {
         CommandExecutionCompletionItem {
             model_context: None,
-            plugin_id: Some("sample@openai-curated".to_string()),
-            script_path: Some("scripts/run.py".to_string()),
             command: command.to_string(),
             cwd: test_path_buf("/tmp").abs().into(),
             command_actions: vec![V2ParsedCommand::Unknown {
@@ -2138,8 +2122,6 @@ mod tests {
             model_context: None,
             id: format!("review-{id}"),
             target_item_id: Some(id.to_string()),
-            plugin_id: Some("sample@openai-curated".to_string()),
-            script_path: Some("scripts/run.py".to_string()),
             turn_id: turn_id.to_string(),
             started_at_ms: 1_000,
             completed_at_ms: (!matches!(status, GuardianAssessmentStatus::InProgress))
@@ -2207,8 +2189,6 @@ mod tests {
                 model_context: None,
                 id: "review-1".to_string(),
                 target_item_id: Some("item-1".to_string()),
-                plugin_id: None,
-                script_path: None,
                 turn_id: String::new(),
                 started_at_ms: 1_000,
                 completed_at_ms: None,
@@ -2257,8 +2237,6 @@ mod tests {
                 model_context: None,
                 id: "review-2".to_string(),
                 target_item_id: Some("item-2".to_string()),
-                plugin_id: None,
-                script_path: None,
                 turn_id: "turn-from-assessment".to_string(),
                 started_at_ms: 1_000,
                 completed_at_ms: Some(1_042),
@@ -2315,8 +2293,6 @@ mod tests {
                 model_context: None,
                 id: "review-3".to_string(),
                 target_item_id: None,
-                plugin_id: None,
-                script_path: None,
                 turn_id: "turn-from-assessment".to_string(),
                 started_at_ms: 1_000,
                 completed_at_ms: Some(1_042),
@@ -2388,8 +2364,6 @@ mod tests {
                         model_context: None,
                         sandbox_type: None,
                         id: "cmd-1".to_string(),
-                        plugin_id: completion_item.plugin_id.clone(),
-                        script_path: completion_item.script_path.clone(),
                         command: completion_item.command.clone(),
                         cwd: completion_item.cwd.clone(),
                         process_id: None,
@@ -2466,8 +2440,6 @@ mod tests {
             ServerNotification::ItemCompleted(payload) => {
                 let ThreadItemPayload::CommandExecution {
                     id,
-                    plugin_id,
-                    script_path,
                     status,
                     ..
                 } = payload.item.payload
@@ -2475,8 +2447,6 @@ mod tests {
                     bail!("expected command execution completion");
                 };
                 assert_eq!(id, "cmd-1");
-                assert_eq!(plugin_id.as_deref(), Some("sample@openai-curated"));
-                assert_eq!(script_path.as_deref(), Some("scripts/run.py"));
                 assert_eq!(status, CommandExecutionStatus::Declined);
             }
             other => bail!("unexpected message: {other:?}"),
@@ -2506,7 +2476,7 @@ mod tests {
         let config = load_default_config_for_test(&codex_home).await;
         let thread_manager = Arc::new(
             codex_core::test_support::thread_manager_with_models_provider_and_home(
-                CodexAuth::create_dummy_chatgpt_auth_for_testing(),
+                CodexAuth::from_api_key("dummy"),
                 config.model_provider.clone(),
                 config.codex_home.to_path_buf(),
                 Arc::new(codex_exec_server::EnvironmentManager::default_for_tests()),
@@ -2553,8 +2523,6 @@ mod tests {
                 assert_eq!(payload.turn_id, "turn-guardian-approved");
                 let ThreadItemPayload::CommandExecution {
                     id,
-                    plugin_id,
-                    script_path,
                     status,
                     ..
                 } = payload.item.payload
@@ -2562,8 +2530,6 @@ mod tests {
                     bail!("expected command execution item");
                 };
                 assert_eq!(id, "cmd-guardian-approved");
-                assert_eq!(plugin_id.as_deref(), Some("sample@openai-curated"));
-                assert_eq!(script_path.as_deref(), Some("scripts/run.py"));
                 assert_eq!(status, CommandExecutionStatus::InProgress);
             }
             other => bail!("unexpected message: {other:?}"),
@@ -2625,8 +2591,6 @@ mod tests {
                 assert_eq!(payload.turn_id, "turn-guardian-denied");
                 let ThreadItemPayload::CommandExecution {
                     id,
-                    plugin_id,
-                    script_path,
                     status,
                     ..
                 } = payload.item.payload
@@ -2634,8 +2598,6 @@ mod tests {
                     bail!("expected command execution item");
                 };
                 assert_eq!(id, "cmd-guardian-denied");
-                assert_eq!(plugin_id.as_deref(), Some("sample@openai-curated"));
-                assert_eq!(script_path.as_deref(), Some("scripts/run.py"));
                 assert_eq!(status, CommandExecutionStatus::InProgress);
             }
             other => bail!("unexpected message: {other:?}"),
@@ -2682,8 +2644,6 @@ mod tests {
                 assert_eq!(payload.item.completed_at_ms, Some(1_042));
                 let ThreadItemPayload::CommandExecution {
                     id,
-                    plugin_id,
-                    script_path,
                     status,
                     ..
                 } = payload.item.payload
@@ -2691,8 +2651,6 @@ mod tests {
                     bail!("expected command execution completion");
                 };
                 assert_eq!(id, "cmd-guardian-denied");
-                assert_eq!(plugin_id.as_deref(), Some("sample@openai-curated"));
-                assert_eq!(script_path.as_deref(), Some("scripts/run.py"));
                 assert_eq!(status, CommandExecutionStatus::Declined);
             }
             other => bail!("unexpected message: {other:?}"),
@@ -2941,7 +2899,7 @@ mod tests {
         let config = load_default_config_for_test(&codex_home).await;
         let thread_manager = Arc::new(
             codex_core::test_support::thread_manager_with_models_provider_and_home(
-                CodexAuth::create_dummy_chatgpt_auth_for_testing(),
+                CodexAuth::from_api_key("dummy"),
                 config.model_provider.clone(),
                 config.codex_home.to_path_buf(),
                 Arc::new(codex_exec_server::EnvironmentManager::default_for_tests()),
@@ -3078,7 +3036,7 @@ mod tests {
         let config = load_default_config_for_test(&codex_home).await;
         let thread_manager = Arc::new(
             codex_core::test_support::thread_manager_with_models_provider_and_home(
-                CodexAuth::create_dummy_chatgpt_auth_for_testing(),
+                CodexAuth::from_api_key("dummy"),
                 config.model_provider.clone(),
                 config.codex_home.to_path_buf(),
                 Arc::new(codex_exec_server::EnvironmentManager::default_for_tests()),
@@ -3174,7 +3132,7 @@ mod tests {
         let config = load_default_config_for_test(&codex_home).await;
         let thread_manager = Arc::new(
             codex_core::test_support::thread_manager_with_models_provider_and_home(
-                CodexAuth::create_dummy_chatgpt_auth_for_testing(),
+                CodexAuth::from_api_key("dummy"),
                 config.model_provider.clone(),
                 config.codex_home.to_path_buf(),
                 Arc::new(codex_exec_server::EnvironmentManager::default_for_tests()),

@@ -320,7 +320,6 @@ async fn spawn_agent_limit_failure_emits_bounded_metric() {
     turn.session_telemetry = turn.session_telemetry.clone().with_metrics(metrics.clone());
     let mut config = (*turn.config).clone();
     config.agent_max_threads = Some(0);
-    config.apps_mcp_product_sku = Some("codex".to_string());
     turn.config = Arc::new(config);
     let manager = thread_manager();
     set_agent_control(&mut session, manager.agent_control());
@@ -368,7 +367,6 @@ async fn spawn_agent_limit_failure_emits_bounded_metric() {
             ("error_kind".to_string(), "agent_limit_reached".to_string()),
             ("fork_mode".to_string(), "none".to_string()),
             ("multi_agent_version".to_string(), "v1".to_string()),
-            ("product_sku".to_string(), "codex".to_string()),
             ("reason".to_string(), "limit_reached".to_string()),
         ])
     );
@@ -4316,7 +4314,6 @@ async fn tool_handlers_cascade_close_and_resume_and_keep_explicitly_closed_subtr
         &config,
         auth_manager.clone(),
         crate::thread_manager::build_models_manager(&config, auth_manager),
-        crate::CodexAppsToolsCache::default(),
         SessionSource::Exec,
         Arc::new(codex_exec_server::EnvironmentManager::default_for_tests()),
         empty_extension_registry(),

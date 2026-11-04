@@ -410,12 +410,6 @@ pub enum ElicitationType {
     Approval,
 }
 
-pub struct AppInvocation {
-    pub connector_id: Option<String>,
-    pub app_name: Option<String>,
-    pub invocation_type: Option<InvocationType>,
-}
-
 /// A known classification, queued before the corresponding item completion.
 /// Ordinary calls do not send this fact; their emitted classification stays null.
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -606,8 +600,6 @@ pub(crate) enum CustomAnalyticsFact {
     TurnCodexError(Box<TurnCodexErrorFact>),
     ImagePreparation(Box<ImagePreparationFact>),
     SkillInvoked(SkillInvokedInput),
-    AppMentioned(AppMentionedInput),
-    AppUsed(AppUsedInput),
     McpToolCallElicitation(McpToolCallElicitation),
     HookRun(HookRunInput),
     ExternalAgentConfigImportCompleted(ExternalAgentConfigImportCompletedInput),
@@ -623,17 +615,6 @@ pub(crate) struct ArtifactOperationInput {
 pub(crate) struct SkillInvokedInput {
     pub tracking: TrackEventsContext,
     pub invocations: Vec<SkillInvocation>,
-}
-
-pub(crate) struct AppMentionedInput {
-    pub tracking: TrackEventsContext,
-    pub mentions: Vec<AppInvocation>,
-}
-
-pub(crate) struct AppUsedInput {
-    pub tracking: TrackEventsContext,
-    pub app: AppInvocation,
-    pub elicitation_type: Option<ElicitationType>,
 }
 
 pub(crate) struct HookRunInput {

@@ -23,7 +23,6 @@ struct State {
 #[derive(PartialEq, Eq)]
 struct SourceIdentity<'a> {
     connector_id: Option<&'a str>,
-    plugin_id: Option<&'a str>,
     server_name: &'a str,
     tool_name: &'a str,
 }
@@ -32,7 +31,6 @@ impl<'a> From<&'a McpAttributionSource> for SourceIdentity<'a> {
     fn from(source: &'a McpAttributionSource) -> Self {
         Self {
             connector_id: source.connector_id.as_deref(),
-            plugin_id: source.plugin_id.as_deref(),
             server_name: &source.server_name,
             tool_name: &source.tool_name,
         }

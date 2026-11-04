@@ -104,7 +104,6 @@ pub(crate) fn thread_extensions(
         http_client_factory,
     );
     codex_memories_extension::install(&mut builder, codex_otel::global());
-    codex_mcp_extension::install(&mut builder);
     codex_web_search_extension::install(&mut builder, auth_manager.clone());
     let mut skill_providers = codex_skills_extension::SkillProviders::new()
         .with_executor_provider(executor_skill_provider)

@@ -518,17 +518,6 @@ pub(super) async fn run_main_inner(
         && !app_server_target.uses_remote_workspace();
     if auto_start_daemon
         && daemon_exclusion.is_none()
-        && [Feature::BedrockSetupWizard, Feature::GcpSetupWizard]
-            .into_iter()
-            .any(|feature| {
-                should_show_provider_setup_wizard(
-                    LoginStatus::NotAuthenticated,
-                    config.model_provider.requires_openai_auth,
-                    &config,
-                    &AppServerTarget::Embedded,
-                    feature,
-                )
-            })
         && startup_draft
             .run_until(
                 config

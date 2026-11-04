@@ -170,4 +170,3 @@ async fn interrupt_completes_cancelled_dynamic_call(hook: Option<HookEventName>)
     );
     Ok(())
 }
-

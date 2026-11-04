@@ -104,7 +104,6 @@ pub(crate) async fn emit_explicit_skill_invocations(
                 turn_id: &turn_context.sub_id,
                 skill_name: &skill.name,
                 scope: Some(skill.scope),
-                plugin_id: None,
                 invocation_type: SkillInvocationType::Explicit,
             });
         for contributor in sess.services.extensions.skill_invocation_contributors() {
@@ -190,7 +189,6 @@ pub(crate) async fn maybe_emit_implicit_skill_invocation(
                 SkillInvocationLocation::Host { scope, .. } => Some(*scope),
                 SkillInvocationLocation::Resource { scope, .. } => *scope,
             },
-            plugin_id: None,
             invocation_type: SkillInvocationType::Implicit,
         });
     let skill_name_tag = sanitize_metric_tag_value(skill_name.as_str());

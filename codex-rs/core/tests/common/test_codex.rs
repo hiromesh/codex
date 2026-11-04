@@ -396,7 +396,6 @@ pub async fn submit_queue_barrier(codex: &CodexThread) {
 }
 
 pub struct TestCodexBuilder {
-    apps_tools_cache: codex_core::CodexAppsToolsCache,
     config_mutators: Vec<Box<ConfigMutator>>,
     thread_manager_configurer: Option<Box<dyn FnOnce(ThreadManager) -> ThreadManager + Send>>,
     auth: TestAuth,
@@ -419,11 +418,6 @@ pub struct TestCodexBuilder {
 }
 
 impl TestCodexBuilder {
-    pub fn with_apps_tools_cache(mut self, cache: codex_core::CodexAppsToolsCache) -> Self {
-        self.apps_tools_cache = cache;
-        self
-    }
-
     pub fn with_thread_store(mut self, thread_store: Arc<dyn ThreadStore>) -> Self {
         self.thread_store = Some(thread_store);
         self
@@ -488,6 +482,19 @@ impl TestCodexBuilder {
     pub fn with_history_mode(mut self, history_mode: impl Into<Option<ThreadHistoryMode>>) -> Self {
         self.history_mode = history_mode.into();
         self
+    }
+
+    /// Treats the mock server's `/v1/models` endpoint as the provider's authoritative
+    /// catalog, matching how a proxy provider must be configured for API-key discovery.
+    pub fn with_mock_model_catalog(self, server: &MockServer) -> Self {
+        let catalog_url = format!("{}/v1/models", server.uri());
+        self.with_config(move |config| {
+            config.model_provider.model_catalog_url = Some(catalog_url.into());
+            config
+                .features
+                .enable(Feature::ApiKeyModelDiscovery)
+                .expect("enable API-key model discovery");
+        })
     }
 
     pub fn with_model_info_override<T>(self, model: &str, override_model_info: T) -> Self
@@ -841,7 +848,6 @@ impl TestCodexBuilder {
                 &config,
                 auth_manager.clone(),
                 models_manager,
-                self.apps_tools_cache.clone(),
                 SessionSource::Exec,
                 Arc::clone(&environment_manager),
                 Arc::new(extensions.build()),
@@ -1492,13 +1498,8 @@ fn function_call_output<'a>(bodies: &'a [Value], call_id: &str) -> &'a Value {
 
 pub fn test_codex() -> TestCodexBuilder {
     TestCodexBuilder {
-        apps_tools_cache: Default::default(),
         thread_manager_configurer: None,
         config_mutators: vec![Box::new(|config| {
-            config
-                .features
-                .disable(Feature::Apps)
-                .expect("test config should allow Apps override");
             // Snapshot tests opt in explicitly; avoid spawning login shells for every test.
             config
                 .features

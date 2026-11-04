@@ -1455,9 +1455,7 @@ async fn apply_patch_cli_can_use_exec_command_output_as_patch_input() -> Result<
         "exec_command output producer runs in the test runner, not in the remote apply_patch workspace",
     );
 
-    let harness =
-        apply_patch_harness_with(|builder| builder.with_model("gpt-5.5"))
-            .await?;
+    let harness = apply_patch_harness_with(|builder| builder.with_model("gpt-5.5")).await?;
 
     let source_contents = "line1\nnaïve café\nline3\n";
     harness.write_file("source.txt", source_contents).await?;

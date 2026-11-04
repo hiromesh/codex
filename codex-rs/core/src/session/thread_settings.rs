@@ -116,7 +116,6 @@ pub(super) fn prepare_update(
         service_tier,
         collaboration_mode,
         personality,
-        disabled_plugin_ids,
     } = overrides;
     SessionSettingsUpdate {
         turn_extension_init,
@@ -136,7 +135,6 @@ pub(super) fn prepare_update(
         sandbox_policy,
         permission_profile,
         active_permission_profile,
-        disabled_plugin_ids,
         ..Default::default()
     }
 }

@@ -18,14 +18,11 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
 
-use codex_config::ConfigLayerStack;
 use codex_config::Constrained;
-use codex_config::McpEnterpriseManagedAuthConfig;
 use codex_config::McpServerAuth;
 use codex_config::McpServerConfig;
 use codex_config::McpServerTransportConfig;
 use codex_config::types::AppToolApproval;
-use codex_config::types::ApprovalsReviewer;
 use codex_config::types::AuthKeyringBackendKind;
 use codex_config::types::OAuthCredentialsStoreMode;
 use codex_login::CodexAuth;
@@ -47,7 +44,6 @@ use serde_json::Value;
 use tokio_util::sync::CancellationToken;
 
 use crate::McpProtocolMode;
-use crate::McpServerSource;
 use crate::ResolvedMcpCatalog;
 use crate::connection_manager::McpConnectionSet;
 use crate::runtime::McpPublicationGate;
@@ -120,13 +116,6 @@ pub struct McpConfig {
     pub requires_read_only_mcp_tools: bool,
     /// Codex home directory used for MCP OAuth state.
     pub codex_home: PathBuf,
-    /// Trusted enterprise IdP inherited after normal catalog and policy resolution.
-    pub mcp_enterprise_managed_auth: Option<McpEnterpriseManagedAuthConfig>,
-    /// Retires only EMA connections and pending exchanges for this config snapshot.
-    pub mcp_ema_cancellation: codex_config::McpEmaCancellation,
-    pub xaa_enabled: bool,
-    /// Shared sign-in requirements for account-backed enterprise MCP.
-    pub ema_state: Arc<crate::EmaState>,
     /// Preferred credential store for MCP OAuth tokens.
     pub mcp_oauth_credentials_store_mode: OAuthCredentialsStoreMode,
     /// OAuth refresh ownership selected for new MCP connections.
@@ -148,11 +137,6 @@ pub struct McpConfig {
     pub approval_policy: Constrained<AskForApproval>,
     /// Permission profile captured with the connections and approval policy.
     pub permission_profile: PermissionProfile,
-    /// Configuration layers used to evaluate Apps tool policy and reviewer selection.
-    pub config_layer_stack: ConfigLayerStack,
-    pub plugins: codex_config::types::PluginsConfigToml,
-    /// Default reviewer used when an Apps tool has no reviewer override.
-    pub approvals_reviewer: ApprovalsReviewer,
     /// Working directories for the exact environment handles used by this runtime.
     pub environment_cwds: HashMap<String, PathUri>,
     /// Explicit server permissions; unresolved or unavailable servers have no entry.
@@ -203,9 +187,7 @@ impl McpConfig {
                     environment_profiles.get(&server.config().environment_id)
                 {
                     permission_profile
-                } else if server.config().is_local_environment()
-                    || matches!(server.source(), McpServerSource::SelectedPlugin(_))
-                {
+                } else if server.config().is_local_environment() {
                     &self.permission_profile
                 } else {
                     return None;
@@ -230,67 +212,6 @@ impl McpConfig {
             .map(|(name, _)| (name.clone(), PermissionProfile::default()))
             .collect();
         config
-    }
-}
-
-/// Plugin attribution and selection data derived from the current MCP configuration.
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub(crate) struct ToolPluginContext {
-    plugin_display_names_by_mcp_server_name: HashMap<String, Vec<String>>,
-    plugin_ids_by_mcp_server_name: HashMap<String, String>,
-    selected_plugin_mcp_server_names: HashSet<String>,
-}
-
-impl ToolPluginContext {
-    pub fn plugin_display_names_for_mcp_server_name(&self, server_name: &str) -> &[String] {
-        self.plugin_display_names_by_mcp_server_name
-            .get(server_name)
-            .map(Vec::as_slice)
-            .unwrap_or(&[])
-    }
-
-    pub fn plugin_id_for_mcp_server_name(&self, server_name: &str) -> Option<&str> {
-        self.plugin_ids_by_mcp_server_name
-            .get(server_name)
-            .map(String::as_str)
-    }
-
-    pub(crate) fn is_selected_plugin_mcp_server(&self, server_name: &str) -> bool {
-        self.selected_plugin_mcp_server_names.contains(server_name)
-    }
-
-    fn from_config(config: &McpConfig) -> Self {
-        let mut tool_plugin_context = Self::default();
-
-        for (server_name, attribution) in config
-            .mcp_server_catalog
-            .plugin_attributions_by_server_name()
-        {
-            tool_plugin_context
-                .plugin_display_names_by_mcp_server_name
-                .insert(
-                    server_name.clone(),
-                    vec![attribution.display_name().to_string()],
-                );
-            tool_plugin_context
-                .plugin_ids_by_mcp_server_name
-                .insert(server_name, attribution.plugin_id().to_string());
-        }
-        tool_plugin_context.selected_plugin_mcp_server_names.extend(
-            config
-                .mcp_server_catalog
-                .selected_plugin_server_names()
-                .map(str::to_string),
-        );
-
-        for plugin_names in tool_plugin_context
-            .plugin_display_names_by_mcp_server_name
-            .values_mut()
-        {
-            plugin_names.sort_unstable();
-            plugin_names.dedup();
-        }
-        tool_plugin_context
     }
 }
 
@@ -371,15 +292,10 @@ pub fn effective_mcp_servers_from_configured(
                 EffectiveMcpServer::from_config_with_policy(
                     server,
                     registration.credential_policy(),
-                )
-                .with_agent_plugin(registration.source().is_agent_plugin()),
+                ),
             )
         })
         .collect::<HashMap<_, _>>()
-}
-
-pub(crate) fn tool_plugin_context(config: &McpConfig) -> ToolPluginContext {
-    ToolPluginContext::from_config(config)
 }
 
 pub async fn read_mcp_resource(
@@ -395,15 +311,12 @@ pub async fn read_mcp_resource(
     let cancel_token = CancellationToken::new();
     let runtime_config = config.for_threadless_operations(&mcp_servers);
     let manager = McpConnectionSet::new(
-        /*ema_auth*/ None,
-        /*existing_ema*/ None,
         /*previous*/ None,
         McpPublicationGate::already_published(),
         McpRuntimeInput {
             network_policy_metadata: None,
             startup_policy: McpStartupPolicy::Eager,
             config: Arc::new(runtime_config),
-            plugins_available: false,
             ready_selected_capability_roots: Vec::new(),
             mcp_servers,
             submit_id: String::new(),
@@ -471,7 +384,6 @@ pub async fn collect_mcp_server_status_snapshot_with_detail(
         config.auth_keyring_backend_kind,
         auth,
         auth_manager,
-        &config.ema_state,
         &runtime_context,
     )
     .await;
@@ -481,15 +393,12 @@ pub async fn collect_mcp_server_status_snapshot_with_detail(
     let cancel_token = CancellationToken::new();
     let runtime_config = config.for_threadless_operations(&mcp_servers);
     let mcp_connection_manager = McpConnectionSet::new(
-        /*ema_auth*/ None,
-        /*existing_ema*/ None,
         /*previous*/ None,
         McpPublicationGate::already_published(),
         McpRuntimeInput {
             network_policy_metadata: None,
             startup_policy: McpStartupPolicy::Eager,
             config: Arc::new(runtime_config),
-            plugins_available: false,
             ready_selected_capability_roots: Vec::new(),
             mcp_servers,
             submit_id: String::new(),
@@ -697,16 +606,11 @@ pub(crate) async fn collect_mcp_server_status_snapshot_from_manager(
             .insert(tool_name, tool);
     }
 
-    // Status-only discovery has no event channel. Report OAuth and EMA failures from the completed
+    // Status-only discovery has no event channel. Report OAuth failures from the completed
     // connection attempt instead of retaining the credential-presence status read beforehand.
     let mut auth_statuses = auth_statuses_from_entries(&auth_status_entries);
     for server_name in mcp_connection_manager.authentication_failed_servers().await {
-        if auth_statuses.get(&server_name) == Some(&McpAuthStatus::OAuth)
-            || auth_status_entries
-                .get(&server_name)
-                .and_then(|entry| entry.config.as_ref())
-                .is_some_and(|config| matches!(config.auth, McpServerAuth::EmaAuth))
-        {
+        if auth_statuses.get(&server_name) == Some(&McpAuthStatus::OAuth) {
             auth_statuses.insert(server_name, McpAuthStatus::NotLoggedIn);
         }
     }

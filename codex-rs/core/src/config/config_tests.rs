@@ -2,7 +2,6 @@ use crate::config::edit::ConfigEdit;
 use crate::config::edit::ConfigEditsBuilder;
 use crate::config::edit::apply_blocking;
 use crate::context::ContextualUserFragment;
-use crate::plugins::plugins_manager_for_config;
 use crate::session::multi_agents::resolve_usage_hints;
 use assert_matches::assert_matches;
 use codex_config::CONFIG_TOML_FILE;
@@ -69,7 +68,6 @@ use codex_features::Feature;
 use codex_features::FeaturesToml;
 use codex_login::CodexAuth;
 use codex_login::default_client::RESIDENCY_HEADER_NAME;
-use codex_login::test_support::auth_manager_from_optional_auth;
 use codex_model_provider::ProviderCapabilities;
 use codex_model_provider_info::LMSTUDIO_OSS_PROVIDER_ID;
 use codex_model_provider_info::WireApi;
@@ -618,9 +616,7 @@ async fn load_config_resolves_non_prefixed_mcp_tool_servers() -> std::io::Result
 
         assert_eq!(config.non_prefixed_mcp_tool_servers, expected_servers);
         assert_eq!(config.prefix_mcp_tool_names(), expected_prefix);
-        let plugins_manager =
-            plugins_manager_for_config(&config, auth_manager_from_optional_auth(/*auth*/ None));
-        let mcp_config = config.to_mcp_config(&plugins_manager).await;
+        let mcp_config = config.to_mcp_config();
         assert_eq!(mcp_config.prefix_mcp_tool_names, expected_prefix);
         assert_eq!(
             mcp_config.non_prefixed_mcp_tool_servers,
@@ -1994,16 +1990,6 @@ respect_system_proxy = true
             .http_client_factory()
             .outbound_proxy_policy(),
         codex_http_client::OutboundProxyPolicy::RespectSystemProxy
-    );
-    assert_eq!(
-        config.plugins_config_input().remote_plugin_service_config(),
-        codex_core_plugins::remote::RemotePluginServiceConfig::new(
-            config.chatgpt_base_url,
-            codex_http_client::HttpClientFactory::new(
-                codex_http_client::OutboundProxyPolicy::RespectSystemProxy,
-            ),
-            /*product_sku*/ None,
-        )
     );
     Ok(())
 }
@@ -4667,625 +4653,6 @@ async fn runtime_config_resolves_resume_cwd_default_and_override() {
 }
 
 #[tokio::test]
-async fn legacy_sandbox_mode_builds_profiles_with_compatible_projection() -> std::io::Result<()> {
-    let codex_home = TempDir::new()?;
-    let cwd = TempDir::new()?;
-    let extra_root = test_absolute_path("/tmp/legacy-extra-root");
-    let cases = vec![
-        (
-            "danger-full-access".to_string(),
-            r#"sandbox_mode = "danger-full-access"
-"#
-            .to_string(),
-        ),
-        (
-            "read-only".to_string(),
-            r#"sandbox_mode = "read-only"
-"#
-            .to_string(),
-        ),
-        (
-            "workspace-write".to_string(),
-            format!(
-                r#"sandbox_mode = "workspace-write"
-
-[sandbox_workspace_write]
-writable_roots = [{}]
-exclude_tmpdir_env_var = true
-exclude_slash_tmp = true
-"#,
-                serde_json::json!(extra_root)
-            ),
-        ),
-    ];
-
-    for (name, config_toml) in cases {
-        let cfg = toml::from_str::<ConfigToml>(&config_toml)
-            .unwrap_or_else(|err| panic!("case `{name}` should parse: {err}"));
-        let config = Config::load_from_base_config_with_overrides(
-            cfg,
-            ConfigOverrides {
-                cwd: Some(cwd.path().to_path_buf()),
-                ..Default::default()
-            },
-            codex_home.abs(),
-        )
-        .await?;
-
-        let sandbox_policy = config.legacy_sandbox_policy();
-        let file_system_policy = config.permissions.file_system_sandbox_policy();
-        let network_policy = config.permissions.network_sandbox_policy();
-
-        assert_eq!(
-            network_policy,
-            NetworkSandboxPolicy::from(&sandbox_policy),
-            "case `{name}` should preserve network semantics from legacy config"
-        );
-        assert_eq!(
-            file_system_policy
-                .to_legacy_sandbox_policy(network_policy, cwd.path())
-                .unwrap_or_else(|err| panic!("case `{name}` should round-trip: {err}")),
-            sandbox_policy,
-            "case `{name}` should preserve its legacy compatibility projection"
-        );
-
-        match name.as_str() {
-            "danger-full-access" | "read-only" => {
-                assert_eq!(
-                    file_system_policy,
-                    FileSystemSandboxPolicy::from_legacy_sandbox_policy_for_cwd(
-                        &sandbox_policy,
-                        cwd.path()
-                    ),
-                    "case `{name}` should match the legacy filesystem projection exactly"
-                );
-            }
-            "workspace-write" => {
-                if false {
-                    assert_eq!(
-                        sandbox_policy,
-                        SandboxPolicy::new_read_only_policy(),
-                        "legacy workspace-write should keep the existing Windows downgrade when \
-                         the experimental Windows sandbox is disabled"
-                    );
-                    assert_eq!(
-                        file_system_policy,
-                        FileSystemSandboxPolicy::from_legacy_sandbox_policy_for_cwd(
-                            &sandbox_policy,
-                            cwd.path()
-                        ),
-                        "downgraded workspace-write should match the legacy read-only projection"
-                    );
-                    continue;
-                }
-                assert_eq!(
-                    config.permissions.workspace_roots(),
-                    &[cwd.abs(), extra_root.clone()]
-                );
-                assert!(
-                    file_system_policy
-                        .entries
-                        .contains(&FileSystemSandboxEntry {
-                            path: cwd.abs().into(),
-                            access: FileSystemAccessMode::Write,
-                            missing_path_behavior: None,
-                        })
-                );
-                assert!(
-                    file_system_policy
-                        .entries
-                        .contains(&FileSystemSandboxEntry {
-                            path: FileSystemPath::Path {
-                                path: extra_root.clone().into(),
-                            },
-                            access: FileSystemAccessMode::Write,
-                            missing_path_behavior: None,
-                        })
-                );
-                for subpath in [".git", ".agents", ".codex", ".aws"] {
-                    assert!(
-                        file_system_policy
-                            .entries
-                            .contains(&FileSystemSandboxEntry {
-                                path: FileSystemPath::Path {
-                                    path: AbsolutePathBuf::resolve_path_against_base(
-                                        subpath,
-                                        cwd.path()
-                                    )
-                                    .into(),
-                                },
-                                access: FileSystemAccessMode::Read,
-                                missing_path_behavior: Some(
-                                    codex_protocol::permissions::FileSystemSandboxEntryMissingPathBehavior::Skip,
-                                ),
-                            }),
-                        "case `{name}` should materialize `{subpath}` for the runtime workspace \
-                         root"
-                    );
-                }
-            }
-            _ => unreachable!("unexpected test case `{name}`"),
-        }
-    }
-
-    Ok(())
-}
-
-#[test]
-fn filter_mcp_servers_by_allowlist_enforces_identity_rules() {
-    const MISMATCHED_COMMAND_SERVER: &str = "mismatched-command-should-disable";
-    const MISMATCHED_URL_SERVER: &str = "mismatched-url-should-disable";
-    const MATCHED_COMMAND_SERVER: &str = "matched-command-should-allow";
-    const MATCHED_URL_SERVER: &str = "matched-url-should-allow";
-    const DIFFERENT_NAME_SERVER: &str = "different-name-should-disable";
-
-    const GOOD_CMD: &str = "good-cmd";
-    const GOOD_URL: &str = "https://example.com/good";
-
-    let mut servers = HashMap::from([
-        (MISMATCHED_COMMAND_SERVER.to_string(), stdio_mcp("docs-cmd")),
-        (
-            MISMATCHED_URL_SERVER.to_string(),
-            http_mcp("https://example.com/mcp"),
-        ),
-        (MATCHED_COMMAND_SERVER.to_string(), stdio_mcp(GOOD_CMD)),
-        (MATCHED_URL_SERVER.to_string(), http_mcp(GOOD_URL)),
-        (DIFFERENT_NAME_SERVER.to_string(), stdio_mcp("same-cmd")),
-    ]);
-    let source = RequirementSource::LegacyManagedConfigTomlFromMdm;
-    let requirements = Sourced::new(
-        BTreeMap::from([
-            (
-                MISMATCHED_URL_SERVER.to_string(),
-                McpServerRequirement::Identity {
-                    identity: McpServerIdentity::Url {
-                        url: "https://example.com/other".to_string(),
-                    },
-                },
-            ),
-            (
-                MISMATCHED_COMMAND_SERVER.to_string(),
-                McpServerRequirement::Identity {
-                    identity: McpServerIdentity::Command {
-                        command: "other-cmd".to_string(),
-                    },
-                },
-            ),
-            (
-                MATCHED_URL_SERVER.to_string(),
-                McpServerRequirement::Identity {
-                    identity: McpServerIdentity::Url {
-                        url: GOOD_URL.to_string(),
-                    },
-                },
-            ),
-            (
-                MATCHED_COMMAND_SERVER.to_string(),
-                McpServerRequirement::Identity {
-                    identity: McpServerIdentity::Command {
-                        command: GOOD_CMD.to_string(),
-                    },
-                },
-            ),
-        ]),
-        source.clone(),
-    );
-    filter_mcp_servers_by_requirements(&mut servers, Some(&requirements));
-
-    let reason = Some(McpServerDisabledReason::Requirements { source });
-    assert_eq!(
-        servers
-            .iter()
-            .map(|(name, server)| (
-                name.clone(),
-                (server.enabled, server.disabled_reason.clone())
-            ))
-            .collect::<HashMap<String, (bool, Option<McpServerDisabledReason>)>>(),
-        HashMap::from([
-            (MISMATCHED_URL_SERVER.to_string(), (false, reason.clone())),
-            (
-                MISMATCHED_COMMAND_SERVER.to_string(),
-                (false, reason.clone()),
-            ),
-            (MATCHED_URL_SERVER.to_string(), (true, None)),
-            (MATCHED_COMMAND_SERVER.to_string(), (true, None)),
-            (DIFFERENT_NAME_SERVER.to_string(), (false, reason)),
-        ])
-    );
-}
-
-#[test]
-fn filter_mcp_servers_by_allowlist_allows_all_when_unset() {
-    let mut servers = HashMap::from([
-        ("server-a".to_string(), stdio_mcp("cmd-a")),
-        ("server-b".to_string(), http_mcp("https://example.com/b")),
-    ]);
-
-    filter_mcp_servers_by_requirements(&mut servers, /*mcp_requirements*/ None);
-
-    assert_eq!(
-        servers
-            .iter()
-            .map(|(name, server)| (
-                name.clone(),
-                (server.enabled, server.disabled_reason.clone())
-            ))
-            .collect::<HashMap<String, (bool, Option<McpServerDisabledReason>)>>(),
-        HashMap::from([
-            ("server-a".to_string(), (true, None)),
-            ("server-b".to_string(), (true, None)),
-        ])
-    );
-}
-
-#[test]
-fn filter_mcp_servers_by_matchers_enforces_command_and_positional_args() {
-    let mut servers = HashMap::from([
-        (
-            "internal_mcp_proxy".to_string(),
-            stdio_mcp_with_args(
-                "company-cli",
-                &[
-                    "mcp",
-                    "proxy",
-                    "--server",
-                    "https://pricing.mcp.internal.example.com",
-                ],
-            ),
-        ),
-        (
-            "unlisted".to_string(),
-            stdio_mcp_with_args(
-                "company-cli",
-                &[
-                    "mcp",
-                    "proxy",
-                    "--server",
-                    "https://pricing.mcp.internal.example.com",
-                ],
-            ),
-        ),
-        (
-            "wrong-order".to_string(),
-            stdio_mcp_with_args(
-                "company-cli",
-                &[
-                    "proxy",
-                    "mcp",
-                    "--server",
-                    "https://pricing.mcp.internal.example.com",
-                ],
-            ),
-        ),
-        (
-            "trailing-arg".to_string(),
-            stdio_mcp_with_args(
-                "company-cli",
-                &[
-                    "mcp",
-                    "proxy",
-                    "--server",
-                    "https://pricing.mcp.internal.example.com",
-                    "--verbose",
-                ],
-            ),
-        ),
-        (
-            "wrong-host".to_string(),
-            stdio_mcp_with_args(
-                "company-cli",
-                &["mcp", "proxy", "--server", "https://mcp.example.com"],
-            ),
-        ),
-    ]);
-    let source = RequirementSource::LegacyManagedConfigTomlFromMdm;
-    let requirement = McpServerRequirement::Command(McpServerCommandMatcher {
-        executable: "company-cli".to_string(),
-        args: vec![
-            McpServerValueMatcher::Exact {
-                value: "mcp".to_string(),
-            },
-            McpServerValueMatcher::Exact {
-                value: "proxy".to_string(),
-            },
-            McpServerValueMatcher::Exact {
-                value: "--server".to_string(),
-            },
-            McpServerValueMatcher::Regex {
-                expression:
-                    r"^https://[A-Za-z0-9-]+\.mcp\.internal\.example\.com(?::443)?(?:/.*)?$"
-                        .to_string(),
-            },
-        ],
-    });
-    let requirements = Sourced::new(
-        BTreeMap::from([
-            ("internal_mcp_proxy".to_string(), requirement.clone()),
-            ("wrong-order".to_string(), requirement.clone()),
-            ("trailing-arg".to_string(), requirement.clone()),
-            ("wrong-host".to_string(), requirement),
-        ]),
-        source.clone(),
-    );
-
-    filter_mcp_servers_by_requirements(&mut servers, Some(&requirements));
-
-    let reason = Some(McpServerDisabledReason::Requirements { source });
-    assert_eq!(
-        servers
-            .iter()
-            .map(|(name, server)| (
-                name.clone(),
-                (server.enabled, server.disabled_reason.clone())
-            ))
-            .collect::<HashMap<String, (bool, Option<McpServerDisabledReason>)>>(),
-        HashMap::from([
-            ("internal_mcp_proxy".to_string(), (true, None)),
-            ("unlisted".to_string(), (false, reason.clone())),
-            ("wrong-order".to_string(), (false, reason.clone())),
-            ("trailing-arg".to_string(), (false, reason.clone())),
-            ("wrong-host".to_string(), (false, reason)),
-        ])
-    );
-}
-
-#[test]
-fn filter_mcp_servers_by_allowlist_blocks_all_when_empty() {
-    let mut servers = HashMap::from([
-        ("server-a".to_string(), stdio_mcp("cmd-a")),
-        ("server-b".to_string(), http_mcp("https://example.com/b")),
-    ]);
-
-    servers.get_mut("server-b").expect("server-b").enabled = false;
-    let source = RequirementSource::LegacyManagedConfigTomlFromMdm;
-    let requirements = Sourced::new(BTreeMap::new(), source.clone());
-    filter_mcp_servers_by_requirements(&mut servers, Some(&requirements));
-    filter_mcp_servers_by_requirements(&mut servers, Some(&requirements));
-
-    let reason = Some(McpServerDisabledReason::Requirements { source });
-    assert_eq!(
-        servers
-            .iter()
-            .map(|(name, server)| (
-                name.clone(),
-                (server.enabled, server.disabled_reason.clone())
-            ))
-            .collect::<HashMap<String, (bool, Option<McpServerDisabledReason>)>>(),
-        HashMap::from([
-            ("server-a".to_string(), (false, reason)),
-            (
-                "server-b".to_string(),
-                (
-                    false,
-                    Some(McpServerDisabledReason::ExplicitAndRequirements {
-                        source: requirements.source.clone(),
-                    })
-                ),
-            ),
-        ])
-    );
-}
-
-#[test]
-fn filter_plugin_mcp_servers_without_allowlists_does_not_filter_any_plugin() {
-    let original_servers = HashMap::from([
-        ("server-a".to_string(), stdio_mcp("cmd-a")),
-        ("server-b".to_string(), http_mcp("https://example.com/b")),
-    ]);
-    let requirements = Sourced::new(
-        BTreeMap::from([(
-            "sites@openai-bundled".to_string(),
-            codex_config::PluginRequirementsToml { mcp_servers: None },
-        )]),
-        RequirementSource::LegacyManagedConfigTomlFromMdm,
-    );
-
-    for plugin_name in ["sites@openai-bundled", "sample@test"] {
-        let mut servers = original_servers.clone();
-        filter_plugin_mcp_servers_by_requirements(plugin_name, &mut servers, Some(&requirements));
-
-        assert_eq!(servers, original_servers);
-    }
-}
-
-#[test]
-fn filter_plugin_mcp_servers_by_empty_allowlist_blocks_all() {
-    let mut servers = HashMap::from([
-        ("server-a".to_string(), stdio_mcp("cmd-a")),
-        ("server-b".to_string(), http_mcp("https://example.com/b")),
-    ]);
-    let source = RequirementSource::LegacyManagedConfigTomlFromMdm;
-    let requirements = Sourced::new(
-        BTreeMap::from([(
-            "sample@test".to_string(),
-            codex_config::PluginRequirementsToml {
-                mcp_servers: Some(BTreeMap::new()),
-            },
-        )]),
-        source.clone(),
-    );
-
-    filter_plugin_mcp_servers_by_requirements("sample@test", &mut servers, Some(&requirements));
-
-    let reason = Some(McpServerDisabledReason::Requirements { source });
-    assert_eq!(
-        servers
-            .iter()
-            .map(|(name, server)| (
-                name.clone(),
-                (server.enabled, server.disabled_reason.clone())
-            ))
-            .collect::<HashMap<String, (bool, Option<McpServerDisabledReason>)>>(),
-        HashMap::from([
-            ("server-a".to_string(), (false, reason.clone())),
-            ("server-b".to_string(), (false, reason)),
-        ])
-    );
-}
-
-#[test]
-fn filter_plugin_mcp_servers_by_allowlist_enforces_plugin_and_identity_rules() {
-    const MATCHED_SERVER: &str = "matched-should-allow";
-    const MISMATCHED_SERVER: &str = "mismatched-should-disable";
-    const UNLISTED_SERVER: &str = "unlisted-should-disable";
-    const GOOD_CMD: &str = "good-cmd";
-
-    let mut servers = HashMap::from([
-        (MATCHED_SERVER.to_string(), stdio_mcp(GOOD_CMD)),
-        (MISMATCHED_SERVER.to_string(), stdio_mcp("bad-cmd")),
-        (
-            UNLISTED_SERVER.to_string(),
-            http_mcp("https://example.com/mcp"),
-        ),
-    ]);
-    let source = RequirementSource::LegacyManagedConfigTomlFromMdm;
-    let requirements = Sourced::new(
-        BTreeMap::from([(
-            "sample@test".to_string(),
-            codex_config::PluginRequirementsToml {
-                mcp_servers: Some(BTreeMap::from([
-                    (
-                        MATCHED_SERVER.to_string(),
-                        McpServerRequirement::Identity {
-                            identity: McpServerIdentity::Command {
-                                command: GOOD_CMD.to_string(),
-                            },
-                        },
-                    ),
-                    (
-                        MISMATCHED_SERVER.to_string(),
-                        McpServerRequirement::Identity {
-                            identity: McpServerIdentity::Command {
-                                command: GOOD_CMD.to_string(),
-                            },
-                        },
-                    ),
-                ])),
-            },
-        )]),
-        source.clone(),
-    );
-
-    filter_plugin_mcp_servers_by_requirements("sample@test", &mut servers, Some(&requirements));
-
-    let reason = Some(McpServerDisabledReason::Requirements { source });
-    assert_eq!(
-        servers
-            .iter()
-            .map(|(name, server)| (
-                name.clone(),
-                (server.enabled, server.disabled_reason.clone())
-            ))
-            .collect::<HashMap<String, (bool, Option<McpServerDisabledReason>)>>(),
-        HashMap::from([
-            (MATCHED_SERVER.to_string(), (true, None)),
-            (MISMATCHED_SERVER.to_string(), (false, reason.clone())),
-            (UNLISTED_SERVER.to_string(), (false, reason)),
-        ])
-    );
-}
-
-#[test]
-fn filter_plugin_mcp_servers_by_allowlist_blocks_unlisted_plugin() {
-    let mut servers = HashMap::from([("server-a".to_string(), stdio_mcp("cmd-a"))]);
-    let source = RequirementSource::LegacyManagedConfigTomlFromMdm;
-    let requirements = Sourced::new(
-        BTreeMap::from([(
-            "other@test".to_string(),
-            codex_config::PluginRequirementsToml {
-                mcp_servers: Some(BTreeMap::from([(
-                    "server-a".to_string(),
-                    McpServerRequirement::Identity {
-                        identity: McpServerIdentity::Command {
-                            command: "cmd-a".to_string(),
-                        },
-                    },
-                )])),
-            },
-        )]),
-        source.clone(),
-    );
-
-    filter_plugin_mcp_servers_by_requirements("sample@test", &mut servers, Some(&requirements));
-
-    assert_eq!(
-        servers
-            .iter()
-            .map(|(name, server)| (
-                name.clone(),
-                (server.enabled, server.disabled_reason.clone())
-            ))
-            .collect::<HashMap<String, (bool, Option<McpServerDisabledReason>)>>(),
-        HashMap::from([(
-            "server-a".to_string(),
-            (
-                false,
-                Some(McpServerDisabledReason::Requirements { source })
-            )
-        )])
-    );
-}
-
-#[test]
-fn filter_plugin_mcp_servers_by_matchers_enforces_name_and_invocation() {
-    const MATCHED_SERVER: &str = "matched";
-    const MISMATCHED_SERVER: &str = "mismatched";
-    const UNLISTED_SERVER: &str = "unlisted";
-
-    let mut servers = HashMap::from([
-        (
-            MATCHED_SERVER.to_string(),
-            stdio_mcp_with_args("company-cli", &["approved"]),
-        ),
-        (
-            MISMATCHED_SERVER.to_string(),
-            stdio_mcp_with_args("company-cli", &["rejected"]),
-        ),
-        (
-            UNLISTED_SERVER.to_string(),
-            stdio_mcp_with_args("company-cli", &["approved"]),
-        ),
-    ]);
-    let source = RequirementSource::LegacyManagedConfigTomlFromMdm;
-    let requirement = McpServerRequirement::Command(McpServerCommandMatcher {
-        executable: "company-cli".to_string(),
-        args: vec![McpServerValueMatcher::Exact {
-            value: "approved".to_string(),
-        }],
-    });
-    let requirements = Sourced::new(
-        BTreeMap::from([(
-            "sample@test".to_string(),
-            codex_config::PluginRequirementsToml {
-                mcp_servers: Some(BTreeMap::from([
-                    (MATCHED_SERVER.to_string(), requirement.clone()),
-                    (MISMATCHED_SERVER.to_string(), requirement),
-                ])),
-            },
-        )]),
-        source.clone(),
-    );
-
-    filter_plugin_mcp_servers_by_requirements("sample@test", &mut servers, Some(&requirements));
-
-    let reason = Some(McpServerDisabledReason::Requirements { source });
-    assert_eq!(
-        servers
-            .iter()
-            .map(|(name, server)| (
-                name.clone(),
-                (server.enabled, server.disabled_reason.clone())
-            ))
-            .collect::<HashMap<String, (bool, Option<McpServerDisabledReason>)>>(),
-        HashMap::from([
-            (MATCHED_SERVER.to_string(), (true, None)),
-            (MISMATCHED_SERVER.to_string(), (false, reason.clone())),
-            (UNLISTED_SERVER.to_string(), (false, reason)),
-        ])
-    );
-}
-
-#[tokio::test]
 async fn rebuild_with_session_layers_refreshes_requirements() -> std::io::Result<()> {
     let service_config = codex_config::ConfigServer {
         base_url: "https://policy.example/settings".into(),
@@ -5506,344 +4873,6 @@ async fn rebuild_with_session_layers_refreshes_requirements() -> std::io::Result
         ])
     );
 
-    Ok(())
-}
-
-#[tokio::test]
-async fn rebuild_with_session_layers_refreshes_plugin_derived_mcp_config() -> anyhow::Result<()> {
-    let codex_home = TempDir::new()?;
-    let plugin_root = codex_home
-        .path()
-        .join("plugins/cache")
-        .join("test/sample/local");
-    std::fs::create_dir_all(plugin_root.join(".codex-plugin"))?;
-    std::fs::write(
-        plugin_root.join(".codex-plugin/plugin.json"),
-        r#"{"name":"sample"}"#,
-    )?;
-    std::fs::write(
-        plugin_root.join(".mcp.json"),
-        r#"{
-  "mcpServers": {
-    "sample": {
-      "type": "http",
-      "url": "https://sample.example/mcp"
-    }
-  }
-}"#,
-    )?;
-
-    let user_file = AbsolutePathBuf::resolve_path_against_base(CONFIG_TOML_FILE, codex_home.path());
-    let refreshed_layer_stack = ConfigLayerStack::new(
-        vec![ConfigLayerEntry::new(
-            ConfigLayerSource::User {
-                file: user_file.clone(),
-                profile: None,
-            },
-            toml::toml! {
-                [features]
-                plugins = true
-
-                [plugins."sample@test"]
-                enabled = true
-            }
-            .into(),
-        )],
-        Default::default(),
-        Default::default(),
-    )?;
-    let thread_layer_stack = ConfigLayerStack::new(
-        vec![ConfigLayerEntry::new(
-            ConfigLayerSource::User {
-                file: user_file,
-                profile: None,
-            },
-            toml::toml! {
-                [features]
-                plugins = false
-
-                [plugins."sample@test"]
-                enabled = true
-            }
-            .into(),
-        )],
-        Default::default(),
-        Default::default(),
-    )?;
-    let thread_config = Config::load_config_with_layer_stack(
-        LOCAL_FS.as_ref(),
-        thread_layer_stack.effective_config().try_into()?,
-        ConfigOverrides {
-            cwd: Some(codex_home.path().to_path_buf()),
-            ..Default::default()
-        },
-        codex_home.abs(),
-        thread_layer_stack,
-    )
-    .await?;
-    let config = Config::rebuild_with_session_layers(
-        &thread_config.config_layer_stack,
-        thread_config.cwd.to_path_buf(),
-        &refreshed_layer_stack,
-        codex_home.abs(),
-    )
-    .await?;
-    let plugins_manager =
-        plugins_manager_for_config(&config, auth_manager_from_optional_auth(/*auth*/ None));
-    let mcp_config = config.to_mcp_config(&plugins_manager).await;
-    let configured_servers = mcp_config.mcp_server_catalog.configured_servers();
-
-    assert_eq!(
-        configured_servers.get("sample"),
-        Some(&http_mcp("https://sample.example/mcp"))
-    );
-    assert_eq!(
-        mcp_config
-            .mcp_server_catalog
-            .plugin_attributions_by_server_name(),
-        HashMap::from([(
-            "sample".to_string(),
-            McpPluginAttribution::new("sample@test".to_string(), "sample".to_string())
-                .with_host_root(PathUri::from_host_native_path(&plugin_root)?),
-        )])
-    );
-
-    Ok(())
-}
-
-#[tokio::test]
-async fn to_mcp_config_omits_plugin_id_when_user_server_shadows_plugin_mcp() -> anyhow::Result<()> {
-    let codex_home = TempDir::new()?;
-    let plugin_root = codex_home
-        .path()
-        .join("plugins/cache")
-        .join("test/sample/local");
-    std::fs::create_dir_all(plugin_root.join(".codex-plugin"))?;
-    std::fs::write(
-        plugin_root.join(".codex-plugin/plugin.json"),
-        r#"{"name":"sample"}"#,
-    )?;
-    std::fs::write(
-        plugin_root.join(".mcp.json"),
-        r#"{
-  "mcpServers": {
-    "sample": {
-      "type": "http",
-      "url": "https://plugin.example/mcp"
-    }
-  }
-}"#,
-    )?;
-    std::fs::write(
-        codex_home.path().join(CONFIG_TOML_FILE),
-        r#"
-[features]
-plugins = true
-
-[mcp_servers.sample]
-url = "https://user.example/mcp"
-
-[plugins."sample@test"]
-enabled = true
-"#,
-    )?;
-
-    let config = ConfigBuilder::default()
-        .codex_home(codex_home.path().to_path_buf())
-        .build()
-        .await?;
-    let plugins_manager =
-        plugins_manager_for_config(&config, auth_manager_from_optional_auth(/*auth*/ None));
-    let mcp_config = config.to_mcp_config(&plugins_manager).await;
-    let configured_servers = mcp_config.mcp_server_catalog.configured_servers();
-
-    assert_eq!(
-        configured_servers.get("sample"),
-        Some(&http_mcp("https://user.example/mcp"))
-    );
-    assert!(
-        mcp_config
-            .mcp_server_catalog
-            .plugin_attributions_by_server_name()
-            .is_empty()
-    );
-
-    Ok(())
-}
-
-#[tokio::test]
-async fn selected_plugin_wins_after_discovered_plugin_requirements() -> anyhow::Result<()> {
-    let codex_home = TempDir::new()?;
-    let plugin_root = codex_home
-        .path()
-        .join("plugins/cache")
-        .join("test/sample/local");
-    std::fs::create_dir_all(plugin_root.join(".codex-plugin"))?;
-    std::fs::write(
-        plugin_root.join(".codex-plugin/plugin.json"),
-        r#"{"name":"sample"}"#,
-    )?;
-    std::fs::write(
-        plugin_root.join(".mcp.json"),
-        r#"{
-  "mcpServers": {
-    "sample": {
-      "type": "http",
-      "url": "https://sample.example/mcp"
-    },
-    "unlisted": {
-      "type": "http",
-      "url": "https://unlisted.example/mcp"
-    }
-  }
-}"#,
-    )?;
-    std::fs::write(
-        codex_home.path().join(CONFIG_TOML_FILE),
-        r#"
-[features]
-plugins = true
-
-[plugins."sample@test"]
-enabled = true
-"#,
-    )?;
-
-    let config = ConfigBuilder::default()
-        .codex_home(codex_home.path().to_path_buf())
-        .cloud_config_bundle(
-            CloudConfigBundleFixture::loader_with_enterprise_requirement(
-                r#"
-[plugins."sample@test".mcp_servers.sample.identity]
-url = "https://sample.example/mcp"
-"#,
-            ),
-        )
-        .build()
-        .await?;
-    let plugins_manager =
-        plugins_manager_for_config(&config, auth_manager_from_optional_auth(/*auth*/ None));
-    let mcp_config = config.to_mcp_config(&plugins_manager).await;
-    let configured_servers = mcp_config.mcp_server_catalog.configured_servers();
-
-    assert_eq!(
-        configured_servers
-            .get("sample")
-            .map(|server| (server.enabled, server.disabled_reason.clone())),
-        Some((true, None))
-    );
-    assert_eq!(
-        configured_servers
-            .get("unlisted")
-            .map(|server| (server.enabled, server.disabled_reason.clone())),
-        Some((
-            false,
-            Some(McpServerDisabledReason::Requirements {
-                source: RequirementSource::EnterpriseManaged {
-                    id: "req_1".to_string(),
-                    name: "Base requirements".to_string(),
-                },
-            })
-        ))
-    );
-
-    let selected = http_mcp("https://selected.example/mcp");
-    let mcp_config = config
-        .to_mcp_config_with_plugin_registrations(
-            &plugins_manager,
-            [McpServerRegistration::from_selected_plugin(
-                "unlisted".to_string(),
-                McpPluginAttribution::new(
-                    "selected-root".to_string(),
-                    "Selected Plugin".to_string(),
-                ),
-                /*selection_order*/ 0,
-                codex_config::DEFAULT_MCP_SERVER_ENVIRONMENT_ID,
-                selected.clone(),
-            )],
-        )
-        .await;
-
-    assert_eq!(
-        mcp_config
-            .mcp_server_catalog
-            .server("unlisted")
-            .map(|server| (server.source().clone(), server.config().clone())),
-        Some((
-            codex_mcp::McpServerSource::SelectedPlugin(McpPluginAttribution::new(
-                "selected-root".to_string(),
-                "Selected Plugin".to_string(),
-            )),
-            selected,
-        ))
-    );
-    Ok(())
-}
-
-#[tokio::test]
-async fn to_mcp_config_empty_mcp_requirements_disable_plugin_mcps() -> anyhow::Result<()> {
-    let codex_home = TempDir::new()?;
-    let plugin_root = codex_home
-        .path()
-        .join("plugins/cache")
-        .join("test/sample/local");
-    std::fs::create_dir_all(plugin_root.join(".codex-plugin"))?;
-    std::fs::write(
-        plugin_root.join(".codex-plugin/plugin.json"),
-        r#"{"name":"sample"}"#,
-    )?;
-    std::fs::write(
-        plugin_root.join(".mcp.json"),
-        r#"{
-  "mcpServers": {
-    "sample": {
-      "type": "http",
-      "url": "https://sample.example/mcp"
-    }
-  }
-}"#,
-    )?;
-    std::fs::write(
-        codex_home.path().join(CONFIG_TOML_FILE),
-        r#"
-[features]
-plugins = true
-
-[plugins."sample@test"]
-enabled = true
-"#,
-    )?;
-
-    let config = ConfigBuilder::default()
-        .codex_home(codex_home.path().to_path_buf())
-        .cloud_config_bundle(
-            CloudConfigBundleFixture::loader_with_enterprise_requirement(
-                r#"
-[mcp_servers]
-"#,
-            ),
-        )
-        .build()
-        .await?;
-    let plugins_manager =
-        plugins_manager_for_config(&config, auth_manager_from_optional_auth(/*auth*/ None));
-    let mcp_config = config.to_mcp_config(&plugins_manager).await;
-    let configured_servers = mcp_config.mcp_server_catalog.configured_servers();
-
-    assert_eq!(
-        configured_servers
-            .get("sample")
-            .map(|server| (server.enabled, server.disabled_reason.clone())),
-        Some((
-            false,
-            Some(McpServerDisabledReason::Requirements {
-                source: RequirementSource::EnterpriseManaged {
-                    id: "req_1".to_string(),
-                    name: "Base requirements".to_string(),
-                },
-            })
-        ))
-    );
     Ok(())
 }
 
@@ -7090,34 +6119,6 @@ pane = { selected = "console", expanded = false }
 }
 
 #[tokio::test]
-async fn to_mcp_config_preserves_apps_feature_from_config() -> std::io::Result<()> {
-    let codex_home = TempDir::new()?;
-    let mut config = Config::load_from_base_config_with_overrides(
-        ConfigToml::default(),
-        ConfigOverrides::default(),
-        codex_home.abs(),
-    )
-    .await?;
-    let plugins_manager =
-        plugins_manager_for_config(&config, auth_manager_from_optional_auth(/*auth*/ None));
-
-    config.apps_mcp_product_sku = Some("tpp".to_string());
-    let mcp_config = config.to_mcp_config(&plugins_manager).await;
-    assert!(mcp_config.apps_enabled);
-    assert_eq!(mcp_config.apps_mcp_product_sku.as_deref(), Some("tpp"));
-
-    let _ = config.features.disable(Feature::Apps);
-    let mcp_config = config.to_mcp_config(&plugins_manager).await;
-    assert!(!mcp_config.apps_enabled);
-
-    let _ = config.features.enable(Feature::Apps);
-    let mcp_config = config.to_mcp_config(&plugins_manager).await;
-    assert!(mcp_config.apps_enabled);
-
-    Ok(())
-}
-
-#[tokio::test]
 async fn to_mcp_config_flows_mcp_tool_prefix_from_feature() -> std::io::Result<()> {
     let codex_home = TempDir::new()?;
     let mut config = Config::load_from_base_config_with_overrides(
@@ -7126,20 +6127,18 @@ async fn to_mcp_config_flows_mcp_tool_prefix_from_feature() -> std::io::Result<(
         codex_home.abs(),
     )
     .await?;
-    let plugins_manager =
-        plugins_manager_for_config(&config, auth_manager_from_optional_auth(/*auth*/ None));
 
-    let mcp_config = config.to_mcp_config(&plugins_manager).await;
+    let mcp_config = config.to_mcp_config();
     assert!(mcp_config.prefix_mcp_tool_names);
     assert!(mcp_config.non_prefixed_mcp_tool_servers.is_empty());
 
     let _ = config.features.enable(Feature::NonPrefixedMcpToolNames);
-    let mcp_config = config.to_mcp_config(&plugins_manager).await;
+    let mcp_config = config.to_mcp_config();
     assert!(!mcp_config.prefix_mcp_tool_names);
     assert!(mcp_config.non_prefixed_mcp_tool_servers.is_empty());
 
     config.non_prefixed_mcp_tool_servers = Some(vec!["history".to_string(), "notes".to_string()]);
-    let mcp_config = config.to_mcp_config(&plugins_manager).await;
+    let mcp_config = config.to_mcp_config();
     assert!(mcp_config.prefix_mcp_tool_names);
     assert_eq!(
         mcp_config.non_prefixed_mcp_tool_servers,
@@ -7147,7 +6146,7 @@ async fn to_mcp_config_flows_mcp_tool_prefix_from_feature() -> std::io::Result<(
     );
 
     let _ = config.features.disable(Feature::NonPrefixedMcpToolNames);
-    let mcp_config = config.to_mcp_config(&plugins_manager).await;
+    let mcp_config = config.to_mcp_config();
     assert!(mcp_config.prefix_mcp_tool_names);
     assert!(mcp_config.non_prefixed_mcp_tool_servers.is_empty());
 
@@ -7155,7 +6154,7 @@ async fn to_mcp_config_flows_mcp_tool_prefix_from_feature() -> std::io::Result<(
 }
 
 #[tokio::test]
-async fn to_mcp_config_flows_independent_mcp_2026_features() -> std::io::Result<()> {
+async fn to_mcp_config_flows_mcp_2026_feature() -> std::io::Result<()> {
     let codex_home = TempDir::new()?;
     let mut config = Config::load_from_base_config_with_overrides(
         ConfigToml::default(),
@@ -7163,46 +6162,18 @@ async fn to_mcp_config_flows_independent_mcp_2026_features() -> std::io::Result<
         codex_home.abs(),
     )
     .await?;
-    let plugins_manager =
-        plugins_manager_for_config(&config, auth_manager_from_optional_auth(/*auth*/ None));
 
-    let mcp_config = config.to_mcp_config(&plugins_manager).await;
+    let mcp_config = config.to_mcp_config();
     assert_eq!(
-        (
-            mcp_config.protocol_mode,
-            mcp_config.host_owned_apps_protocol_mode,
-        ),
-        (
-            codex_mcp::McpProtocolMode::Legacy,
-            codex_mcp::McpProtocolMode::Legacy,
-        )
+        mcp_config.protocol_mode,
+        codex_mcp::McpProtocolMode::Legacy
     );
 
     let _ = config.features.enable(Feature::Mcp20260728);
-    let mcp_config = config.to_mcp_config(&plugins_manager).await;
+    let mcp_config = config.to_mcp_config();
     assert_eq!(
-        (
-            mcp_config.protocol_mode,
-            mcp_config.host_owned_apps_protocol_mode,
-        ),
-        (
-            codex_mcp::McpProtocolMode::V20260728,
-            codex_mcp::McpProtocolMode::Legacy,
-        )
-    );
-
-    let _ = config.features.disable(Feature::Mcp20260728);
-    let _ = config.features.enable(Feature::CodexAppsMcp20260728);
-    let mcp_config = config.to_mcp_config(&plugins_manager).await;
-    assert_eq!(
-        (
-            mcp_config.protocol_mode,
-            mcp_config.host_owned_apps_protocol_mode,
-        ),
-        (
-            codex_mcp::McpProtocolMode::Legacy,
-            codex_mcp::McpProtocolMode::V20260728,
-        )
+        mcp_config.protocol_mode,
+        codex_mcp::McpProtocolMode::V20260728
     );
 
     Ok(())
@@ -7217,10 +6188,8 @@ async fn to_mcp_config_preserves_auth_elicitation_feature_from_config() -> std::
         codex_home.abs(),
     )
     .await?;
-    let plugins_manager =
-        plugins_manager_for_config(&config, auth_manager_from_optional_auth(/*auth*/ None));
 
-    let mcp_config = config.to_mcp_config(&plugins_manager).await;
+    let mcp_config = config.to_mcp_config();
     assert_eq!(
         mcp_config.client_elicitation_capability,
         ElicitationCapability::new()
@@ -7229,7 +6198,7 @@ async fn to_mcp_config_preserves_auth_elicitation_feature_from_config() -> std::
     );
 
     let _ = config.features.disable(Feature::AuthElicitation);
-    let mcp_config = config.to_mcp_config(&plugins_manager).await;
+    let mcp_config = config.to_mcp_config();
     assert_eq!(
         mcp_config.client_elicitation_capability,
         ElicitationCapability::default()
@@ -8390,10 +7359,6 @@ experimental_policy_template = "Configured template: {{ tenant_policy_config }}"
 }
 
 #[test_case::test_case("", codex_protocol::TranscriptFormat::Line; "default_line")]
-#[test_case::test_case("[guardianv2]\ntranscript_mode = 'line'", codex_protocol::TranscriptFormat::Line; "explicit_line")]
-#[test_case::test_case("[guardianv2]\ntranscript_mode = 'json'", codex_protocol::TranscriptFormat::Json; "explicit_json")]
-#[test_case::test_case("[guardianv2]\nasync_classifier_mode = 'snapshot'", codex_protocol::TranscriptFormat::Line; "legacy_snapshot")]
-#[test_case::test_case("[guardianv2]\nasync_classifier_mode = 'conversation'", codex_protocol::TranscriptFormat::Line; "legacy_conversation")]
 #[tokio::test]
 async fn load_config_uses_auto_review_guardian_policy_config_and_template(
     features: &str,
@@ -10278,7 +9243,6 @@ async fn test_requirements_web_search_mode_allowlist_does_not_warn_when_unset() 
         application: None,
         allow_managed_hooks_only: None,
         allow_appshots: None,
-        allow_remote_control: None,
         allow_browser_and_computer_use: None,
         computer_use: None,
         browser_use: None,
@@ -10286,10 +9250,7 @@ async fn test_requirements_web_search_mode_allowlist_does_not_warn_when_unset() 
         feature_requirements: None,
         hooks: None,
         mcp_servers: None,
-        plugins: None,
-        marketplaces: None,
         otel: None,
-        apps: None,
         rules: None,
         enforce_residency: None,
         network: None,
@@ -10624,27 +9585,6 @@ allow_login_shell = false
     .await?;
 
     assert!(!config.permissions.allow_login_shell);
-    Ok(())
-}
-
-#[tokio::test]
-async fn config_loads_apps_mcp_product_sku_from_toml() -> std::io::Result<()> {
-    let codex_home = TempDir::new()?;
-    let toml = r#"
-model = "gpt-5.4"
-apps_mcp_product_sku = "tpp"
-"#;
-    let cfg: ConfigToml =
-        toml::from_str(toml).expect("TOML deserialization should succeed for apps MCP SKU");
-
-    let config = Config::load_from_base_config_with_overrides(
-        cfg,
-        ConfigOverrides::default(),
-        codex_home.abs(),
-    )
-    .await?;
-
-    assert_eq!(config.apps_mcp_product_sku.as_deref(), Some("tpp"));
     Ok(())
 }
 
@@ -11538,7 +10478,6 @@ async fn prompt_instruction_blocks_can_be_disabled_from_config() -> std::io::Res
     std::fs::write(
         codex_home.path().join(CONFIG_TOML_FILE),
         r#"include_permissions_instructions = false
-include_apps_instructions = false
 include_collaboration_mode_instructions = false
 include_environment_context = false
 include_environment_context_time = false
@@ -11555,7 +10494,6 @@ include_instructions = false
         .await?;
 
     assert!(!config.include_permissions_instructions);
-    assert!(!config.include_apps_instructions);
     assert!(!config.include_collaboration_mode_instructions);
     assert!(!config.include_skill_instructions);
     assert!(!config.include_environment_context);
@@ -12522,7 +11460,6 @@ async fn tool_suggest_discoverables_load_from_config_toml() -> std::io::Result<(
 [tool_suggest]
 discoverables = [
   { type = "connector", id = "connector_alpha" },
-  { type = "plugin", id = "plugin_alpha@openai-curated" },
   { type = "connector", id = "   " }
 ]
 "#,
@@ -12536,10 +11473,6 @@ discoverables = [
                 ToolSuggestDiscoverable {
                     kind: ToolSuggestDiscoverableType::Connector,
                     id: "connector_alpha".to_string(),
-                },
-                ToolSuggestDiscoverable {
-                    kind: ToolSuggestDiscoverableType::Plugin,
-                    id: "plugin_alpha@openai-curated".to_string(),
                 },
                 ToolSuggestDiscoverable {
                     kind: ToolSuggestDiscoverableType::Connector,
@@ -12566,10 +11499,6 @@ discoverables = [
                     kind: ToolSuggestDiscoverableType::Connector,
                     id: "connector_alpha".to_string(),
                 },
-                ToolSuggestDiscoverable {
-                    kind: ToolSuggestDiscoverableType::Plugin,
-                    id: "plugin_alpha@openai-curated".to_string(),
-                },
             ],
             disabled_tools: Vec::new(),
         }
@@ -12585,8 +11514,7 @@ async fn tool_suggest_disabled_tools_load_from_config_toml() -> std::io::Result<
 disabled_tools = [
   { type = "connector", id = " connector_calendar " },
   { type = "connector", id = "connector_calendar" },
-  { type = "connector", id = "   " },
-  { type = "plugin", id = "slack@openai-curated" }
+  { type = "connector", id = "   " }
 ]
 "#,
     )
@@ -12600,7 +11528,6 @@ disabled_tools = [
                 ToolSuggestDisabledTool::connector(" connector_calendar "),
                 ToolSuggestDisabledTool::connector("connector_calendar"),
                 ToolSuggestDisabledTool::connector("   "),
-                ToolSuggestDisabledTool::plugin("slack@openai-curated"),
             ],
         })
     );
@@ -12619,7 +11546,6 @@ disabled_tools = [
             discoverables: Vec::new(),
             disabled_tools: vec![
                 ToolSuggestDisabledTool::connector("connector_calendar"),
-                ToolSuggestDisabledTool::plugin("slack@openai-curated"),
             ],
         }
     );
@@ -12641,7 +11567,6 @@ trust_level = "trusted"
 [tool_suggest]
 disabled_tools = [
   {{ type = "connector", id = " user_connector " }},
-  {{ type = "plugin", id = "shared_plugin" }},
   {{ type = "connector", id = "project_connector" }},
 ]
 "#
@@ -12656,8 +11581,6 @@ disabled_tools = [
 [tool_suggest]
 disabled_tools = [
   { type = "connector", id = "project_connector" },
-  { type = "plugin", id = "project_plugin" },
-  { type = "plugin", id = "shared_plugin" },
 ]
 "#,
     )?;
@@ -12675,9 +11598,7 @@ disabled_tools = [
         config.tool_suggest.disabled_tools,
         vec![
             ToolSuggestDisabledTool::connector("user_connector"),
-            ToolSuggestDisabledTool::plugin("shared_plugin"),
             ToolSuggestDisabledTool::connector("project_connector"),
-            ToolSuggestDisabledTool::plugin("project_plugin"),
         ]
     );
     Ok(())

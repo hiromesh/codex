@@ -35,9 +35,9 @@ pub(crate) async fn program_for_turn(
         anyhow::ensure!(
             matches!(
                 read_account(client, request_ids).await?,
-                Some(Account::Chatgpt { .. } | Account::ApiKey { .. })
+                Some(Account::ApiKey { .. })
             ),
-            "Daybreak requires a signed-in ChatGPT account or an OpenAI API key"
+            "Daybreak requires an OpenAI API key"
         );
     }
 
@@ -74,11 +74,10 @@ pub(crate) async fn program_for_turn(
                 return Ok(None);
             };
             let eligible = match read_account(client, request_ids).await.unwrap_or(None) {
-                Some(Account::Chatgpt { .. }) => true,
                 Some(Account::ApiKey { .. }) => {
                     features.enabled(Feature::ApiKeyCyberAccessPrograms)
                 }
-                Some(Account::AmazonBedrock { .. } | Account::Gcp {}) | None => false,
+                None => false,
             };
             return Ok(eligible.then_some(standard.into()));
         }

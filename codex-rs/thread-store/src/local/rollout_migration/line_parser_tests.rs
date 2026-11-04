@@ -226,3 +226,75 @@ fn skips_legacy_ghost_snapshots() {
             .is_none()
     );
 }
+
+#[test]
+fn skips_legacy_image_generation_events() {
+    for event_type in ["image_generation_begin", "image_generation_end"] {
+        let bytes = line("event_msg", json!({"type": event_type}));
+        assert!(
+            parse_legacy_rollout_line(&bytes)
+                .expect("inspect retired image generation event")
+                .is_none()
+        );
+    }
+}
+
+#[test]
+fn skips_legacy_image_generation_response_items() {
+    let bytes = line(
+        "response_item",
+        json!({
+            "type": "image_generation_call",
+            "status": "completed",
+            "result": "Zm9v",
+        }),
+    );
+    assert!(
+        parse_legacy_rollout_line(&bytes)
+            .expect("inspect retired image generation response item")
+            .is_none()
+    );
+}
+
+#[test]
+fn skips_legacy_image_generation_turn_items() {
+    for event_type in ["item_started", "item_completed"] {
+        let bytes = line(
+            "event_msg",
+            json!({
+                "type": event_type,
+                "item": {
+                    "type": "ImageGeneration",
+                    "id": "ig_123",
+                },
+            }),
+        );
+        assert!(
+            parse_legacy_rollout_line(&bytes)
+                .expect("inspect retired image generation turn item")
+                .is_none()
+        );
+    }
+}
+
+#[test]
+fn skips_legacy_image_generation_extension_items() {
+    for event_type in ["item_started", "item_completed"] {
+        let bytes = line(
+            "event_msg",
+            json!({
+                "type": event_type,
+                "item": {
+                    "type": "Extension",
+                    "kind": "image_gen.generation",
+                    "id": "ig_123",
+                },
+            }),
+        );
+        assert!(
+            parse_legacy_rollout_line(&bytes)
+                .expect("inspect retired image generation extension item")
+                .is_none()
+        );
+    }
+}

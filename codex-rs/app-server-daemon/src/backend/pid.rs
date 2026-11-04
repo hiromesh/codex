@@ -16,8 +16,6 @@ use crate::managed_install::ExecutableIdentity;
 use anyhow::Context;
 use anyhow::Result;
 use anyhow::bail;
-#[cfg(unix)]
-use codex_app_server_transport::REMOTE_CONTROL_DISABLED_ENV_VAR;
 use serde::Deserialize;
 use serde::Serialize;
 use tokio::fs;
@@ -86,7 +84,7 @@ enum PidFileState {
 #[derive(Debug, Clone)]
 #[cfg_attr(not(any(unix)), allow(dead_code))]
 enum PidCommandKind {
-    AppServer { remote_control_enabled: bool },
+    AppServer,
     UpdateLoop { restore_release: Option<String> },
 }
 
@@ -109,16 +107,14 @@ impl PidBackend {
         }
     }
 
-    pub(crate) fn new(codex_bin: PathBuf, pid_file: PathBuf, remote_control_enabled: bool) -> Self {
+    pub(crate) fn new(codex_bin: PathBuf, pid_file: PathBuf) -> Self {
         let lock_file = pid_file.with_extension("pid.lock");
         Self {
             feature_overrides: BTreeMap::new(),
             codex_bin,
             pid_file,
             lock_file,
-            command_kind: PidCommandKind::AppServer {
-                remote_control_enabled,
-            },
+            command_kind: PidCommandKind::AppServer,
         }
     }
 
@@ -359,17 +355,9 @@ impl PidBackend {
     #[cfg(unix)]
     fn command_args(&self) -> Vec<Cow<'_, str>> {
         let mut args = match &self.command_kind {
-            PidCommandKind::AppServer {
-                remote_control_enabled: true,
-            } => vec![
-                "app-server".into(),
-                "--remote-control".into(),
-                "--listen".into(),
-                "unix://".into(),
-            ],
-            PidCommandKind::AppServer {
-                remote_control_enabled: false,
-            } => vec!["app-server".into(), "--listen".into(), "unix://".into()],
+            PidCommandKind::AppServer => {
+                vec!["app-server".into(), "--listen".into(), "unix://".into()]
+            }
             PidCommandKind::UpdateLoop { restore_release } => {
                 let mut args = vec![
                     "app-server".into(),
@@ -382,7 +370,7 @@ impl PidBackend {
                 args
             }
         };
-        if matches!(self.command_kind, PidCommandKind::AppServer { .. }) {
+        if matches!(self.command_kind, PidCommandKind::AppServer) {
             // Match first-party clients' default while preserving explicit analytics opt-outs.
             args.push("--analytics-default-enabled".into());
             for (name, enabled) in &self.feature_overrides {
@@ -392,22 +380,9 @@ impl PidBackend {
         args
     }
 
-    #[cfg(unix)]
-    fn command_env(&self) -> Option<(&'static str, &'static str)> {
-        match self.command_kind {
-            PidCommandKind::AppServer {
-                remote_control_enabled: false,
-            } => Some((REMOTE_CONTROL_DISABLED_ENV_VAR, "1")),
-            PidCommandKind::AppServer {
-                remote_control_enabled: true,
-            }
-            | PidCommandKind::UpdateLoop { .. } => None,
-        }
-    }
-
     fn terminate_process(&self, pid: u32) -> Result<()> {
         match self.command_kind {
-            PidCommandKind::AppServer { .. } => terminate_process(pid),
+            PidCommandKind::AppServer => terminate_process(pid),
             #[cfg(unix)]
             PidCommandKind::UpdateLoop { .. } => terminate_process_group(pid),
             #[cfg(not(unix))]
@@ -417,7 +392,7 @@ impl PidBackend {
 
     fn force_terminate_process(&self, pid: u32) -> Result<()> {
         match self.command_kind {
-            PidCommandKind::AppServer { .. } => force_terminate_process(pid),
+            PidCommandKind::AppServer => force_terminate_process(pid),
             PidCommandKind::UpdateLoop { .. } => force_terminate_process_group(pid),
         }
     }
@@ -807,8 +782,6 @@ async fn read_process_details(pid: u32) -> Result<(String, String)> {
 #[cfg(all(test, any(unix)))]
 #[path = "pid_tests.rs"]
 mod tests;
-
-
 
 #[cfg(unix)]
 #[path = "pid_start.rs"]

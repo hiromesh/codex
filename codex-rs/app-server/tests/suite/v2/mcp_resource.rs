@@ -10,14 +10,13 @@ use std::time::Duration;
 
 use anyhow::Context;
 use anyhow::Result;
-use app_test_support::ChatGptAuthFixture;
+use app_test_support::write_api_key_auth;
 use app_test_support::MockResponsesConfig;
 use app_test_support::TestAppServer;
 use app_test_support::create_fake_paginated_rollout;
 use app_test_support::create_fake_rollout;
 use app_test_support::create_mock_responses_server_repeating_assistant;
 use app_test_support::rollout_path;
-use app_test_support::write_chatgpt_auth;
 use axum::Router;
 use codex_app_server::in_process;
 use codex_app_server::in_process::InProcessServerEvent;
@@ -30,7 +29,6 @@ use codex_app_server_protocol::InitializeParams;
 use codex_app_server_protocol::McpResourceContent;
 use codex_app_server_protocol::McpResourceReadParams;
 use codex_app_server_protocol::McpResourceReadResponse;
-use codex_app_server_protocol::McpResourceReadTarget;
 use codex_app_server_protocol::McpServerToolCallParams;
 use codex_app_server_protocol::McpServerToolCallResponse;
 use codex_app_server_protocol::ProjectCreateParams;
@@ -67,7 +65,6 @@ use codex_config::ThreadConfigContext;
 use codex_config::ThreadConfigLoader;
 use codex_config::ThreadConfigLoaderFuture;
 use codex_config::ThreadConfigSource;
-use codex_config::types::AuthCredentialsStoreMode;
 use codex_core::ARCHIVED_SESSIONS_SUBDIR;
 use codex_core::config::ConfigBuilder;
 use codex_exec_server::EnvironmentManager;
@@ -121,9 +118,6 @@ use tokio::sync::Notify;
 use tokio::task::JoinHandle;
 use tokio::time::timeout;
 
-#[path = "mcp_resource/plugin_metadata_refresh.rs"]
-mod plugin_metadata_refresh;
-
 pub(super) const DEFAULT_READ_TIMEOUT: Duration = Duration::from_secs(10);
 const TEST_RESOURCE_URI: &str = "test://codex/resource";
 pub(super) const TEST_WIDGET_RESOURCE_URI: &str = "ui://widget/checkout-session.html";
@@ -150,79 +144,6 @@ const SKILL_CONTENTS: &str = concat!(
 );
 const SKILL_REFERENCE_CONTENTS: &str =
     "# Deploy reference\n\nUse the orchestrator deployment API.\n";
-
-#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn mcp_resource_read_returns_resource_contents() -> Result<()> {
-    let responses_server = responses::start_mock_server().await;
-    let (apps_server_url, apps_server_calls, apps_server_handle) =
-        start_resource_apps_mcp_server().await?;
-    let responses_server_uri = responses_server.uri();
-    let (_codex_home, mut mcp) = start_resource_test_app_server(
-        &apps_server_url,
-        &responses_server_uri,
-        ResourceTestEnvironment::Auto,
-    )
-    .await?;
-
-    let ThreadStartResponse { thread, .. } = mcp
-        .start_thread(ThreadStartParams {
-            model: Some("mock-model".to_string()),
-            ..Default::default()
-        })
-        .await?;
-    for thread_id in [Some(thread.id), None] {
-        for target in [
-            None,
-            Some(McpResourceReadTarget {
-                connector_id: "calendar".to_string(),
-                link_id: Some("link_calendar".to_string()),
-            }),
-            Some(McpResourceReadTarget {
-                connector_id: "calendar".to_string(),
-                link_id: None,
-            }),
-        ] {
-            let read_response: McpResourceReadResponse = mcp
-                .request(|request_id| ClientRequest::McpResourceRead {
-                    request_id,
-                    params: McpResourceReadParams {
-                        thread_id: thread_id.clone(),
-                        origin_call_id: None,
-                        server: "codex_apps".to_string(),
-                        uri: TEST_RESOURCE_URI.to_string(),
-                        connector_id: None,
-                        target: target.clone(),
-                    },
-                })
-                .await?;
-            assert_eq!(read_response, expected_resource_read_response());
-            let metadata = apps_server_calls
-                .read_metadata
-                .lock()
-                .expect("read metadata lock");
-            let metadata = metadata
-                .last()
-                .expect("resource read reached the MCP server");
-            assert_eq!(
-                (
-                    metadata.get("connector_id").cloned(),
-                    metadata.get("link_id").cloned()
-                ),
-                match &target {
-                    Some(target) => (
-                        Some(json!(target.connector_id)),
-                        Some(json!(target.link_id)),
-                    ),
-                    None => (None, None),
-                },
-            );
-        }
-    }
-
-    apps_server_handle.abort();
-    let _ = apps_server_handle.await;
-    Ok(())
-}
 
 #[test_case(ProtocolVersion::V_2025_06_18; "legacy")]
 #[test_case(ProtocolVersion::V_2026_07_28; "modern")]
@@ -272,11 +193,8 @@ async fn mcp_resource_read_preserves_protocol_errors(protocol: ProtocolVersion) 
             let request_id = mcp
                 .send_mcp_resource_read_request(McpResourceReadParams {
                     thread_id,
-                    origin_call_id: None,
                     server: server.to_string(),
                     uri: TEST_ERROR_RESOURCE_URI.to_string(),
-                    connector_id: None,
-                    target: None,
                 })
                 .await?;
             let error = timeout(
@@ -459,23 +377,14 @@ async fn mcp_resource_read_returns_contents_and_declines_elicitation_without_thr
         codex_home.path().join("config.toml"),
         format!(
             r#"
-chatgpt_base_url = "{apps_server_url}"
 mcp_oauth_credentials_store = "file"
 approval_policy = "never"
 sandbox_mode = "danger-full-access"
 
-[features]
-apps = true
+[mcp_servers.codex_apps]
+url = "{apps_server_url}/api/codex/ps/mcp"
 "#
         ),
-    )?;
-    write_chatgpt_auth(
-        codex_home.path(),
-        ChatGptAuthFixture::new("chatgpt-token")
-            .account_id("account-123")
-            .chatgpt_user_id("user-123")
-            .chatgpt_account_id("account-123"),
-        AuthCredentialsStoreMode::File,
     )?;
 
     let mut mcp = TestAppServer::builder()
@@ -488,11 +397,8 @@ apps = true
             request_id,
             params: McpResourceReadParams {
                 thread_id: None,
-                origin_call_id: None,
                 server: "codex_apps".to_string(),
                 uri: TEST_RESOURCE_URI.to_string(),
-                connector_id: None,
-                target: None,
             },
         })
         .await?;
@@ -502,11 +408,8 @@ apps = true
             request_id,
             params: McpResourceReadParams {
                 thread_id: None,
-                origin_call_id: None,
                 server: "codex_apps".to_string(),
                 uri: TEST_ELICITATION_RESOURCE_URI.to_string(),
-                connector_id: None,
-                target: None,
             },
         })
         .await?;
@@ -519,7 +422,6 @@ apps = true
                 text: TEST_ELICITATION_RESOURCE_TEXT.to_string(),
                 meta: None,
             }],
-            origin_call_id: None,
         }
     );
 
@@ -544,11 +446,8 @@ async fn mcp_resource_read_returns_error_for_unknown_thread() -> Result<()> {
             request_id: RequestId::Integer(1),
             params: McpResourceReadParams {
                 thread_id: Some("00000000-0000-4000-8000-000000000000".to_string()),
-                origin_call_id: None,
                 server: "codex_apps".to_string(),
                 uri: TEST_RESOURCE_URI.to_string(),
-                connector_id: None,
-                target: None,
             },
         })
         .await;
@@ -671,11 +570,8 @@ async fn metadata_and_mcp_requests_complete_while_unrelated_resume_loads_config(
                     request_id: RequestId::Integer(7),
                     params: McpResourceReadParams {
                         thread_id: Some(thread.id.clone()),
-                        origin_call_id: None,
                         server: "resource_server".to_string(),
                         uri: TEST_RESOURCE_URI.to_string(),
-                        connector_id: None,
-                        target: None,
                     },
                 }),
                 sender.request(ClientRequest::McpServerToolCall {
@@ -1329,19 +1225,11 @@ async fn start_resource_test_app_server_with_extra_config(
         .with_root_config(&format!(
             "chatgpt_base_url = \"{apps_server_url}\"\nmcp_oauth_credentials_store = \"file\""
         ))
-        .enable_feature(Feature::Apps)
         .with_extra_config(&format!(
             "[skills]\ninclude_instructions = true\n{extra_config}"
         ))
         .write(codex_home.path())?;
-    write_chatgpt_auth(
-        codex_home.path(),
-        ChatGptAuthFixture::new("chatgpt-token")
-            .account_id("account-123")
-            .chatgpt_user_id("user-123")
-            .chatgpt_account_id("account-123"),
-        AuthCredentialsStoreMode::File,
-    )?;
+    write_api_key_auth(codex_home.path(), "sk-test-key")?;
 
     let builder = TestAppServer::builder().with_codex_home(codex_home.path());
     let builder = match environment {
@@ -1399,7 +1287,6 @@ fn expected_resource_read_response() -> McpResourceReadResponse {
                 meta: None,
             },
         ],
-        origin_call_id: None,
     }
 }
 

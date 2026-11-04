@@ -12,7 +12,6 @@ use crate::protocol::v2::CommandExecutionStatus;
 use crate::protocol::v2::DynamicToolCallOutputContentItem;
 use crate::protocol::v2::DynamicToolCallStatus;
 use crate::protocol::v2::ImageReference;
-use crate::protocol::v2::McpToolCallAppContext;
 use crate::protocol::v2::McpToolCallError;
 use crate::protocol::v2::McpToolCallResult;
 use crate::protocol::v2::McpToolCallStatus;
@@ -946,19 +945,6 @@ impl ThreadHistoryBuilder {
                 .arguments
                 .clone()
                 .unwrap_or(serde_json::Value::Null),
-            app_context: payload
-                .connector_id
-                .clone()
-                .map(|connector_id| McpToolCallAppContext {
-                    connector_id,
-                    link_id: payload.link_id.clone(),
-                    resource_uri: payload.mcp_app_resource_uri.clone(),
-                    app_name: payload.app_name.clone(),
-                    action_name: payload.action_name.clone(),
-                }),
-            mcp_app_resource_uri: payload.mcp_app_resource_uri.clone(),
-            mcp_app_ui: payload.mcp_app_ui.clone(),
-            plugin_id: payload.plugin_id.clone(),
             read_only_hint: payload.read_only_hint,
             result: None,
             error: None,
@@ -1004,19 +990,6 @@ impl ThreadHistoryBuilder {
                 .arguments
                 .clone()
                 .unwrap_or(serde_json::Value::Null),
-            app_context: payload
-                .connector_id
-                .clone()
-                .map(|connector_id| McpToolCallAppContext {
-                    connector_id,
-                    link_id: payload.link_id.clone(),
-                    resource_uri: payload.mcp_app_resource_uri.clone(),
-                    app_name: payload.app_name.clone(),
-                    action_name: payload.action_name.clone(),
-                }),
-            mcp_app_resource_uri: payload.mcp_app_resource_uri.clone(),
-            mcp_app_ui: payload.mcp_app_ui.clone(),
-            plugin_id: payload.plugin_id.clone(),
             read_only_hint: payload.read_only_hint,
             result,
             error,
@@ -2540,8 +2513,6 @@ mod tests {
             model_context: None,
             sandbox_type: None,
             id: "exec-1".to_string(),
-            plugin_id: Some("sample@openai-curated".to_string()),
-            script_path: Some("scripts/run.py".to_string()),
             process_id: Some("pid-1".to_string()),
             command: command.clone(),
             cwd: test_path_buf("/tmp").abs().into(),
@@ -2565,8 +2536,6 @@ mod tests {
             }),
             EventMsg::ExecCommandBegin(ExecCommandBeginEvent {
                 call_id: "exec-1".to_string(),
-                plugin_id: Some("sample@openai-curated".to_string()),
-                script_path: Some("scripts/run.py".to_string()),
                 process_id: Some("pid-1".to_string()),
                 turn_id: turn_id.to_string(),
                 started_at_ms: 0,
@@ -2585,8 +2554,6 @@ mod tests {
             }),
             EventMsg::ExecCommandEnd(ExecCommandEndEvent {
                 call_id: "exec-1".to_string(),
-                plugin_id: Some("sample@openai-curated".to_string()),
-                script_path: Some("scripts/run.py".to_string()),
                 process_id: Some("pid-1".to_string()),
                 turn_id: turn_id.to_string(),
                 completed_at_ms: 1_000,
@@ -2625,8 +2592,6 @@ mod tests {
                 model_context: None,
                 sandbox_type: None,
                 id: "exec-1".to_string(),
-                plugin_id: Some("sample@openai-curated".to_string()),
-                script_path: Some("scripts/run.py".to_string()),
                 command: "git -c 'http.extraHeader=Authorization: Bearer [REDACTED_SECRET]' push"
                     .to_string(),
                 cwd: test_path_buf("/tmp").abs().into(),
@@ -2652,8 +2617,6 @@ mod tests {
                 model_context: None,
                 sandbox_type: None,
                 id: "exec-1".to_string(),
-                plugin_id: Some("sample@openai-curated".to_string()),
-                script_path: Some("scripts/run.py".to_string()),
                 command: "git -c 'http.extraHeader=Authorization: Bearer [REDACTED_SECRET]' push"
                     .to_string(),
                 cwd: test_path_buf("/tmp").abs().into(),
@@ -3192,8 +3155,6 @@ mod tests {
             }),
             EventMsg::ExecCommandEnd(ExecCommandEndEvent {
                 call_id: "exec-1".into(),
-                plugin_id: None,
-                script_path: None,
                 process_id: Some("pid-1".into()),
                 turn_id: "turn-1".into(),
                 completed_at_ms: 0,
@@ -3217,13 +3178,6 @@ mod tests {
                     tool: "lookup".into(),
                     arguments: Some(serde_json::json!({"id":"123"})),
                 },
-                connector_id: None,
-                mcp_app_resource_uri: None,
-                mcp_app_ui: None,
-                link_id: None,
-                app_name: None,
-                action_name: None,
-                plugin_id: None,
                 read_only_hint: None,
                 duration: Duration::from_millis(8),
                 result: Err("boom".into()),
@@ -3259,8 +3213,6 @@ mod tests {
                 model_context: None,
                 sandbox_type: None,
                 id: "exec-1".into(),
-                plugin_id: None,
-                script_path: None,
                 command: "echo 'hello world'".into(),
                 cwd: test_path_buf("/tmp").abs().into(),
                 process_id: Some("pid-1".into()),
@@ -3282,10 +3234,6 @@ mod tests {
                 tool: "lookup".into(),
                 status: McpToolCallStatus::Failed,
                 arguments: serde_json::json!({"id":"123"}),
-                app_context: None,
-                mcp_app_resource_uri: None,
-                mcp_app_ui: None,
-                plugin_id: None,
                 read_only_hint: None,
                 result: None,
                 error: Some(McpToolCallError {
@@ -3316,13 +3264,6 @@ mod tests {
                     tool: "lookup".into(),
                     arguments: Some(serde_json::json!({"id":"123"})),
                 },
-                connector_id: Some("calendar".into()),
-                mcp_app_resource_uri: Some("ui://widget/lookup.html".into()),
-                mcp_app_ui: None,
-                link_id: Some("link_calendar".into()),
-                app_name: Some("Calendar".into()),
-                action_name: Some("lookup".into()),
-                plugin_id: Some("sample@test".into()),
                 read_only_hint: Some(false),
                 duration: Duration::from_millis(8),
                 result: Ok(CallToolResult {
@@ -3353,16 +3294,6 @@ mod tests {
                 tool: "lookup".into(),
                 status: McpToolCallStatus::Completed,
                 arguments: serde_json::json!({"id":"123"}),
-                app_context: Some(McpToolCallAppContext {
-                    connector_id: "calendar".into(),
-                    link_id: Some("link_calendar".into()),
-                    resource_uri: Some("ui://widget/lookup.html".into()),
-                    app_name: Some("Calendar".into()),
-                    action_name: Some("lookup".into()),
-                }),
-                mcp_app_resource_uri: Some("ui://widget/lookup.html".into()),
-                mcp_app_ui: None,
-                plugin_id: Some("sample@test".into()),
                 read_only_hint: Some(false),
                 result: Some(Box::new(McpToolCallResult {
                     content: vec![serde_json::json!({
@@ -3482,8 +3413,6 @@ mod tests {
             }),
             EventMsg::ExecCommandEnd(ExecCommandEndEvent {
                 call_id: "exec-declined".into(),
-                plugin_id: None,
-                script_path: None,
                 process_id: Some("pid-2".into()),
                 turn_id: "turn-1".into(),
                 completed_at_ms: 0,
@@ -3528,8 +3457,6 @@ mod tests {
                 model_context: None,
                 sandbox_type: None,
                 id: "exec-declined".into(),
-                plugin_id: None,
-                script_path: None,
                 command: "ls".into(),
                 cwd: test_path_buf("/tmp").abs().into(),
                 process_id: Some("pid-2".into()),
@@ -3582,8 +3509,6 @@ mod tests {
                 model_context: None,
                 id: "review-guardian-exec".into(),
                 target_item_id: Some("guardian-exec".into()),
-                plugin_id: Some("sample@openai-curated".into()),
-                script_path: Some("scripts/run.py".into()),
                 turn_id: "turn-1".into(),
                 started_at_ms: 1_000,
                 completed_at_ms: None,
@@ -3605,8 +3530,6 @@ mod tests {
                 model_context: None,
                 id: "review-guardian-exec".into(),
                 target_item_id: Some("guardian-exec".into()),
-                plugin_id: Some("sample@openai-curated".into()),
-                script_path: Some("scripts/run.py".into()),
                 turn_id: "turn-1".into(),
                 started_at_ms: 1_000,
                 completed_at_ms: Some(1_042),
@@ -3645,8 +3568,6 @@ mod tests {
                 model_context: None,
                 sandbox_type: None,
                 id: "guardian-exec".into(),
-                plugin_id: Some("sample@openai-curated".into()),
-                script_path: Some("scripts/run.py".into()),
                 command: "rm -rf /tmp/guardian".into(),
                 cwd: test_path_buf("/tmp").abs().into(),
                 process_id: None,
@@ -3687,8 +3608,6 @@ mod tests {
                 model_context: None,
                 id: "review-guardian-execve".into(),
                 target_item_id: Some("guardian-execve".into()),
-                plugin_id: Some("sample@openai-curated".into()),
-                script_path: Some("scripts/run.py".into()),
                 turn_id: "turn-1".into(),
                 started_at_ms: 2_000,
                 completed_at_ms: None,
@@ -3721,8 +3640,6 @@ mod tests {
                 model_context: None,
                 sandbox_type: None,
                 id: "guardian-execve".into(),
-                plugin_id: Some("sample@openai-curated".into()),
-                script_path: Some("scripts/run.py".into()),
                 command: "/bin/rm -f /tmp/file.sqlite".into(),
                 cwd: test_path_buf("/tmp").abs().into(),
                 process_id: None,
@@ -3754,13 +3671,6 @@ mod tests {
                 server: "slack".into(),
                 tool: "search".into(),
                 arguments: serde_json::json!({"query": "incident"}),
-                connector_id: None,
-                mcp_app_resource_uri: None,
-                mcp_app_ui: None,
-                link_id: None,
-                app_name: None,
-                action_name: None,
-                plugin_id: None,
                 read_only_hint: Some(true),
                 status: CoreMcpToolCallStatus::Completed,
                 result: Some(CallToolResult {
@@ -3886,8 +3796,6 @@ mod tests {
             }),
             EventMsg::ExecCommandEnd(ExecCommandEndEvent {
                 call_id: "exec-late".into(),
-                plugin_id: None,
-                script_path: None,
                 process_id: Some("pid-42".into()),
                 turn_id: "turn-a".into(),
                 completed_at_ms: 0,
@@ -3931,8 +3839,6 @@ mod tests {
                 model_context: None,
                 sandbox_type: None,
                 id: "exec-late".into(),
-                plugin_id: None,
-                script_path: None,
                 command: "echo done".into(),
                 cwd: test_path_buf("/tmp").abs().into(),
                 process_id: Some("pid-42".into()),
@@ -3997,8 +3903,6 @@ mod tests {
             }),
             EventMsg::ExecCommandEnd(ExecCommandEndEvent {
                 call_id: "exec-unknown-turn".into(),
-                plugin_id: None,
-                script_path: None,
                 process_id: Some("pid-42".into()),
                 turn_id: "turn-missing".into(),
                 completed_at_ms: 0,

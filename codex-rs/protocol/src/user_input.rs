@@ -48,7 +48,7 @@ pub enum UserInput {
     /// Explicit structured mention selected by the user.
     ///
     /// `path` identifies the exact mention target, for example
-    /// `app://<connector-id>` or `plugin://<plugin-name>@<marketplace-name>`.
+    /// A structured mention target.
     Mention { name: String, path: String },
 }
 

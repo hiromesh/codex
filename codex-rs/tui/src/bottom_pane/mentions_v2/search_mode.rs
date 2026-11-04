@@ -30,7 +30,7 @@ impl SearchMode {
             Self::FilesystemOnly => {
                 matches!(mention_type, MentionType::File | MentionType::Directory)
             }
-            Self::Tools => matches!(mention_type, MentionType::Plugin | MentionType::Skill),
+            Self::Tools => matches!(mention_type, MentionType::Skill),
         }
     }
 
@@ -38,7 +38,7 @@ impl SearchMode {
         match self {
             Self::Results => "All Results",
             Self::FilesystemOnly => "Filesystem Only",
-            Self::Tools => "Plugins",
+            Self::Tools => "Skills",
         }
     }
 }

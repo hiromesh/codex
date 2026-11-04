@@ -488,7 +488,9 @@ pub(super) async fn start_recording_app_server_with_history_options(
             let frame = tokio::select! {
                 frame = websocket.next() => frame,
                 event = embedded.next_event() => {
-                    let Some(event) = event else { break };
+                    let Some(event) = event else {
+                        break;
+                    };
                     if let codex_app_server_client::InProcessServerEvent::ServerNotification(notification) = event
                         && matches!(*notification, ServerNotification::ThreadSettingsUpdated(_))
                     {
@@ -1850,28 +1852,19 @@ async fn embedded_server_dispatches_only_its_own_dynamic_tools() -> Result<()> {
 
 #[tokio::test]
 async fn dynamic_tool_requests_ignore_other_namespaces_and_dispatch_tui_namespace() -> Result<()> {
-    use HistoryCapabilities::ConfigReadUnsupported;
     use HistoryCapabilities::Current;
-    use codex_app_server_protocol::AuthMode::ApiKey;
-    use codex_app_server_protocol::AuthMode::Chatgpt;
 
     for (
         rollout_enabled,
-        auth_mode,
         api_key_cyber_access_programs,
         history_capabilities,
         expected_program,
     ) in [
-        (true, Chatgpt, false, Current, Some("daybreakBlue")),
-        (false, Chatgpt, false, Current, None),
-        (true, ApiKey, false, Current, None),
-        (true, ApiKey, true, Current, Some("daybreakBlue")),
-        (true, Chatgpt, false, ConfigReadUnsupported(-32601), None),
-        (true, Chatgpt, false, ConfigReadUnsupported(-32600), None),
+        (true, false, Current, None),
+        (true, true, Current, Some("daybreakBlue")),
     ] {
         boxed_future!(check_dynamic_tool_requests(
             rollout_enabled,
-            auth_mode,
             api_key_cyber_access_programs,
             history_capabilities,
             expected_program,
@@ -1883,7 +1876,6 @@ async fn dynamic_tool_requests_ignore_other_namespaces_and_dispatch_tui_namespac
 
 async fn check_dynamic_tool_requests(
     rollout_enabled: bool,
-    auth_mode: codex_app_server_protocol::AuthMode,
     api_key_cyber_access_programs: bool,
     history_capabilities: HistoryCapabilities,
     expected_program: Option<&str>,
@@ -1919,22 +1911,12 @@ async fn check_dynamic_tool_requests(
     app.config.chatgpt_base_url = backend_url;
     app.config.model_catalog = Some(catalog);
     app.config.cli_auth_credentials_store_mode = codex_login::AuthCredentialsStoreMode::File;
-    app_test_support::write_chatgpt_auth(
+    codex_login::login_with_api_key(
         codex_home.path(),
-        app_test_support::ChatGptAuthFixture::new("test-token")
-            .chatgpt_user_id("test-user")
-            .plan_type("plus"),
+        "test-key",
         codex_login::AuthCredentialsStoreMode::File,
-    )
-    .expect("write fixture auth");
-    if auth_mode == codex_app_server_protocol::AuthMode::ApiKey {
-        codex_login::login_with_api_key(
-            codex_home.path(),
-            "test-key",
-            codex_login::AuthCredentialsStoreMode::File,
-            codex_login::AuthKeyringBackendKind::default(),
-        )?;
-    }
+        codex_login::AuthKeyringBackendKind::default(),
+    )?;
     app.config
         .permissions
         .set_permission_profile(PermissionProfile::workspace_write_with(
@@ -4496,15 +4478,13 @@ async fn changing_directory_preserves_project_trust_permissions_history_and_hook
     );
     let (cwd, result) = (current.clone(), Err("stale skills".into()));
     let skills = AppEvent::SkillsListLoaded { cwd, result };
-    let (cwd, plugins) = (current.clone(), Some(vec![]));
-    let plugins = AppEvent::PluginMentionsLoaded { cwd, plugins };
     let diff = AppEvent::DiffResult(current.clone(), "stale diff".to_string());
     let branch = AppEvent::SyncThreadGitBranch {
         thread_id: original,
         branch: "stale".to_string(),
         cwd: current.clone(),
     };
-    for event in [diff, skills, plugins, branch] {
+    for event in [diff, skills, branch] {
         app.handle_event(&mut tui, &mut server, event).await?;
     }
     let path = trusted.to_str().expect("trusted path");

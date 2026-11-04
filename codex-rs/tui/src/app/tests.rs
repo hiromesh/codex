@@ -10,8 +10,6 @@ mod mcp_login_tests;
 
 #[path = "tests/math_interruption_tests.rs"]
 mod math_interruption_tests;
-#[path = "tests/security_setup_tests.rs"]
-mod security_setup_tests;
 
 #[path = "tests/advanced_reasoning_tests.rs"]
 mod advanced_reasoning_tests;
@@ -33,8 +31,6 @@ mod background_task_defaults_tests;
 mod browsing_pagination_tests;
 #[path = "tests/buffered_replay.rs"]
 mod buffered_replay;
-#[path = "tests/connector_policy.rs"]
-mod connector_policy;
 #[path = "tests/disconnect_tests.rs"]
 mod disconnect;
 #[path = "tests/external_writer_fork_tests.rs"]
@@ -51,8 +47,6 @@ mod key_chords;
 mod local_command_scroll_tests;
 #[path = "tests/luna_reserve_recovery_tests.rs"]
 mod luna_reserve_recovery_tests;
-#[path = "tests/marketplace_upgrade_tests.rs"]
-mod marketplace_upgrade_tests;
 #[path = "tests/mcp_startup.rs"]
 mod mcp_startup;
 #[path = "tests/misalignment_policy_tests.rs"]
@@ -79,7 +73,6 @@ mod backend_sessions;
 mod history_hydration_tests;
 #[path = "tests/permission_shortcuts_tests.rs"]
 mod permission_shortcuts_tests;
-mod plugin_catalog;
 mod rate_limits;
 #[path = "tests/reasoning_resume_tests.rs"]
 mod reasoning_resume_tests;
@@ -508,7 +501,6 @@ async fn handle_mcp_inventory_result_respects_origin_thread() {
             tools_error: None,
             name: "docs".to_string(),
             runtime_status: None,
-            plugin_id: None,
             http_origin: None,
             server_info: None,
             tools: HashMap::new(),
@@ -4825,46 +4817,6 @@ async fn inactive_thread_permissions_approval_preserves_file_system_permissions(
 }
 
 #[tokio::test]
-async fn inactive_thread_url_elicitation_routes_to_app_link() {
-    let app = make_test_app().await;
-    let thread_id = ThreadId::new();
-    let request = ServerRequest::McpServerElicitationRequest {
-        request_id: AppServerRequestId::Integer(9),
-        params: McpServerElicitationRequestParams {
-            thread_id: thread_id.to_string(),
-            turn_id: Some("turn-auth".to_string()),
-            server_name: "payments".to_string(),
-            request: McpServerElicitationRequest::Url {
-                meta: None,
-                message: "Review the payment details to continue.".to_string(),
-                url: "https://payments.example/checkout/123".to_string(),
-                elicitation_id: "payment-123".to_string(),
-            },
-        },
-    };
-
-    let Some(ThreadInteractiveRequest::AppLink(params)) = app
-        .interactive_request_for_thread_request(thread_id, &request)
-        .await
-        .expect("valid localized paths")
-    else {
-        panic!("expected app link request");
-    };
-
-    assert_eq!(params.title, "Action required");
-    assert_eq!(params.description, Some("Server: payments".to_string()));
-    assert_eq!(params.url, "https://payments.example/checkout/123");
-    assert_eq!(
-        params.elicitation_target,
-        Some(crate::bottom_pane::AppLinkElicitationTarget {
-            thread_id,
-            server_name: "payments".to_string(),
-            request_id: AppServerRequestId::Integer(9),
-        })
-    );
-}
-
-#[tokio::test]
 async fn inactive_thread_invalid_url_elicitation_is_declined() {
     let (app, mut app_event_rx, _op_rx) = make_test_app_with_channels().await;
     let thread_id = ThreadId::new();
@@ -6614,7 +6566,6 @@ async fn make_test_app() -> Box<App> {
         rate_limit_refresh_state: Default::default(),
         pending_mcp_login_start: None,
         active_mcp_login_ids: HashMap::new(),
-        pending_plugin_enabled_writes: HashMap::new(),
         pending_hook_enabled_writes: HashMap::new(),
         recap: recap::RecapState::default(),
         _test_codex_home: test_codex_home,
@@ -6734,7 +6685,6 @@ pub(super) async fn make_test_app_with_channels() -> (
             rate_limit_refresh_state: Default::default(),
             pending_mcp_login_start: None,
             active_mcp_login_ids: HashMap::new(),
-            pending_plugin_enabled_writes: HashMap::new(),
             pending_hook_enabled_writes: HashMap::new(),
             recap: recap::RecapState::default(),
             _test_codex_home: test_codex_home,
@@ -10049,7 +9999,6 @@ async fn selecting_cyber_model_respects_auto_review_requirements() {
             .expect("set approval policy");
         app.chat_widget
             .set_approval_policy(AskForApproval::UnlessTrusted);
-        app.chat_widget.sync_plugin_mentions_config(&app.config);
 
         let mut model = app
             .model_catalog
@@ -10194,7 +10143,6 @@ async fn inactive_thread_settings_notification_updates_cached_collaboration_mode
     let notification = ThreadSettingsUpdatedNotification {
         thread_id: inactive_thread_id.to_string(),
         thread_settings: ThreadSettings {
-            disabled_plugin_ids: Vec::new(),
             cwd: test_absolute_path("/tmp/thread-settings"),
             approval_policy: AskForApproval::OnRequest,
             approvals_reviewer: codex_app_server_protocol::ApprovalsReviewer::AutoReview,

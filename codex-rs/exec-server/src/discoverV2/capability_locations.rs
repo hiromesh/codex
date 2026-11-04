@@ -26,14 +26,6 @@ const AGENTS_SKILLS_SUFFIX: &str = ".agents/skills";
 pub(crate) struct CapabilityLocation {
     pub root: PathUri,
     pub standalone_root_id: Option<String>,
-    pub plugin: Option<InstalledPlugin>,
-}
-
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub(crate) struct InstalledPlugin {
-    pub id: String,
-    pub version: String,
-    pub remote_plugin_id: Option<String>,
 }
 
 /// Selected locations; membership does not authorize capability reads.
@@ -75,3 +67,7 @@ pub(crate) async fn prewarm_locations(
     )
     .await
 }
+
+#[cfg(test)]
+#[path = "tests/capability_locations_tests.rs"]
+pub(crate) mod tests;

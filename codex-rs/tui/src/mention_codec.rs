@@ -3,8 +3,10 @@
 use std::collections::HashMap;
 use std::collections::VecDeque;
 
-use codex_utils_plugins::mention_syntax::PLUGIN_TEXT_MENTION_SIGIL;
-use codex_utils_plugins::mention_syntax::TOOL_MENTION_SIGIL;
+use codex_protocol::mention_syntax::TOOL_MENTION_SIGIL;
+
+/// Plaintext `@` sigil for history-linked mentions (tasks and legacy links).
+pub(crate) const TEXT_MENTION_SIGIL: char = '@';
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) struct LinkedMention {
@@ -38,7 +40,7 @@ pub(crate) fn encode_history_mentions_at_elements(
     for mention in mentions {
         if !matches!(
             mention.sigil,
-            TOOL_MENTION_SIGIL | PLUGIN_TEXT_MENTION_SIGIL
+            TOOL_MENTION_SIGIL | TEXT_MENTION_SIGIL
         ) {
             continue;
         }
@@ -55,10 +57,10 @@ pub(crate) fn encode_history_mentions_at_elements(
     while index < bytes.len() {
         if matches!(
             bytes[index],
-            byte if byte == TOOL_MENTION_SIGIL as u8 || byte == PLUGIN_TEXT_MENTION_SIGIL as u8
+            byte if byte == TOOL_MENTION_SIGIL as u8 || byte == TEXT_MENTION_SIGIL as u8
         ) {
             let sigil = bytes[index] as char;
-            if sigil == PLUGIN_TEXT_MENTION_SIGIL
+            if sigil == TEXT_MENTION_SIGIL
                 && let Some(element) = elements
                     .iter()
                     .find(|element| element.byte_range.start == index)
@@ -195,14 +197,14 @@ fn parse_history_linked_mention(
 
     if at_mentions_enabled {
         if let Some((name, path, end_index)) =
-            parse_linked_tool_mention(text, start, PLUGIN_TEXT_MENTION_SIGIL)
+            parse_linked_tool_mention(text, start, TEXT_MENTION_SIGIL)
             && !is_common_env_var(name)
             && is_tool_path(path)
         {
-            return Some((PLUGIN_TEXT_MENTION_SIGIL, name, path, end_index));
+            return Some((TEXT_MENTION_SIGIL, name, path, end_index));
         }
     } else if let Some((name, path, end_index)) =
-        parse_linked_tool_mention(text, start, PLUGIN_TEXT_MENTION_SIGIL)
+        parse_linked_tool_mention(text, start, TEXT_MENTION_SIGIL)
         && !is_common_env_var(name)
         && path.starts_with("plugin://")
     {
@@ -340,7 +342,7 @@ mod tests {
     #[test]
     fn parse_linked_mentions_preserves_byte_offsets_and_trims_paths() {
         let prefix = "before 🦀 ";
-        for sigil in [TOOL_MENTION_SIGIL, PLUGIN_TEXT_MENTION_SIGIL] {
+        for sigil in [TOOL_MENTION_SIGIL, TEXT_MENTION_SIGIL] {
             let text =
                 format!("{prefix}[{sigil}tool_1-name] \n\t( skill://路径/SKILL.md ) trailing");
             assert_eq!(

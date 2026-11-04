@@ -2,9 +2,6 @@
 #![allow(clippy::expect_used)]
 
 mod common;
-#[cfg(target_os = "linux")]
-#[path = "common/fake_bwrap.rs"]
-mod fake_bwrap;
 
 #[path = "file_system/shared.rs"]
 mod shared;
@@ -30,8 +27,6 @@ use anyhow::Context;
 use anyhow::Result;
 use codex_exec_server::CopyOptions;
 use codex_exec_server::CreateDirectoryOptions;
-#[cfg(target_os = "linux")]
-use codex_exec_server::Environment;
 use codex_exec_server::FileMetadata;
 use codex_exec_server::FileSystemSandboxContext;
 use codex_exec_server::GetMetadataOptions;
@@ -43,23 +38,12 @@ use codex_exec_server::WalkEntryKind;
 use codex_exec_server::WalkOptions;
 use codex_exec_server::WalkOutcome;
 use codex_exec_server::WriteFileOptions;
-use codex_protocol::models::PermissionProfile;
-use codex_protocol::permissions::FileSystemAccessMode;
-use codex_protocol::permissions::FileSystemPath;
-use codex_protocol::permissions::FileSystemSandboxEntry;
-use codex_protocol::permissions::FileSystemSandboxPolicy;
-use codex_protocol::permissions::FileSystemSpecialPath;
-use codex_protocol::permissions::NetworkSandboxPolicy;
 use codex_utils_path_uri::PathUri;
 use pretty_assertions::assert_eq;
 use tempfile::TempDir;
 use test_case::test_case;
 use tokio::time::timeout;
 
-#[cfg(target_os = "linux")]
-use crate::common::exec_server::exec_server_with_env;
-#[cfg(target_os = "linux")]
-use crate::fake_bwrap::write_fake_bwrap;
 
 use crate::support::FileSystemImplementation;
 use crate::support::create_file_system_context;
@@ -123,7 +107,6 @@ fn create_directory_symlink(target: &Path, alias: &Path) -> Result<()> {
 }
 
 #[test_case(FileSystemImplementation::Local ; "local")]
-#[test_case(FileSystemImplementation::Remote ; "remote")]
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn file_system_canonicalize_resolves_directory_symlink(
     implementation: FileSystemImplementation,
@@ -133,7 +116,6 @@ async fn file_system_canonicalize_resolves_directory_symlink(
 }
 
 #[test_case(FileSystemImplementation::Local ; "local")]
-#[test_case(FileSystemImplementation::Remote ; "remote")]
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn file_system_operations_can_reject_symlinks_in_any_path_component(
     implementation: FileSystemImplementation,
@@ -273,7 +255,6 @@ async fn file_system_operations_can_reject_symlinks_in_any_path_component(
 }
 
 #[test_case(FileSystemImplementation::Local ; "local")]
-#[test_case(FileSystemImplementation::Remote ; "remote")]
 #[tokio::test]
 async fn file_system_no_follow_non_recursive_root_creation_fails(
     implementation: FileSystemImplementation,
@@ -297,7 +278,6 @@ async fn file_system_no_follow_non_recursive_root_creation_fails(
 
 #[cfg(target_os = "linux")]
 #[test_case(FileSystemImplementation::Local ; "local")]
-#[test_case(FileSystemImplementation::Remote ; "remote")]
 #[tokio::test]
 async fn file_system_no_follow_metadata_preserves_linux_birthtime(
     implementation: FileSystemImplementation,
@@ -335,7 +315,6 @@ async fn file_system_no_follow_metadata_preserves_linux_birthtime(
 }
 
 #[test_case(FileSystemImplementation::Local ; "local")]
-#[test_case(FileSystemImplementation::Remote ; "remote")]
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn file_system_no_follow_operations_support_search_only_ancestors(
     implementation: FileSystemImplementation,
@@ -446,7 +425,6 @@ async fn file_system_no_follow_operations_support_search_only_ancestors(
 }
 
 #[test_case(FileSystemImplementation::Local ; "local")]
-#[test_case(FileSystemImplementation::Remote ; "remote")]
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn file_system_no_follow_write_rejects_fifo_without_blocking(
     implementation: FileSystemImplementation,
@@ -478,7 +456,6 @@ async fn file_system_no_follow_write_rejects_fifo_without_blocking(
 }
 
 #[test_case(FileSystemImplementation::Local ; "local")]
-#[test_case(FileSystemImplementation::Remote ; "remote")]
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 async fn file_system_no_follow_recursive_mkdir_handles_concurrent_creators(
     implementation: FileSystemImplementation,
@@ -515,7 +492,6 @@ async fn file_system_no_follow_recursive_mkdir_handles_concurrent_creators(
 }
 
 #[test_case(FileSystemImplementation::Local ; "local")]
-#[test_case(FileSystemImplementation::Remote ; "remote")]
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn file_system_sandboxed_canonicalize_resolves_directory_symlink(
     implementation: FileSystemImplementation,
@@ -527,132 +503,7 @@ async fn file_system_sandboxed_canonicalize_resolves_directory_symlink(
     .await
 }
 
-#[cfg(target_os = "linux")]
-#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn sandboxed_file_system_helper_finds_bwrap_on_preserved_path() -> Result<()> {
-    let tmp = TempDir::new()?;
-    let fake_bin_dir = tmp.path().join("bin");
-    let fake_bwrap = write_fake_bwrap(&fake_bin_dir)?;
-    let mut path_entries = vec![fake_bin_dir];
-    if let Some(path) = std::env::var_os("PATH") {
-        path_entries.extend(std::env::split_paths(&path));
-    }
-    let helper_path = std::env::join_paths(path_entries)?;
-
-    let server = exec_server_with_env([("PATH", helper_path.as_os_str())], &[]).await?;
-    let environment = Environment::create_for_tests(Some(server.websocket_url().to_string()))?;
-    let file_system = environment.get_filesystem();
-    let workspace = tmp.path().join("workspace");
-    std::fs::create_dir_all(&workspace)?;
-    let file_path = workspace.join("created.txt");
-    let sandbox = workspace_write_sandbox(workspace);
-
-    file_system
-        .write_file(
-            &PathUri::from_host_native_path(&file_path)?,
-            b"written through fs helper".to_vec(),
-            Default::default(),
-            Some(&sandbox),
-        )
-        .await?;
-
-    assert_eq!(std::fs::read(&file_path)?, b"written through fs helper");
-
-    let bwrap_log = fake_bwrap.with_file_name("bwrap.log");
-    let log = std::fs::read_to_string(&bwrap_log)
-        .with_context(|| format!("expected fake bwrap log at {}", bwrap_log.display()))?;
-    assert!(
-        log.contains("--argv0"),
-        "expected fs helper sandbox path to invoke PATH bwrap with --argv0, got: {log}"
-    );
-
-    Ok(())
-}
-
-#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn remote_read_file_materializes_environment_workspace_roots() -> Result<()> {
-    let context = create_file_system_context(FileSystemImplementation::Remote).await?;
-    let file_system = context.file_system;
-    let tmp = TempDir::new()?;
-    let workspace = tmp.path().join("workspace");
-    let workspace_file = workspace.join("included.txt");
-    let excluded_file = tmp.path().join("excluded.txt");
-    std::fs::create_dir(&workspace)?;
-    std::fs::write(&workspace_file, b"included")?;
-    std::fs::write(&excluded_file, b"excluded")?;
-
-    let policy = FileSystemSandboxPolicy::restricted(vec![FileSystemSandboxEntry {
-        path: FileSystemPath::Special {
-            value: FileSystemSpecialPath::project_roots(/*subpath*/ None),
-        },
-        access: FileSystemAccessMode::Read,
-        missing_path_behavior: None,
-    }]);
-    let mut sandbox = FileSystemSandboxContext::from_permission_profile(
-        PermissionProfile::from_runtime_permissions(&policy, NetworkSandboxPolicy::Restricted),
-        PathUri::from_host_native_path(tmp.path())?,
-    );
-    sandbox.workspace_roots = vec![PathUri::from_host_native_path(&workspace)?];
-
-    assert_eq!(
-        file_system
-            .read_file(
-                &PathUri::from_host_native_path(&workspace_file)?,
-                Default::default(),
-                Some(&sandbox),
-            )
-            .await?,
-        b"included"
-    );
-    let error = file_system
-        .read_file(
-            &PathUri::from_host_native_path(&excluded_file)?,
-            Default::default(),
-            Some(&sandbox),
-        )
-        .await
-        .expect_err("read outside environment workspace roots should fail");
-    assert_sandbox_denied(&error);
-
-    Ok(())
-}
-
-#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn remote_read_file_preserves_empty_workspace_roots() -> Result<()> {
-    let context = create_file_system_context(FileSystemImplementation::Remote).await?;
-    let file_system = context.file_system;
-    let tmp = TempDir::new()?;
-    let file = tmp.path().join("excluded.txt");
-    std::fs::write(&file, b"excluded")?;
-
-    let policy = FileSystemSandboxPolicy::restricted(vec![FileSystemSandboxEntry {
-        path: FileSystemPath::Special {
-            value: FileSystemSpecialPath::project_roots(/*subpath*/ None),
-        },
-        access: FileSystemAccessMode::Read,
-        missing_path_behavior: None,
-    }]);
-    let mut sandbox = FileSystemSandboxContext::from_permission_profile(
-        PermissionProfile::from_runtime_permissions(&policy, NetworkSandboxPolicy::Restricted),
-        PathUri::from_host_native_path(tmp.path())?,
-    );
-    sandbox.workspace_roots.clear();
-
-    let error = file_system
-        .read_file(
-            &PathUri::from_host_native_path(&file)?,
-            Default::default(),
-            Some(&sandbox),
-        )
-        .await
-        .expect_err("empty workspace roots should not grant cwd access");
-    assert_sandbox_denied(&error);
-
-    Ok(())
-}
-
 #[test_case(FileSystemImplementation::Local ; "local")]
-#[test_case(FileSystemImplementation::Remote ; "remote")]
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn file_system_metadata_and_directory_listing_follow_symlinks(
     implementation: FileSystemImplementation,
@@ -752,7 +603,6 @@ async fn file_system_metadata_and_directory_listing_follow_symlinks(
 }
 
 #[test_case(FileSystemImplementation::Local ; "local")]
-#[test_case(FileSystemImplementation::Remote ; "remote")]
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn file_system_walk_handles_directory_symlinks(
     implementation: FileSystemImplementation,
@@ -842,7 +692,6 @@ async fn file_system_walk_handles_directory_symlinks(
 
 #[cfg(target_os = "linux")]
 #[test_case(FileSystemImplementation::Local ; "local")]
-#[test_case(FileSystemImplementation::Remote ; "remote")]
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn file_system_walk_reports_non_utf8_names(
     implementation: FileSystemImplementation,
@@ -892,7 +741,6 @@ async fn file_system_walk_reports_non_utf8_names(
 }
 
 #[test_case(FileSystemImplementation::Local ; "local")]
-#[test_case(FileSystemImplementation::Remote ; "remote")]
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn file_system_walk_prunes_hidden_directories_without_claiming_visible_aliases(
     implementation: FileSystemImplementation,
@@ -954,7 +802,6 @@ async fn file_system_walk_prunes_hidden_directories_without_claiming_visible_ali
 }
 
 #[test_case(FileSystemImplementation::Local ; "local")]
-#[test_case(FileSystemImplementation::Remote ; "remote")]
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn file_system_sandboxed_write_rejects_unwritable_path(
     implementation: FileSystemImplementation,
@@ -985,7 +832,6 @@ async fn file_system_sandboxed_write_rejects_unwritable_path(
 }
 
 #[test_case(FileSystemImplementation::Local ; "local")]
-#[test_case(FileSystemImplementation::Remote ; "remote")]
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn file_system_sandboxed_write_allows_explicit_alias_roots(
     implementation: FileSystemImplementation,
@@ -1018,7 +864,6 @@ async fn file_system_sandboxed_write_allows_explicit_alias_roots(
 }
 
 #[test_case(FileSystemImplementation::Local ; "local")]
-#[test_case(FileSystemImplementation::Remote ; "remote")]
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn file_system_sandboxed_read_rejects_symlink_escape(
     implementation: FileSystemImplementation,
@@ -1063,7 +908,6 @@ async fn file_system_sandboxed_read_rejects_symlink_escape(
 }
 
 #[test_case(FileSystemImplementation::Local ; "local")]
-#[test_case(FileSystemImplementation::Remote ; "remote")]
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn file_system_sandboxed_read_rejects_symlink_parent_dotdot_escape(
     implementation: FileSystemImplementation,
@@ -1101,7 +945,6 @@ async fn file_system_sandboxed_read_rejects_symlink_parent_dotdot_escape(
 }
 
 #[test_case(FileSystemImplementation::Local ; "local")]
-#[test_case(FileSystemImplementation::Remote ; "remote")]
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn file_system_sandboxed_write_rejects_symlink_escape(
     implementation: FileSystemImplementation,
@@ -1137,7 +980,6 @@ async fn file_system_sandboxed_write_rejects_symlink_escape(
 }
 
 #[test_case(FileSystemImplementation::Local ; "local")]
-#[test_case(FileSystemImplementation::Remote ; "remote")]
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn file_system_sandboxed_write_preserves_existing_hard_link(
     implementation: FileSystemImplementation,
@@ -1187,7 +1029,6 @@ async fn file_system_sandboxed_write_preserves_existing_hard_link(
 }
 
 #[test_case(FileSystemImplementation::Local ; "local")]
-#[test_case(FileSystemImplementation::Remote ; "remote")]
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn file_system_create_directory_rejects_symlink_escape(
     implementation: FileSystemImplementation,
@@ -1225,7 +1066,6 @@ async fn file_system_create_directory_rejects_symlink_escape(
 }
 
 #[test_case(FileSystemImplementation::Local ; "local")]
-#[test_case(FileSystemImplementation::Remote ; "remote")]
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn file_system_read_directory_rejects_symlink_escape(
     implementation: FileSystemImplementation,
@@ -1259,7 +1099,6 @@ async fn file_system_read_directory_rejects_symlink_escape(
 }
 
 #[test_case(FileSystemImplementation::Local ; "local")]
-#[test_case(FileSystemImplementation::Remote ; "remote")]
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn file_system_copy_rejects_symlink_escape_destination(
     implementation: FileSystemImplementation,
@@ -1296,7 +1135,6 @@ async fn file_system_copy_rejects_symlink_escape_destination(
 }
 
 #[test_case(FileSystemImplementation::Local ; "local")]
-#[test_case(FileSystemImplementation::Remote ; "remote")]
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn file_system_remove_removes_symlink_not_target(
     implementation: FileSystemImplementation,
@@ -1336,7 +1174,6 @@ async fn file_system_remove_removes_symlink_not_target(
 }
 
 #[test_case(FileSystemImplementation::Local ; "local")]
-#[test_case(FileSystemImplementation::Remote ; "remote")]
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn file_system_copy_preserves_symlink_source(
     implementation: FileSystemImplementation,
@@ -1374,7 +1211,6 @@ async fn file_system_copy_preserves_symlink_source(
 }
 
 #[test_case(FileSystemImplementation::Local ; "local")]
-#[test_case(FileSystemImplementation::Remote ; "remote")]
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn file_system_remove_rejects_symlink_escape(
     implementation: FileSystemImplementation,
@@ -1415,7 +1251,6 @@ async fn file_system_remove_rejects_symlink_escape(
 }
 
 #[test_case(FileSystemImplementation::Local ; "local")]
-#[test_case(FileSystemImplementation::Remote ; "remote")]
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn file_system_copy_rejects_symlink_escape_source(
     implementation: FileSystemImplementation,
@@ -1454,7 +1289,6 @@ async fn file_system_copy_rejects_symlink_escape_source(
 }
 
 #[test_case(FileSystemImplementation::Local ; "local")]
-#[test_case(FileSystemImplementation::Remote ; "remote")]
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn file_system_copy_preserves_symlinks_in_recursive_copy(
     implementation: FileSystemImplementation,
@@ -1491,7 +1325,6 @@ async fn file_system_copy_preserves_symlinks_in_recursive_copy(
 }
 
 #[test_case(FileSystemImplementation::Local ; "local")]
-#[test_case(FileSystemImplementation::Remote ; "remote")]
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn file_system_copy_ignores_unknown_special_files_in_recursive_copy(
     implementation: FileSystemImplementation,
@@ -1535,7 +1368,6 @@ async fn file_system_copy_ignores_unknown_special_files_in_recursive_copy(
 }
 
 #[test_case(FileSystemImplementation::Local ; "local")]
-#[test_case(FileSystemImplementation::Remote ; "remote")]
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn file_system_copy_rejects_standalone_fifo_source(
     implementation: FileSystemImplementation,

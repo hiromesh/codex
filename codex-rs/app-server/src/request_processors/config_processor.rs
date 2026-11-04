@@ -379,7 +379,6 @@ async fn reload_user_config_inner(config_manager: &ConfigManager, thread_manager
             let current_requirements = current_config.config_layer_stack.requirements();
             let next_requirements = next_config.config_layer_stack.requirements();
             let promote_mcp = current_requirements.mcp_servers != next_requirements.mcp_servers
-                || current_requirements.plugins != next_requirements.plugins
                 || current_requirements.feature_requirements
                     != next_requirements.feature_requirements;
             let outcome = if promote_mcp {
@@ -416,7 +415,7 @@ pub(crate) fn map_requirements_to_api(
 ) -> Option<ConfigRequirements> {
     let requirements = match requirements {
         Some(requirements) => requirements,
-        None if allowed_login_methods == [ForcedLoginMethod::Api, ForcedLoginMethod::Chatgpt] => {
+        None if allowed_login_methods == [ForcedLoginMethod::Api] => {
             return None;
         }
         None => ConfigRequirementsToml::default(),
@@ -512,7 +511,6 @@ pub(crate) fn map_requirements_to_api(
         allow_managed_hooks_only: requirements.allow_managed_hooks_only,
         allow_browser_and_computer_use: requirements.allow_browser_and_computer_use,
         allow_appshots: requirements.allow_appshots,
-        allow_remote_control: requirements.allow_remote_control,
         computer_use: requirements
             .computer_use
             .map(map_computer_use_requirements_to_api),
@@ -971,7 +969,7 @@ client_id = "mcp-client"
     ) -> codex_app_server_protocol::ConfigRequirements {
         map_requirements_to_api(
             Some(requirements),
-            vec![ForcedLoginMethod::Api, ForcedLoginMethod::Chatgpt],
+            vec![ForcedLoginMethod::Api],
         )
         .expect("requirements")
     }
@@ -1020,16 +1018,6 @@ client_id = "mcp-client"
 
         assert_eq!(mapped.allow_appshots, Some(false));
         assert_eq!(mapped.hooks, None);
-    }
-
-    #[test]
-    fn requirements_api_includes_allow_remote_control() {
-        let mapped = map_test_requirements(ConfigRequirementsToml {
-            allow_remote_control: Some(false),
-            ..ConfigRequirementsToml::default()
-        });
-
-        assert_eq!(mapped.allow_remote_control, Some(false));
     }
 
     #[test]

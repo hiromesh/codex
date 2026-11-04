@@ -1,8 +1,6 @@
 use crate::ThreadId;
 use crate::auth::KnownPlan;
 use crate::auth::PlanType;
-pub use crate::auth::RefreshTokenFailedError;
-pub use crate::auth::RefreshTokenFailedReason;
 use crate::exec_output::ExecToolCallOutput;
 use crate::network_policy::NetworkPolicyDecisionPayload;
 use crate::protocol::CodexErrorInfo;
@@ -210,8 +208,6 @@ pub enum CodexErrorDetails {
     LandlockSandboxExecutableNotProvided,
     #[error("unsupported operation: {0}")]
     UnsupportedOperation(String),
-    #[error("{0}")]
-    RefreshTokenFailed(RefreshTokenFailedError),
     /// Gateway credentials require user action before requests can resume.
     #[error("{0}")]
     GatewayLoginRequired(String),
@@ -387,7 +383,6 @@ impl CodexErr {
         RetryLimit(error: RetryLimitReachedError),
         Sandbox(error: SandboxErr),
         UnsupportedOperation(message: String),
-        RefreshTokenFailed(error: RefreshTokenFailedError),
         Fatal(message: String),
         Io(error: io::Error),
         Json(error: serde_json::Error),
@@ -436,7 +431,6 @@ impl CodexErr {
             | CodexErrorDetails::ModelNotFound { .. }
             | CodexErrorDetails::InvalidPrompt { .. }
             | CodexErrorDetails::ToolCollision(_)
-            | CodexErrorDetails::RefreshTokenFailed(_)
             | CodexErrorDetails::GatewayLoginRequired(_)
             | CodexErrorDetails::UnsupportedOperation(_)
             | CodexErrorDetails::Sandbox(_)
@@ -533,7 +527,6 @@ impl CodexErr {
                     http_status_code: self.http_status_code_value(),
                 }
             }
-            CodexErrorDetails::RefreshTokenFailed(_) => CodexErrorInfo::Unauthorized,
             CodexErrorDetails::SessionConfiguredNotFirstEvent
             | CodexErrorDetails::InternalServerError
             | CodexErrorDetails::InternalAgentDied => CodexErrorInfo::InternalServerError,

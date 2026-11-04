@@ -73,7 +73,7 @@ cwd = {cwd}
 #[test_case("", "gateway"; "definition_only")]
 #[test_case("model_provider = 'gateway'", "matching"; "matching_configuration")]
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn required_provider_routes_models_and_inference_with_chatgpt_auth(
+async fn required_provider_routes_models_and_inference_with_api_key_auth(
     required_selection: &str,
     local_selection: &str,
 ) -> Result<()> {
@@ -102,6 +102,7 @@ base_url = "{local_url}"
 [model_providers.gateway]
 name = "Managed gateway"
 base_url = "{gateway_url}"
+model_catalog_url = "{gateway_url}/models"
 requires_openai_auth = true
 [model_providers.gateway.http_headers]
 X-Managed = "required"
@@ -122,7 +123,7 @@ X-Managed = "required"
         ]),
     )
     .await;
-    let auth = CodexAuth::create_dummy_chatgpt_auth_for_testing();
+    let auth = CodexAuth::from_api_key("test-api-key");
     let expected_authorization = format!("Bearer {}", auth.get_token()?);
     let test = test_codex()
         .with_auth(auth)

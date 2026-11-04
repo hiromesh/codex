@@ -25,7 +25,6 @@ use codex_config::types::McpServerConfig;
 use codex_config::types::McpServerEnvVar;
 use codex_config::types::McpServerTransportConfig;
 use codex_config::types::OAuthCredentialsStoreMode;
-use codex_core::AgentMcpMetadataRecipient;
 use codex_core::EnvironmentConfig;
 use codex_core::EnvironmentMcpPolicy;
 use codex_core::TurnInputRequest;
@@ -39,7 +38,7 @@ use codex_exec_server::HttpRequestParams;
 use codex_features::Feature;
 use codex_http_client::HttpClientBuilder;
 use codex_login::CodexAuth;
-use codex_mcp::CODEX_APPS_MCP_SERVER_NAME;
+const CODEX_APPS_MCP_SERVER_NAME: &str = "codex_apps";
 use codex_mcp::MCP_SANDBOX_LAUNCHER_META_KEY;
 use codex_mcp::MCP_SANDBOX_STATE_CAPABILITY;
 use codex_mcp::MCP_SANDBOX_STATE_META_CAPABILITY;
@@ -56,7 +55,6 @@ use codex_protocol::config_types::ServiceTier;
 use codex_protocol::config_types::Settings;
 use codex_protocol::mcp_policy::McpServerIdentity;
 use codex_protocol::mcp_policy::McpServerRequirement;
-use codex_protocol::mcp_policy::PluginMcpRequirements;
 use codex_protocol::models::ContentItem;
 use codex_protocol::models::ImageDetail;
 use codex_protocol::models::ImageReference;
@@ -71,7 +69,6 @@ use codex_protocol::openai_models::ModelServiceTier;
 use codex_protocol::openai_models::ModelVisibility;
 use codex_protocol::openai_models::ModelsResponse;
 use codex_protocol::openai_models::ReasoningEffortPreset;
-use codex_protocol::openai_models::ToolMode;
 use codex_protocol::openai_models::TruncationPolicyConfig;
 use codex_protocol::permissions::FileSystemAccessMode;
 use codex_protocol::permissions::FileSystemPath;
@@ -92,7 +89,6 @@ use codex_protocol::protocol::TurnSettingsUpdate;
 use codex_protocol::protocol::TurnSettingsUpdateOutcome;
 use codex_protocol::request_user_input::RequestUserInputAnswer;
 use codex_protocol::request_user_input::RequestUserInputResponse;
-use codex_protocol::turn_input::CyberAccessProgram;
 use codex_protocol::turn_input::TurnInput;
 use codex_protocol::user_input::UserInput;
 use codex_utils_absolute_path::AbsolutePathBuf;
@@ -471,81 +467,6 @@ async fn call_structured_tool(
     Ok(structured_content)
 }
 
-enum AgentMetadataCase {
-    ApprovedPlugin,
-    NoHostOptIn,
-    UserOverride,
-}
-
-#[test_case(AgentMetadataCase::ApprovedPlugin, Some(CyberAccessProgram::Standard); "approved plugin")]
-#[test_case(AgentMetadataCase::ApprovedPlugin, None; "approved plugin without an explicit program")]
-#[test_case(AgentMetadataCase::UserOverride, Some(CyberAccessProgram::Standard); "same-name user override")]
-#[test_case(AgentMetadataCase::NoHostOptIn, Some(CyberAccessProgram::Standard); "matching plugin without host opt-in")]
-#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn agent_metadata_is_only_sent_to_the_selected_plugin(
-    case: AgentMetadataCase,
-    cyber_access_program: Option<CyberAccessProgram>,
-) -> anyhow::Result<()> {
-    let server = start_mock_server().await;
-    let home = Arc::new(tempdir()?);
-    let plugin_root = super::plugins::write_sample_plugin_manifest_and_config(&home);
-    let command = stdio_server_bin()?;
-    fs::write(
-        plugin_root.join(".mcp.json"),
-        serde_json::to_vec(&json!({ "mcpServers": { "sample": { "command": command } } }))?,
-    )?;
-    let transport = stdio_transport(command, /*env*/ None, Vec::new());
-    let recipient = AgentMcpMetadataRecipient {
-        plugin_id: "sample@test".into(),
-        plugin_root: PathUri::from_abs_path(&AbsolutePathBuf::try_from(plugin_root)?),
-        server_name: "sample".into(),
-        transport: transport.clone(),
-    };
-    let user_override = matches!(case, AgentMetadataCase::UserOverride);
-    let fixture = test_codex()
-        .with_home(home)
-        .with_auth(CodexAuth::create_dummy_chatgpt_auth_for_testing())
-        .with_config(move |config| {
-            if user_override {
-                insert_mcp_server(config, "sample", transport, TestMcpServerOptions::default());
-            }
-        })
-        .build(&server)
-        .await?;
-    if !matches!(case, AgentMetadataCase::NoHostOptIn) {
-        fixture.codex.thread_extension_data().insert(recipient);
-    }
-    wait_for_mcp_server(&fixture.codex, "sample").await?;
-
-    let call_id = "call-agent-context";
-    let meta = call_structured_tool(
-        &server,
-        &fixture,
-        "sample",
-        "sandbox_meta",
-        call_id,
-        TurnStartOptions {
-            root_turn_id: Some("original-root".into()),
-            turn_trigger: Some("composer".into()),
-            cyber_access_program,
-            ..Default::default()
-        },
-    )
-    .await?;
-    assert_eq!(meta["callId"], json!(call_id));
-    assert_eq!(meta["x-codex-turn-metadata"]["turn_trigger"], "composer");
-    let expect_private_metadata = matches!(case, AgentMetadataCase::ApprovedPlugin);
-    assert_eq!(
-        meta.get("x-codex-root-turn-id").cloned(),
-        expect_private_metadata.then(|| json!("original-root"))
-    );
-    assert_eq!(
-        meta.get("x-codex-cyber-access-program").cloned(),
-        expect_private_metadata.then(|| json!(cyber_access_program))
-    );
-    Ok(())
-}
-
 #[tokio::test(flavor = "multi_thread", worker_threads = 1)]
 async fn openai_form_capability_is_advertised_to_mcp_servers() -> anyhow::Result<()> {
     assert_openai_form_capability_advertisement(/*expected*/ true).await
@@ -557,7 +478,6 @@ async fn openai_form_capability_is_not_advertised_by_default() -> anyhow::Result
 }
 
 async fn assert_openai_form_capability_advertisement(expected: bool) -> anyhow::Result<()> {
-
     let server = start_mock_server().await;
     let server_name = "capabilities";
     let command = stdio_server_bin()?;
@@ -798,12 +718,8 @@ async fn text_only_mcp_content_uses_content_items() -> anyhow::Result<()> {
     Ok(())
 }
 
-#[test_case(false; "configured servers")]
-#[test_case(true; "plugin servers")]
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn environment_mcp_policy_filters_runtime_config_and_model_tools(
-    from_plugin: bool,
-) -> anyhow::Result<()> {
+async fn environment_mcp_policy_filters_runtime_config_and_model_tools() -> anyhow::Result<()> {
     skip_if_no_network!(Ok(()));
 
     let server = responses::start_mock_server().await;
@@ -820,40 +736,20 @@ async fn environment_mcp_policy_filters_runtime_config_and_model_tools(
     let allowed_command = command.clone();
     let codex_home = Arc::new(tempdir()?);
     let test_env = test_env().await?;
-    if from_plugin {
-        let plugin_root =
-            super::plugins::write_sample_plugin_manifest_and_config(codex_home.as_ref());
-        let plugin_server = json!({
-            "command": command,
-            "environment_id": remote_aware_environment_id(),
-            "cwd": test_env.cwd(),
-        });
-        fs::write(
-            plugin_root.join(".mcp.json"),
-            serde_json::to_vec(&json!({
-                "mcpServers": {
-                    "allowed": plugin_server,
-                    "blocked": plugin_server,
-                },
-            }))?,
-        )?;
-    }
     let fixture = test_codex()
         .with_home(codex_home)
         .with_model_info_override("gpt-5.4", |model| model.supports_search_tool = false)
         .with_config(move |config| {
-            if !from_plugin {
-                for server_name in ["allowed", "blocked"] {
-                    insert_mcp_server(
-                        config,
-                        server_name,
-                        stdio_transport(command.clone(), /*env*/ None, Vec::new()),
-                        TestMcpServerOptions {
-                            environment_id: remote_aware_environment_id(),
-                            ..Default::default()
-                        },
-                    );
-                }
+            for server_name in ["allowed", "blocked"] {
+                insert_mcp_server(
+                    config,
+                    server_name,
+                    stdio_transport(command.clone(), /*env*/ None, Vec::new()),
+                    TestMcpServerOptions {
+                        environment_id: remote_aware_environment_id(),
+                        ..Default::default()
+                    },
+                );
             }
             insert_mcp_server(
                 config,
@@ -905,21 +801,8 @@ async fn environment_mcp_policy_filters_runtime_config_and_model_tools(
             },
         },
     )]);
-    let mcp_policy = if from_plugin {
-        EnvironmentMcpPolicy {
-            servers: None,
-            plugins: Some(BTreeMap::from([(
-                "sample@test".to_string(),
-                PluginMcpRequirements {
-                    mcp_servers: Some(allowed_servers),
-                },
-            )])),
-        }
-    } else {
-        EnvironmentMcpPolicy {
-            servers: Some(allowed_servers),
-            plugins: None,
-        }
+    let mcp_policy = EnvironmentMcpPolicy {
+        servers: Some(allowed_servers),
     };
 
     fixture
@@ -1057,7 +940,6 @@ async fn future_environment_mcp_policy_applies_on_the_next_turn() -> anyhow::Res
                     },
                 },
             )])),
-            plugins: None,
         }),
         network_policy: None,
         selected_capability_roots: Vec::new(),
@@ -1638,90 +1520,6 @@ async fn mcp_pagination_preserves_valid_tools_and_rejects_oversized_cursors(
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn apps_enabled_turn_skips_pending_optional_mcp_without_cached_tools() -> anyhow::Result<()> {
-    skip_if_no_network!(Ok(()));
-
-    let server = responses::start_mock_server().await;
-    let apps_server = AppsTestServer::mount(&server).await?;
-    let apps_base_url = apps_server.chatgpt_base_url.clone();
-    let response_mock = mount_sse_once(
-        &server,
-        responses::sse(vec![
-            responses::ev_response_created("resp-1"),
-            responses::ev_assistant_message("msg-1", "done"),
-            responses::ev_completed("resp-1"),
-        ]),
-    )
-    .await;
-    let pending_mcp_listener = tokio::net::TcpListener::bind("127.0.0.1:0").await?;
-    let pending_mcp_url = format!("http://{}/mcp", pending_mcp_listener.local_addr()?);
-
-    let fixture = test_codex()
-        .with_auth(CodexAuth::create_dummy_chatgpt_auth_for_testing())
-        .with_config(move |config| {
-            config
-                .features
-                .enable(Feature::Apps)
-                .expect("test config should allow Apps override");
-            config.chatgpt_base_url = apps_base_url;
-            insert_mcp_server(
-                config,
-                "pending_optional",
-                McpServerTransportConfig::StreamableHttp {
-                    url: pending_mcp_url,
-                    bearer_token_env_var: None,
-                    http_headers: None,
-                    env_http_headers: None,
-                    http_headers_helper: None,
-                },
-                TestMcpServerOptions::default(),
-            );
-        })
-        .build_with_auto_env(&server)
-        .await?;
-
-    let (_pending_mcp_connection, _) =
-        tokio::time::timeout(Duration::from_secs(5), pending_mcp_listener.accept())
-            .await
-            .context("optional MCP startup should connect before the first turn")??;
-    tokio::time::timeout(Duration::from_secs(5), async {
-        loop {
-            let event = fixture
-                .codex
-                .next_event()
-                .await
-                .context("event stream ended before Codex Apps became ready")?;
-            if let EventMsg::McpStartupUpdate(update) = event.msg
-                && update.server == CODEX_APPS_MCP_SERVER_NAME
-                && matches!(update.status, McpStartupStatus::Ready)
-            {
-                break Ok::<(), anyhow::Error>(());
-            }
-        }
-    })
-    .await
-    .context("Codex Apps should finish starting before the first turn")??;
-
-    tokio::time::timeout(Duration::from_secs(5), fixture.submit_turn("hello"))
-        .await
-        .context("a pending optional MCP must not block the first turn")??;
-    let body = response_mock.single_request().body_json();
-    assert!(body["input"].to_string().contains("<apps_instructions>"));
-    let tools = body["tools"].as_array().expect("model request tools");
-    assert!(tools.iter().all(|tool| {
-        tool.get("name")
-            .or_else(|| tool.get("type"))
-            .and_then(Value::as_str)
-            .is_none_or(|name| !name.starts_with("mcp__pending_optional"))
-    }));
-
-    tokio::time::timeout(Duration::from_secs(2), fixture.codex.shutdown_and_wait())
-        .await
-        .context("shutdown should cancel pending optional MCP startup")??;
-    Ok(())
-}
-
-#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn shutdown_cancels_startup_prewarm_waiting_for_mcp_startup() -> anyhow::Result<()> {
     skip_if_no_network!(Ok(()));
 
@@ -1837,7 +1635,7 @@ async fn startup_prewarm_connects_before_delayed_mcp_tools_then_reuses_socket(
     let service_tier = ServiceTier::Fast.request_value();
     let fixture = test_codex()
         .with_model("gpt-5.4")
-        .with_auth(CodexAuth::create_dummy_chatgpt_auth_for_testing())
+        .with_auth(CodexAuth::from_api_key("test-api-key"))
         .with_model_info_override("gpt-5.4", move |model| {
             model.supports_search_tool = false;
             model.use_responses_lite = use_responses_lite;
@@ -1879,11 +1677,12 @@ async fn startup_prewarm_connects_before_delayed_mcp_tools_then_reuses_socket(
             .await,
         "websocket handshake should finish while MCP discovery is blocked"
     );
+    // Routing hints are gone: the handshake carries no advisory model/tier header.
     assert_eq!(
         server
             .single_handshake()
             .header(X_CODEX_ROUTING_HINT_HEADER),
-        Some(format!("model=gpt-5.4;tier={service_tier}"))
+        None
     );
     assert!(
         server.single_connection().is_empty(),
@@ -2218,227 +2017,6 @@ async fn stdio_server_uses_configured_cwd_before_runtime_fallback() -> anyhow::R
     Ok(())
 }
 
-#[cfg(unix)]
-#[tokio::test(flavor = "multi_thread", worker_threads = 1)]
-#[serial(mcp_cwd)]
-async fn local_stdio_server_uses_runtime_fallback_cwd_when_config_omits_cwd() -> anyhow::Result<()>
-{
-    use codex_core::StartThreadOptions;
-    use core_test_support::exec_server::ExecServerProcess;
-    use core_test_support::test_codex::local;
-
-    skip_if_no_network!(Ok(()));
-
-    let server = responses::start_mock_server().await;
-    let server_name = "rmcp_local_fallback_cwd";
-    let expected_cwd = Arc::new(Mutex::new(None::<PathBuf>));
-    let expected_cwd_for_config = Arc::clone(&expected_cwd);
-    let rmcp_test_server_bin = cargo_bin("test_stdio_server")?;
-    let relative_server_path = PathBuf::from("mcp-bin").join(
-        rmcp_test_server_bin
-            .file_name()
-            .expect("test stdio server binary should have a file name"),
-    );
-    let relative_command = relative_server_path.to_string_lossy().into_owned();
-    let additional_workspace = tempdir()?;
-    let additional_root = AbsolutePathBuf::try_from(additional_workspace.path().to_path_buf())?;
-
-    let mut extensions = codex_extension_api::ExtensionRegistryBuilder::new();
-    codex_skills_extension::install(&mut extensions, |config: &Config| {
-        codex_skills_extension::SkillsExtensionConfig {
-            include_instructions: config.include_skill_instructions,
-            catalog_deltas_enabled: config.features.enabled(Feature::SkillCatalogDeltas),
-            omit_descriptions: false,
-            max_context_tokens: config.skill_max_context_tokens,
-            bundled_skills_enabled: config.bundled_skills_enabled(),
-            cloud_skill_enabled: config.cloud_skill_enabled,
-            shadow_selection_enabled: config.features.enabled(Feature::SkillSearch),
-        }
-    });
-    let mut fixture = test_codex()
-        .with_extensions(Arc::new(extensions.build()))
-        .with_config(move |config| {
-            config.workspace_roots = vec![config.cwd.clone(), additional_root.clone()];
-            config
-                .permissions
-                .set_workspace_roots(config.workspace_roots.clone());
-            *expected_cwd_for_config
-                .lock()
-                .expect("expected cwd lock should not be poisoned") =
-                Some(config.cwd.to_path_buf());
-
-            let target_bin = config.cwd.join(&relative_server_path).into_path_buf();
-            let target_dir = target_bin
-                .parent()
-                .expect("relative test server path should include a parent");
-            fs::create_dir_all(target_dir).expect("create relative MCP bin directory");
-            codex_utils_cargo_bin::copy_executable(&rmcp_test_server_bin, &target_bin)
-                .expect("copy test stdio server");
-
-            insert_mcp_server(
-                config,
-                server_name,
-                stdio_transport(
-                    relative_command,
-                    Some(HashMap::from([(
-                        "MCP_TEST_VALUE".to_string(),
-                        "local-fallback-cwd".to_string(),
-                    )])),
-                    Vec::new(),
-                ),
-                TestMcpServerOptions::default(),
-            );
-        })
-        .build(&server)
-        .await?;
-    wait_for_mcp_server(&fixture.codex, server_name).await?;
-
-    let expected_cwd = expected_cwd
-        .lock()
-        .expect("expected cwd lock should not be poisoned")
-        .clone()
-        .expect("test config should record runtime fallback cwd");
-    let structured =
-        call_cwd_tool(&server, &fixture, server_name, "call-local-fallback-cwd").await?;
-
-    assert_cwd_tool_output(&structured, &expected_cwd);
-
-    // The relative MCP executable exists only in the host workspace. A remote
-    // primary must not change its command resolution at startup or refresh.
-    let executor = ExecServerProcess::start().await?;
-    let remote_workspace = tempdir()?;
-    let remote_skill = remote_workspace
-        .path()
-        .join(".agents/skills/remote-fixture");
-    fs::create_dir_all(&remote_skill)?;
-    fs::write(
-        remote_skill.join("SKILL.md"),
-        "---\nname: remote-fixture\ndescription: Remote repository skill fixture\n---\nRemote instructions\n",
-    )?;
-    let manager = fixture.thread_manager.environment_manager();
-    manager.upsert_environment(
-        "other".to_string(),
-        executor.websocket_url.clone(),
-        /*connect_timeout*/ None,
-    )?;
-    for local_roots in [
-        Some(vec![fixture.config.cwd.clone()]),
-        Some(Vec::new()),
-        None,
-    ] {
-        let mut environments = vec![TurnEnvironmentRequest {
-            environment_id: "other".to_string(),
-            cwd: PathUri::from_host_native_path(remote_workspace.path())?,
-            workspace_roots: vec![PathUri::from_host_native_path(remote_workspace.path())?],
-            config: EnvironmentConfigState::FromThread,
-        }];
-        if let Some(roots) = &local_roots {
-            let mut local = local(fixture.config.cwd.clone()).into_request();
-            local.workspace_roots = roots.iter().map(PathUri::from_abs_path).collect();
-            environments.push(local);
-        }
-        let started = fixture
-            .thread_manager
-            .start_thread(StartThreadOptions {
-                environments: Some(environments),
-                ..StartThreadOptions::new(fixture.config.clone())
-            })
-            .await?;
-        fixture.codex = started.thread;
-        fixture.session_configured = started.session_configured;
-        wait_for_mcp_server(&fixture.codex, server_name).await?;
-
-        // A fresh thread must still discover the primary executor's repository
-        // skills; host routing must not silently replace them with local skills.
-        let request = responses::mount_sse_once(
-            &server,
-            responses::sse(vec![responses::ev_completed("remote-skills")]),
-        )
-        .await;
-        fixture.submit_turn("list repository skills").await?;
-        assert!(
-            request
-                .single_request()
-                .message_input_texts("developer")
-                .join("\n")
-                .contains("Remote repository skill fixture")
-        );
-
-        let initial = call_cwd_tool(&server, &fixture, server_name, "before-refresh").await?;
-        assert_cwd_tool_output(&initial, &expected_cwd);
-        fixture.codex.submit(Op::RefreshMcpServers).await?;
-        let refreshed = call_cwd_tool(&server, &fixture, server_name, "after-refresh").await?;
-        assert_cwd_tool_output(&refreshed, &expected_cwd);
-
-        // Host MCP policy follows explicit local roots, including an empty list,
-        // and falls back to the saved host roots only when local is absent.
-        for (phase, updated_roots) in [("initial", None), ("revoked", Some(Vec::new()))] {
-            let expected_roots = local_roots
-                .as_ref()
-                .or(updated_roots.as_ref())
-                .unwrap_or(&fixture.config.workspace_roots)
-                .clone();
-            let call_id = format!("host-sandbox-{phase}");
-            mount_sse_once(
-                &server,
-                responses::sse(vec![
-                    responses::ev_function_call_with_namespace(
-                        &call_id,
-                        &format!("mcp__{server_name}"),
-                        "sandbox_meta",
-                        "{}",
-                    ),
-                    responses::ev_completed("sandbox-meta"),
-                ]),
-            )
-            .await;
-            let final_request = mount_sse_once(
-                &server,
-                responses::sse(vec![responses::ev_completed("sandbox-meta-done")]),
-            )
-            .await;
-            fixture
-                .codex
-                .start_or_steer_turn(
-                    TurnInputRequest::user_input(vec![UserInput::Text {
-                        text: "inspect host MCP permissions".into(),
-                        text_elements: Vec::new(),
-                    }])
-                    .with_thread_settings(ThreadSettingsOverrides {
-                        permission_profile: Some(PermissionProfile::workspace_write()),
-                        runtime_workspace_roots: updated_roots,
-                        ..Default::default()
-                    }),
-                )
-                .await?;
-            wait_for_event(&fixture.codex, |event| {
-                matches!(event, EventMsg::TurnComplete(_))
-            })
-            .await;
-            let output = final_request
-                .single_request()
-                .function_call_output(&call_id);
-            let metadata: Value = serde_json::from_str(split_wall_time_wrapped_output(
-                output["output"]
-                    .as_str()
-                    .context("sandbox metadata output")?,
-            ))?;
-            assert_eq!(
-                metadata.get(MCP_SANDBOX_STATE_CAPABILITY),
-                Some(&serde_json::to_value(SandboxState {
-                    permission_profile: PermissionProfile::workspace_write()
-                        .materialize_project_roots_with_workspace_roots(&expected_roots),
-                    codex_linux_sandbox_exe: fixture.config.codex_linux_sandbox_exe.clone(),
-                    sandbox_cwd: PathUri::from_abs_path(&fixture.config.cwd),
-                    use_legacy_landlock: false,
-                })?),
-            );
-        }
-    }
-    server.verify().await;
-    Ok(())
-}
-
 #[test_case("rmcp", false, false, false, Some("catalog policy"), Some("native catalog policy"); "both disabled")]
 #[test_case("rmcp", true, false, false, Some("catalog policy"), Some("native catalog policy"); "auto review required")]
 #[test_case("rmcp", false, true, false, Some("catalog policy"), Some("native catalog policy"); "disabled")]
@@ -2527,7 +2105,7 @@ async fn stdio_mcp_tool_call_includes_sandbox_state_meta(
 
     let rmcp_test_server_bin = remote_aware_stdio_server_bin()?;
     let fixture = test_codex()
-        .with_auth(CodexAuth::create_dummy_chatgpt_auth_for_testing())
+        .with_auth(CodexAuth::from_api_key("test-api-key"))
         .with_model("gpt-5.5")
         .with_config(move |config| {
             // The real CLI is explicitly provided; the test harness is not a CLI.
@@ -3245,13 +2823,6 @@ async fn stdio_image_responses_round_trip() -> anyhow::Result<()> {
                 tool: "image".to_string(),
                 arguments: Some(json!({})),
             },
-            connector_id: None,
-            mcp_app_resource_uri: None,
-            mcp_app_ui: None,
-            link_id: None,
-            app_name: None,
-            action_name: None,
-            plugin_id: None,
             read_only_hint: Some(true),
         },
     );
@@ -3531,7 +3102,6 @@ async fn stdio_image_responses_are_sanitized_for_text_only_model() -> anyhow::Re
                 upgrade: None,
                 model_messages: None,
                 include_skills_usage_instructions: false,
-                include_plugin_usage_instructions: false,
                 include_apps_usage_instructions: false,
                 supports_reasoning_summary_parameter: true,
                 default_reasoning_summary: ReasoningSummary::Auto,
@@ -3589,7 +3159,7 @@ async fn stdio_image_responses_are_sanitized_for_text_only_model() -> anyhow::Re
     let rmcp_test_server_bin = remote_aware_stdio_server_bin()?;
 
     let fixture = test_codex()
-        .with_auth(CodexAuth::create_dummy_chatgpt_auth_for_testing())
+        .with_auth(CodexAuth::from_api_key("test-api-key"))
         .with_config(move |config| {
             insert_mcp_server(
                 config,
@@ -4245,180 +3815,6 @@ async fn streamable_http_tool_call_round_trip(mode: HeadersHelperMode) -> anyhow
     server.verify().await;
 
     http_server.shutdown().await;
-
-    Ok(())
-}
-
-#[tokio::test(flavor = "multi_thread", worker_threads = 1)]
-async fn streamable_http_configured_auth_precedes_chatgpt_auth() -> anyhow::Result<()> {
-    skip_if_no_network!(Ok(()));
-
-    let server = responses::start_mock_server().await;
-    let Some(configured_auth_server) = start_streamable_http_test_server(
-        "configured-auth",
-        Some("configured-token"),
-        /*expected_gateway_token*/ None,
-    )
-    .await?
-    else {
-        return Ok(());
-    };
-    let configured_auth_url = configured_auth_server.url().to_string();
-
-    let configured_auth_fixture = test_codex()
-        .with_auth(CodexAuth::create_dummy_chatgpt_auth_for_testing())
-        .with_config(move |config| {
-            insert_mcp_server(
-                config,
-                "configured_auth",
-                McpServerTransportConfig::StreamableHttp {
-                    url: configured_auth_url,
-                    bearer_token_env_var: None,
-                    http_headers: Some(HashMap::from([(
-                        "Authorization".to_string(),
-                        "Bearer configured-token".to_string(),
-                    )])),
-                    env_http_headers: None,
-                    http_headers_helper: None,
-                },
-                TestMcpServerOptions {
-                    environment_id: remote_aware_environment_id(),
-                    auth: McpServerAuth::ChatGpt,
-                    ..Default::default()
-                },
-            );
-        })
-        .build_with_auto_env(&server)
-        .await?;
-
-    wait_for_mcp_server(&configured_auth_fixture.codex, "configured_auth").await?;
-    drop(configured_auth_fixture);
-    configured_auth_server.shutdown().await;
-
-    Ok(())
-}
-
-#[tokio::test(flavor = "multi_thread", worker_threads = 1)]
-async fn streamable_http_chatgpt_auth_is_not_sent_to_configured_origin() -> anyhow::Result<()> {
-    skip_if_no_network!(Ok(()));
-
-    let server = responses::start_mock_server().await;
-    let untrusted_server = MockServer::start().await;
-    let untrusted_apps = AppsTestServer::mount(&untrusted_server).await?;
-    let untrusted_mcp_url = format!("{}/api/codex/ps/mcp", untrusted_apps.chatgpt_base_url);
-    let untrusted_chatgpt_base_url = untrusted_apps.chatgpt_base_url;
-
-    let fixture = test_codex()
-        .with_auth(CodexAuth::create_dummy_chatgpt_auth_for_testing())
-        .with_config(move |config| {
-            config.chatgpt_base_url = untrusted_chatgpt_base_url;
-            insert_mcp_server(
-                config,
-                "untrusted_origin",
-                McpServerTransportConfig::StreamableHttp {
-                    url: untrusted_mcp_url,
-                    bearer_token_env_var: None,
-                    http_headers: None,
-                    env_http_headers: None,
-                    http_headers_helper: None,
-                },
-                TestMcpServerOptions {
-                    auth: McpServerAuth::ChatGpt,
-                    ..Default::default()
-                },
-            );
-        })
-        .build(&server)
-        .await?;
-
-    wait_for_mcp_server(&fixture.codex, "untrusted_origin").await?;
-    let observed_requests = untrusted_server
-        .received_requests()
-        .await
-        .expect("mock server should capture MCP startup requests")
-        .into_iter()
-        .filter(|request| request.url.path() == "/api/codex/ps/mcp")
-        .filter_map(|request| {
-            let body: Value = serde_json::from_slice(&request.body).ok()?;
-            let method = body.get("method")?.as_str()?.to_string();
-            let authorization = request
-                .headers
-                .get("authorization")
-                .and_then(|value| value.to_str().ok())
-                .map(str::to_string);
-            Some((method, authorization))
-        })
-        .collect::<Vec<_>>();
-
-    assert_eq!(
-        observed_requests,
-        vec![
-            ("initialize".to_string(), None),
-            ("notifications/initialized".to_string(), None),
-            ("tools/list".to_string(), None),
-        ],
-    );
-
-    Ok(())
-}
-
-#[tokio::test(flavor = "multi_thread", worker_threads = 1)]
-async fn configured_chatgpt_base_url_does_not_grant_mcp_chatgpt_auth() -> anyhow::Result<()> {
-    skip_if_no_network!(Ok(()));
-
-    let server = responses::start_mock_server().await;
-    let untrusted_server = MockServer::start().await;
-    let untrusted_apps = AppsTestServer::mount(&untrusted_server).await?;
-    let untrusted_mcp_url = format!("{}/api/codex/ps/mcp", untrusted_apps.chatgpt_base_url);
-    let untrusted_chatgpt_base_url = untrusted_apps.chatgpt_base_url;
-
-    let fixture = test_codex()
-        .with_auth(CodexAuth::create_dummy_chatgpt_auth_for_testing())
-        .with_pre_build_hook(move |codex_home| {
-            fs::write(
-                codex_home.join("config.toml"),
-                format!(
-                    r#"
-chatgpt_base_url = "{untrusted_chatgpt_base_url}"
-
-[mcp_servers.untrusted_origin]
-url = "{untrusted_mcp_url}"
-auth = "chatgpt"
-"#,
-                ),
-            )
-            .expect("write attacker-controlled MCP config");
-        })
-        .build(&server)
-        .await?;
-
-    wait_for_mcp_server(&fixture.codex, "untrusted_origin").await?;
-    let observed_requests = untrusted_server
-        .received_requests()
-        .await
-        .expect("mock server should capture MCP startup requests")
-        .into_iter()
-        .filter(|request| request.url.path() == "/api/codex/ps/mcp")
-        .filter_map(|request| {
-            let body: Value = serde_json::from_slice(&request.body).ok()?;
-            let method = body.get("method")?.as_str()?.to_string();
-            let authorization = request
-                .headers
-                .get("authorization")
-                .and_then(|value| value.to_str().ok())
-                .map(str::to_string);
-            Some((method, authorization))
-        })
-        .collect::<Vec<_>>();
-
-    assert_eq!(
-        observed_requests,
-        vec![
-            ("initialize".to_string(), None),
-            ("notifications/initialized".to_string(), None),
-            ("tools/list".to_string(), None),
-        ],
-    );
 
     Ok(())
 }

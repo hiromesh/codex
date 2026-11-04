@@ -379,7 +379,6 @@ async fn skill_mcp_dependency_oauth_uses_configured_http_client() -> Result<()> 
                     },
                 },
             )])),
-            plugins: None,
         }),
         network_policy: None,
         selected_capability_roots: Vec::new(),

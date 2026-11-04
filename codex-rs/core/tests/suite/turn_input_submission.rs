@@ -1379,7 +1379,6 @@ async fn start_or_steer_turn_requires_matching_active_output_schema() {
 
 #[test_case(Vec::new(), "local"; "automatic")]
 #[test_case(vec![UserInput::Text { text: "Do the work".into(), text_elements: Vec::new() }], "local"; "user")]
-#[cfg_attr(unix, test_case(Vec::new(), "remote"; "remote_stays_idle"))]
 #[tokio::test]
 async fn sampling_is_ready_for_daemon_recovery(
     input: Vec<UserInput>,

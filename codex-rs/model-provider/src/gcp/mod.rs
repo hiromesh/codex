@@ -10,7 +10,6 @@ use codex_login::CodexAuth;
 use codex_model_provider_info::ModelProviderInfo;
 use codex_models_manager::manager::SharedModelsManager;
 use codex_models_manager::manager::StaticModelsManager;
-use codex_protocol::account::ProviderAccount;
 use codex_protocol::error::CodexErr;
 use codex_protocol::error::EnvVarError;
 use codex_protocol::error::Result;
@@ -110,7 +109,7 @@ impl ModelProvider for GcpModelProvider {
 
     fn account_state(&self) -> ProviderAccountResult {
         Ok(ProviderAccountState {
-            account: Some(ProviderAccount::Gcp),
+            account: None,
             requires_openai_auth: false,
         })
     }

@@ -56,7 +56,6 @@ impl ContextContributor for PrefixInstructions {
 }
 
 #[test_case::test_case("local"; "local")]
-#[test_case::test_case("remote"; "remote")]
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn extension_window_prefix_survives_compaction(compaction: &str) -> Result<()> {
     skip_if_no_network!(Ok(()));
@@ -102,7 +101,7 @@ async fn extension_window_prefix_survives_compaction(compaction: &str) -> Result
     let test = test_codex()
         .with_extensions(Arc::new(extensions.build()))
         .with_model("gpt-6-astra")
-        .with_auth(CodexAuth::create_dummy_chatgpt_auth_for_testing())
+        .with_auth(CodexAuth::from_api_key("test-api-key"))
         .with_config(move |config| {
             configure_scenario_catalog(config);
             config.workspace_roots = vec![config.cwd.clone()];

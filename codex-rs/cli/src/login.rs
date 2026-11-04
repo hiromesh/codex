@@ -182,12 +182,6 @@ pub async fn run_login_status(cli_config_overrides: CliConfigOverrides) -> ! {
                     std::process::exit(1);
                 }
             },
-            _ => {
-                eprintln!(
-                    "Stored credentials use an unsupported authentication method. Run `codex logout` and log in with an API key."
-                );
-                std::process::exit(1);
-            }
         },
         Ok(None) => {
             eprintln!("Not logged in");

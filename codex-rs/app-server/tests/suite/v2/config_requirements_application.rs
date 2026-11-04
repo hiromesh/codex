@@ -39,10 +39,7 @@ async fn application_network_defaults_and_null_base_url_are_exposed() -> Result<
         ),
     ] {
         let home = TempDir::new()?;
-        std::fs::write(
-            home.path().join("requirements.toml"),
-            format!("allow_remote_control = false\n{contents}"),
-        )?;
+        std::fs::write(home.path().join("requirements.toml"), contents)?;
         let mut server = start_server(&home).await?;
         let wire = read_requirements(&mut server).await?;
         let requirements = wire["requirements"]

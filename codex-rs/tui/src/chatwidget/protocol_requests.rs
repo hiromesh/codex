@@ -51,7 +51,6 @@ impl ChatWidget {
             ServerRequest::DynamicToolCall { .. }
             | ServerRequest::AttestationGenerate { .. }
             | ServerRequest::CurrentTimeRead { .. }
-            | ServerRequest::ChatgptAuthTokensRefresh { .. }
             | ServerRequest::ApplyPatchApproval { .. }
             | ServerRequest::ExecCommandApproval { .. } => {
                 if replay_kind.is_none() {
@@ -99,8 +98,6 @@ impl ChatWidget {
             model_context: None,
             id,
             target_item_id: None,
-            plugin_id: None,
-            script_path: None,
             turn_id,
             started_at_ms,
             completed_at_ms,

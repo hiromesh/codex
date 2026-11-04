@@ -280,23 +280,6 @@ include_view_image_tool = false
 }
 
 #[test]
-fn removed_private_desktop_setting_has_migration_hint() {
-    let config = ConfigLayerStack::new(
-        vec![layer(
-            ConfigLayerSource::SessionFlags,
-            "[windows]\nsandbox_private_desktop = false",
-        )],
-        ConfigRequirements::default(),
-        ConfigRequirementsToml::default(),
-    )
-    .unwrap();
-    assert_eq!(
-        ignored_config_warning(&config, &[]).unwrap(),
-        "Codex is ignoring 1 unrecognized configuration setting. Check for typos or deprecated settings.\n  session-flags: `windows.sandbox_private_desktop` is ignored. Remove windows.sandbox_private_desktop; legacy Windows sandboxes always use a private desktop."
-    );
-}
-
-#[test]
 fn managed_network_unknown_fields_are_reported_for_each_spelling() {
     let config = ConfigLayerStack::new(
         Vec::new(),

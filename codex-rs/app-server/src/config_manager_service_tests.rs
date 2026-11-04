@@ -1,9 +1,6 @@
 use super::*;
 use anyhow::Result;
 use axum::http::HeaderValue;
-use codex_app_server_protocol::AppConfig;
-use codex_app_server_protocol::AppToolApproval;
-use codex_app_server_protocol::AppsConfig;
 use codex_app_server_protocol::AskForApproval;
 use codex_app_server_protocol::ConfigLayerSource as ApiConfigLayerSource;
 use codex_config::CloudConfigBundleLoader;
@@ -724,7 +721,7 @@ async fn psp_feature_configures_first_party_routing() -> Result<()> {
             Some(
                 [(
                     "features".to_string(),
-                    serde_json::json!({ "apps": true, "psp": true }),
+                    serde_json::json!({ "psp": true }),
                 )]
                 .into_iter()
                 .collect(),
@@ -902,73 +899,6 @@ async fn batch_write_rejects_legacy_profile_selector() -> Result<()> {
         "{error}"
     );
     assert_eq!(std::fs::read_to_string(&path)?, "model = \"gpt-main\"\n");
-    Ok(())
-}
-
-#[tokio::test]
-async fn write_value_supports_nested_app_paths() -> Result<()> {
-    let tmp = tempdir().expect("tempdir");
-    std::fs::write(tmp.path().join(CONFIG_TOML_FILE), "")?;
-
-    let service = ConfigManager::without_managed_config_for_tests(tmp.path().to_path_buf());
-    service
-        .write_value(ConfigValueWriteParams {
-            file_path: Some(tmp.path().join(CONFIG_TOML_FILE).display().to_string()),
-            key_path: "apps".to_string(),
-            value: serde_json::json!({
-                "app1": {
-                    "enabled": false,
-                    "omit_tools_from": ["deferred"],
-                },
-            }),
-            merge_strategy: MergeStrategy::Replace,
-            expected_version: None,
-        })
-        .await
-        .expect("write apps succeeds");
-
-    service
-        .write_value(ConfigValueWriteParams {
-            file_path: Some(tmp.path().join(CONFIG_TOML_FILE).display().to_string()),
-            key_path: "apps.app1.default_tools_approval_mode".to_string(),
-            value: serde_json::json!("prompt"),
-            merge_strategy: MergeStrategy::Replace,
-            expected_version: None,
-        })
-        .await
-        .expect("write apps.app1.default_tools_approval_mode succeeds");
-
-    let read = service
-        .read(ConfigReadParams {
-            include_layers: false,
-            cwd: None,
-        })
-        .await
-        .expect("config read succeeds");
-
-    assert_eq!(
-        read.config.apps,
-        Some(AppsConfig {
-            default: None,
-            apps: std::collections::HashMap::from([(
-                "app1".to_string(),
-                AppConfig {
-                    enabled: false,
-                    omit_tools_from: Some(vec![
-                        codex_protocol::config_types::ToolExposureSurface::Deferred
-                    ]),
-                    approvals_reviewer: None,
-                    destructive_enabled: None,
-                    open_world_enabled: None,
-                    default_tools_approval_mode: Some(AppToolApproval::Prompt),
-                    default_tools_enabled: None,
-                    tools: None,
-                    links: None,
-                },
-            )]),
-        })
-    );
-
     Ok(())
 }
 

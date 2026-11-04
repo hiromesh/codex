@@ -146,32 +146,8 @@ impl ClientToolCatalog {
         result
     }
 
-    /// Serialize fetching and publication, leaving the current catalog usable during the fetch.
-    /// The publication callback runs alongside the exact-client update under the write lock.
-    #[expect(
-        clippy::await_holding_invalid_type,
-        reason = "refreshes must remain serialized through fetching and catalog publication"
-    )]
-    pub(crate) async fn refresh<C, R, F, Fut, P>(&self, fetch: F, publish: P) -> Result<R>
-    where
-        F: FnOnce() -> Fut,
-        Fut: Future<Output = Result<(Vec<ToolInfo>, Option<Arc<serde_json::Value>>, C)>>,
-        P: FnOnce(&[ToolInfo], Option<Arc<serde_json::Value>>, C) -> R,
-    {
-        let _refresh = self.refresh_lock.lock().await;
-        let (tools, meta, context) = fetch().await?;
-        let _calls = self.calls.write().await;
-        let mut current = self.current.write().await;
-        let result = publish(&tools, meta.clone(), context);
-        current.tools = tools.into();
-        current.meta = meta;
-        current.revision += 1;
-        current.last_refresh_revision = current.revision;
-        Ok(result)
-    }
-
-    /// Reject stale calls before preparation. Explicit refreshes wait for execution;
-    /// ordinary list-change notifications may publish while an admitted call runs.
+    /// Reject stale calls before preparation. Ordinary list-change notifications may
+    /// publish while an admitted call runs.
     #[expect(
         clippy::await_holding_invalid_type,
         reason = "catalog publication must wait for call preparation and execution"
@@ -193,7 +169,9 @@ impl ClientToolCatalog {
         {
             return None;
         }
-        let _current = current;
+        // Notifications may publish a newer catalog while this admitted call uses the
+        // snapshot it already validated.
+        drop(current);
         Some(run().await)
     }
 }

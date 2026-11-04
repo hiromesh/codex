@@ -5,6 +5,7 @@ use codex_login::CodexAuth;
 use codex_model_provider_info::ModelProviderInfo;
 use codex_model_provider_info::built_in_model_providers;
 use codex_models_manager::bundled_models_response;
+use codex_models_manager::manager::ModelsManager;
 use codex_models_manager::manager::RefreshStrategy;
 use codex_models_manager::manager::SharedModelsManager;
 use codex_models_manager::model_info::BASE_INSTRUCTIONS;
@@ -138,7 +139,6 @@ async fn remote_models_get_model_info_uses_longest_matching_prefix() -> Result<(
     skip_if_no_network!(Ok(()));
     skip_if_sandbox!(Ok(()));
 
-    let server = MockServer::start().await;
     let generic = test_remote_model_with_policy(
         "gpt-5.3",
         ModelVisibility::List,
@@ -167,34 +167,21 @@ async fn remote_models_get_model_info_uses_longest_matching_prefix() -> Result<(
         }),
         ..generic
     };
-    mount_models_once(
-        &server,
-        ModelsResponse {
-            models: vec![generic.clone(), specific.clone()],
-        },
-    )
-    .await;
 
     let codex_home = TempDir::new()?;
     let config = load_default_config_for_test(&codex_home).await;
 
-    let auth = CodexAuth::create_dummy_chatgpt_auth_for_testing();
-    let provider = ModelProviderInfo {
-        base_url: Some(format!("{}/v1", server.uri())),
-        ..built_in_model_providers(/* openai_base_url */ /*openai_base_url*/ None)["openai"].clone()
-    };
-    let manager = codex_core::test_support::models_manager_with_provider(
-        codex_home.path().to_path_buf(),
-        codex_core::test_support::auth_manager_from_auth(auth),
-        provider,
+    // Provider catalogs are authoritative and resolved through the static catalog path,
+    // so keep the longest-prefix contract covered without a model endpoint.
+    let manager = codex_models_manager::manager::StaticModelsManager::new(
+        Some(codex_core::test_support::auth_manager_from_auth(
+            CodexAuth::from_api_key("test-api-key"),
+        )),
+        ModelsResponse {
+            models: vec![generic, specific.clone()],
+        },
+        codex_models_manager::ModelOrigin::ExplicitConfig,
     );
-
-    manager
-        .list_models(
-            RefreshStrategy::OnlineIfUncached,
-            codex_core::test_support::default_http_client_factory(),
-        )
-        .await;
 
     let model_info = manager
         .get_model_info("gpt-5.3-codex-test", &config.to_models_manager_config())
@@ -220,7 +207,7 @@ async fn remote_models_config_context_window_override_clamps_to_max_context_wind
     let server = MockServer::start().await;
     let requested_model = "gpt-5.4-test";
     let mut remote_model =
-        test_remote_model("gpt-5.4", ModelVisibility::List, /*priority*/ 1_000);
+        test_remote_model(requested_model, ModelVisibility::List, /*priority*/ 1_000);
     remote_model.context_window = Some(273_000);
     remote_model.max_context_window = Some(400_000);
     remote_model.effective_context_window_percent = 100;
@@ -238,7 +225,8 @@ async fn remote_models_config_context_window_override_clamps_to_max_context_wind
     .await;
 
     let TestCodex { codex, .. } = test_codex()
-        .with_auth(CodexAuth::create_dummy_chatgpt_auth_for_testing())
+        .with_auth(CodexAuth::from_api_key("test-api-key"))
+        .with_mock_model_catalog(&server)
         .with_config(|config| {
             config.model = Some(requested_model.to_string());
             config.model_context_window = Some(1_000_000);
@@ -281,7 +269,7 @@ async fn remote_models_config_override_above_max_uses_max_context_window() -> Re
     let server = MockServer::start().await;
     let requested_model = "gpt-5.4-test";
     let mut remote_model =
-        test_remote_model("gpt-5.4", ModelVisibility::List, /*priority*/ 1_000);
+        test_remote_model(requested_model, ModelVisibility::List, /*priority*/ 1_000);
     remote_model.context_window = Some(273_000);
     remote_model.max_context_window = Some(400_000);
     remote_model.effective_context_window_percent = 100;
@@ -299,7 +287,8 @@ async fn remote_models_config_override_above_max_uses_max_context_window() -> Re
     .await;
 
     let TestCodex { codex, .. } = test_codex()
-        .with_auth(CodexAuth::create_dummy_chatgpt_auth_for_testing())
+        .with_auth(CodexAuth::from_api_key("test-api-key"))
+        .with_mock_model_catalog(&server)
         .with_config(|config| {
             config.model = Some(requested_model.to_string());
             config.model_context_window = Some(500_000);
@@ -342,7 +331,7 @@ async fn remote_models_use_context_window_when_config_override_is_absent() -> Re
     let server = MockServer::start().await;
     let requested_model = "gpt-5.4-test";
     let mut remote_model =
-        test_remote_model("gpt-5.4", ModelVisibility::List, /*priority*/ 1_000);
+        test_remote_model(requested_model, ModelVisibility::List, /*priority*/ 1_000);
     remote_model.context_window = Some(273_000);
     remote_model.max_context_window = Some(400_000);
     remote_model.effective_context_window_percent = 100;
@@ -360,7 +349,8 @@ async fn remote_models_use_context_window_when_config_override_is_absent() -> Re
     .await;
 
     let TestCodex { codex, .. } = test_codex()
-        .with_auth(CodexAuth::create_dummy_chatgpt_auth_for_testing())
+        .with_auth(CodexAuth::from_api_key("test-api-key"))
+        .with_mock_model_catalog(&server)
         .with_config(|config| {
             config.model = Some(requested_model.to_string());
         })
@@ -406,11 +396,10 @@ async fn remote_models_long_model_slug_is_sent_with_supported_reasoning(
 
     let server = MockServer::start().await;
     let requested_model = "gpt-5.3-codex-test";
-    let prefix_model = "gpt-5.3-codex";
     let base_instructions = "Keep the catalog base instructions.";
     let developer_instructions = "Keep the configured developer instructions.";
     let mut remote_model = test_remote_model_with_policy(
-        prefix_model,
+        requested_model,
         ModelVisibility::List,
         /*priority*/ 1_000,
         TruncationPolicyConfig::bytes(/*limit*/ 10_000),
@@ -447,7 +436,8 @@ async fn remote_models_long_model_slug_is_sent_with_supported_reasoning(
     .await;
 
     let TestCodex { codex, .. } = test_codex()
-        .with_auth(CodexAuth::create_dummy_chatgpt_auth_for_testing())
+        .with_auth(CodexAuth::from_api_key("test-api-key"))
+        .with_mock_model_catalog(&server)
         .with_config(|config| {
             config.model = Some(requested_model.to_string());
             config.developer_instructions = Some(developer_instructions.to_string());
@@ -598,7 +588,6 @@ async fn remote_models_remote_model_uses_unified_exec() -> Result<()> {
         upgrade: None,
         model_messages: None,
         include_skills_usage_instructions: false,
-        include_plugin_usage_instructions: false,
         include_apps_usage_instructions: false,
         supports_reasoning_summary_parameter: true,
         default_reasoning_summary: ReasoningSummary::Auto,
@@ -630,7 +619,8 @@ async fn remote_models_remote_model_uses_unified_exec() -> Result<()> {
         .await;
 
     let mut builder = test_codex()
-        .with_auth(CodexAuth::create_dummy_chatgpt_auth_for_testing())
+        .with_auth(CodexAuth::from_api_key("test-api-key"))
+        .with_mock_model_catalog(&server)
         .with_config(|config| {
             config.model = Some("gpt-5.4".to_string());
         });
@@ -757,7 +747,8 @@ async fn remote_models_truncation_policy_without_override_preserves_remote() -> 
     .await;
 
     let mut builder = test_codex()
-        .with_auth(CodexAuth::create_dummy_chatgpt_auth_for_testing())
+        .with_auth(CodexAuth::from_api_key("test-api-key"))
+        .with_mock_model_catalog(&server)
         .with_config(|config| {
             config.model = Some("gpt-5.4".to_string());
         });
@@ -803,7 +794,8 @@ async fn remote_models_truncation_policy_with_tool_output_override() -> Result<(
     .await;
 
     let mut builder = test_codex()
-        .with_auth(CodexAuth::create_dummy_chatgpt_auth_for_testing())
+        .with_auth(CodexAuth::from_api_key("test-api-key"))
+        .with_mock_model_catalog(&server)
         .with_config(|config| {
             config.model = Some("gpt-5.4".to_string());
             config.tool_output_token_limit = Some(50);
@@ -824,7 +816,6 @@ async fn remote_models_truncation_policy_with_tool_output_override() -> Result<(
     Ok(())
 }
 
-#[test_case(CodexAuth::create_dummy_chatgpt_auth_for_testing(); "chatgpt")]
 #[test_case(CodexAuth::from_api_key("test-api-key"); "api key")]
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn remote_models_apply_legacy_instructions(auth: CodexAuth) -> Result<()> {
@@ -875,7 +866,6 @@ async fn remote_models_apply_legacy_instructions(auth: CodexAuth) -> Result<()> 
             ..Default::default()
         }),
         include_skills_usage_instructions: false,
-        include_plugin_usage_instructions: false,
         include_apps_usage_instructions: false,
         supports_reasoning_summary_parameter: true,
         default_reasoning_summary: ReasoningSummary::Auto,
@@ -1040,9 +1030,10 @@ async fn remote_models_do_not_append_removed_builtin_presets() -> Result<()> {
 
     let codex_home = TempDir::new()?;
 
-    let auth = CodexAuth::create_dummy_chatgpt_auth_for_testing();
+    let auth = CodexAuth::from_api_key("test-api-key");
     let provider = ModelProviderInfo {
         base_url: Some(format!("{}/v1", server.uri())),
+        model_catalog_url: Some(format!("{}/v1/models", server.uri()).into()),
         ..built_in_model_providers(/* openai_base_url */ /*openai_base_url*/ None)["openai"].clone()
     };
     let manager = codex_core::test_support::models_manager_with_provider(
@@ -1050,6 +1041,7 @@ async fn remote_models_do_not_append_removed_builtin_presets() -> Result<()> {
         codex_core::test_support::auth_manager_from_auth(auth),
         provider,
     );
+    manager.set_api_key_model_discovery_enabled(true);
 
     let available = manager
         .list_models(
@@ -1106,9 +1098,10 @@ async fn remote_models_merge_adds_new_high_priority_first() -> Result<()> {
 
     let codex_home = TempDir::new()?;
 
-    let auth = CodexAuth::create_dummy_chatgpt_auth_for_testing();
+    let auth = CodexAuth::from_api_key("test-api-key");
     let provider = ModelProviderInfo {
         base_url: Some(format!("{}/v1", server.uri())),
+        model_catalog_url: Some(format!("{}/v1/models", server.uri()).into()),
         ..built_in_model_providers(/* openai_base_url */ /*openai_base_url*/ None)["openai"].clone()
     };
     let manager = codex_core::test_support::models_manager_with_provider(
@@ -1116,6 +1109,7 @@ async fn remote_models_merge_adds_new_high_priority_first() -> Result<()> {
         codex_core::test_support::auth_manager_from_auth(auth),
         provider,
     );
+    manager.set_api_key_model_discovery_enabled(true);
 
     let available = manager
         .list_models(
@@ -1158,9 +1152,10 @@ async fn remote_models_merge_replaces_overlapping_model() -> Result<()> {
 
     let codex_home = TempDir::new()?;
 
-    let auth = CodexAuth::create_dummy_chatgpt_auth_for_testing();
+    let auth = CodexAuth::from_api_key("test-api-key");
     let provider = ModelProviderInfo {
         base_url: Some(format!("{}/v1", server.uri())),
+        model_catalog_url: Some(format!("{}/v1/models", server.uri()).into()),
         ..built_in_model_providers(/* openai_base_url */ /*openai_base_url*/ None)["openai"].clone()
     };
     let manager = codex_core::test_support::models_manager_with_provider(
@@ -1168,6 +1163,7 @@ async fn remote_models_merge_replaces_overlapping_model() -> Result<()> {
         codex_core::test_support::auth_manager_from_auth(auth),
         provider,
     );
+    manager.set_api_key_model_discovery_enabled(true);
 
     let available = manager
         .list_models(
@@ -1198,7 +1194,7 @@ async fn remote_models_merge_replaces_overlapping_model() -> Result<()> {
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn remote_models_merge_preserves_bundled_models_on_empty_response() -> Result<()> {
+async fn remote_models_explicit_catalog_suppresses_bundled_models_on_empty_response() -> Result<()> {
     skip_if_no_network!(Ok(()));
     skip_if_sandbox!(Ok(()));
 
@@ -1207,9 +1203,10 @@ async fn remote_models_merge_preserves_bundled_models_on_empty_response() -> Res
 
     let codex_home = TempDir::new()?;
 
-    let auth = CodexAuth::create_dummy_chatgpt_auth_for_testing();
+    let auth = CodexAuth::from_api_key("test-api-key");
     let provider = ModelProviderInfo {
         base_url: Some(format!("{}/v1", server.uri())),
+        model_catalog_url: Some(format!("{}/v1/models", server.uri()).into()),
         ..built_in_model_providers(/* openai_base_url */ /*openai_base_url*/ None)["openai"].clone()
     };
     let manager = codex_core::test_support::models_manager_with_provider(
@@ -1217,6 +1214,7 @@ async fn remote_models_merge_preserves_bundled_models_on_empty_response() -> Res
         codex_core::test_support::auth_manager_from_auth(auth),
         provider,
     );
+    manager.set_api_key_model_discovery_enabled(true);
 
     let available = manager
         .list_models(
@@ -1226,8 +1224,8 @@ async fn remote_models_merge_preserves_bundled_models_on_empty_response() -> Res
         .await;
     let bundled_slug = bundled_model_slug();
     assert!(
-        available.iter().any(|model| model.model == bundled_slug),
-        "bundled models should remain available after empty remote response"
+        !available.iter().any(|model| model.model == bundled_slug),
+        "an explicit provider catalog must not merge bundled models"
     );
     // Keep the mock server alive until after async assertions complete.
     drop(server);
@@ -1254,9 +1252,10 @@ async fn remote_models_request_times_out_after_5s() -> Result<()> {
 
     let codex_home = TempDir::new()?;
 
-    let auth = CodexAuth::create_dummy_chatgpt_auth_for_testing();
+    let auth = CodexAuth::from_api_key("test-api-key");
     let provider = ModelProviderInfo {
         base_url: Some(format!("{}/v1", server.uri())),
+        model_catalog_url: Some(format!("{}/v1/models", server.uri()).into()),
         ..built_in_model_providers(/* openai_base_url */ /*openai_base_url*/ None)["openai"].clone()
     };
     let manager = codex_core::test_support::models_manager_with_provider(
@@ -1264,6 +1263,7 @@ async fn remote_models_request_times_out_after_5s() -> Result<()> {
         codex_core::test_support::auth_manager_from_auth(auth),
         provider,
     );
+    manager.set_api_key_model_discovery_enabled(true);
 
     let start = Instant::now();
     let model = timeout(
@@ -1277,12 +1277,12 @@ async fn remote_models_request_times_out_after_5s() -> Result<()> {
     )
     .await;
     let elapsed = start.elapsed();
-    // get_model should return a default model even when refresh times out
+    // get_model should finish even when the refresh times out. Explicit provider catalogs
+    // never fall back to bundled models, so a failed first fetch leaves no default yet.
     let default_model = model.expect("get_model should finish and return default model");
-    let expected_default = bundled_default_model_slug();
     assert!(
-        default_model == expected_default,
-        "get_model should return default model when refresh times out, got: {default_model}"
+        default_model.is_empty(),
+        "explicit catalog timeout should not fall back to bundled models, got: {default_model}"
     );
     let _ = server
         .received_requests()
@@ -1329,9 +1329,10 @@ async fn remote_models_hide_picker_only_models() -> Result<()> {
 
     let codex_home = TempDir::new()?;
 
-    let auth = CodexAuth::create_dummy_chatgpt_auth_for_testing();
+    let auth = CodexAuth::from_api_key("test-api-key");
     let provider = ModelProviderInfo {
         base_url: Some(format!("{}/v1", server.uri())),
+        model_catalog_url: Some(format!("{}/v1/models", server.uri()).into()),
         ..built_in_model_providers(/* openai_base_url */ /*openai_base_url*/ None)["openai"].clone()
     };
     let manager = codex_core::test_support::models_manager_with_provider(
@@ -1339,6 +1340,7 @@ async fn remote_models_hide_picker_only_models() -> Result<()> {
         codex_core::test_support::auth_manager_from_auth(auth),
         provider,
     );
+    manager.set_api_key_model_discovery_enabled(true);
 
     let selected = manager
         .get_default_model(
@@ -1348,7 +1350,10 @@ async fn remote_models_hide_picker_only_models() -> Result<()> {
             codex_core::test_support::default_http_client_factory(),
         )
         .await;
-    assert_eq!(selected, bundled_default_model_slug());
+    // Explicit provider catalogs are authoritative and do not merge bundled models.
+    // With a catalog that only exposes a hidden model, that model is the best (and only)
+    // default candidate, while remaining hidden from the picker.
+    assert_eq!(selected, "codex-auto-balanced");
 
     let available = manager
         .list_models(
@@ -1403,15 +1408,6 @@ fn bundled_model_slug() -> String {
         .clone()
 }
 
-fn bundled_default_model_slug() -> String {
-    codex_core::test_support::all_model_presets()
-        .iter()
-        .find(|preset| preset.is_default)
-        .expect("bundled models should include a default")
-        .model
-        .clone()
-}
-
 fn test_remote_model(slug: &str, visibility: ModelVisibility, priority: i32) -> ModelInfo {
     test_remote_model_with_policy(
         slug,
@@ -1460,7 +1456,6 @@ fn test_remote_model_with_policy(
         upgrade: None,
         model_messages: None,
         include_skills_usage_instructions: false,
-        include_plugin_usage_instructions: false,
         include_apps_usage_instructions: false,
         supports_reasoning_summary_parameter: true,
         default_reasoning_summary: ReasoningSummary::Auto,

@@ -51,7 +51,6 @@ v2_enum_from_core!(
         Project,
         Mdm,
         SessionFlags,
-        Plugin,
         CloudRequirements,
         CloudManagedConfig,
         LegacyManagedConfigFile,
@@ -132,7 +131,6 @@ pub struct HookMetadata {
     pub additional_context_limit: Option<usize>,
     pub source_path: AbsolutePathBuf,
     pub source: HookSource,
-    pub plugin_id: Option<String>,
     /// The owning execution environment, if this hook came from its requirements.
     pub environment_id: Option<String>,
     pub display_order: i64,

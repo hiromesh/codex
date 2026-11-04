@@ -1,7 +1,3 @@
-mod executor;
-
-pub(crate) use executor::prepare_executor_hook_sources;
-
 use std::future::Future;
 use std::sync::Arc;
 use std::time::Duration;
@@ -441,9 +437,7 @@ pub(crate) async fn run_turn_stop_hooks(
         last_assistant_message,
         target,
     };
-    let executor_hook_sources = step_context.executor_hook_sources.clone();
-    let hooks = with_environment_hooks(sess, turn_context, &step_context.environments)
-        .with_executor_hooks(executor_hook_sources);
+    let hooks = with_environment_hooks(sess, turn_context, &step_context.environments);
     emit_hook_started_events(sess, turn_context, hooks.preview_stop(&request)).await;
 
     let mut outcome = hooks.run_stop(request).await;
@@ -453,7 +447,7 @@ pub(crate) async fn run_turn_stop_hooks(
 
 #[instrument(level = "trace", skip_all)]
 pub(crate) async fn run_session_end_hooks(sess: &Arc<Session>) {
-    // Building a turn can read plugins and skills from a remote executor. Check
+    // Building a turn can read skills from a remote executor. Check
     // the captured hook declarations before spending any of the shutdown deadline.
     let environments = sess.services.turn_environments.snapshot_now();
     let has_environment_end_hooks = environments.turn_environments().any(|environment| {
@@ -507,20 +501,14 @@ pub(crate) async fn run_turn_interrupt_hooks(
 
     // The active turn has already been detached. Reuse only its last executing step's discovery.
     let last_known_step_context = turn_state.lock().await.last_known_step_context.clone();
-    let executor_hook_sources = last_known_step_context
-        .as_deref()
-        .map(|step| step.executor_hook_sources.clone())
-        .unwrap_or_default();
-    let has_executor_hooks = !executor_hook_sources.is_empty();
     let hooks = last_known_step_context
         .as_deref()
         .map_or_else(
             || (*sess.hooks()).clone(),
             |step| with_environment_hooks(sess, &step.turn, &step.environments),
-        )
-        .with_executor_hooks(executor_hook_sources);
+        );
     let preview_runs = hooks.preview_interrupt();
-    if preview_runs.is_empty() && !has_executor_hooks {
+    if preview_runs.is_empty() {
         return;
     }
 
@@ -1042,7 +1030,6 @@ fn hook_run_metric_tags(run: &HookRunSummary) -> [(&'static str, &'static str); 
         HookSource::Project => "project",
         HookSource::Mdm => "mdm",
         HookSource::SessionFlags => "session_flags",
-        HookSource::Plugin => "plugin",
         HookSource::CloudRequirements => "cloud_requirements",
         HookSource::CloudManagedConfig => "cloud_managed_config",
         HookSource::LegacyManagedConfigFile => "legacy_managed_config_file",
@@ -1112,11 +1099,9 @@ pub(crate) fn hooks_for_model_request(
 ) -> Arc<codex_hooks::Hooks> {
     match step.turn.session_source {
         SessionSource::Internal(InternalSessionSource::MemoryConsolidation)
-        | SessionSource::SubAgent(SubAgentSource::MemoryConsolidation) => Arc::new(
-            session
-                .hooks()
-                .for_memory_consolidation(step.executor_hook_sources.clone()),
-        ),
+        | SessionSource::SubAgent(SubAgentSource::MemoryConsolidation) => {
+            Arc::new(session.hooks().for_memory_consolidation())
+        }
         _ => Arc::new(with_environment_hooks(
             session,
             &step.turn,
@@ -1242,7 +1227,7 @@ mod tests {
         let mut builtin_run = synchronous_run.clone();
         builtin_run.id = "builtin-hook".to_string();
         builtin_run.builtin = true;
-        builtin_run.source = HookSource::Plugin;
+        builtin_run.source = HookSource::Project;
         builtin_run.handler_type = HookHandlerType::McpTool;
 
         emit_hook_started_events(

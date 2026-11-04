@@ -285,10 +285,6 @@ impl ChatWidget {
             return KeyEventAction::None;
         }
 
-        if self.handle_plugins_popup_key_event(key_event) {
-            return KeyEventAction::None;
-        }
-
         match key_event {
             KeyEvent {
                 code: KeyCode::BackTab,

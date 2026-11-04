@@ -5,7 +5,6 @@
 
 mod daybreak_api_key_compat;
 mod events;
-mod external_agent_config;
 pub(crate) mod fs;
 mod history;
 mod models;
@@ -168,7 +167,6 @@ use uuid::Uuid;
 const JSONRPC_INVALID_REQUEST: i64 = -32600;
 const JSONRPC_METHOD_NOT_FOUND: i64 = -32601;
 const JSONRPC_INVALID_PARAMS: i64 = -32602;
-pub(crate) const EXTERNAL_AGENT_CONFIG_IMPORT_IN_PROGRESS_MESSAGE: &str = "A previous external agent import is still running. Wait for it to finish before importing again.";
 const THREAD_SETTINGS_UPDATE_METHOD: &str = "thread/settings/update";
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -350,7 +348,6 @@ pub(crate) struct AppServerSession {
     available_models: Vec<ModelPreset>,
     daybreak_api_key_compat: Arc<tokio::sync::Semaphore>,
     managed_new_thread_defaults: Option<NewThreadModelDefaults>,
-    external_agent_config_import_id: Mutex<Option<String>>,
     dynamic_tool_mcp: Option<Arc<DynamicToolMcpServer>>,
     pub(crate) worktree_source_config_builder:
         Option<Box<crate::legacy_core::config::ConfigBuilder>>,
@@ -525,7 +522,6 @@ impl AppServerSession {
             available_models: Vec::new(),
             daybreak_api_key_compat: Arc::new(tokio::sync::Semaphore::new(/*permits*/ 1)),
             managed_new_thread_defaults: None,
-            external_agent_config_import_id: Mutex::default(),
             dynamic_tool_mcp: None,
             worktree_source_config_builder: None,
         }
@@ -906,35 +902,6 @@ impl AppServerSession {
                 FeedbackAudience::External,
                 false,
             ),
-            Some(Account::Chatgpt {
-                email,
-                plan_type,
-                workspace_name,
-            }) => {
-                let feedback_audience = if email
-                    .as_deref()
-                    .is_some_and(|email| email.ends_with("@openai.com"))
-                {
-                    FeedbackAudience::OpenAiEmployee
-                } else {
-                    FeedbackAudience::External
-                };
-                (
-                    email.clone(),
-                    Some(TelemetryAuthMode::Chatgpt),
-                    Some(StatusAccountDisplay::ChatGpt {
-                        email,
-                        plan: Some(plan_type_display_name(plan_type)),
-                        workspace: workspace_display(workspace_name, account.workspace_routing),
-                    }),
-                    Some(plan_type),
-                    feedback_audience,
-                    true,
-                )
-            }
-            Some(Account::AmazonBedrock { .. } | Account::Gcp {}) => {
-                (None, None, None, None, FeedbackAudience::External, false)
-            }
             None => (None, None, None, None, FeedbackAudience::External, false),
         };
         Ok(AppServerBootstrap {
@@ -2036,17 +2003,6 @@ pub(crate) fn status_account_display_from_auth_mode(
 ) -> Option<StatusAccountDisplay> {
     match auth_mode {
         Some(AuthMode::ApiKey) => Some(StatusAccountDisplay::ApiKey),
-        Some(AuthMode::Chatgpt)
-        | Some(AuthMode::ChatgptAuthTokens)
-        | Some(AuthMode::AgentIdentity)
-        | Some(AuthMode::PersonalAccessToken) => Some(StatusAccountDisplay::ChatGpt {
-            email: None,
-            plan: plan_type.map(plan_type_display_name),
-            workspace: None,
-        }),
-        Some(AuthMode::Headers)
-        | Some(AuthMode::BedrockApiKey)
-        | Some(AuthMode::BedrockAccessKeys) => None,
         None => None,
     }
 }
@@ -2929,11 +2885,7 @@ mod tests {
         let next_request_id = app_server.next_request_id;
         let account = GetAccountResponse {
             workspace_routing: None,
-            account: Some(Account::Chatgpt {
-                email: Some("teammate@openai.com".to_string()),
-                plan_type: codex_protocol::account::PlanType::Plus,
-                workspace_name: None,
-            }),
+            account: Some(Account::ApiKey {}),
             requires_openai_auth: true,
         };
 
@@ -2948,13 +2900,7 @@ mod tests {
                 bootstrap.feedback_audience,
                 bootstrap.has_chatgpt_account,
             ),
-            (
-                Some("teammate@openai.com"),
-                Some(TelemetryAuthMode::Chatgpt),
-                Some(codex_protocol::account::PlanType::Plus),
-                FeedbackAudience::OpenAiEmployee,
-                true,
-            )
+            (None, Some(TelemetryAuthMode::ApiKey), None, FeedbackAudience::External, false)
         );
 
         // Account-specific catalog filtering at startup and before/after thread creation.
@@ -3044,11 +2990,7 @@ mod tests {
             ThreadParamsMode::Cloud,
         );
         let account = GetAccountResponse {
-            account: Some(Account::Chatgpt {
-                email: Some("teammate@openai.com".to_string()),
-                plan_type: codex_protocol::account::PlanType::Plus,
-                workspace_name: None,
-            }),
+            account: Some(Account::ApiKey {}),
             requires_openai_auth: true,
             workspace_routing: None,
         };
@@ -4640,7 +4582,6 @@ mod tests {
         let forked_from_id = ThreadId::new();
         let read_only_profile = PermissionProfile::read_only();
         let response = ThreadResumeResponse {
-            disabled_plugin_ids: Vec::new(),
             thread: codex_app_server_protocol::Thread {
                 originator: None,
                 environments: None,
@@ -4935,45 +4876,4 @@ mod tests {
         assert_eq!(session.forked_from_id, Some(forked_from_id));
     }
 
-    #[test]
-    fn status_account_display_from_auth_mode_uses_remapped_plan_labels() {
-        let business = status_account_display_from_auth_mode(
-            Some(AuthMode::Chatgpt),
-            Some(codex_protocol::account::PlanType::EnterpriseCbpUsageBased),
-        );
-        assert!(matches!(
-            business,
-            Some(StatusAccountDisplay::ChatGpt {
-                email: None,
-                plan: Some(ref plan),
-                ..
-            }) if plan == "Enterprise"
-        ));
-
-        let team = status_account_display_from_auth_mode(
-            Some(AuthMode::Chatgpt),
-            Some(codex_protocol::account::PlanType::SelfServeBusinessUsageBased),
-        );
-        assert!(matches!(
-            team,
-            Some(StatusAccountDisplay::ChatGpt {
-                email: None,
-                plan: Some(ref plan),
-                ..
-            }) if plan == "Business"
-        ));
-
-        let business_prolite = status_account_display_from_auth_mode(
-            Some(AuthMode::Chatgpt),
-            Some(codex_protocol::account::PlanType::SelfServeBusinessProLite),
-        );
-        assert!(matches!(
-            business_prolite,
-            Some(StatusAccountDisplay::ChatGpt {
-                email: None,
-                plan: Some(ref plan),
-                ..
-            }) if plan == "Business Premium"
-        ));
-    }
 }

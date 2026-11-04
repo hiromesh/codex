@@ -25,11 +25,7 @@ pub(super) fn should_delay_startup_composer_for_first_login(
     managed_configuration: impl FnOnce() -> io::Result<bool>,
     environment_variable: impl Fn(&str) -> Option<OsString>,
 ) -> bool {
-    if environment_variable(codex_login::CODEX_ACCESS_TOKEN_ENV_VAR).is_some_and(|credential| {
-        credential
-            .to_str()
-            .is_some_and(|value| !value.trim().is_empty())
-    }) || environment_variable(OPENAI_FEDERATION_RULE_ID_ENV_VAR).is_some()
+    if environment_variable(OPENAI_FEDERATION_RULE_ID_ENV_VAR).is_some()
         || environment_variable(OPENAI_IDENTITY_TOKEN_FILE_ENV_VAR).is_some()
     {
         return false;

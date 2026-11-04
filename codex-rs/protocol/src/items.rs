@@ -216,23 +216,6 @@ impl From<ExecCommandStatus> for CommandExecutionStatus {
     }
 }
 
-/// Returns whether a path is safe to serialize as a trusted plugin-relative path.
-///
-/// This validates the cross-platform wire shape only. The trusted plugin resolver
-/// remains responsible for establishing that the path actually came from a plugin root.
-pub fn is_safe_plugin_relative_path(path: &str) -> bool {
-    !path.is_empty()
-        && !path.starts_with('/')
-        && !path.contains('\\')
-        && path.split('/').all(|component| {
-            !component.is_empty()
-                && !matches!(component, "." | "..")
-                && !matches!(
-                    component.as_bytes(),
-                    [drive, b':', ..] if drive.is_ascii_alphabetic()
-                )
-        })
-}
 
 /// Immutable model labels carried within command lifecycle events for analytics.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -253,12 +236,6 @@ pub struct CommandExecutionItem {
     #[ts(skip)]
     pub model_context: Option<ModelInvocationContext>,
     pub id: String,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    #[ts(optional)]
-    pub plugin_id: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    #[ts(optional)]
-    pub script_path: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[ts(optional)]
     pub process_id: Option<String>,
@@ -440,28 +417,6 @@ pub struct McpToolCallItem {
     pub server: String,
     pub tool: String,
     pub arguments: serde_json::Value,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    #[ts(optional)]
-    pub connector_id: Option<String>,
-    /// Legacy compatibility field; prefer `mcp_app_ui.resource_uri` when available.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    #[ts(optional)]
-    pub mcp_app_resource_uri: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    #[ts(optional)]
-    pub mcp_app_ui: Option<McpAppUi>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    #[ts(optional)]
-    pub link_id: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    #[ts(optional)]
-    pub app_name: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    #[ts(optional)]
-    pub action_name: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    #[ts(optional)]
-    pub plugin_id: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[ts(optional)]
     pub read_only_hint: Option<bool>,
@@ -765,28 +720,7 @@ mod tests {
         );
     }
 
-    #[test]
-    fn plugin_relative_paths_use_safe_wire_shape() {
-        assert!(is_safe_plugin_relative_path("scripts/run.py"));
-
-        for path in [
-            "",
-            "/home/user/.codex/plugins/cache/sample/scripts/run.py",
-            "C:/Users/user/.codex/plugins/cache/sample/scripts/run.py",
-            "scripts/C:/run.py",
-            r"\\server\share\sample\scripts\run.py",
-            r"scripts\run.py",
-            "scripts//run.py",
-            "scripts/./run.py",
-            "scripts/../run.py",
-        ] {
-            assert!(
-                !is_safe_plugin_relative_path(path),
-                "unsafe plugin-relative path should be rejected: {path:?}"
-            );
-        }
-    }
-
+    
     #[test]
     fn hook_prompt_roundtrips_multiple_fragments() {
         let original = vec![

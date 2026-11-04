@@ -21,15 +21,6 @@ async fn v2_rpc_refreshes_metadata_and_enforces_sandbox() -> anyhow::Result<()> 
     let codex_home = tempfile::tempdir()?;
     let codex_home_path = std::fs::canonicalize(codex_home.path())?;
     let skills = codex_home_path.join("skills/demo/SKILL.md");
-    let plugin = codex_home_path.join("plugins/cache/market/mail/1.0.0");
-    write(
-        &plugin.join(".codex-plugin/plugin.json"),
-        r#"{"name":"mail"}"#,
-    )?;
-    write(
-        &plugin.join("skills/search/SKILL.md"),
-        "---\nname: search\ndescription: Search mail\n---\n",
-    )?;
     write(
         &skills,
         "---\nname: demo\ndescription: original\n---\nPRIVATE INSTRUCTION BODY",
@@ -88,13 +79,6 @@ async fn v2_rpc_refreshes_metadata_and_enforces_sandbox() -> anyhow::Result<()> 
     );
     assert!(!serde_json::to_string(&first)?.contains("PRIVATE INSTRUCTION BODY"));
 
-    assert!(
-        first
-            .plugins
-            .iter()
-            .any(|plugin| plugin.id == "mail@market" && plugin.skills.len() == 1)
-    );
-
     // Exercise one content refresh through the real RPC and native watcher.
     write(&skills, "---\nname: demo\ndescription: updated\n---\n")?;
     tokio::time::timeout(std::time::Duration::from_secs(30), async {
@@ -114,7 +98,7 @@ async fn v2_rpc_refreshes_metadata_and_enforces_sandbox() -> anyhow::Result<()> 
     .await
     .context("waiting for discovery refresh")??;
 
-    // A restricted request must not reuse the unrestricted context's cached plugin metadata.
+    // A restricted request must not reuse the unrestricted context's cached skill metadata.
     {
         use codex_exec_server::FileSystemSandboxContext;
         use codex_protocol::models::PermissionProfile;
@@ -140,7 +124,6 @@ async fn v2_rpc_refreshes_metadata_and_enforces_sandbox() -> anyhow::Result<()> 
         #[cfg(any(target_os = "linux", target_os = "macos"))]
         {
             let response = discover(&mut server, &restricted).await?;
-            assert!(response.plugins.is_empty());
             assert_eq!(
                 response
                     .skills
@@ -150,7 +133,6 @@ async fn v2_rpc_refreshes_metadata_and_enforces_sandbox() -> anyhow::Result<()> 
                     .discovery_root,
                 expected_root,
             );
-            assert!(!serde_json::to_string(&response)?.contains("mail@market"));
         }
     }
 

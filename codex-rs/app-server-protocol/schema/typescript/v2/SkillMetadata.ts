@@ -10,8 +10,4 @@ export type SkillMetadata = { name: string, description: string,
 /**
  * Legacy short_description from SKILL.md. Prefer SKILL.json interface.short_description.
  */
-shortDescription?: string, interface?: SkillInterface, dependencies?: SkillDependencies, path: LegacyAppPathString, scope: SkillScope, enabled: boolean,
-/**
- * Owning plugin ID, matching `PluginSummary.id`, when known.
- */
-pluginId: string | null, };
+shortDescription?: string, interface?: SkillInterface, dependencies?: SkillDependencies, path: LegacyAppPathString, scope: SkillScope, enabled: boolean, };

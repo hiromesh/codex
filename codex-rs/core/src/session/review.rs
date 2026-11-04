@@ -142,7 +142,6 @@ pub(super) async fn spawn_review_thread(
             .spawn_git_enrichment_task(Arc::clone(&sess.services.git_root_discovery));
     }
     sess.abort_all_tasks(TurnAbortReason::Replaced).await;
-    sess.clear_connector_selection().await;
 
     // Announce entering review mode so UIs can switch modes.
     let item = TurnItem::EnteredReviewMode(EnteredReviewModeItem {

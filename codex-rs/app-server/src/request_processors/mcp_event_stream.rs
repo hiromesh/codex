@@ -9,7 +9,6 @@ use codex_app_server_protocol::McpServerEventStreamStartParams;
 use codex_app_server_protocol::ServerNotification;
 use codex_core::CodexThread;
 use codex_login::AuthManager;
-use codex_mcp::CODEX_APPS_MCP_SERVER_NAME;
 use codex_mcp::McpEventStream;
 use codex_protocol::ThreadId;
 use serde_json::Value;
@@ -50,11 +49,6 @@ impl McpEventStreams {
         params: McpServerEventStreamStartParams,
         processor: McpRequestProcessor,
     ) -> Result<McpEventStreamReady, JSONRPCErrorError> {
-        if params.server != CODEX_APPS_MCP_SERVER_NAME {
-            return Err(invalid_request(
-                "MCP event subscriptions are only supported for hosted apps",
-            ));
-        }
         let thread_id = ThreadId::from_string(&params.thread_id)
             .map_err(|error| invalid_request(format!("invalid thread id: {error}")))?;
         let subscription_id = params.subscription_id.clone();
@@ -97,6 +91,7 @@ impl McpEventStreams {
                         let (_, thread) = processor.load_thread(&params.thread_id).await?;
                         let stream = thread
                             .start_mcp_event_stream(
+                                &params.server,
                                 &params.name,
                                 params.arguments.clone(),
                                 params.meta.clone(),
@@ -228,6 +223,7 @@ async fn forward_events(
                             .await;
                             let mut stream = thread
                                 .start_mcp_event_stream(
+                                    &params.server,
                                     &params.name,
                                     params.arguments.clone(),
                                     params.meta.clone(),
@@ -294,16 +290,14 @@ struct McpEventStreamAuthChanges {
     manager: Arc<AuthManager>,
     receiver: watch::Receiver<u64>,
     revision: u64,
-    principal: Option<(Option<String>, Option<String>)>,
+    principal: bool,
 }
 
 impl McpEventStreamAuthChanges {
     fn new(manager: Arc<AuthManager>) -> Self {
         let receiver = manager.auth_change_receiver();
         let revision = *receiver.borrow();
-        let principal = manager
-            .auth_cached()
-            .map(|auth| (auth.get_account_id(), auth.get_chatgpt_user_id()));
+        let principal = manager.auth_cached().is_some();
         Self {
             manager,
             receiver,
@@ -314,15 +308,10 @@ impl McpEventStreamAuthChanges {
 
     async fn changed(&mut self) {
         loop {
-            if self
-                .manager
-                .auth_cached()
-                .map(|auth| (auth.get_account_id(), auth.get_chatgpt_user_id()))
-                != self.principal
-            {
+            if self.manager.auth_cached().is_some() != self.principal {
                 return;
             }
-            if self.receiver.changed().await.is_err() || self.principal == Some((None, None)) {
+            if self.receiver.changed().await.is_err() || !self.principal {
                 return;
             }
             let revision = *self.receiver.borrow_and_update();

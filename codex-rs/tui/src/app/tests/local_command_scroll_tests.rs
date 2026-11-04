@@ -511,7 +511,6 @@ async fn dynamic_service_tier_command_returns_to_latest() -> Result<()> {
 }
 
 #[tokio::test]
-#[tokio::test]
 async fn background_history_insertion_keeps_the_visible_reading_rows() -> Result<()> {
     let (mut app, _events, _op_rx) = make_test_app_with_channels().await;
     let mut tui = crate::tui::test_support::make_test_tui()?;

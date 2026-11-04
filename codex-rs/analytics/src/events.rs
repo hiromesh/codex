@@ -1,7 +1,6 @@
 use std::sync::LazyLock;
 use std::time::Duration;
 
-use crate::facts::AppInvocation;
 use crate::facts::ArtifactOperation;
 use crate::facts::ArtifactOperationLifecycle;
 use crate::facts::CodexCompactionEvent;
@@ -67,8 +66,6 @@ pub(crate) enum TrackEventRequest {
     ThreadArchive(ThreadArchiveEvent),
     GuardianReview(Box<GuardianReviewEventRequest>),
     GuardianV2(Box<GuardianV2EventRequest>),
-    AppMentioned(CodexAppMentionedEventRequest),
-    AppUsed(CodexAppUsedEventRequest),
     HookRun(CodexHookRunEventRequest),
     Compaction(Box<CodexCompactionEventRequest>),
     Goal(Box<CodexGoalEventRequest>),
@@ -926,36 +923,6 @@ pub(crate) struct CodexWebSearchEventRequest {
 }
 
 #[derive(Serialize)]
-pub(crate) struct CodexAppMetadata {
-    pub(crate) connector_id: Option<String>,
-    pub(crate) thread_id: Option<String>,
-    pub(crate) turn_id: Option<String>,
-    pub(crate) app_name: Option<String>,
-    pub(crate) product_client_id: Option<String>,
-    pub(crate) invoke_type: Option<InvocationType>,
-    pub(crate) model_slug: Option<String>,
-}
-
-#[derive(Serialize)]
-pub(crate) struct CodexAppMentionedEventRequest {
-    pub(crate) event_type: &'static str,
-    pub(crate) event_params: CodexAppMetadata,
-}
-
-#[derive(Serialize)]
-pub(crate) struct CodexAppUsedMetadata {
-    #[serde(flatten)]
-    pub(crate) app: CodexAppMetadata,
-    pub(crate) elicitation_type: Option<ElicitationType>,
-}
-
-#[derive(Serialize)]
-pub(crate) struct CodexAppUsedEventRequest {
-    pub(crate) event_type: &'static str,
-    pub(crate) event_params: CodexAppUsedMetadata,
-}
-
-#[derive(Serialize)]
 pub(crate) struct CodexHookRunMetadata {
     pub(crate) thread_id: Option<String>,
     pub(crate) turn_id: Option<String>,
@@ -1174,21 +1141,6 @@ pub(crate) struct CodexOnboardingExternalAgentImportFailureEventRequest {
     pub(crate) event_params: CodexOnboardingExternalAgentImportFailureMetadata,
 }
 
-pub(crate) fn codex_app_metadata(
-    tracking: &TrackEventsContext,
-    app: AppInvocation,
-) -> CodexAppMetadata {
-    CodexAppMetadata {
-        connector_id: app.connector_id,
-        thread_id: Some(tracking.thread_id.clone()),
-        turn_id: Some(tracking.turn_id.clone()),
-        app_name: app.app_name,
-        product_client_id: Some(tracking.product_client_id.clone()),
-        invoke_type: app.invocation_type,
-        model_slug: Some(tracking.model_slug.clone()),
-    }
-}
-
 pub(crate) fn codex_compaction_event_params(
     input: CodexCompactionEvent,
     session_id: String,
@@ -1298,7 +1250,6 @@ fn analytics_hook_source(source: HookSource) -> &'static str {
         HookSource::Project => "project",
         HookSource::Mdm => "mdm",
         HookSource::SessionFlags => "session_flags",
-        HookSource::Plugin => "plugin",
         HookSource::CloudRequirements => "cloud_requirements",
         HookSource::CloudManagedConfig => "cloud_managed_config",
         HookSource::LegacyManagedConfigFile => "legacy_managed_config_file",

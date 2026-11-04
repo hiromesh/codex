@@ -633,7 +633,6 @@ async fn host_alias_roots_follow_core_discovery_order() -> Result<(), Box<dyn st
         ],
         &Semaphore::new(/*permits*/ 2),
         /*restriction_product*/ None,
-        /*plugin_skill_snapshots*/ None,
     )
     .await;
     let catalog = HostSkillProvider::new()
@@ -976,82 +975,6 @@ fn mixed_catalog_prefers_executor_inclusion_over_total_aliased_inclusion() {
     );
     assert_eq!(cloud.report.total_count, 1);
     assert_eq!(host.skill_root_lines, Vec::<String>::new());
-}
-
-#[tokio::test]
-async fn singleton_plugin_versions_share_the_marketplace_alias_root()
--> Result<(), Box<dyn std::error::Error>> {
-    let unique = SystemTime::now().duration_since(UNIX_EPOCH)?.as_nanos();
-    let parent = std::env::temp_dir().join(format!(
-        "codex-skills-extension-marketplace-alias-{}-{unique}",
-        std::process::id()
-    ));
-    let marketplace_path = parent.join("plugins/cache/openai-curated");
-    let mut roots = Vec::new();
-    for (plugin, version) in [("github", "hash123"), ("slack", "hash456")] {
-        let root = marketplace_path.join(plugin).join(version).join("skills");
-        let skill_dir = root.join(plugin);
-        std::fs::create_dir_all(&skill_dir)?;
-        std::fs::write(
-            skill_dir.join("SKILL.md"),
-            format!("---\nname: {plugin}\ndescription: {plugin} skill.\n---\n"),
-        )?;
-        roots.push(HostSkillRoot::host(
-            AbsolutePathBuf::try_from(std::fs::canonicalize(root)?)?,
-            SkillScope::User,
-            Arc::clone(&LOCAL_FS),
-        ));
-    }
-    let marketplace_root = dunce::canonicalize(&marketplace_path)?
-        .to_string_lossy()
-        .replace('\\', "/");
-    let outcome = load_and_merge_host_skill_roots(
-        roots,
-        &Semaphore::new(/*permits*/ 2),
-        /*restriction_product*/ None,
-        /*plugin_skill_snapshots*/ None,
-    )
-    .await;
-    let catalog = HostSkillProvider::new()
-        .list(SkillListQuery {
-            turn_id: "turn-1".to_string(),
-            executor_roots: Vec::new(),
-            resolved_executor_roots: Vec::new(),
-            host_snapshot: Some(Arc::new(HostSkillsSnapshot::new(Arc::new(outcome)))),
-            include_host_skills: true,
-            include_bundled_skills: false,
-            include_cloud_skills: false,
-            mcp_resources: None,
-            executor_capability_discovery: None,
-            executor_capability_discovery_v2: None,
-        })
-        .await?;
-    let entries = catalog.entries.iter().collect::<Vec<_>>();
-    let plan = build_alias_plan(&entries).expect("alias plan should build");
-    let github = entries
-        .iter()
-        .find(|entry| entry.name == "github")
-        .ok_or("GitHub skill should be discovered")?;
-    let slack = entries
-        .iter()
-        .find(|entry| entry.name == "slack")
-        .ok_or("Slack skill should be discovered")?;
-
-    assert_eq!(
-        plan.root_lines(),
-        vec![format!("- `r0` = `{marketplace_root}`")]
-    );
-    assert_eq!(
-        render_skill_locator_with_aliases(github, &plan, &mut HashSet::new()),
-        "r0/github/hash123/skills/github/SKILL.md"
-    );
-    assert_eq!(
-        render_skill_locator_with_aliases(slack, &plan, &mut HashSet::new()),
-        "r0/slack/hash456/skills/slack/SKILL.md"
-    );
-
-    std::fs::remove_dir_all(parent)?;
-    Ok(())
 }
 
 #[test]

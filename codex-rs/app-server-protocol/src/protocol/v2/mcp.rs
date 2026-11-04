@@ -80,8 +80,7 @@ pub struct McpServerStatus {
     pub name: String,
     /// Current thread-runtime connection state; null when unavailable or the configuration changed.
     pub runtime_status: Option<McpServerConnectionStatus>,
-    pub plugin_id: Option<String>,
-    /// HTTP origin of the effective configured endpoint, including plugin servers.
+    /// HTTP origin of the effective configured endpoint.
     /// Excludes credentials, path, query, and fragment; null for non-HTTP transports.
     pub http_origin: Option<String>,
     pub server_info: Option<McpServerInfo>,
@@ -114,31 +113,8 @@ pub struct ListMcpServerStatusResponse {
 pub struct McpResourceReadParams {
     #[ts(optional = nullable)]
     pub thread_id: Option<String>,
-    /// Originating MCP tool call used to select the resource's app.
-    #[ts(optional = nullable)]
-    pub origin_call_id: Option<String>,
     pub server: String,
     pub uri: String,
-    #[ts(optional = nullable)]
-    pub connector_id: Option<String>,
-    /// Explicit hosted app/account. Omit to retain legacy resource discovery.
-    #[ts(optional = nullable)]
-    pub target: Option<McpResourceReadTarget>,
-}
-
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, JsonSchema, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export_to = "v2/")]
-pub struct McpResourceReadTarget {
-    pub connector_id: String,
-    /// Null explicitly requests no-auth access, subject to the app's resource policy.
-    #[serde(deserialize_with = "Option::deserialize")]
-    #[schemars(
-        required,
-        schema_with = "crate::protocol::serde_helpers::nullable_string_schema"
-    )]
-    #[ts(type = "string | null")]
-    pub link_id: Option<String>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, JsonSchema, TS)]
@@ -146,8 +122,6 @@ pub struct McpResourceReadTarget {
 #[ts(export_to = "v2/")]
 pub struct McpResourceReadResponse {
     pub contents: Vec<McpResourceContent>,
-    /// Originating call when the server applied app-specific resource scoping.
-    pub origin_call_id: Option<String>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, JsonSchema, TS)]

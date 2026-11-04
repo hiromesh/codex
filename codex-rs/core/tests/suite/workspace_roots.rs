@@ -140,7 +140,6 @@ async fn workspace_roots_allow_file_and_command_writes() -> Result<()> {
     const PATCH_CONTENTS: &str = "workspace root patch access";
     const COMMAND_CONTENTS: &str = "workspace root command access";
 
-
     let server = start_mock_server().await;
     let test = workspace_roots_test(&server).await?;
     let cwd = PathUri::from_abs_path(&test.config.cwd);
@@ -191,7 +190,6 @@ async fn workspace_roots_allow_file_and_command_writes_in_secondary_root(
 ) -> Result<()> {
     const SECONDARY_ROOT_NAME: &str = "secondary-workspace-root";
     const COMMAND_CONTENTS: &str = "secondary root command";
-
 
     let server = start_mock_server().await;
     let mut builder = test_codex()
@@ -316,7 +314,6 @@ async fn workspace_roots_allow_patches_but_protect_metadata_directories() -> Res
     const PATCH_CONTENTS: &str = "workspace root patch access";
     const PROTECTED_METADATA_DIRECTORIES: [&str; 4] = [".git", ".agents", ".codex", ".aws"];
 
-
     let server = start_mock_server().await;
     let test = workspace_roots_test(&server).await?;
     let cwd = PathUri::from_abs_path(&test.config.cwd);
@@ -404,7 +401,6 @@ async fn workspace_roots_allow_patches_but_protect_metadata_directories() -> Res
 async fn workspace_roots_deny_file_and_command_writes_outside_roots() -> Result<()> {
     const PATCH_CONTENTS: &str = "outside workspace root patch";
     const COMMAND_CONTENTS: &str = "outside workspace root command";
-
 
     let server = start_mock_server().await;
     let test = workspace_roots_test(&server).await?;

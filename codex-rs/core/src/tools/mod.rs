@@ -50,9 +50,22 @@ pub(crate) fn flat_tool_name(tool_name: &ToolName) -> Cow<'_, str> {
     }
 
     match tool_name.namespace.as_deref() {
-        Some(namespace) => {
+        // Legacy callers encode the separator in the namespace (e.g. `functions.`)
+        // or in the child name (`_create_event`); keep their historical spelling.
+        Some(namespace)
+            if namespace.ends_with('.')
+                || namespace.ends_with('_')
+                || tool_name.name.starts_with('_') =>
+        {
             let mut name = String::with_capacity(namespace.len() + tool_name.name.len());
             name.push_str(namespace);
+            name.push_str(&tool_name.name);
+            Cow::Owned(name)
+        }
+        Some(namespace) => {
+            let mut name = String::with_capacity(namespace.len() + tool_name.name.len() + 2);
+            name.push_str(namespace);
+            name.push_str("__");
             name.push_str(&tool_name.name);
             Cow::Owned(name)
         }

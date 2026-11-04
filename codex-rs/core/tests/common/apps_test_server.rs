@@ -6,7 +6,6 @@ use codex_extension_api::ExtensionFuture;
 use codex_extension_api::McpServerContribution;
 use codex_extension_api::McpServerContributionContext;
 use codex_extension_api::McpServerContributor;
-use codex_features::Feature;
 use codex_login::CodexAuth;
 use codex_models_manager::bundled_models_response;
 use serde_json::Value;
@@ -34,16 +33,17 @@ const DISCOVERABLE_CALENDAR_ID: &str = "connector_2128aebfecb84f64a069897515042a
 const DISCOVERABLE_GMAIL_ID: &str = "connector_68df038e0ba48191908c8434991bbac2";
 const CONNECTOR_DESCRIPTION: &str = "Plan events and manage your calendar.";
 const CODEX_APPS_META_KEY: &str = "_codex_apps";
+pub const CODEX_APPS_MCP_SERVER_NAME: &str = "codex_apps";
+pub const CODEX_APPS_TOOL_NAMESPACE: &str = "mcp__codex_apps";
 const CODEX_APPS_MCP_PATH_REGEX: &str = "^/api/codex/ps/mcp/?$";
-const HOSTED_PLUGIN_RUNTIME_MCP_PATH_REGEX: &str = "^/api/codex/ps/mcp/?$";
 const PROTOCOL_VERSION: &str = "2025-11-25";
 const SERVER_NAME: &str = "codex-apps-test";
 const SERVER_VERSION: &str = "1.0.0";
 const SEARCHABLE_TOOL_COUNT: usize = 100;
-const CALENDAR_CREATE_EVENT_TOOL_NAME: &str = "calendar_create_event";
+pub const CALENDAR_CREATE_EVENT_TOOL_NAME: &str = "calendar_create_event";
 const CALENDAR_APP_ONLY_TOOL_NAME: &str = "calendar_app_only_action";
 pub const CALENDAR_EXTRACT_TEXT_TOOL_NAME: &str = "calendar_extract_text";
-const CALENDAR_LIST_EVENTS_TOOL_NAME: &str = "calendar_list_events";
+pub const CALENDAR_LIST_EVENTS_TOOL_NAME: &str = "calendar_list_events";
 pub const DIRECT_CALENDAR_CREATE_EVENT_TOOL: &str = "mcp__codex_apps__calendar__create_event";
 pub const DIRECT_CALENDAR_APP_ONLY_TOOL: &str = "mcp__codex_apps__calendar__app_only_action";
 pub const DIRECT_CALENDAR_LIST_EVENTS_TOOL: &str = "mcp__codex_apps__calendar__list_events";
@@ -75,7 +75,8 @@ impl McpServerContributor<Config> for HostedMessagingServer {
         _context: McpServerContributionContext<'a, Config>,
     ) -> ExtensionFuture<'a, Vec<McpServerContribution>> {
         Box::pin(async move {
-            vec![McpServerContribution::HostedApps {
+            vec![McpServerContribution::Set {
+                name: "codex_apps".to_string(),
                 config: Box::new(
                     serde_json::from_value(json!({
                         "url": self.0,
@@ -84,7 +85,6 @@ impl McpServerContributor<Config> for HostedMessagingServer {
                     }))
                     .expect("host-owned messaging MCP config"),
                 ),
-                protocol_mode: None,
             }]
         })
     }
@@ -148,24 +148,6 @@ impl AppsTestServer {
         mount_connectors_directory(server).await;
         mount_streamable_http_json_rpc(
             server,
-            CONNECTOR_NAME.to_string(),
-            CONNECTOR_DESCRIPTION.to_string(),
-            /*searchable*/ true,
-            /*include_app_only_tool*/ false,
-            AppsTestToolsListBehavior::AlwaysAvailable,
-        )
-        .await;
-        Ok(Self {
-            chatgpt_base_url: server.uri(),
-        })
-    }
-
-    pub async fn mount_hosted_plugin_runtime_searchable(server: &MockServer) -> Result<Self> {
-        mount_oauth_metadata(server).await;
-        mount_connectors_directory(server).await;
-        mount_streamable_http_json_rpc_at_path(
-            server,
-            HOSTED_PLUGIN_RUNTIME_MCP_PATH_REGEX,
             CONNECTOR_NAME.to_string(),
             CONNECTOR_DESCRIPTION.to_string(),
             /*searchable*/ true,
@@ -306,11 +288,20 @@ pub fn configure_search_capable_model(config: &mut Config) {
 }
 
 fn configure_apps(config: &mut Config, apps_base_url: &str) {
-    config
-        .features
-        .enable(Feature::Apps)
-        .expect("test config should allow feature update");
     config.chatgpt_base_url = apps_base_url.to_string();
+    let url = format!(
+        "{}/api/codex/ps/mcp",
+        apps_base_url.trim_end_matches('/')
+    );
+    let server: codex_config::McpServerConfig =
+        serde_json::from_value(json!({ "url": url })).expect("apps MCP fixture config");
+    config
+        .mcp_servers
+        .set(std::collections::HashMap::from([(
+            CODEX_APPS_MCP_SERVER_NAME.to_string(),
+            server,
+        )]))
+        .expect("apps MCP fixture server should be accepted");
 }
 
 pub fn configure_search_capable_apps(config: &mut Config, apps_base_url: &str) {
@@ -321,23 +312,25 @@ pub fn configure_search_capable_apps(config: &mut Config, apps_base_url: &str) {
 pub fn apps_enabled_builder(apps_base_url: impl Into<String>) -> TestCodexBuilder {
     let apps_base_url = apps_base_url.into();
     test_codex()
-        .with_auth(CodexAuth::create_dummy_chatgpt_auth_for_testing())
+        .with_auth(CodexAuth::from_api_key("test-api-key"))
         .with_config(move |config| configure_apps(config, apps_base_url.as_str()))
 }
 
 pub fn search_capable_apps_builder(apps_base_url: impl Into<String>) -> TestCodexBuilder {
     let apps_base_url = apps_base_url.into();
     test_codex()
-        .with_auth(CodexAuth::create_dummy_chatgpt_auth_for_testing())
+        .with_auth(CodexAuth::from_api_key("test-api-key"))
         .with_config(move |config| configure_search_capable_apps(config, apps_base_url.as_str()))
 }
 
 fn apps_tool_call_id(body: &Value) -> Option<&str> {
-    body.get("params")?
-        .get("_meta")?
-        .get(CODEX_APPS_META_KEY)?
-        .get("call_id")?
-        .as_str()
+    let meta = body.get("params")?.get("_meta")?;
+    // Apps-managed connector metadata is stripped from outgoing MCP calls; fall back to the
+    // generic MCP call id that the runtime always sends.
+    meta.get(CODEX_APPS_META_KEY)
+        .and_then(|apps| apps.get("call_id"))
+        .and_then(Value::as_str)
+        .or_else(|| meta.get("callId").and_then(Value::as_str))
 }
 
 pub async fn recorded_apps_tool_calls(server: &MockServer) -> Vec<Value> {
@@ -585,7 +578,8 @@ impl Respond for CodexAppsJsonRpcResponder {
                         "serverInfo": {
                             "name": SERVER_NAME,
                             "version": SERVER_VERSION
-                        }
+                        },
+                        "instructions": self.connector_description.clone()
                     }
                 }))
             }

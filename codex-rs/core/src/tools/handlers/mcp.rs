@@ -29,7 +29,6 @@ use codex_tools::ToolName;
 use codex_tools::ToolSearchInfo;
 use codex_tools::ToolSearchSourceInfo;
 use codex_tools::ToolSpec;
-use codex_tools::agent_plugin_mcp_tool_to_responses_api_tool;
 use codex_tools::mcp_tool_to_responses_api_tool;
 use codex_utils_output_truncation::TruncationPolicy;
 use codex_utils_string::take_bytes_at_char_boundary;
@@ -39,13 +38,11 @@ use serde_json::Value;
 
 const LEGACY_MCP_TOOL_NAME_PREFIX: &str = "mcp__";
 const MCP_TOOL_NAME_DELIMITER: &str = "__";
-const MAX_AGENT_PLUGIN_MCP_NAMESPACE_DESCRIPTION_BYTES: usize = 1_000;
 const MAX_MCP_NAMESPACE_DESCRIPTION_BYTES: usize = 512 * 1024;
 
 /// Immutable tool metadata and normalized schema, shared only within an MCP manager.
 pub(crate) struct McpHandlerDefinition {
     tool_info: ToolInfo,
-    agent_plugin: bool,
     schema_max_bytes: Option<usize>,
     spec: Arc<ToolSpec>,
 }
@@ -53,17 +50,11 @@ pub(crate) struct McpHandlerDefinition {
 impl McpHandlerDefinition {
     pub(crate) fn new(
         tool_info: ToolInfo,
-        agent_plugin: bool,
         schema_max_bytes: Option<usize>,
     ) -> Result<Self, serde_json::Error> {
-        let spec = Arc::new(create_tool_spec(
-            &tool_info,
-            agent_plugin,
-            schema_max_bytes,
-        )?);
+        let spec = Arc::new(create_tool_spec(&tool_info, schema_max_bytes)?);
         Ok(Self {
             tool_info,
-            agent_plugin,
             schema_max_bytes,
             spec,
         })
@@ -72,12 +63,9 @@ impl McpHandlerDefinition {
     pub(crate) fn matches(
         &self,
         tool_info: &ToolInfo,
-        agent_plugin: bool,
         schema_max_bytes: Option<usize>,
     ) -> bool {
-        self.tool_info == *tool_info
-            && self.agent_plugin == agent_plugin
-            && self.schema_max_bytes == schema_max_bytes
+        self.tool_info == *tool_info && self.schema_max_bytes == schema_max_bytes
     }
 }
 
@@ -88,26 +76,9 @@ pub struct McpHandler {
 #[cfg(test)]
 impl McpHandler {
     pub fn new(tool_info: ToolInfo) -> Result<Self, serde_json::Error> {
-        Self::with_agent_plugin(
-            tool_info, /*agent_plugin*/ false, /*schema_max_bytes*/ None,
-        )
-    }
-
-    pub fn new_agent_plugin(tool_info: ToolInfo) -> Result<Self, serde_json::Error> {
-        Self::with_agent_plugin(
-            tool_info, /*agent_plugin*/ true, /*schema_max_bytes*/ None,
-        )
-    }
-
-    fn with_agent_plugin(
-        tool_info: ToolInfo,
-        agent_plugin: bool,
-        schema_max_bytes: Option<usize>,
-    ) -> Result<Self, serde_json::Error> {
         Ok(Self::from_definition(Arc::new(McpHandlerDefinition::new(
             tool_info,
-            agent_plugin,
-            schema_max_bytes,
+            /*schema_max_bytes*/ None,
         )?)))
     }
 }
@@ -183,17 +154,14 @@ impl ToolExecutor<ToolInvocation> for McpHandler {
             .unwrap_or_else(|| self.definition.tool_info.server_name.trim());
         let source_info = (!source_name.is_empty()).then(|| ToolSearchSourceInfo {
             name: source_name.to_string(),
-            description: effective_namespace_description(
-                &self.definition.tool_info,
-                self.definition.agent_plugin,
-            )
+            description: effective_namespace_description(&self.definition.tool_info)
             .map(str::trim)
             .filter(|description| !description.is_empty())
             .map(str::to_string),
         });
 
         ToolSearchInfo::from_shared_spec(
-            build_mcp_search_text(&self.definition.tool_info, self.definition.agent_plugin),
+            build_mcp_search_text(&self.definition.tool_info),
             Arc::clone(&self.definition.spec),
             source_info,
         )
@@ -216,15 +184,8 @@ impl McpHandler {
             .session
             .prepare_mcp_call(&self.definition.tool_info)
             .await;
-        // Use the executed call's binding; a later catalog refresh must not change eligibility.
-        let result_metadata_capture_allowed = invocation
-            .session
-            .services
-            .analytics_events_client
-            .is_enabled()
-            && prepared_mcp_call
-                .as_ref()
-                .is_some_and(codex_mcp::PreparedMcpCall::is_host_owned_apps);
+        // Result metadata capture is independent of analytics emission.
+        let result_metadata_capture_allowed = true;
         let mcp_tool = prepared_mcp_call.as_ref().map(|call| {
             McpToolContext::from_prepared_call(
                 call,
@@ -403,16 +364,11 @@ impl CoreToolRuntime for McpHandler {
 
 fn create_tool_spec(
     tool_info: &ToolInfo,
-    agent_plugin: bool,
     schema_max_bytes: Option<usize>,
 ) -> Result<ToolSpec, serde_json::Error> {
     let tool_name = tool_info.canonical_tool_name();
-    let tool = if agent_plugin {
-        agent_plugin_mcp_tool_to_responses_api_tool(&tool_name, &tool_info.tool)?
-    } else {
-        mcp_tool_to_responses_api_tool(&tool_name, &tool_info.tool, schema_max_bytes)?
-    };
-    let description = effective_namespace_description(tool_info, agent_plugin)
+    let tool = mcp_tool_to_responses_api_tool(&tool_name, &tool_info.tool, schema_max_bytes)?;
+    let description = effective_namespace_description(tool_info)
         .map(str::trim)
         .filter(|description| !description.is_empty())
         .map(str::to_string)
@@ -434,16 +390,8 @@ fn create_tool_spec(
     }))
 }
 
-fn effective_namespace_description(tool_info: &ToolInfo, agent_plugin: bool) -> Option<&str> {
-    let description = tool_info.namespace_description.as_deref()?;
-    Some(if agent_plugin {
-        take_bytes_at_char_boundary(
-            description,
-            MAX_AGENT_PLUGIN_MCP_NAMESPACE_DESCRIPTION_BYTES,
-        )
-    } else {
-        description
-    })
+fn effective_namespace_description(tool_info: &ToolInfo) -> Option<&str> {
+    tool_info.namespace_description.as_deref()
 }
 
 fn mcp_hook_tool_input(raw_arguments: &str) -> Value {
@@ -454,7 +402,7 @@ fn mcp_hook_tool_input(raw_arguments: &str) -> Value {
     serde_json::from_str(raw_arguments).unwrap_or_else(|_| Value::String(raw_arguments.to_string()))
 }
 
-fn build_mcp_search_text(info: &ToolInfo, agent_plugin: bool) -> String {
+fn build_mcp_search_text(info: &ToolInfo) -> String {
     let tool_name = info.canonical_tool_name();
     let mut schema_properties = info
         .tool
@@ -486,19 +434,11 @@ fn build_mcp_search_text(info: &ToolInfo, agent_plugin: bool) -> String {
         parts.push(connector_name.to_string());
     }
     if let Some(namespace_description) =
-        effective_namespace_description(info, agent_plugin).map(str::trim)
+        effective_namespace_description(info).map(str::trim)
         && !namespace_description.is_empty()
     {
         parts.push(namespace_description.to_string());
     }
-    parts.extend(
-        info.plugin_display_names
-            .iter()
-            .map(String::as_str)
-            .map(str::trim)
-            .filter(|display_name| !display_name.is_empty())
-            .map(str::to_string),
-    );
     parts.extend(schema_properties);
     parts.join(" ")
 }
@@ -735,7 +675,7 @@ mod tests {
         assert_eq!(
             serde_json::to_value(items[0].executed_tool_call_metadata()).unwrap()["executed_tool_calls"],
             json!([{
-                "name": "mcp__filesystem__read_file",
+                "name": "filesystem__read_file",
                 "arguments": { "path": "/tmp/notes.txt" },
                 "tool_result_metadata": { "provider/custom": { "items": [1, null] } },
             }]),
@@ -798,7 +738,6 @@ mod tests {
             openai_file_input_optional_fields: Default::default(),
             connector_id: None,
             connector_name: None,
-            plugin_display_names: Vec::new(),
         }
     }
 }

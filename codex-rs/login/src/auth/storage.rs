@@ -1,5 +1,3 @@
-use chrono::DateTime;
-use chrono::Utc;
 use codex_otel::auth_storage::Operation;
 use codex_otel::auth_storage::Store;
 use serde::Deserialize;
@@ -30,9 +28,6 @@ mod storage_commit;
 #[path = "storage_telemetry.rs"]
 mod storage_telemetry;
 
-use super::BedrockAccessKeysAuth;
-use super::BedrockApiKeyAuth;
-use crate::token_data::TokenData;
 use codex_config::types::AuthCredentialsStoreMode;
 pub use codex_config::types::AuthKeyringBackendKind;
 use codex_keyring_store::DefaultKeyringStore;
@@ -53,21 +48,6 @@ pub struct AuthDotJson {
 
     #[serde(rename = "OPENAI_API_KEY")]
     pub openai_api_key: Option<String>,
-
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub tokens: Option<TokenData>,
-
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub last_refresh: Option<DateTime<Utc>>,
-
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub personal_access_token: Option<String>,
-
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub bedrock_api_key: Option<BedrockApiKeyAuth>,
-
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub bedrock_access_keys: Option<BedrockAccessKeysAuth>,
 }
 
 pub(super) fn get_auth_file(codex_home: &Path) -> PathBuf {

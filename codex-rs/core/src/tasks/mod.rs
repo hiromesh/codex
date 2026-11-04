@@ -277,7 +277,6 @@ impl Session {
         task: T,
     ) {
         self.abort_all_tasks(TurnAbortReason::Replaced).await;
-        self.clear_connector_selection().await;
         self.start_task(turn_context, input, task).await;
     }
 
@@ -303,7 +302,6 @@ impl Session {
             // MCP contributors must project the new inventory even if their other inputs match.
             self.request_mcp_runtime_reprojection();
         }
-        self.activate_plugin_selection(&turn_context).await;
         // Inherited or recovered roots are applied before task start. Otherwise this
         // task owns its turn, including background work. Later mail cannot change it.
         turn_context

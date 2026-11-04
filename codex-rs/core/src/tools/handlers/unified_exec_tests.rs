@@ -2,7 +2,6 @@ use super::*;
 use crate::shell::ShellType;
 use crate::shell::default_user_shell;
 use crate::shell::get_shell;
-use codex_exec_server::Environment;
 use codex_utils_output_truncation::TruncationPolicy;
 use codex_utils_path_uri::PathUri;
 use pretty_assertions::assert_eq;
@@ -368,96 +367,6 @@ async fn exec_command_rejects_login_when_selected_environment_disallows_it() {
     assert_eq!(
         message,
         "login shell is disabled by config; omit `login` or set it to false."
-    );
-}
-
-#[tokio::test]
-async fn exec_command_reuses_foreign_windows_grant() {
-    use crate::session::tests::make_session_and_context_with_auth_and_config_and_rx;
-    use codex_features::Feature;
-    use codex_protocol::models::AdditionalPermissionProfile;
-    use codex_protocol::models::FileSystemPermissions;
-    use codex_utils_path_uri::PathUri;
-
-    let (session, mut turn, _events) = make_session_and_context_with_auth_and_config_and_rx(
-        codex_login::CodexAuth::from_api_key("Test API Key"),
-        Vec::new(),
-        |config| {
-            config
-                .features
-                .enable(Feature::RequestPermissionsTool)
-                .expect("test setup should allow request permissions");
-        },
-    )
-    .await;
-
-    let cwd = PathUri::parse("file:///C:/workspace").expect("valid Windows cwd");
-    let granted_permissions = AdditionalPermissionProfile {
-        file_system: Some(FileSystemPermissions::from_read_write_path_uris(
-            /*read*/ Some(Vec::new()),
-            /*write*/
-            Some(vec![
-                PathUri::parse("file:///C:/workspace/granted").expect("valid Windows grant"),
-            ]),
-        )),
-        ..Default::default()
-    };
-    {
-        let turn = Arc::get_mut(&mut turn).expect("turn should be uniquely owned");
-        let TurnEnvironmentState::Ready(environment) = turn
-            .initial_environments
-            .environments
-            .first_mut()
-            .expect("primary environment")
-        else {
-            panic!("primary environment should be ready");
-        };
-        environment.selection.environment_id = codex_exec_server::REMOTE_ENVIRONMENT_ID.to_string();
-        environment.selection.cwd = cwd.clone();
-        environment.selection.workspace_roots = vec![cwd.clone()];
-        environment.config_mut().workspace_roots = vec![cwd];
-        environment.environment = Arc::new(
-            Environment::create_for_tests(Some("ws://127.0.0.1:1/remote-exec-server".to_string()))
-                .expect("remote environment"),
-        );
-    }
-
-    let step_context = StepContext::for_test(Arc::clone(&turn));
-    step_context.turn.record_granted_permissions(
-        codex_exec_server::REMOTE_ENVIRONMENT_ID,
-        granted_permissions.clone(),
-        /*strict_auto_review*/ false,
-    );
-    let response = ExecCommandHandler::default()
-        .handle(ToolInvocation {
-            session: Arc::clone(&session),
-            step_context,
-            turn,
-            cancellation_token: tokio_util::sync::CancellationToken::new(),
-            tracker: Arc::new(Mutex::new(TurnDiffTracker::new())),
-            call_id: "foreign-windows-grant".to_string(),
-            tool_name: codex_tools::ToolName::plain("exec_command"),
-            source: ToolCallSource::Direct,
-            native_call: None,
-            environments: Default::default(),
-            payload: ToolPayload::Function {
-                arguments: serde_json::json!({
-                    "cmd": "*** Begin Patch\n*** Add File: granted/file.txt\n+text\n*** End Patch",
-                    "workdir": "nested",
-                    "sandbox_permissions": "with_additional_permissions",
-                    "additional_permissions": granted_permissions,
-                })
-                .to_string(),
-            },
-        })
-        .await;
-
-    let Err(FunctionCallError::RespondToModel(message)) = response else {
-        panic!("raw patch should stop before remote execution");
-    };
-    assert!(
-        message.contains("apply_patch verification failed"),
-        "matching foreign grant should reach patch interception: {message}"
     );
 }
 

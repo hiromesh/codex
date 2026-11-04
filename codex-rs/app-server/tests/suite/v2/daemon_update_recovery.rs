@@ -6,6 +6,7 @@ use anyhow::Context;
 use anyhow::Result;
 use app_test_support::DISABLE_PLUGIN_STARTUP_TASKS_ARG;
 use app_test_support::create_final_assistant_message_sse_response;
+use app_test_support::mount_plain_mcp_server;
 use codex_app_server_protocol::InitializeCapabilities;
 use codex_app_server_protocol::JSONRPCMessage;
 use codex_app_server_protocol::RequestId;
@@ -309,10 +310,8 @@ async fn managed_shutdown_skips_nonpersistent_threads_and_tolerates_save_failure
 async fn managed_shutdown_preserves_admitted_resume() -> Result<()> {
     let home = TempDir::new()?;
     let mock = wiremock::MockServer::start().await;
-    let (mcp, control) =
-        core_test_support::apps_test_server::AppsTestServer::mount_with_startup_control(&mock)
-            .await?;
-    let release = control.hold_next_successful_initialize();
+    let mcp_server = mount_plain_mcp_server(&mock, "/mcp").await;
+    let release = mcp_server.control.hold_next_successful_initialize();
     create_config_toml(home.path(), "http://127.0.0.1:1", "never")?;
     let config = home.path().join("config.toml");
     std::fs::write(
@@ -320,7 +319,7 @@ async fn managed_shutdown_preserves_admitted_resume() -> Result<()> {
         format!(
             "{}\n[mcp_servers.stalled]\nurl = {:?}\nrequired = true\nstartup_timeout_sec = 120\nhttp_headers = {{ Authorization = \"Bearer synthetic-test-token\" }}\n",
             std::fs::read_to_string(&config)?,
-            format!("{}/api/codex/ps/mcp", mcp.chatgpt_base_url),
+            mcp_server.url,
         ),
     )?;
     let id = app_test_support::create_fake_rollout(
@@ -343,7 +342,7 @@ async fn managed_shutdown_preserves_admitted_resume() -> Result<()> {
         .await?;
     // Required MCP startup holds the admitted resume before its runtime is registered.
     timeout(DEFAULT_READ_TIMEOUT, async {
-        while control.initialize_attempts() == 0 {
+        while mcp_server.control.initialize_attempts() == 0 {
             sleep(Duration::from_millis(25)).await;
         }
     })

@@ -374,9 +374,7 @@ fn normalize_skill_path(path: &str) -> String {
         return path.to_string();
     }
     let path = path.replace('\\', "/");
-    if let Some((_, rest)) = path.rsplit_once("/plugins/cache/") {
-        format!("<PLUGINS_CACHE>/{rest}")
-    } else if let Some((_, rest)) = path.rsplit_once("/.agents/skills/") {
+    if let Some((_, rest)) = path.rsplit_once("/.agents/skills/") {
         format!("<PROJECT_SKILLS>/{rest}")
     } else if let Some((_, rest)) = path.rsplit_once("/skills/") {
         format!("<SKILLS_ROOT>/{rest}")

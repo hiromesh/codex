@@ -261,7 +261,6 @@ async fn sample_preserves_context_and_keeps_source_unchanged(
                     ),
                 },
             }),
-            disabled_plugin_ids: Some(vec!["unused@plugin".to_string()]),
             ..Default::default()
         })
         .await?;

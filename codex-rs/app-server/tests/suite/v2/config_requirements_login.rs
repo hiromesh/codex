@@ -2,7 +2,6 @@
 
 use anyhow::Result;
 use app_test_support::TestAppServer;
-use codex_app_server_protocol::Account;
 use codex_app_server_protocol::GetAccountParams;
 use codex_app_server_protocol::GetAccountResponse;
 use codex_app_server_protocol::RequestId;
@@ -52,7 +51,7 @@ async fn config_requirements_read_preserves_unrestricted_default(config: &str) -
     Ok(())
 }
 
-#[test_case("allow_remote_control = false", "", &[ForcedLoginMethod::Api, ForcedLoginMethod::Chatgpt]; "unrestricted_with_other_requirements")]
+#[test_case("", "", &[ForcedLoginMethod::Api, ForcedLoginMethod::Chatgpt]; "unrestricted_without_requirements")]
 #[test_case("allowed_login_methods = ['api']", "", &[ForcedLoginMethod::Api]; "managed_api")]
 #[test_case("allowed_login_methods = ['chatgpt']", "", &[ForcedLoginMethod::Chatgpt]; "managed_chatgpt")]
 #[test_case("allowed_login_methods = ['chatgpt', 'api', 'api']", "", &[ForcedLoginMethod::Api, ForcedLoginMethod::Chatgpt]; "both_normalized")]
@@ -72,15 +71,6 @@ async fn config_requirements_read_exposes_effective_login_methods(
     let (_home, mut server) = start_server(config, Some(requirements)).await?;
     let wire = read_requirements(&mut server).await?;
     assert_eq!(wire["requirements"]["allowedLoginMethods"], json!(expected));
-    if !expected.contains(&ForcedLoginMethod::Chatgpt) {
-        let id = server.send_login_account_chatgpt_request().await?;
-        let error = timeout(
-            READ_TIMEOUT,
-            server.read_stream_until_error_message(RequestId::Integer(id)),
-        )
-        .await??;
-        assert!(error.error.message.contains("disabled"), "{error:?}");
-    }
     if !expected.contains(&ForcedLoginMethod::Api) {
         let id = server.send_login_account_api_key_request("sk-test").await?;
         let error = timeout(
@@ -103,13 +93,6 @@ async fn config_requirements_read_uses_running_auth_policy(refreshed: &str) -> R
         read_requirements(&mut server).await?["requirements"]["allowedLoginMethods"],
         json!(["api"])
     );
-    let id = server.send_login_account_chatgpt_request().await?;
-    let error = timeout(
-        READ_TIMEOUT,
-        server.read_stream_until_error_message(RequestId::Integer(id)),
-    )
-    .await??;
-    assert!(error.error.message.contains("disabled"), "{error:?}");
     Ok(())
 }
 
@@ -166,9 +149,7 @@ command = "print-token"
     assert_eq!(
         account,
         GetAccountResponse {
-            account: Some(Account::AmazonBedrock {
-                uses_codex_managed_credentials: false
-            }),
+            account: None,
             requires_openai_auth: false,
             workspace_routing: None,
         }

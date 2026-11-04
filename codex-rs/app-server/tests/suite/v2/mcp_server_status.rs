@@ -1,5 +1,3 @@
-use super::mcp_resource::ResourceTestEnvironment;
-use super::mcp_resource::start_resource_test_app_server;
 use std::borrow::Cow;
 use std::collections::BTreeMap;
 use std::collections::BTreeSet;
@@ -27,8 +25,6 @@ use codex_app_server_protocol::McpServerConnectionStatus;
 use codex_app_server_protocol::McpServerOauthLoginCompletedNotification;
 use codex_app_server_protocol::McpServerOauthLoginResponse;
 use codex_app_server_protocol::McpServerStatusDetail;
-use codex_app_server_protocol::PluginInstallParams;
-use codex_app_server_protocol::PluginInstallResponse;
 use codex_app_server_protocol::RequestId;
 use codex_app_server_protocol::ThreadStartParams;
 use codex_app_server_protocol::ThreadStartResponse;
@@ -38,7 +34,6 @@ use codex_protocol::config_types::TrustLevel;
 use codex_rmcp_client::McpOAuthCallbackMode;
 use codex_rmcp_client::resolve_mcp_oauth_callback_url;
 use codex_utils_absolute_path::AbsolutePathBuf;
-use core_test_support::apps_test_server::AppsTestServer;
 use core_test_support::skip_if_remote;
 use core_test_support::stdio_server_bin;
 use pretty_assertions::assert_eq;
@@ -70,7 +65,6 @@ use wiremock::Match;
 use wiremock::Mock;
 use wiremock::MockServer;
 use wiremock::ResponseTemplate;
-use wiremock::matchers::body_partial_json;
 use wiremock::matchers::header;
 use wiremock::matchers::method;
 use wiremock::matchers::path;
@@ -171,58 +165,6 @@ async fn mcp_server_status_list_reuses_thread_connection() -> Result<()> {
         .filter(|method| matches!(method.as_str(), "initialize" | "tools/list"))
         .collect();
     assert_eq!(discovery_methods, ["initialize", "tools/list"]);
-    Ok(())
-}
-
-#[test_case(false; "standalone")]
-#[test_case(true; "thread runtime")]
-#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn full_mcp_server_status_skips_codex_apps_resource_templates(
-    thread_runtime: bool,
-) -> Result<()> {
-    let server = MockServer::start().await;
-    let apps = AppsTestServer::mount(&server).await?;
-    let (_home, mut app_server) = start_resource_test_app_server(
-        &apps.chatgpt_base_url,
-        &server.uri(),
-        ResourceTestEnvironment::Auto,
-    )
-    .await?;
-    let thread_id = if thread_runtime {
-        Some(
-            app_server
-                .start_thread(ThreadStartParams::default())
-                .await?
-                .thread
-                .id,
-        )
-    } else {
-        None
-    };
-    let response: ListMcpServerStatusResponse = app_server
-        .request(|request_id| ClientRequest::McpServerStatusList {
-            request_id,
-            params: ListMcpServerStatusParams {
-                cursor: None,
-                limit: None,
-                detail: Some(McpServerStatusDetail::Full),
-                thread_id,
-                server_name: Some("codex_apps".to_string()),
-            },
-        })
-        .await?;
-    let [status] = response.data.as_slice() else {
-        anyhow::bail!("expected the selected Apps server in the full inventory");
-    };
-    assert_eq!(status.name, "codex_apps");
-    assert!(status.resource_templates.is_empty());
-    let requests = server.received_requests().await.expect("recorded requests");
-    let was_requested = |method: &str| {
-        let matcher = body_partial_json(json!({ "method": method }));
-        requests.iter().any(|request| matcher.matches(request))
-    };
-    assert!(was_requested("resources/list"));
-    assert!(!was_requested("resources/templates/list"));
     Ok(())
 }
 
@@ -742,147 +684,6 @@ async fn oauth_login_automatically_selects_callback_specific_cimd_without_metada
 
     oauth_server_handle.abort();
     let _ = oauth_server_handle.await;
-    Ok(())
-}
-
-#[test_case(false; "configured server")]
-#[test_case(true; "plugin server")]
-#[tokio::test]
-async fn mcp_server_status_list_returns_raw_server_and_tool_names(plugin: bool) -> Result<()> {
-    let server = create_mock_responses_server_sequence_unchecked(Vec::new()).await;
-    let (mcp_server_url, mcp_server_handle) =
-        start_mcp_server("look-up.raw", /*tools_error*/ None).await?;
-    let codex_home = TempDir::new()?;
-    let endpoint = format!("{mcp_server_url}/mcp?secret=not-for-clients");
-    let http_config = if plugin {
-        "[features]\nplugins = true\n".to_string()
-    } else {
-        format!("[mcp_servers.some-server]\nurl = {endpoint:?}\n")
-    };
-    mock_responses_config(&server.uri())
-        .with_extra_config(&format!(
-            "{http_config}[mcp_servers.broken-server]\ncommand = {}",
-            toml::Value::String(
-                codex_home
-                    .path()
-                    .join("missing-mcp-server")
-                    .display()
-                    .to_string()
-            )
-        ))
-        .write(codex_home.path())?;
-
-    let mut mcp = TestAppServer::builder()
-        .with_codex_home(codex_home.path())
-        .without_auto_env()
-        .build_initialized()
-        .await?;
-    let plugin_root = TempDir::new()?;
-    if plugin {
-        std::fs::create_dir_all(plugin_root.path().join(".git"))?;
-        std::fs::create_dir_all(plugin_root.path().join(".agents/plugins"))?;
-        std::fs::create_dir_all(plugin_root.path().join("sample/.codex-plugin"))?;
-        std::fs::write(
-            plugin_root.path().join("sample/.codex-plugin/plugin.json"),
-            serde_json::to_vec(&json!({"name": "sample"}))?,
-        )?;
-        std::fs::write(
-            plugin_root.path().join("sample/.mcp.json"),
-            serde_json::to_vec(
-                &json!({"mcpServers": {"some-server": {"type": "http", "url": endpoint}}}),
-            )?,
-        )?;
-        let marketplace_path = plugin_root.path().join(".agents/plugins/marketplace.json");
-        std::fs::write(
-            &marketplace_path,
-            serde_json::to_vec(&json!({
-                "name": "debug", "plugins": [{"name": "sample", "source": {"source": "local", "path": "./sample"}}]
-            }))?,
-        )?;
-        let request_id = mcp
-            .send_plugin_install_request(PluginInstallParams {
-                marketplace_path: Some(AbsolutePathBuf::try_from(marketplace_path)?),
-                remote_marketplace_name: None,
-                install_attempt_id: None,
-                plugin_name: "sample".to_string(),
-            })
-            .await?;
-        let _: PluginInstallResponse =
-            timeout(DEFAULT_READ_TIMEOUT, mcp.read_response(request_id)).await??;
-    }
-    let response: ListMcpServerStatusResponse = mcp
-        .request(|request_id| ClientRequest::McpServerStatusList {
-            request_id,
-            params: ListMcpServerStatusParams {
-                server_name: None,
-                cursor: None,
-                limit: None,
-                detail: None,
-                thread_id: None,
-            },
-        })
-        .await?;
-
-    assert_eq!(response.next_cursor, None);
-    assert_eq!(response.data.len(), 2);
-    let failed = response
-        .data
-        .iter()
-        .find(|status| status.name == "broken-server")
-        .expect("broken server status");
-    assert!(failed.tools.is_empty());
-    assert_eq!(failed.server_capabilities, None);
-    assert_eq!(failed.http_origin, None);
-    assert!(
-        failed
-            .tools_error
-            .as_deref()
-            .is_some_and(|error| error.contains("MCP startup failed"))
-    );
-    let status = response
-        .data
-        .iter()
-        .find(|status| status.name == "some-server")
-        .expect("configured server status");
-    assert_eq!(
-        status
-            .server_capabilities
-            .as_ref()
-            .and_then(|caps| caps.get("extensions")),
-        Some(&json!({
-            "openai/settings": { "readTool": "settings.read", "updateTool": "settings.update" }
-        }))
-    );
-    assert_eq!(status.tools_error, None);
-    assert_eq!(status.name, "some-server");
-    assert_eq!(status.runtime_status, None);
-    assert_eq!(
-        status.plugin_id.as_deref(),
-        plugin.then_some("sample@debug")
-    );
-    assert_eq!(status.http_origin.as_deref(), Some(mcp_server_url.as_str()));
-    assert_eq!(
-        status.tools.keys().cloned().collect::<BTreeSet<_>>(),
-        BTreeSet::from(["look-up.raw".to_string()])
-    );
-    assert_eq!(
-        status
-            .tools
-            .get("look-up.raw")
-            .map(|tool| tool.name.as_str()),
-        Some("look-up.raw")
-    );
-    assert_eq!(
-        status
-            .server_info
-            .as_ref()
-            .and_then(|info| info.title.as_deref()),
-        Some("Lookup Server")
-    );
-
-    mcp_server_handle.abort();
-    let _ = mcp_server_handle.await;
-
     Ok(())
 }
 

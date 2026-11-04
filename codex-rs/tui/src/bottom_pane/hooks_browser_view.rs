@@ -711,14 +711,7 @@ fn hook_source_summary(hook: &HookMetadata) -> String {
     if let Some(id) = &hook.environment_id {
         return format!("Environment - {id}");
     }
-    match hook.source {
-        HookSource::Plugin => hook
-            .plugin_id
-            .as_deref()
-            .map(|plugin_id| format!("Plugin - {plugin_id}"))
-            .unwrap_or_else(|| "Plugin".to_string()),
-        _ => config_source_label(hook.source).to_string(),
-    }
+    config_source_label(hook.source).to_string()
 }
 
 fn detail_source_value(hook: &HookMetadata) -> String {
@@ -726,7 +719,6 @@ fn detail_source_value(hook: &HookMetadata) -> String {
         return hook_source_summary(hook);
     }
     match hook.source {
-        HookSource::Plugin => hook_source_summary(hook),
         HookSource::System
         | HookSource::Mdm
         | HookSource::CloudRequirements
@@ -748,7 +740,6 @@ fn config_source_label(source: HookSource) -> &'static str {
         HookSource::Project => "Project config",
         HookSource::Mdm => "Admin config",
         HookSource::SessionFlags => "Session flags",
-        HookSource::Plugin => unreachable!("plugin hooks are handled by summary_source"),
         HookSource::CloudRequirements => "Admin config",
         HookSource::CloudManagedConfig => "Cloud-managed config",
         HookSource::LegacyManagedConfigFile => "Admin config",
@@ -823,7 +814,6 @@ mod tests {
         key: &str,
         event_name: HookEventName,
         source: HookSource,
-        plugin_id: Option<&str>,
         command: &str,
         enabled: bool,
         is_managed: bool,
@@ -844,7 +834,6 @@ mod tests {
             additional_context_limit: None,
             source_path: test_path_buf("/tmp/hooks.json").abs(),
             source,
-            plugin_id: plugin_id.map(str::to_string),
             environment_id: None,
             display_order,
             enabled,
@@ -862,10 +851,9 @@ mod tests {
         HooksBrowserView::new(
             vec![
                 hook(
-                    "plugin:superpowers",
+                    "user:superpowers",
                     HookEventName::PreToolUse,
-                    HookSource::Plugin,
-                    Some("superpowers@openai-curated"),
+                    HookSource::User,
                     "${CODEX_PLUGIN_ROOT}/hooks/pre-tool-use-check.sh",
                     /*enabled*/ true,
                     /*is_managed*/ false,
@@ -875,7 +863,6 @@ mod tests {
                     "path:user-config",
                     HookEventName::PreToolUse,
                     HookSource::User,
-                    /*plugin_id*/ None,
                     "~/bin/check-shell-with-a-command-that-is-way-too-long-for-the-summary-column.sh",
                     /*enabled*/ false,
                     /*is_managed*/ false,
@@ -885,7 +872,6 @@ mod tests {
                     "path:managed",
                     HookEventName::PermissionRequest,
                     HookSource::System,
-                    /*plugin_id*/ None,
                     "/enterprise/hooks/permission-check.sh",
                     /*enabled*/ true,
                     /*is_managed*/ true,
@@ -968,7 +954,6 @@ mod tests {
             "path:untrusted",
             HookEventName::PreToolUse,
             HookSource::User,
-            /*plugin_id*/ None,
             "/tmp/pre-tool-use-check.sh",
             /*enabled*/ false,
             /*is_managed*/ false,
@@ -1068,10 +1053,9 @@ mod tests {
     fn renders_mcp_tool_handler_with_server_and_tool_details() {
         let (tx_raw, _rx) = unbounded_channel::<AppEvent>();
         let mut configured_hook = hook(
-            "plugin:security-scanner",
+            "user:security-scanner",
             HookEventName::PreToolUse,
-            HookSource::Plugin,
-            Some("security-tools@openai-curated"),
+            HookSource::User,
             "",
             /*enabled*/ true,
             /*is_managed*/ false,
@@ -1103,7 +1087,6 @@ mod tests {
             "path:context-limit",
             HookEventName::PreToolUse,
             HookSource::User,
-            /*plugin_id*/ None,
             "/tmp/pre-tool-use.sh",
             /*enabled*/ true,
             /*is_managed*/ false,
@@ -1132,7 +1115,6 @@ mod tests {
             "path:untrusted",
             HookEventName::PreToolUse,
             HookSource::User,
-            /*plugin_id*/ None,
             "~/bin/untrusted.sh",
             /*enabled*/ true,
             /*is_managed*/ false,
@@ -1164,7 +1146,6 @@ mod tests {
             "path:untrusted",
             HookEventName::PreToolUse,
             HookSource::User,
-            /*plugin_id*/ None,
             "~/bin/untrusted.sh",
             /*enabled*/ false,
             /*is_managed*/ false,
@@ -1177,7 +1158,6 @@ mod tests {
                     "path:trusted",
                     HookEventName::PreToolUse,
                     HookSource::User,
-                    /*plugin_id*/ None,
                     "~/bin/trusted.sh",
                     /*enabled*/ true,
                     /*is_managed*/ false,
@@ -1233,7 +1213,6 @@ mod tests {
                     "path:managed-1",
                     HookEventName::PreToolUse,
                     HookSource::System,
-                    /*plugin_id*/ None,
                     "/enterprise/hooks/pre-tool-use-1.sh",
                     /*enabled*/ true,
                     /*is_managed*/ true,
@@ -1243,7 +1222,6 @@ mod tests {
                     "path:managed-2",
                     HookEventName::PreToolUse,
                     HookSource::System,
-                    /*plugin_id*/ None,
                     "/enterprise/hooks/pre-tool-use-2.sh",
                     /*enabled*/ true,
                     /*is_managed*/ true,
@@ -1271,7 +1249,6 @@ mod tests {
                     &format!("path:hook-{idx}"),
                     HookEventName::PreToolUse,
                     HookSource::User,
-                    /*plugin_id*/ None,
                     &format!("/tmp/hook-{idx}.sh"),
                     /*enabled*/ true,
                     /*is_managed*/ false,
@@ -1307,7 +1284,6 @@ mod tests {
             "path:long-command",
             HookEventName::PreToolUse,
             HookSource::User,
-            /*plugin_id*/ None,
             "one two three four five six seven eight nine ten eleven twelve thirteen fourteen fifteen sixteen seventeen eighteen nineteen twenty",
             /*enabled*/ true,
             /*is_managed*/ false,
@@ -1354,7 +1330,6 @@ mod tests {
                 "path:managed",
                 HookEventName::PreToolUse,
                 HookSource::System,
-                /*plugin_id*/ None,
                 "/enterprise/hooks/pre-tool-use-check.sh",
                 /*enabled*/ true,
                 /*is_managed*/ true,
@@ -1382,7 +1357,6 @@ mod tests {
             "path:untrusted",
             HookEventName::PreToolUse,
             HookSource::User,
-            /*plugin_id*/ None,
             "/tmp/pre-tool-use-check.sh",
             /*enabled*/ true,
             /*is_managed*/ false,
@@ -1414,7 +1388,6 @@ mod tests {
             "path:untrusted",
             HookEventName::PermissionRequest,
             HookSource::User,
-            /*plugin_id*/ None,
             "/tmp/permission-request-check.sh",
             /*enabled*/ false,
             /*is_managed*/ false,
@@ -1441,7 +1414,6 @@ mod tests {
             "path:untrusted",
             HookEventName::PreToolUse,
             HookSource::User,
-            /*plugin_id*/ None,
             "/tmp/pre-tool-use-check.sh",
             /*enabled*/ false,
             /*is_managed*/ false,
@@ -1466,10 +1438,9 @@ mod tests {
         let (tx_raw, mut rx) = unbounded_channel::<AppEvent>();
         let mut view = HooksBrowserView::new(
             vec![hook(
-                "plugin:superpowers",
+                "user:superpowers",
                 HookEventName::PreToolUse,
-                HookSource::Plugin,
-                Some("superpowers@openai-curated"),
+                HookSource::User,
                 "hooks/pre-tool-use-check.sh",
                 /*enabled*/ true,
                 /*is_managed*/ false,
@@ -1506,7 +1477,6 @@ mod tests {
                 "path:managed",
                 HookEventName::PreToolUse,
                 HookSource::System,
-                /*plugin_id*/ None,
                 "/enterprise/hooks/pre-tool-use-check.sh",
                 /*enabled*/ true,
                 /*is_managed*/ true,
@@ -1529,7 +1499,6 @@ mod tests {
             "path:untrusted",
             HookEventName::PreToolUse,
             HookSource::User,
-            /*plugin_id*/ None,
             "/tmp/pre-tool-use-check.sh",
             /*enabled*/ false,
             /*is_managed*/ false,
@@ -1565,7 +1534,6 @@ mod tests {
             "path:modified",
             HookEventName::PreToolUse,
             HookSource::User,
-            /*plugin_id*/ None,
             "/tmp/pre-tool-use-check.sh",
             /*enabled*/ false,
             /*is_managed*/ false,
@@ -1604,7 +1572,6 @@ mod tests {
             "path:untrusted",
             HookEventName::PreToolUse,
             HookSource::User,
-            /*plugin_id*/ None,
             "/tmp/pre-tool-use-check.sh",
             /*enabled*/ false,
             /*is_managed*/ false,
@@ -1615,7 +1582,6 @@ mod tests {
             "path:modified",
             HookEventName::Stop,
             HookSource::User,
-            /*plugin_id*/ None,
             "/tmp/stop-check.sh",
             /*enabled*/ false,
             /*is_managed*/ false,
@@ -1630,7 +1596,6 @@ mod tests {
                     "path:trusted",
                     HookEventName::PreToolUse,
                     HookSource::User,
-                    /*plugin_id*/ None,
                     "/tmp/trusted.sh",
                     /*enabled*/ true,
                     /*is_managed*/ false,

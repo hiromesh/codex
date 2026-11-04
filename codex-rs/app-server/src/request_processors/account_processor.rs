@@ -1,22 +1,7 @@
 use super::bedrock_auth::clear_user_model_provider_if_bedrock;
 use super::*;
-use crate::auth_mode::auth_mode_to_api;
 use crate::model_catalog::ModelCatalog;
 use crate::outgoing_message::AccountNotification;
-use codex_mcp::ema_auth_scope;
-use codex_rmcp_client::EnterpriseOAuthCredentialGuard;
-
-mod enterprise_login;
-
-pub(super) use enterprise_login::EnterpriseLoginCompletion;
-pub(super) use enterprise_login::EnterpriseLoginTarget;
-
-
-enum RefreshTokenRequestOutcome {
-    NotAttemptedOrSucceeded,
-    FailedTransiently,
-    FailedPermanently,
-}
 
 #[derive(Clone)]
 pub(crate) struct AccountRequestProcessor {
@@ -26,7 +11,6 @@ pub(crate) struct AccountRequestProcessor {
     config: Arc<Config>,
     config_manager: ConfigManager,
     model_catalog: Arc<ModelCatalog>,
-    pub(super) enterprise_login: Arc<enterprise_login::EnterpriseLoginState>,
 }
 
 impl AccountRequestProcessor {
@@ -38,11 +22,6 @@ impl AccountRequestProcessor {
         config_manager: ConfigManager,
         model_catalog: Arc<ModelCatalog>,
     ) -> Arc<Self> {
-        let enterprise_login = Arc::new(enterprise_login::EnterpriseLoginState::new(
-            Arc::clone(&auth_manager),
-            Arc::clone(&thread_manager),
-            config_manager.clone(),
-        ));
         let processor = Arc::new(Self {
             auth_manager,
             thread_manager,
@@ -50,7 +29,6 @@ impl AccountRequestProcessor {
             config,
             config_manager,
             model_catalog,
-            enterprise_login,
         });
         processor
     }
@@ -70,19 +48,6 @@ impl AccountRequestProcessor {
         self.logout_v2(request_id).await.map(|()| None)
     }
 
-    pub(crate) async fn cancel_login_account(
-        &self,
-        _params: CancelLoginAccountParams,
-    ) -> Result<Option<ClientResponsePayload>, JSONRPCErrorError> {
-        // API-key login completes synchronously, so there is never an active login to cancel.
-        Ok(Some(
-            CancelLoginAccountResponse {
-                status: CancelLoginAccountStatus::NotFound,
-            }
-            .into(),
-        ))
-    }
-
     pub(crate) async fn get_auth_status(
         &self,
         params: GetAuthStatusParams,
@@ -94,10 +59,12 @@ impl AccountRequestProcessor {
 
     pub(crate) async fn get_account(
         &self,
-        params: GetAccountParams,
+        _params: GetAccountParams,
     ) -> Result<Option<ClientResponsePayload>, JSONRPCErrorError> {
-        self.refresh_token_if_requested(params.refresh_token)
-            .await;
+        Ok(Some(self.read_account().await?.into()))
+    }
+
+    async fn read_account(&self) -> Result<GetAccountResponse, JSONRPCErrorError> {
         let config = self.load_latest_config().await;
         let provider = create_model_provider(
             config.model_provider.clone(),
@@ -106,32 +73,18 @@ impl AccountRequestProcessor {
         let account_state = provider
             .account_state()
             .map_err(|error| internal_error(error.to_string()))?;
-        Ok(Some(
-            GetAccountResponse {
-                account: account_state.account.map(Account::from),
-                requires_openai_auth: account_state.requires_openai_auth,
-                workspace_routing: None,
-            }
-            .into(),
-        ))
-    }
-
-    pub(crate) async fn cancel_active_login(&self) {
-        self.enterprise_login.cancel(/*login_id*/ None).await;
-    }
-
-    pub(crate) fn clear_external_auth(&self) {
-        self.auth_manager.clear_external_auth();
+        Ok(GetAccountResponse {
+            account: account_state.account.map(|_| Account::ApiKey {}),
+            requires_openai_auth: account_state.requires_openai_auth,
+            workspace_routing: None,
+        })
     }
 
     fn current_account_updated_notification(&self) -> AccountUpdatedNotification {
         let auth = self.auth_manager.auth_cached();
         AccountUpdatedNotification {
-            auth_mode: auth
-                .as_ref()
-                .map(CodexAuth::api_auth_mode)
-                .map(auth_mode_to_api),
-            plan_type: auth.as_ref().and_then(CodexAuth::account_plan_type),
+            auth_mode: auth.as_ref().map(|_| AuthMode::ApiKey),
+            plan_type: None,
         }
     }
 
@@ -163,51 +116,24 @@ impl AccountRequestProcessor {
         request_id: ConnectionRequestId,
         params: LoginAccountParams,
     ) -> Result<(), JSONRPCErrorError> {
-        self.enterprise_login.cancel(/*login_id*/ None).await;
         match params {
             LoginAccountParams::ApiKey { api_key } => {
                 self.login_api_key_v2(request_id, LoginApiKeyParams { api_key })
-                    .await;
-            }
-            LoginAccountParams::Chatgpt { .. }
-            | LoginAccountParams::ChatgptDeviceCode
-            | LoginAccountParams::ChatgptAuthTokens { .. }
-            | LoginAccountParams::AmazonBedrock { .. }
-            | LoginAccountParams::AmazonBedrockAccessKeys { .. } => {
-                self.outgoing
-                    .send_result(
-                        request_id,
-                        Err::<LoginAccountResponse, _>(invalid_request(
-                            "Only API key login is supported.",
-                        )),
-                    )
                     .await;
             }
         }
         Ok(())
     }
 
-    fn external_auth_active_error(&self) -> JSONRPCErrorError {
-        invalid_request(
-            "External auth is active. Use account/login/start (chatgptAuthTokens) to update it or account/logout to clear it.",
-        )
-    }
-
     async fn login_api_key_common(
         &self,
         params: &LoginApiKeyParams,
     ) -> std::result::Result<(), JSONRPCErrorError> {
-        if self.auth_manager.is_external_chatgpt_auth_active() {
-            return Err(self.external_auth_active_error());
-        }
-
         if !self
             .auth_manager
             .is_login_method_allowed(ForcedLoginMethod::Api)
         {
-            return Err(invalid_request(
-                "API key login is disabled. Use ChatGPT login instead.",
-            ));
+            return Err(invalid_request("API key login is disabled."));
         }
 
         match login_with_api_key(
@@ -259,11 +185,9 @@ impl AccountRequestProcessor {
     ) {
         let auth_changes = self.auth_manager.auth_change_state_receiver();
         let owner_generation = auth_changes.borrow().owner_generation;
-        if payload.success
-            && let Err(error) = self.read_account(/*request*/ None).await
-        {
+        if payload.success && let Err(error) = self.read_account().await {
             payload.success = false;
-            payload.error = Some(error.to_string());
+            payload.error = Some(error.message);
         }
         if payload.success && auth_changes.borrow().owner_generation == owner_generation {
             Self::refresh_skills_and_mcp_for_current_config(
@@ -297,7 +221,6 @@ impl AccountRequestProcessor {
     }
 
     async fn logout_common(&self) -> std::result::Result<Option<AuthMode>, JSONRPCErrorError> {
-        self.cancel_active_login().await;
         let config =
             logout_configured_account(&self.config_manager, &self.auth_manager, &self.config)
                 .await?;
@@ -317,8 +240,7 @@ impl AccountRequestProcessor {
             .auth_manager
             .auth_cached()
             .as_ref()
-            .map(CodexAuth::api_auth_mode)
-            .map(auth_mode_to_api))
+            .map(|_| AuthMode::ApiKey))
     }
 
     async fn logout_v2(&self, request_id: ConnectionRequestId) -> Result<(), JSONRPCErrorError> {
@@ -344,29 +266,11 @@ impl AccountRequestProcessor {
         Ok(())
     }
 
-    async fn refresh_token_if_requested(&self, do_refresh: bool) -> RefreshTokenRequestOutcome {
-        if self.auth_manager.is_external_chatgpt_auth_active() {
-            return RefreshTokenRequestOutcome::NotAttemptedOrSucceeded;
-        }
-        if do_refresh && let Err(err) = self.auth_manager.refresh_token().await {
-            let failed_reason = err.failed_reason();
-            if failed_reason.is_none() {
-                tracing::warn!("failed to refresh token while getting account: {err}");
-                return RefreshTokenRequestOutcome::FailedTransiently;
-            }
-            return RefreshTokenRequestOutcome::FailedPermanently;
-        }
-        RefreshTokenRequestOutcome::NotAttemptedOrSucceeded
-    }
-
     async fn get_auth_status_response(
         &self,
         params: GetAuthStatusParams,
     ) -> Result<GetAuthStatusResponse, JSONRPCErrorError> {
         let include_token = params.include_token.unwrap_or(false);
-        let do_refresh = params.refresh_token.unwrap_or(false);
-
-        self.refresh_token_if_requested(do_refresh).await;
 
         // Determine whether auth is required based on the active model provider.
         // If a custom provider is configured with `requires_openai_auth == false`,
@@ -381,40 +285,24 @@ impl AccountRequestProcessor {
                 requires_openai_auth: Some(false),
             }
         } else {
-            let auth = if do_refresh {
-                self.auth_manager.auth_cached()
-            } else {
-                self.auth_manager.auth().await
-            };
-            match auth {
+            match self.auth_manager.auth().await {
                 Some(auth) => {
-                    let permanent_refresh_failure =
-                        self.auth_manager.refresh_failure_for_auth(&auth).is_some();
-                    let auth_mode = auth_mode_to_api(auth.api_auth_mode());
-                    let (reported_auth_method, token_opt) =
-                        if matches!(
-                            auth,
-                            CodexAuth::Headers(_) | CodexAuth::PersonalAccessToken(_)
-                        ) || include_token && permanent_refresh_failure
-                        {
-                            // Host-owned and metadata-bearing credentials are never exported.
-                            (Some(auth_mode), None)
-                        } else {
-                            match auth.get_token() {
-                                Ok(token) if !token.is_empty() => {
-                                    let tok = if include_token { Some(token) } else { None };
-                                    (Some(auth_mode), tok)
-                                }
-                                Ok(_) => (None, None),
-                                Err(err) => {
-                                    tracing::warn!("failed to get token for auth status: {err}");
-                                    (None, None)
-                                }
+                    let auth_mode = AuthMode::ApiKey;
+                    let token = if include_token {
+                        match auth.get_token() {
+                            Ok(token) if !token.is_empty() => Some(token),
+                            Ok(_) => None,
+                            Err(err) => {
+                                tracing::warn!("failed to get token for auth status: {err}");
+                                None
                             }
-                        };
+                        }
+                    } else {
+                        None
+                    };
                     GetAuthStatusResponse {
-                        auth_method: reported_auth_method,
-                        auth_token: token_opt,
+                        auth_method: Some(auth_mode),
+                        auth_token: token,
                         requires_openai_auth: Some(true),
                     }
                 }
@@ -444,42 +332,7 @@ pub(crate) async fn logout_configured_account(
     let config = config_manager
         .load_latest_config(/*fallback_cwd*/ None)
         .await;
-    let scope = ema_auth_scope(auth_manager.auth_cached().as_ref());
-    let enterprise_policy_failed = scope.is_some() && config.is_err();
-    // Startup policy may belong to another workspace. Never use that fallback
-    // to select a credential; a policy failure must not block primary logout.
-    let enterprise_grant = config.as_ref().ok().and_then(|config| {
-        scope
-            .as_ref()
-            .zip(config.mcp_enterprise_managed_auth.as_ref())
-            .map(|(scope, profile)| {
-                (
-                    profile.idp.credential_name(scope),
-                    profile.idp.issuer.clone(),
-                    config.auth_keyring_backend_kind(),
-                )
-            })
-    });
     let config = config.unwrap_or_else(|_| fallback_config.clone());
-
-    // Retain the credential lock through primary logout. Otherwise a second
-    // process can commit after deletion but before the account is removed.
-    let enterprise_guard =
-        if let Some((credential_name, issuer, keyring_backend)) = enterprise_grant {
-            EnterpriseOAuthCredentialGuard::acquire(&credential_name, &issuer, keyring_backend)
-                .await
-                .map(Some)
-        } else {
-            Ok(None)
-        };
-    let cleanup_failed = match &enterprise_guard {
-        Ok(Some(guard)) => guard.delete_tokens().is_err(),
-        Ok(None) => false,
-        Err(_) => true,
-    };
-    if enterprise_policy_failed || cleanup_failed {
-        tracing::warn!("Failed to remove enterprise authorization; continuing account logout");
-    }
 
     match auth_manager.logout().await {
         Ok(_) => {}
@@ -487,7 +340,6 @@ pub(crate) async fn logout_configured_account(
             return Err(internal_error(format!("logout failed: {err}")));
         }
     }
-    drop(enterprise_guard);
     Ok(config)
 }
 

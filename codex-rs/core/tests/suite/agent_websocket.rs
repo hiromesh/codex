@@ -74,7 +74,7 @@ async fn spawned_agent_prewarm_handshake_inherits_effective_root_service_tier(
     };
     let test = test_codex()
         .with_model("gpt-5.4")
-        .with_auth(CodexAuth::create_dummy_chatgpt_auth_for_testing())
+        .with_auth(CodexAuth::from_api_key("test-api-key"))
         .with_model_info_override("gpt-5.4", move |model| {
             model.service_tiers.push(ModelServiceTier {
                 id: tier.to_string(),
@@ -134,15 +134,8 @@ async fn spawned_agent_prewarm_handshake_inherits_effective_root_service_tier(
         "child startup should connect before its first turn"
     );
     let handshakes = server.handshakes();
-    let expected_hint = if tier_enabled {
-        format!("model=gpt-5.4;tier={tier}")
-    } else {
-        "model=gpt-5.4".to_string()
-    };
-    assert_eq!(
-        handshakes[1].header(X_CODEX_ROUTING_HINT_HEADER),
-        Some(expected_hint)
-    );
+    // Routing hints are gone: the handshake carries no advisory model/tier header.
+    assert_eq!(handshakes[1].header(X_CODEX_ROUTING_HINT_HEADER), None);
     let child_warmup = tokio::time::timeout(
         Duration::from_secs(5),
         server.wait_for_request(/*connection_index*/ 1, /*request_index*/ 0),
@@ -590,7 +583,7 @@ async fn websocket_v2_first_turn_sends_full_create_when_tier_changes_after_start
                 })
                 .collect();
         })
-        .with_auth(CodexAuth::create_dummy_chatgpt_auth_for_testing())
+        .with_auth(CodexAuth::from_api_key("test-api-key"))
         .with_config(move |config| {
             for feature in [Feature::ResponsesWebsocketsV2, Feature::FastMode] {
                 config
@@ -614,14 +607,12 @@ async fn websocket_v2_first_turn_sends_full_create_when_tier_changes_after_start
         .await?;
 
     assert_eq!(server.handshakes().len(), 1);
+    // Routing hints are gone: the handshake carries no advisory model/tier header.
     assert_eq!(
         server
             .single_handshake()
             .header(X_CODEX_ROUTING_HINT_HEADER),
-        Some(match startup_tier {
-            Some(tier) => format!("model={model};tier={tier}"),
-            None => format!("model={model}"),
-        })
+        None
     );
     let connection = server.single_connection();
     assert_eq!(connection.len(), 2);

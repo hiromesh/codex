@@ -112,8 +112,8 @@ fn build_session_telemetry(
     let auth = auth_manager.auth_cached();
     let auth = auth.as_ref();
     let auth_mode = auth.map(CodexAuth::auth_mode).map(TelemetryAuthMode::from);
-    let account_id = auth.and_then(CodexAuth::get_account_id);
-    let account_email = auth.and_then(CodexAuth::get_account_email);
+    let account_id: Option<String> = None;
+    let account_email: Option<String> = None;
     let auth_env_telemetry = collect_auth_env_telemetry(
         &config.model_provider,
         auth_manager.codex_api_key_env_enabled(),

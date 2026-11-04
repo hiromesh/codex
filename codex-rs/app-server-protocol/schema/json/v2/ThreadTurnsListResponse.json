@@ -1,10 +1,6 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "definitions": {
-    "AbsolutePathBuf": {
-      "description": "A path that is guaranteed to be absolute and normalized (though it is not guaranteed to be canonicalized or exist on the filesystem).\n\nIMPORTANT: When deserializing an `AbsolutePathBuf`, a base path must be set using [AbsolutePathBufGuard::new]. If no base path is set, the deserialization will fail unless the path being deserialized is already absolute.",
-      "type": "string"
-    },
     "AgentMessageDelivery": {
       "enum": [
         "async"
@@ -586,114 +582,8 @@
       ],
       "type": "string"
     },
-    "ImageGenerationFailure": {
-      "oneOf": [
-        {
-          "properties": {
-            "limitId": {
-              "type": "string"
-            },
-            "resetsAt": {
-              "format": "int64",
-              "type": [
-                "integer",
-                "null"
-              ]
-            },
-            "type": {
-              "enum": [
-                "usageLimitExceeded"
-              ],
-              "title": "UsageLimitExceededImageGenerationFailureType",
-              "type": "string"
-            }
-          },
-          "required": [
-            "limitId",
-            "type"
-          ],
-          "title": "UsageLimitExceededImageGenerationFailure",
-          "type": "object"
-        }
-      ]
-    },
-    "ImageGenerationInputImage": {
-      "description": "A local image file successfully read for this exact image-generation request.",
-      "properties": {
-        "path": {
-          "$ref": "#/definitions/AbsolutePathBuf"
-        },
-        "sha256": {
-          "description": "Lowercase SHA-256 of the file bytes read before image normalization.",
-          "type": "string"
-        }
-      },
-      "required": [
-        "path",
-        "sha256"
-      ],
-      "type": "object"
-    },
     "LegacyAppPathString": {
       "type": "string"
-    },
-    "McpAppDisplayMode": {
-      "enum": [
-        "inline",
-        "fullscreen"
-      ],
-      "type": "string"
-    },
-    "McpAppUi": {
-      "description": "UI resource and display preference for model invocations, captured from the tool descriptor.",
-      "properties": {
-        "preferredModelDisplayMode": {
-          "$ref": "#/definitions/McpAppDisplayMode"
-        },
-        "resourceUri": {
-          "type": "string"
-        }
-      },
-      "required": [
-        "preferredModelDisplayMode",
-        "resourceUri"
-      ],
-      "type": "object"
-    },
-    "McpToolCallAppContext": {
-      "properties": {
-        "actionName": {
-          "type": [
-            "string",
-            "null"
-          ]
-        },
-        "appName": {
-          "type": [
-            "string",
-            "null"
-          ]
-        },
-        "connectorId": {
-          "type": "string"
-        },
-        "linkId": {
-          "type": [
-            "string",
-            "null"
-          ]
-        },
-        "resourceUri": {
-          "type": [
-            "string",
-            "null"
-          ]
-        }
-      },
-      "required": [
-        "connectorId"
-      ],
-      "type": "object"
     },
     "McpToolCallError": {
       "properties": {
@@ -1231,24 +1121,8 @@
             "id": {
               "type": "string"
             },
-            "pluginId": {
-              "default": null,
-              "description": "Trusted first-party plugin id when this command resolves to one plugin script.",
-              "type": [
-                "string",
-                "null"
-              ]
-            },
             "processId": {
               "description": "Identifier for the underlying PTY process (when available).",
-              "type": [
-                "string",
-                "null"
-              ]
-            },
-            "scriptPath": {
-              "default": null,
-              "description": "Safe plugin-relative path when this command resolves to one plugin script.",
               "type": [
                 "string",
                 "null"
@@ -1317,16 +1191,6 @@
         },
         {
           "properties": {
-            "appContext": {
-              "anyOf": [
-                {
-                  "$ref": "#/definitions/McpToolCallAppContext"
-                },
-                {
-                  "type": "null"
-                }
-              ]
-            },
             "arguments": true,
             "durationMs": {
               "description": "The duration of the MCP tool call in milliseconds.",
@@ -1348,30 +1212,6 @@
             },
             "id": {
               "type": "string"
-            },
-            "mcpAppResourceUri": {
-              "description": "Legacy compatibility field; prefer `mcpAppUi.resourceUri` when available.",
-              "type": [
-                "string",
-                "null"
-              ]
-            },
-            "mcpAppUi": {
-              "anyOf": [
-                {
-                  "$ref": "#/definitions/McpAppUi"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "description": "Presentation captured from the invoked descriptor; absent in older history."
-            },
-            "pluginId": {
-              "type": [
-                "string",
-                "null"
-              ]
             },
             "readOnlyHint": {
               "type": [
@@ -1703,106 +1543,6 @@
             "type"
           ],
           "title": "SleepThreadItem",
-          "type": "object"
-        },
-        {
-          "anyOf": [
-            {
-              "properties": {
-                "fileId": {
-                  "type": "string"
-                }
-              },
-              "required": [
-                "fileId"
-              ],
-              "title": "FileIdThreadItem",
-              "type": "object"
-            },
-            {
-              "properties": {
-                "result": {
-                  "type": "string"
-                }
-              },
-              "required": [
-                "result"
-              ],
-              "title": "ResultThreadItem",
-              "type": "object"
-            }
-          ],
-          "description": "Either inline generated-image data or its durable attachment-store identity.\n\n`File` must remain first so rollouts written during the migration, which contain both an empty `result` and a `fileId`, retain the file reference when deserialized.",
-          "properties": {
-            "failure": {
-              "anyOf": [
-                {
-                  "$ref": "#/definitions/ImageGenerationFailure"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "default": null
-            },
-            "generationId": {
-              "default": null,
-              "description": "Image generation identifier for the generated image, when provided by the image backend.",
-              "type": [
-                "string",
-                "null"
-              ]
-            },
-            "id": {
-              "type": "string"
-            },
-            "inputImages": {
-              "description": "Observed local inputs for a completed generation, absent on older items.",
-              "items": {
-                "$ref": "#/definitions/ImageGenerationInputImage"
-              },
-              "type": "array"
-            },
-            "revisedPrompt": {
-              "type": [
-                "string",
-                "null"
-              ]
-            },
-            "savedPath": {
-              "anyOf": [
-                {
-                  "$ref": "#/definitions/AbsolutePathBuf"
-                },
-                {
-                  "type": "null"
-                }
-              ]
-            },
-            "status": {
-              "type": "string"
-            },
-            "transparentBackground": {
-              "default": null,
-              "type": [
-                "boolean",
-                "null"
-              ]
-            },
-            "type": {
-              "enum": [
-                "imageGeneration"
-              ],
-              "title": "ImageGenerationThreadItemType",
-              "type": "string"
-            }
-          },
-          "required": [
-            "id",
-            "status",
-            "type"
-          ],
-          "title": "ImageGenerationThreadItem",
           "type": "object"
         },
         {

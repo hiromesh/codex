@@ -180,290 +180,6 @@
     "AgentPath": {
       "type": "string"
     },
-    "AppBranding": {
-      "description": "EXPERIMENTAL - app metadata returned by app-list APIs.",
-      "properties": {
-        "category": {
-          "type": [
-            "string",
-            "null"
-          ]
-        },
-        "developer": {
-          "type": [
-            "string",
-            "null"
-          ]
-        },
-        "isDiscoverableApp": {
-          "type": "boolean"
-        },
-        "privacyPolicy": {
-          "type": [
-            "string",
-            "null"
-          ]
-        },
-        "termsOfService": {
-          "type": [
-            "string",
-            "null"
-          ]
-        },
-        "website": {
-          "type": [
-            "string",
-            "null"
-          ]
-        }
-      },
-      "required": [
-        "isDiscoverableApp"
-      ],
-      "type": "object"
-    },
-    "AppInfo": {
-      "description": "EXPERIMENTAL - app metadata returned by app-list APIs.",
-      "properties": {
-        "appMetadata": {
-          "anyOf": [
-            {
-              "$ref": "#/definitions/AppMetadata"
-            },
-            {
-              "type": "null"
-            }
-          ]
-        },
-        "branding": {
-          "anyOf": [
-            {
-              "$ref": "#/definitions/AppBranding"
-            },
-            {
-              "type": "null"
-            }
-          ]
-        },
-        "description": {
-          "type": [
-            "string",
-            "null"
-          ]
-        },
-        "distributionChannel": {
-          "type": [
-            "string",
-            "null"
-          ]
-        },
-        "iconAssets": {
-          "additionalProperties": {
-            "type": "string"
-          },
-          "type": [
-            "object",
-            "null"
-          ]
-        },
-        "iconDarkAssets": {
-          "additionalProperties": {
-            "type": "string"
-          },
-          "type": [
-            "object",
-            "null"
-          ]
-        },
-        "id": {
-          "type": "string"
-        },
-        "installUrl": {
-          "type": [
-            "string",
-            "null"
-          ]
-        },
-        "isAccessible": {
-          "default": false,
-          "type": "boolean"
-        },
-        "isEnabled": {
-          "default": true,
-          "description": "Whether this app is enabled in config.toml. Example: ```toml [apps.bad_app] enabled = false ```",
-          "type": "boolean"
-        },
-        "labels": {
-          "additionalProperties": {
-            "type": "string"
-          },
-          "type": [
-            "object",
-            "null"
-          ]
-        },
-        "logoUrl": {
-          "type": [
-            "string",
-            "null"
-          ]
-        },
-        "logoUrlDark": {
-          "type": [
-            "string",
-            "null"
-          ]
-        },
-        "name": {
-          "type": "string"
-        },
-        "pluginDisplayNames": {
-          "default": [],
-          "items": {
-            "type": "string"
-          },
-          "type": "array"
-        }
-      },
-      "required": [
-        "id",
-        "name"
-      ],
-      "type": "object"
-    },
-    "AppListUpdatedNotification": {
-      "description": "EXPERIMENTAL - notification emitted when the app list changes.",
-      "properties": {
-        "data": {
-          "items": {
-            "$ref": "#/definitions/AppInfo"
-          },
-          "type": "array"
-        }
-      },
-      "required": [
-        "data"
-      ],
-      "type": "object"
-    },
-    "AppMetadata": {
-      "properties": {
-        "categories": {
-          "items": {
-            "type": "string"
-          },
-          "type": [
-            "array",
-            "null"
-          ]
-        },
-        "developer": {
-          "type": [
-            "string",
-            "null"
-          ]
-        },
-        "firstPartyRequiresInstall": {
-          "type": [
-            "boolean",
-            "null"
-          ]
-        },
-        "review": {
-          "anyOf": [
-            {
-              "$ref": "#/definitions/AppReview"
-            },
-            {
-              "type": "null"
-            }
-          ]
-        },
-        "screenshots": {
-          "items": {
-            "$ref": "#/definitions/AppScreenshot"
-          },
-          "type": [
-            "array",
-            "null"
-          ]
-        },
-        "seoDescription": {
-          "type": [
-            "string",
-            "null"
-          ]
-        },
-        "showInComposerWhenUnlinked": {
-          "type": [
-            "boolean",
-            "null"
-          ]
-        },
-        "subCategories": {
-          "items": {
-            "type": "string"
-          },
-          "type": [
-            "array",
-            "null"
-          ]
-        },
-        "version": {
-          "type": [
-            "string",
-            "null"
-          ]
-        },
-        "versionId": {
-          "type": [
-            "string",
-            "null"
-          ]
-        },
-        "versionNotes": {
-          "type": [
-            "string",
-            "null"
-          ]
-        }
-      },
-      "type": "object"
-    },
-    "AppReview": {
-      "properties": {
-        "status": {
-          "type": "string"
-        }
-      },
-      "required": [
-        "status"
-      ],
-      "type": "object"
-    },
-    "AppScreenshot": {
-      "properties": {
-        "fileId": {
-          "type": [
-            "string",
-            "null"
-          ]
-        },
-        "url": {
-          "type": [
-            "string",
-            "null"
-          ]
-        },
-        "userPrompt": {
-          "type": "string"
-        }
-      },
-      "required": [
-        "userPrompt"
-      ],
-      "type": "object"
-    },
     "ApprovalsReviewer": {
       "description": "Configures who approval requests are routed to for review. Examples include sandbox escapes, blocked network access, MCP approval prompts, and ARC escalations. Defaults to `user`. `auto_review` uses a carefully prompted subagent to gather relevant context and apply a risk-based decision framework before approving or denying the request. The legacy value `guardian_subagent` is accepted for compatibility.",
       "enum": [
@@ -550,55 +266,6 @@
           "description": "OpenAI API key provided by the caller and stored by Codex.",
           "enum": [
             "apikey"
-          ],
-          "type": "string"
-        },
-        {
-          "description": "ChatGPT OAuth managed by Codex (tokens persisted and refreshed by Codex).",
-          "enum": [
-            "chatgpt"
-          ],
-          "type": "string"
-        },
-        {
-          "description": "[UNSTABLE] FOR OPENAI INTERNAL USE ONLY - DO NOT USE.\n\nChatGPT auth tokens are supplied by an external host app and are only stored in memory. Token refresh must be handled by the external host app.",
-          "enum": [
-            "chatgptAuthTokens"
-          ],
-          "type": "string"
-        },
-        {
-          "description": "Backend auth supplied as request headers.",
-          "enum": [
-            "headers"
-          ],
-          "type": "string"
-        },
-        {
-          "description": "Programmatic Codex auth backed by a registered Agent Identity.",
-          "enum": [
-            "agentIdentity"
-          ],
-          "type": "string"
-        },
-        {
-          "description": "Programmatic Codex auth backed by a personal access token.",
-          "enum": [
-            "personalAccessToken"
-          ],
-          "type": "string"
-        },
-        {
-          "description": "Amazon Bedrock bearer token managed by Codex.",
-          "enum": [
-            "bedrockApiKey"
-          ],
-          "type": "string"
-        },
-        {
-          "description": "Amazon Bedrock AWS access keys managed by Codex.",
-          "enum": [
-            "bedrockAccessKeys"
           ],
           "type": "string"
         }
@@ -1262,162 +929,6 @@
       ],
       "type": "object"
     },
-    "ExternalAgentConfigImportCompletedNotification": {
-      "properties": {
-        "importId": {
-          "type": "string"
-        },
-        "itemTypeResults": {
-          "items": {
-            "$ref": "#/definitions/ExternalAgentConfigImportTypeResult"
-          },
-          "type": "array"
-        }
-      },
-      "required": [
-        "importId",
-        "itemTypeResults"
-      ],
-      "type": "object"
-    },
-    "ExternalAgentConfigImportItemTypeFailure": {
-      "properties": {
-        "cwd": {
-          "type": [
-            "string",
-            "null"
-          ]
-        },
-        "errorType": {
-          "type": [
-            "string",
-            "null"
-          ]
-        },
-        "failureStage": {
-          "type": "string"
-        },
-        "itemType": {
-          "$ref": "#/definitions/ExternalAgentConfigMigrationItemType"
-        },
-        "message": {
-          "type": "string"
-        },
-        "source": {
-          "type": [
-            "string",
-            "null"
-          ]
-        },
-        "subErrorType": {
-          "type": [
-            "string",
-            "null"
-          ]
-        }
-      },
-      "required": [
-        "failureStage",
-        "itemType",
-        "message"
-      ],
-      "type": "object"
-    },
-    "ExternalAgentConfigImportItemTypeSuccess": {
-      "properties": {
-        "cwd": {
-          "type": [
-            "string",
-            "null"
-          ]
-        },
-        "itemType": {
-          "$ref": "#/definitions/ExternalAgentConfigMigrationItemType"
-        },
-        "source": {
-          "type": [
-            "string",
-            "null"
-          ]
-        },
-        "target": {
-          "type": [
-            "string",
-            "null"
-          ]
-        },
-        "title": {
-          "default": null,
-          "description": "Original title for an imported session; null for other item types.",
-          "type": [
-            "string",
-            "null"
-          ]
-        }
-      },
-      "required": [
-        "itemType"
-      ],
-      "type": "object"
-    },
-    "ExternalAgentConfigImportProgressNotification": {
-      "properties": {
-        "importId": {
-          "type": "string"
-        },
-        "itemTypeResults": {
-          "items": {
-            "$ref": "#/definitions/ExternalAgentConfigImportTypeResult"
-          },
-          "type": "array"
-        }
-      },
-      "required": [
-        "importId",
-        "itemTypeResults"
-      ],
-      "type": "object"
-    },
-    "ExternalAgentConfigImportTypeResult": {
-      "properties": {
-        "failures": {
-          "items": {
-            "$ref": "#/definitions/ExternalAgentConfigImportItemTypeFailure"
-          },
-          "type": "array"
-        },
-        "itemType": {
-          "$ref": "#/definitions/ExternalAgentConfigMigrationItemType"
-        },
-        "successes": {
-          "items": {
-            "$ref": "#/definitions/ExternalAgentConfigImportItemTypeSuccess"
-          },
-          "type": "array"
-        }
-      },
-      "required": [
-        "failures",
-        "itemType",
-        "successes"
-      ],
-      "type": "object"
-    },
-    "ExternalAgentConfigMigrationItemType": {
-      "enum": [
-        "AGENTS_MD",
-        "CONFIG",
-        "SKILLS",
-        "PLUGINS",
-        "MCP_SERVER_CONFIG",
-        "SUBAGENTS",
-        "HOOKS",
-        "COMMANDS",
-        "MEMORY",
-        "SESSIONS"
-      ],
-      "type": "string"
-    },
     "FileChangeOutputDeltaNotification": {
       "description": "Deprecated legacy notification for `apply_patch` textual output.\n\nThe server no longer emits this notification.",
       "properties": {
@@ -1903,43 +1414,6 @@
       ],
       "type": "object"
     },
-    "GatewayOAuthChangedNotification": {
-      "properties": {
-        "authUrl": {
-          "description": "Authorization handoff, sent only to the connection that started login.",
-          "type": [
-            "string",
-            "null"
-          ]
-        },
-        "error": {
-          "type": [
-            "string",
-            "null"
-          ]
-        },
-        "providerId": {
-          "type": "string"
-        },
-        "status": {
-          "$ref": "#/definitions/GatewayOAuthStatus"
-        }
-      },
-      "required": [
-        "providerId",
-        "status"
-      ],
-      "type": "object"
-    },
-    "GatewayOAuthStatus": {
-      "enum": [
-        "notReady",
-        "started",
-        "succeeded",
-        "failed"
-      ],
-      "type": "string"
-    },
     "GitInfo": {
       "properties": {
         "branch": {
@@ -2162,18 +1636,6 @@
         },
         {
           "properties": {
-            "connectorId": {
-              "type": [
-                "string",
-                "null"
-              ]
-            },
-            "connectorName": {
-              "type": [
-                "string",
-                "null"
-              ]
-            },
             "server": {
               "type": "string"
             },
@@ -2485,7 +1947,6 @@
         "project",
         "mdm",
         "sessionFlags",
-        "plugin",
         "cloudRequirements",
         "cloudManagedConfig",
         "legacyManagedConfigFile",
@@ -2523,54 +1984,6 @@
         "original"
       ],
       "type": "string"
-    },
-    "ImageGenerationFailure": {
-      "oneOf": [
-        {
-          "properties": {
-            "limitId": {
-              "type": "string"
-            },
-            "resetsAt": {
-              "format": "int64",
-              "type": [
-                "integer",
-                "null"
-              ]
-            },
-            "type": {
-              "enum": [
-                "usageLimitExceeded"
-              ],
-              "title": "UsageLimitExceededImageGenerationFailureType",
-              "type": "string"
-            }
-          },
-          "required": [
-            "limitId",
-            "type"
-          ],
-          "title": "UsageLimitExceededImageGenerationFailure",
-          "type": "object"
-        }
-      ]
-    },
-    "ImageGenerationInputImage": {
-      "description": "A local image file successfully read for this exact image-generation request.",
-      "properties": {
-        "path": {
-          "$ref": "#/definitions/AbsolutePathBuf"
-        },
-        "sha256": {
-          "description": "Lowercase SHA-256 of the file bytes read before image normalization.",
-          "type": "string"
-        }
-      },
-      "required": [
-        "path",
-        "sha256"
-      ],
-      "type": "object"
     },
     "ItemCompletedNotification": {
       "properties": {
@@ -2719,29 +2132,6 @@
     "LegacyAppPathString": {
       "type": "string"
     },
-    "McpAppDisplayMode": {
-      "enum": [
-        "inline",
-        "fullscreen"
-      ],
-      "type": "string"
-    },
-    "McpAppUi": {
-      "description": "UI resource and display preference for model invocations, captured from the tool descriptor.",
-      "properties": {
-        "preferredModelDisplayMode": {
-          "$ref": "#/definitions/McpAppDisplayMode"
-        },
-        "resourceUri": {
-          "type": "string"
-        }
-      },
-      "required": [
-        "preferredModelDisplayMode",
-        "resourceUri"
-      ],
-      "type": "object"
-    },
     "McpServerEventNotification": {
       "properties": {
         "method": {
@@ -2853,41 +2243,6 @@
       "required": [
         "name",
         "status"
-      ],
-      "type": "object"
-    },
-    "McpToolCallAppContext": {
-      "properties": {
-        "actionName": {
-          "type": [
-            "string",
-            "null"
-          ]
-        },
-        "appName": {
-          "type": [
-            "string",
-            "null"
-          ]
-        },
-        "connectorId": {
-          "type": "string"
-        },
-        "linkId": {
-          "type": [
-            "string",
-            "null"
-          ]
-        },
-        "resourceUri": {
-          "type": [
-            "string",
-            "null"
-          ]
-        }
-      },
-      "required": [
-        "connectorId"
       ],
       "type": "object"
     },
@@ -3703,41 +3058,6 @@
         "itemId",
         "threadId",
         "turnId"
-      ],
-      "type": "object"
-    },
-    "RemoteControlConnectionStatus": {
-      "enum": [
-        "disabled",
-        "connecting",
-        "connected",
-        "errored"
-      ],
-      "type": "string"
-    },
-    "RemoteControlStatusChangedNotification": {
-      "description": "Current remote-control connection status and remote identity exposed to clients.",
-      "properties": {
-        "environmentId": {
-          "type": [
-            "string",
-            "null"
-          ]
-        },
-        "installationId": {
-          "type": "string"
-        },
-        "serverName": {
-          "type": "string"
-        },
-        "status": {
-          "$ref": "#/definitions/RemoteControlConnectionStatus"
-        }
-      },
-      "required": [
-        "installationId",
-        "serverName",
-        "status"
       ],
       "type": "object"
     },
@@ -4872,24 +4192,8 @@
             "id": {
               "type": "string"
             },
-            "pluginId": {
-              "default": null,
-              "description": "Trusted first-party plugin id when this command resolves to one plugin script.",
-              "type": [
-                "string",
-                "null"
-              ]
-            },
             "processId": {
               "description": "Identifier for the underlying PTY process (when available).",
-              "type": [
-                "string",
-                "null"
-              ]
-            },
-            "scriptPath": {
-              "default": null,
-              "description": "Safe plugin-relative path when this command resolves to one plugin script.",
               "type": [
                 "string",
                 "null"
@@ -4958,16 +4262,6 @@
         },
         {
           "properties": {
-            "appContext": {
-              "anyOf": [
-                {
-                  "$ref": "#/definitions/McpToolCallAppContext"
-                },
-                {
-                  "type": "null"
-                }
-              ]
-            },
             "arguments": true,
             "durationMs": {
               "description": "The duration of the MCP tool call in milliseconds.",
@@ -4989,30 +4283,6 @@
             },
             "id": {
               "type": "string"
-            },
-            "mcpAppResourceUri": {
-              "description": "Legacy compatibility field; prefer `mcpAppUi.resourceUri` when available.",
-              "type": [
-                "string",
-                "null"
-              ]
-            },
-            "mcpAppUi": {
-              "anyOf": [
-                {
-                  "$ref": "#/definitions/McpAppUi"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "description": "Presentation captured from the invoked descriptor; absent in older history."
-            },
-            "pluginId": {
-              "type": [
-                "string",
-                "null"
-              ]
             },
             "readOnlyHint": {
               "type": [
@@ -5344,106 +4614,6 @@
             "type"
           ],
           "title": "SleepThreadItem",
-          "type": "object"
-        },
-        {
-          "anyOf": [
-            {
-              "properties": {
-                "fileId": {
-                  "type": "string"
-                }
-              },
-              "required": [
-                "fileId"
-              ],
-              "title": "FileIdThreadItem",
-              "type": "object"
-            },
-            {
-              "properties": {
-                "result": {
-                  "type": "string"
-                }
-              },
-              "required": [
-                "result"
-              ],
-              "title": "ResultThreadItem",
-              "type": "object"
-            }
-          ],
-          "description": "Either inline generated-image data or its durable attachment-store identity.\n\n`File` must remain first so rollouts written during the migration, which contain both an empty `result` and a `fileId`, retain the file reference when deserialized.",
-          "properties": {
-            "failure": {
-              "anyOf": [
-                {
-                  "$ref": "#/definitions/ImageGenerationFailure"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "default": null
-            },
-            "generationId": {
-              "default": null,
-              "description": "Image generation identifier for the generated image, when provided by the image backend.",
-              "type": [
-                "string",
-                "null"
-              ]
-            },
-            "id": {
-              "type": "string"
-            },
-            "inputImages": {
-              "description": "Observed local inputs for a completed generation, absent on older items.",
-              "items": {
-                "$ref": "#/definitions/ImageGenerationInputImage"
-              },
-              "type": "array"
-            },
-            "revisedPrompt": {
-              "type": [
-                "string",
-                "null"
-              ]
-            },
-            "savedPath": {
-              "anyOf": [
-                {
-                  "$ref": "#/definitions/AbsolutePathBuf"
-                },
-                {
-                  "type": "null"
-                }
-              ]
-            },
-            "status": {
-              "type": "string"
-            },
-            "transparentBackground": {
-              "default": null,
-              "type": [
-                "boolean",
-                "null"
-              ]
-            },
-            "type": {
-              "enum": [
-                "imageGeneration"
-              ],
-              "title": "ImageGenerationThreadItemType",
-              "type": "string"
-            }
-          },
-          "required": [
-            "id",
-            "status",
-            "type"
-          ],
-          "title": "ImageGenerationThreadItem",
           "type": "object"
         },
         {
@@ -5783,14 +4953,6 @@
         },
         "cwd": {
           "$ref": "#/definitions/AbsolutePathBuf"
-        },
-        "disabledPluginIds": {
-          "default": [],
-          "description": "Saved list of disabled plugin IDs. Does not yet filter plugin capabilities.",
-          "items": {
-            "type": "string"
-          },
-          "type": "array"
         },
         "effort": {
           "anyOf": [
@@ -7644,26 +6806,6 @@
       "properties": {
         "method": {
           "enum": [
-            "account/gatewayOAuth/changed"
-          ],
-          "title": "Account/gatewayOAuth/changedNotificationMethod",
-          "type": "string"
-        },
-        "params": {
-          "$ref": "#/definitions/GatewayOAuthChangedNotification"
-        }
-      },
-      "required": [
-        "method",
-        "params"
-      ],
-      "title": "Account/gatewayOAuth/changedNotification",
-      "type": "object"
-    },
-    {
-      "properties": {
-        "method": {
-          "enum": [
             "account/rateLimits/updated"
           ],
           "title": "Account/rateLimits/updatedNotificationMethod",
@@ -7678,86 +6820,6 @@
         "params"
       ],
       "title": "Account/rateLimits/updatedNotification",
-      "type": "object"
-    },
-    {
-      "properties": {
-        "method": {
-          "enum": [
-            "app/list/updated"
-          ],
-          "title": "App/list/updatedNotificationMethod",
-          "type": "string"
-        },
-        "params": {
-          "$ref": "#/definitions/AppListUpdatedNotification"
-        }
-      },
-      "required": [
-        "method",
-        "params"
-      ],
-      "title": "App/list/updatedNotification",
-      "type": "object"
-    },
-    {
-      "properties": {
-        "method": {
-          "enum": [
-            "remoteControl/status/changed"
-          ],
-          "title": "RemoteControl/status/changedNotificationMethod",
-          "type": "string"
-        },
-        "params": {
-          "$ref": "#/definitions/RemoteControlStatusChangedNotification"
-        }
-      },
-      "required": [
-        "method",
-        "params"
-      ],
-      "title": "RemoteControl/status/changedNotification",
-      "type": "object"
-    },
-    {
-      "properties": {
-        "method": {
-          "enum": [
-            "externalAgentConfig/import/progress"
-          ],
-          "title": "ExternalAgentConfig/import/progressNotificationMethod",
-          "type": "string"
-        },
-        "params": {
-          "$ref": "#/definitions/ExternalAgentConfigImportProgressNotification"
-        }
-      },
-      "required": [
-        "method",
-        "params"
-      ],
-      "title": "ExternalAgentConfig/import/progressNotification",
-      "type": "object"
-    },
-    {
-      "properties": {
-        "method": {
-          "enum": [
-            "externalAgentConfig/import/completed"
-          ],
-          "title": "ExternalAgentConfig/import/completedNotificationMethod",
-          "type": "string"
-        },
-        "params": {
-          "$ref": "#/definitions/ExternalAgentConfigImportCompletedNotification"
-        }
-      },
-      "required": [
-        "method",
-        "params"
-      ],
-      "title": "ExternalAgentConfig/import/completedNotification",
       "type": "object"
     },
     {

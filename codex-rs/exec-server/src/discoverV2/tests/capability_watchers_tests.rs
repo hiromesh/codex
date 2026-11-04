@@ -78,12 +78,7 @@ async fn watch_events_invalidate_discovery_and_no_subscription_disables_caching(
     .await
     .context("native watcher did not deliver its first content event")??;
 
-    // Neither the plugin cache nor the user skills directory existed at startup.
-    write(
-        &root,
-        "codex/plugins/cache/acme/gmail/1.0.0/.codex-plugin/plugin.json",
-        r#"{"name":"gmail"}"#,
-    )?;
+    // The user skills directory did not exist at startup.
     write(
         &root,
         "home/.agents/skills/added/SKILL.md",
@@ -104,12 +99,6 @@ async fn watch_events_invalidate_discovery_and_no_subscription_disables_caching(
                 .locations
                 .iter()
                 .any(|location| location.root == home_skills)
-                && snapshot.locations.locations.iter().any(|location| {
-                    location
-                        .plugin
-                        .as_ref()
-                        .is_some_and(|plugin| plugin.id == "gmail@acme")
-                })
             {
                 assert!(snapshot.sandbox_discoveries.lock().await.is_empty());
                 break anyhow::Ok(());
@@ -128,7 +117,6 @@ async fn watch_events_invalidate_discovery_and_no_subscription_disables_caching(
             .iter()
             .any(|skill| skill.path == added_skill)
     );
-    assert_eq!(refreshed.plugins.len(), 1);
     assert!(
         refreshed
             .skills
@@ -148,10 +136,11 @@ async fn watch_events_invalidate_discovery_and_no_subscription_disables_caching(
         .await
         .context("missing populated snapshot")?;
     assert_eq!(retained.sandbox_discoveries.lock().await.len(), 2);
+    // The system skills root did not exist when the retained snapshot was built.
     write(
         &root,
-        "codex/plugins/cache/acme/gmail/2.0.0/.codex-plugin/plugin.json",
-        r#"{"name":"gmail"}"#,
+        "etc/codex/skills/system/SKILL.md",
+        "---\nname: system\ndescription: system skill\n---\n",
     )?;
     write(
         &root,
@@ -163,26 +152,18 @@ async fn watch_events_invalidate_discovery_and_no_subscription_disables_caching(
         .location_snapshot()
         .await
         .context("missing refreshed snapshot")?;
-    assert_eq!(
-        next.locations
-            .locations
-            .iter()
-            .filter_map(|location| location.plugin.as_ref())
-            .find(|plugin| plugin.id == "gmail@acme")
-            .map(|plugin| plugin.version.as_str()),
-        Some("2.0.0")
-    );
+    let system_skills = PathUri::from_host_native_path(root.join("etc/codex/skills"))?;
+    assert!(next.locations.locations.iter().any(|location| {
+        location.root == system_skills && location.standalone_root_id.as_deref() == Some("system-skills")
+    }));
     assert!(next.sandbox_discoveries.lock().await.is_empty());
     assert_eq!(retained.sandbox_discoveries.lock().await.len(), 2);
-    assert_eq!(
-        retained
+    assert!(
+        !retained
             .locations
             .locations
             .iter()
-            .filter_map(|location| location.plugin.as_ref())
-            .find(|plugin| plugin.id == "gmail@acme")
-            .map(|plugin| plugin.version.as_str()),
-        Some("1.0.0")
+            .any(|location| location.root == system_skills)
     );
     let after = manager.get_or_refresh_discovery(params.clone()).await?;
     assert!(
@@ -190,6 +171,13 @@ async fn watch_events_invalidate_discovery_and_no_subscription_disables_caching(
             .skills
             .iter()
             .any(|skill| skill.path == demo_skill && skill.description == "refreshed")
+    );
+    let system_skill = system_skills.join("system/SKILL.md")?;
+    assert!(
+        after
+            .skills
+            .iter()
+            .any(|skill| skill.path == system_skill)
     );
     // Only the requested context is rebuilt; subsequent requests reuse it.
     assert_eq!(next.sandbox_discoveries.lock().await.len(), 1);
@@ -201,15 +189,15 @@ async fn watch_events_invalidate_discovery_and_no_subscription_disables_caching(
     #[cfg(unix)]
     {
         // A failed event refresh retains the response but retries without another event.
-        let cache = root.join("codex/plugins/cache");
-        let saved_cache = root.join("codex/plugins/saved-cache");
-        std::fs::rename(&cache, &saved_cache)?;
-        std::os::unix::fs::symlink(&cache, &cache)?;
+        let skills_root = root.join("codex/skills");
+        let saved_root = root.join("codex/saved-skills");
+        std::fs::rename(&skills_root, &saved_root)?;
+        std::os::unix::fs::symlink(&skills_root, &skills_root)?;
         manager.refresh_locations().await;
         let fallback = manager.get_or_refresh_discovery(params.clone()).await?;
         assert!(Arc::ptr_eq(&after, &fallback));
-        std::fs::remove_file(&cache)?;
-        std::fs::rename(&saved_cache, &cache)?;
+        std::fs::remove_file(&skills_root)?;
+        std::fs::rename(&saved_root, &skills_root)?;
         write(
             &root,
             "codex/skills/recovered/SKILL.md",
@@ -236,7 +224,7 @@ async fn watch_events_invalidate_discovery_and_no_subscription_disables_caching(
         .watchers
         .file_watcher = None;
     uncached.seed_prewarmed_locations(request.clone()).await?;
-    let before = uncached.get_or_refresh_discovery(params.clone()).await?;
+    uncached.get_or_refresh_discovery(params.clone()).await?;
     assert!(uncached.watchers.subscription.get().is_none());
     write(
         &root,
@@ -245,16 +233,15 @@ async fn watch_events_invalidate_discovery_and_no_subscription_disables_caching(
     )?;
     write(
         &root,
-        "codex/plugins/cache/acme/calendar/1.0.0/.codex-plugin/plugin.json",
-        r#"{"name":"calendar"}"#,
+        "codex/skills/uncached/SKILL.md",
+        "---\nname: uncached\ndescription: added without subscription\n---\n",
     )?;
     let after = uncached.get_or_refresh_discovery(params.clone()).await?;
-    assert_eq!(after.plugins.len(), before.plugins.len() + 1);
     assert!(
         after
-            .plugins
+            .skills
             .iter()
-            .any(|plugin| plugin.id == "calendar@acme")
+            .any(|skill| skill.name == "uncached")
     );
     assert!(
         after
@@ -291,7 +278,6 @@ async fn failed_watch_registration_reloads_locations_and_contents() -> anyhow::R
     manager.seed_prewarmed_locations(request.clone()).await?;
     let before = manager.get_or_refresh_discovery(params.clone()).await?;
     assert_eq!(before.skills.len(), 1);
-    assert!(before.plugins.is_empty());
     assert!(manager.watchers.subscription.get().is_some());
     let initial = manager
         .location_snapshot()
@@ -306,14 +292,23 @@ async fn failed_watch_registration_reloads_locations_and_contents() -> anyhow::R
     )?;
     write(
         &root,
-        "codex/plugins/cache/acme/calendar/1.0.0/.codex-plugin/plugin.json",
-        r#"{"name":"calendar"}"#,
+        "codex/skills/extra/SKILL.md",
+        "---\nname: extra\ndescription: added while watches are unavailable\n---\n",
     )?;
     let after = manager.get_or_refresh_discovery(params.clone()).await?;
-    assert_eq!(after.skills.len(), 1);
-    assert_eq!(after.skills[0].description, "edited");
-    assert_eq!(after.plugins.len(), 1);
-    assert_eq!(after.plugins[0].id, "calendar@acme");
+    assert_eq!(after.skills.len(), 2);
+    assert!(
+        after
+            .skills
+            .iter()
+            .any(|skill| skill.name == "extra")
+    );
+    assert!(
+        after
+            .skills
+            .iter()
+            .any(|skill| skill.name == "demo" && skill.description == "edited")
+    );
     let snapshot = manager
         .location_snapshot()
         .await

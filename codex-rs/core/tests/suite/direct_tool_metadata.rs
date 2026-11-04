@@ -6,11 +6,11 @@ use codex_core::StartThreadOptions;
 use codex_core::TurnInputRequest;
 use codex_core::TurnStartOptions;
 use codex_features::Feature;
-use codex_mcp::CODEX_APPS_MCP_SERVER_NAME;
+const CODEX_APPS_MCP_SERVER_NAME: &str = "codex_apps";
 use codex_model_provider::RemoteCompactionSupport;
 use core_test_support::apps_test_server::AppsTestServer;
-use core_test_support::apps_test_server::SEARCH_CALENDAR_LIST_TOOL;
-use core_test_support::apps_test_server::SEARCH_CALENDAR_NAMESPACE;
+use core_test_support::apps_test_server::CALENDAR_LIST_EVENTS_TOOL_NAME;
+use core_test_support::apps_test_server::CODEX_APPS_TOOL_NAMESPACE;
 use core_test_support::apps_test_server::recorded_apps_tool_calls;
 use core_test_support::apps_test_server::search_capable_apps_builder;
 use core_test_support::responses::ev_function_call_with_namespace;
@@ -693,8 +693,8 @@ async fn direct_metadata_limit_respects_provider_support(
             ev_response_created("resp-1"),
             ev_function_call_with_namespace(
                 "first",
-                SEARCH_CALENDAR_NAMESPACE,
-                SEARCH_CALENDAR_LIST_TOOL,
+                CODEX_APPS_TOOL_NAMESPACE,
+                CALENDAR_LIST_EVENTS_TOOL_NAME,
                 r#"{"query":"first"}"#,
             ),
             ev_completed("resp-1"),
@@ -703,8 +703,8 @@ async fn direct_metadata_limit_respects_provider_support(
             ev_response_created("resp-2"),
             ev_function_call_with_namespace(
                 "second",
-                SEARCH_CALENDAR_NAMESPACE,
-                SEARCH_CALENDAR_LIST_TOOL,
+                CODEX_APPS_TOOL_NAMESPACE,
+                CALENDAR_LIST_EVENTS_TOOL_NAME,
                 r#"{"query":"second"}"#,
             ),
             ev_completed("resp-2"),
@@ -717,8 +717,8 @@ async fn direct_metadata_limit_respects_provider_support(
                 ev_response_created(&format!("resp-{query}")),
                 ev_function_call_with_namespace(
                     query,
-                    SEARCH_CALENDAR_NAMESPACE,
-                    SEARCH_CALENDAR_LIST_TOOL,
+                    CODEX_APPS_TOOL_NAMESPACE,
+                    CALENDAR_LIST_EVENTS_TOOL_NAME,
                     &json!({"query": query}).to_string(),
                 ),
                 ev_completed(&format!("resp-{query}")),
@@ -748,7 +748,6 @@ async fn direct_metadata_limit_respects_provider_support(
         .with_config(configure_metadata.clone());
     // build() always selects the local test environment; all network destinations are the mock.
     let test = builder.build(&server).await?;
-    assert!(test.codex.analytics_enabled());
     wait_for_mcp_server(&test.codex, CODEX_APPS_MCP_SERVER_NAME).await?;
     test.submit_turn_with_approval_and_permission_profile(
         "Use [$calendar](app://calendar) to list events twice.",
@@ -795,7 +794,7 @@ async fn direct_metadata_limit_respects_provider_support(
         assert_eq!(recorded_metadata["tool_calls_complete"], true);
         assert_eq!(
             recorded_metadata["executed_tool_calls"][0]["name"],
-            format!("{SEARCH_CALENDAR_NAMESPACE}{SEARCH_CALENDAR_LIST_TOOL}")
+            format!("{CODEX_APPS_TOOL_NAMESPACE}__{CALENDAR_LIST_EVENTS_TOOL_NAME}")
         );
         assert_eq!(
             recorded_metadata["executed_tool_calls"][0]["arguments"],
@@ -967,7 +966,7 @@ async fn direct_metadata_limit_respects_provider_support(
         );
         assert_eq!(
             metadata["executed_tool_calls"][0]["name"],
-            format!("{SEARCH_CALENDAR_NAMESPACE}{SEARCH_CALENDAR_LIST_TOOL}")
+            format!("{CODEX_APPS_TOOL_NAMESPACE}__{CALENDAR_LIST_EVENTS_TOOL_NAME}")
         );
         assert_eq!(
             metadata["executed_tool_calls"][0]["arguments"],

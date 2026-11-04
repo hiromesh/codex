@@ -104,8 +104,6 @@ pub enum McpAttributionErrorReason {
 pub struct McpAttributionSource {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub connector_id: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub plugin_id: Option<String>,
     pub server_name: String,
     pub tool_name: String,
     pub first_turn_id: String,

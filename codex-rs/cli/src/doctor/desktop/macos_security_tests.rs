@@ -23,7 +23,6 @@ fn only_matching_enforced_apple_security_events_are_failures() {
             Evidence::Malware,
         ),
         ("XP_MALWARE_REMEDIATED ChatGPT.app", Evidence::Malware),
-        ("denied .plugin-appserver", Evidence::Blocked),
         ("audit would block ChatGPT.app", Evidence::Audit),
         ("OSStatus 100024 ChatGPT.app", Evidence::Exhausted),
         ("not blocked ChatGPT.app", Evidence::Clear),

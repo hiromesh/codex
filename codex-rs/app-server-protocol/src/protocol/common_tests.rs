@@ -43,12 +43,12 @@ fn client_response_jsonrpc_parts_preserve_payloads_and_request_ids() -> Result<(
     let payloads = [
         (
             ClientResponsePayload::GetAuthStatus(v1::GetAuthStatusResponse {
-                auth_method: Some(AuthMode::Chatgpt),
+                auth_method: Some(AuthMode::ApiKey),
                 auth_token: None,
                 requires_openai_auth: Some(true),
             }),
             json!({
-                "authMethod": "chatgpt",
+                "authMethod": "apikey",
                 "authToken": null,
                 "requiresOpenaiAuth": true,
             }),

@@ -23,9 +23,6 @@ from .generated.notification_registry import NOTIFICATION_MODELS
 from .generated.v2_all import (
     AccountLoginCompletedNotification,
     AgentMessageDeltaNotification,
-    CancelLoginAccountResponse,
-    ChatgptDeviceCodeLoginAccountResponse,
-    ChatgptLoginAccountResponse,
     GetAccountParams as V2GetAccountParams,
     GetAccountResponse,
     IdleThreadStatus,
@@ -442,24 +439,10 @@ class CodexClient:
         self,
         params: V2LoginAccountParams | JsonObject,
     ) -> LoginAccountResponse:
-        response = self.request(
+        return self.request(
             "account/login/start",
             _params_dict(params),
             response_model=LoginAccountResponse,
-        )
-        response_root = response.root
-        if isinstance(
-            response_root,
-            ChatgptLoginAccountResponse | ChatgptDeviceCodeLoginAccountResponse,
-        ):
-            self.register_login_notifications(response_root.login_id)
-        return response
-
-    def account_login_cancel(self, login_id: str) -> CancelLoginAccountResponse:
-        return self.request(
-            "account/login/cancel",
-            {"loginId": login_id},
-            response_model=CancelLoginAccountResponse,
         )
 
     def account_read(

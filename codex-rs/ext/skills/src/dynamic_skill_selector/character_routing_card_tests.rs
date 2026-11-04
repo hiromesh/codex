@@ -37,8 +37,6 @@ fn host_interface_metadata_makes_unlisted_workflow_discoverable() {
         policy: None,
         path_to_skills_md: PathUri::from_abs_path(&path),
         scope: SkillScope::User,
-        plugin_id: None,
-        remote_plugin_id: None,
     });
     let snapshot = HostSkillsSnapshot::new(std::sync::Arc::new(outcome));
     let catalog = SkillCatalog {

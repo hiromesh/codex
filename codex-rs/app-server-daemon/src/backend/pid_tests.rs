@@ -7,8 +7,6 @@ use tempfile::TempDir;
 #[cfg(unix)]
 use tokio::time::sleep;
 
-use codex_app_server_transport::REMOTE_CONTROL_DISABLED_ENV_VAR;
-
 use super::PidBackend;
 use super::PidCommandKind;
 use super::PidFileState;
@@ -27,11 +25,7 @@ async fn locked_empty_pid_file_is_treated_as_active_reservation() {
     tokio::fs::write(&pid_file, "")
         .await
         .expect("write pid file");
-    let backend = PidBackend::new(
-        temp_dir.path().join("codex"),
-        pid_file.clone(),
-        /*remote_control_enabled*/ false,
-    );
+    let backend = PidBackend::new(temp_dir.path().join("codex"), pid_file.clone());
     let reservation = tokio::fs::OpenOptions::new()
         .create(true)
         .truncate(false)
@@ -66,11 +60,7 @@ async fn unlocked_empty_pid_file_is_treated_as_stale_reservation() {
     tokio::fs::write(&pid_file, "")
         .await
         .expect("write pid file");
-    let backend = PidBackend::new(
-        temp_dir.path().join("codex"),
-        pid_file.clone(),
-        /*remote_control_enabled*/ false,
-    );
+    let backend = PidBackend::new(temp_dir.path().join("codex"), pid_file.clone());
 
     assert_eq!(
         backend.read_pid_file_state().await.expect("read pid"),
@@ -106,7 +96,6 @@ fn reservation_probe_releases_lock_with_duplicated_handle() {
             let backend = PidBackend::new(
                 temp_dir.path().join("codex"),
                 temp_dir.path().join("app-server.pid"),
-                /*remote_control_enabled*/ false,
             );
             match case {
                 Probe::Missing => {}
@@ -195,11 +184,7 @@ async fn stop_waits_for_live_reservation_to_resolve() {
     tokio::fs::write(&pid_file, "")
         .await
         .expect("write pid file");
-    let backend = PidBackend::new(
-        temp_dir.path().join("codex"),
-        pid_file.clone(),
-        /*remote_control_enabled*/ false,
-    );
+    let backend = PidBackend::new(temp_dir.path().join("codex"), pid_file.clone());
     let reservation = tokio::fs::OpenOptions::new()
         .create(true)
         .truncate(false)
@@ -231,11 +216,7 @@ async fn start_retries_stale_empty_pid_file_under_its_own_lock() {
     tokio::fs::write(&pid_file, "")
         .await
         .expect("write pid file");
-    let backend = PidBackend::new(
-        temp_dir.path().join("missing-codex"),
-        pid_file,
-        /*remote_control_enabled*/ false,
-    );
+    let backend = PidBackend::new(temp_dir.path().join("missing-codex"), pid_file);
 
     let err = backend.start().await.expect_err("start");
     assert!(
@@ -260,7 +241,6 @@ async fn legacy_launch_clears_recovery_best_effort() {
         let backend = PidBackend::new(
             home.path().join("missing-codex"),
             state_dir.join("app-server.pid"),
-            /*remote_control_enabled*/ false,
         );
 
         let error = backend.start().await.expect_err("missing binary");
@@ -278,11 +258,7 @@ async fn legacy_launch_clears_recovery_best_effort() {
 async fn stale_record_cleanup_preserves_replacement_record() {
     let temp_dir = TempDir::new().expect("temp dir");
     let pid_file = temp_dir.path().join("app-server.pid");
-    let backend = PidBackend::new(
-        temp_dir.path().join("codex"),
-        pid_file.clone(),
-        /*remote_control_enabled*/ false,
-    );
+    let backend = PidBackend::new(temp_dir.path().join("codex"), pid_file.clone());
     let stale = PidRecord {
         pid: 1,
         process_start_time: "old".to_string(),
@@ -325,11 +301,7 @@ async fn pid_record_captures_the_resolved_launch_binary() {
     }
     let selected = temp.path().join("current-codex");
     std::os::unix::fs::symlink(&original, &selected).expect("selected binary");
-    let backend = PidBackend::new(
-        selected.clone(),
-        temp.path().join("app-server.pid"),
-        /*remote_control_enabled*/ false,
-    );
+    let backend = PidBackend::new(selected.clone(), temp.path().join("app-server.pid"));
     backend.start().await.expect("start daemon");
     let record: PidRecord =
         serde_json::from_slice(&std::fs::read(&backend.pid_file).expect("PID record"))
@@ -368,7 +340,6 @@ async fn legacy_start_time_mismatch_preserves_record_and_process() {
     let backend = PidBackend::new(
         temp.path().join("codex"),
         temp.path().join("app-server.pid"),
-        /*remote_control_enabled*/ false,
     );
     let contents = serde_json::to_vec(&serde_json::json!({
         "pid": std::process::id(),
@@ -418,11 +389,7 @@ async fn stop_reaps_untracked_app_server_child() {
     )
     .await
     .expect("write pid file");
-    let backend = PidBackend::new(
-        temp_dir.path().join("codex"),
-        pid_file.clone(),
-        /*remote_control_enabled*/ false,
-    );
+    let backend = PidBackend::new(temp_dir.path().join("codex"), pid_file.clone());
 
     let result = tokio::time::timeout(Duration::from_secs(2), backend.stop()).await;
     if matches!(child.try_wait(), Ok(None)) {
@@ -505,11 +472,7 @@ async fn shutdown_grace_handles_process_exit() {
         .await
         .expect("write pid file");
         #[cfg(unix)]
-        let backend = PidBackend::new(
-            temp.path().join("codex"),
-            pid_file,
-            /*remote_control_enabled*/ false,
-        );
+        let backend = PidBackend::new(temp.path().join("codex"), pid_file);
         // Cover the backend's full stop budget, plus scheduling headroom on busy runners.
         let stop_timeout =
             super::STOP_FORCE_TIMEOUT + Duration::from_secs(u64::from(grace_seconds) + 5);
@@ -663,49 +626,6 @@ fn update_loop_uses_hidden_app_server_subcommand() {
     );
 }
 
-#[test]
-fn app_server_remote_control_uses_runtime_flag() {
-    let backend = PidBackend::new(
-        "codex".into(),
-        "app-server.pid".into(),
-        /*remote_control_enabled*/ true,
-    );
-
-    assert_eq!(
-        backend.command_args(),
-        vec![
-            "app-server",
-            "--remote-control",
-            "--listen",
-            "unix://",
-            "--analytics-default-enabled"
-        ]
-    );
-}
-
-#[test]
-fn app_server_disabled_remote_control_uses_compatible_args_and_runtime_env() {
-    let backend = PidBackend::new(
-        "codex".into(),
-        "app-server.pid".into(),
-        /*remote_control_enabled*/ false,
-    );
-
-    assert_eq!(
-        backend.command_args(),
-        vec![
-            "app-server",
-            "--listen",
-            "unix://",
-            "--analytics-default-enabled"
-        ]
-    );
-    assert_eq!(
-        backend.command_env(),
-        Some((REMOTE_CONTROL_DISABLED_ENV_VAR, "1"))
-    );
-}
-
 #[tokio::test]
 async fn read_stderr_log_tail_returns_recent_complete_lines() {
     let temp_dir = TempDir::new().expect("temp dir");
@@ -733,7 +653,6 @@ async fn stale_creation_time_never_stops_reused_pid() {
     let backend = PidBackend::new(
         temp.path().join("codex.exe"),
         temp.path().join("server.pid"),
-        /*remote_control_enabled*/ false,
     );
     #[cfg(any(target_os = "linux", target_os = "macos"))]
     let identities = {
@@ -781,11 +700,7 @@ async fn stderr_preservation_failure_does_not_prevent_opening_new_log() -> anyho
     let home = TempDir::new()?;
     let pid_file = home.path().join("daemon.pid");
     let path = stderr_log_file_for_pid_file(&pid_file);
-    let backend = PidBackend::new(
-        home.path().join("codex"),
-        pid_file,
-        /*remote_control_enabled*/ false,
-    );
+    let backend = PidBackend::new(home.path().join("codex"), pid_file);
     tokio::fs::write(&path, b"previous failure").await?;
     tokio::fs::create_dir(path.with_extension("log.previous")).await?;
     let _log = backend.open_stderr_log().await?;

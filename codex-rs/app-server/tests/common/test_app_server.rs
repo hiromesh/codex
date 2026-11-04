@@ -15,10 +15,6 @@ use tokio::process::ChildStdout;
 
 use anyhow::Context;
 use anyhow::ensure;
-use codex_app_server_protocol::AppsInstalledParams;
-use codex_app_server_protocol::AppsListParams;
-use codex_app_server_protocol::AppsReadParams;
-use codex_app_server_protocol::CancelLoginAccountParams;
 use codex_app_server_protocol::ClientInfo;
 use codex_app_server_protocol::ClientNotification;
 use codex_app_server_protocol::ClientRequest;
@@ -55,31 +51,17 @@ use codex_app_server_protocol::JSONRPCRequest;
 use codex_app_server_protocol::JSONRPCResponse;
 use codex_app_server_protocol::ListMcpServerStatusParams;
 use codex_app_server_protocol::LoginAccountParams;
-use codex_app_server_protocol::MarketplaceAddParams;
-use codex_app_server_protocol::MarketplaceRemoveParams;
-use codex_app_server_protocol::MarketplaceUpgradeParams;
 use codex_app_server_protocol::McpResourceReadParams;
 use codex_app_server_protocol::McpServerToolCallParams;
 use codex_app_server_protocol::MockExperimentalMethodParams;
 use codex_app_server_protocol::ModelListParams;
 use codex_app_server_protocol::ModelProviderCapabilitiesReadParams;
 use codex_app_server_protocol::PermissionProfileListParams;
-use codex_app_server_protocol::PluginInstallParams;
-use codex_app_server_protocol::PluginInstalledParams;
-use codex_app_server_protocol::PluginListParams;
-use codex_app_server_protocol::PluginReadParams;
-use codex_app_server_protocol::PluginSearchParams;
-use codex_app_server_protocol::PluginSkillReadParams;
-use codex_app_server_protocol::PluginUninstallParams;
 use codex_app_server_protocol::ProcessKillParams;
 use codex_app_server_protocol::ProcessSpawnParams;
 use codex_app_server_protocol::ProjectImportParams;
 use codex_app_server_protocol::ProjectListParams;
 use codex_app_server_protocol::ProjectReadParams;
-use codex_app_server_protocol::RemoteControlClientsListParams;
-use codex_app_server_protocol::RemoteControlClientsRevokeParams;
-use codex_app_server_protocol::RemoteControlPairingStartParams;
-use codex_app_server_protocol::RemoteControlPairingStatusParams;
 use codex_app_server_protocol::RequestId;
 use codex_app_server_protocol::ReviewStartParams;
 use codex_app_server_protocol::SendAddCreditsNudgeEmailParams;
@@ -482,22 +464,6 @@ impl TestAppServer {
         self.send_request("account/read", params).await
     }
 
-    /// Send an `account/login/start` JSON-RPC request with ChatGPT auth tokens.
-    pub async fn send_chatgpt_auth_tokens_login_request(
-        &mut self,
-        access_token: String,
-        chatgpt_account_id: String,
-        chatgpt_plan_type: Option<String>,
-    ) -> anyhow::Result<i64> {
-        let params = LoginAccountParams::ChatgptAuthTokens {
-            access_token,
-            chatgpt_account_id,
-            chatgpt_plan_type,
-        };
-        self.send_login_account_request(serde_json::to_value(params)?)
-            .await
-    }
-
     /// Send a `thread/start` JSON-RPC request.
     pub async fn send_thread_start_request(
         &mut self,
@@ -785,102 +751,6 @@ impl TestAppServer {
             .await
     }
 
-    /// Send a `remoteControl/enable` JSON-RPC request.
-    pub async fn send_remote_control_enable_request(&mut self) -> anyhow::Result<i64> {
-        self.send_request("remoteControl/enable", /*params*/ None)
-            .await
-    }
-
-    /// Send a runtime-only `remoteControl/enable` JSON-RPC request.
-    pub async fn send_remote_control_ephemeral_enable_request(&mut self) -> anyhow::Result<i64> {
-        self.send_request(
-            "remoteControl/enable",
-            Some(serde_json::json!({ "ephemeral": true })),
-        )
-        .await
-    }
-
-    /// Send a `remoteControl/disable` JSON-RPC request.
-    pub async fn send_remote_control_disable_request(&mut self) -> anyhow::Result<i64> {
-        self.send_request("remoteControl/disable", /*params*/ None)
-            .await
-    }
-
-    /// Send a runtime-only `remoteControl/disable` JSON-RPC request.
-    pub async fn send_remote_control_ephemeral_disable_request(&mut self) -> anyhow::Result<i64> {
-        self.send_request(
-            "remoteControl/disable",
-            Some(serde_json::json!({ "ephemeral": true })),
-        )
-        .await
-    }
-
-    /// Send a `remoteControl/status/read` JSON-RPC request.
-    pub async fn send_remote_control_status_read_request(&mut self) -> anyhow::Result<i64> {
-        self.send_request("remoteControl/status/read", /*params*/ None)
-            .await
-    }
-
-    /// Send a `remoteControl/pairing/start` JSON-RPC request.
-    pub async fn send_remote_control_pairing_start_request(
-        &mut self,
-        params: RemoteControlPairingStartParams,
-    ) -> anyhow::Result<i64> {
-        let params = Some(serde_json::to_value(params)?);
-        self.send_request("remoteControl/pairing/start", params)
-            .await
-    }
-
-    /// Send a `remoteControl/pairing/status` JSON-RPC request.
-    pub async fn send_remote_control_pairing_status_request(
-        &mut self,
-        params: RemoteControlPairingStatusParams,
-    ) -> anyhow::Result<i64> {
-        let params = Some(serde_json::to_value(params)?);
-        self.send_request("remoteControl/pairing/status", params)
-            .await
-    }
-
-    /// Send a `remoteControl/client/list` JSON-RPC request.
-    pub async fn send_remote_control_clients_list_request(
-        &mut self,
-        params: RemoteControlClientsListParams,
-    ) -> anyhow::Result<i64> {
-        let params = Some(serde_json::to_value(params)?);
-        self.send_request("remoteControl/client/list", params).await
-    }
-
-    /// Send a `remoteControl/client/revoke` JSON-RPC request.
-    pub async fn send_remote_control_clients_revoke_request(
-        &mut self,
-        params: RemoteControlClientsRevokeParams,
-    ) -> anyhow::Result<i64> {
-        let params = Some(serde_json::to_value(params)?);
-        self.send_request("remoteControl/client/revoke", params)
-            .await
-    }
-
-    /// Send an `app/list` JSON-RPC request.
-    pub async fn send_apps_list_request(&mut self, params: AppsListParams) -> anyhow::Result<i64> {
-        let params = Some(serde_json::to_value(params)?);
-        self.send_request("app/list", params).await
-    }
-
-    /// Send an `app/installed` JSON-RPC request.
-    pub async fn send_apps_installed_request(
-        &mut self,
-        params: AppsInstalledParams,
-    ) -> anyhow::Result<i64> {
-        let params = Some(serde_json::to_value(params)?);
-        self.send_request("app/installed", params).await
-    }
-
-    /// Send an `app/read` JSON-RPC request.
-    pub async fn send_apps_read_request(&mut self, params: AppsReadParams) -> anyhow::Result<i64> {
-        let params = Some(serde_json::to_value(params)?);
-        self.send_request("app/read", params).await
-    }
-
     /// Send an `mcpServer/resource/read` JSON-RPC request.
     pub async fn send_mcp_resource_read_request(
         &mut self,
@@ -924,96 +794,6 @@ impl TestAppServer {
     ) -> anyhow::Result<i64> {
         let params = Some(serde_json::to_value(params)?);
         self.send_request("hooks/list", params).await
-    }
-
-    /// Send a `marketplace/add` JSON-RPC request.
-    pub async fn send_marketplace_add_request(
-        &mut self,
-        params: MarketplaceAddParams,
-    ) -> anyhow::Result<i64> {
-        let params = Some(serde_json::to_value(params)?);
-        self.send_request("marketplace/add", params).await
-    }
-
-    /// Send a `marketplace/remove` JSON-RPC request.
-    pub async fn send_marketplace_remove_request(
-        &mut self,
-        params: MarketplaceRemoveParams,
-    ) -> anyhow::Result<i64> {
-        let params = Some(serde_json::to_value(params)?);
-        self.send_request("marketplace/remove", params).await
-    }
-
-    /// Send a `marketplace/upgrade` JSON-RPC request.
-    pub async fn send_marketplace_upgrade_request(
-        &mut self,
-        params: MarketplaceUpgradeParams,
-    ) -> anyhow::Result<i64> {
-        let params = Some(serde_json::to_value(params)?);
-        self.send_request("marketplace/upgrade", params).await
-    }
-
-    /// Send a `plugin/install` JSON-RPC request.
-    pub async fn send_plugin_install_request(
-        &mut self,
-        params: PluginInstallParams,
-    ) -> anyhow::Result<i64> {
-        let params = Some(serde_json::to_value(params)?);
-        self.send_request("plugin/install", params).await
-    }
-
-    /// Send a `plugin/uninstall` JSON-RPC request.
-    pub async fn send_plugin_uninstall_request(
-        &mut self,
-        params: PluginUninstallParams,
-    ) -> anyhow::Result<i64> {
-        let params = Some(serde_json::to_value(params)?);
-        self.send_request("plugin/uninstall", params).await
-    }
-
-    /// Send a `plugin/list` JSON-RPC request.
-    pub async fn send_plugin_list_request(
-        &mut self,
-        params: PluginListParams,
-    ) -> anyhow::Result<i64> {
-        let params = Some(serde_json::to_value(params)?);
-        self.send_request("plugin/list", params).await
-    }
-
-    /// Send a `plugin/search` JSON-RPC request.
-    pub async fn send_plugin_search_request(
-        &mut self,
-        params: PluginSearchParams,
-    ) -> anyhow::Result<i64> {
-        let params = Some(serde_json::to_value(params)?);
-        self.send_request("plugin/search", params).await
-    }
-
-    /// Send a `plugin/installed` JSON-RPC request.
-    pub async fn send_plugin_installed_request(
-        &mut self,
-        params: PluginInstalledParams,
-    ) -> anyhow::Result<i64> {
-        let params = Some(serde_json::to_value(params)?);
-        self.send_request("plugin/installed", params).await
-    }
-
-    /// Send a `plugin/read` JSON-RPC request.
-    pub async fn send_plugin_read_request(
-        &mut self,
-        params: PluginReadParams,
-    ) -> anyhow::Result<i64> {
-        let params = Some(serde_json::to_value(params)?);
-        self.send_request("plugin/read", params).await
-    }
-
-    /// Send a `plugin/skill/read` JSON-RPC request.
-    pub async fn send_plugin_skill_read_request(
-        &mut self,
-        params: PluginSkillReadParams,
-    ) -> anyhow::Result<i64> {
-        let params = Some(serde_json::to_value(params)?);
-        self.send_request("plugin/skill/read", params).await
     }
 
     /// Send an `mcpServerStatus/list` JSON-RPC request.
@@ -1395,23 +1175,6 @@ impl TestAppServer {
             "type": "chatgpt"
         });
         self.send_login_account_request(params).await
-    }
-
-    /// Send an `account/login/start` JSON-RPC request for ChatGPT device code login.
-    pub async fn send_login_account_chatgpt_device_code_request(&mut self) -> anyhow::Result<i64> {
-        let params = serde_json::json!({
-            "type": "chatgptDeviceCode"
-        });
-        self.send_login_account_request(params).await
-    }
-
-    /// Send an `account/login/cancel` JSON-RPC request.
-    pub async fn send_cancel_login_account_request(
-        &mut self,
-        params: CancelLoginAccountParams,
-    ) -> anyhow::Result<i64> {
-        let params = Some(serde_json::to_value(params)?);
-        self.send_request("account/login/cancel", params).await
     }
 
     /// Send a `fuzzyFileSearch` JSON-RPC request.

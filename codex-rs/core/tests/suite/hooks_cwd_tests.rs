@@ -227,8 +227,7 @@ async fn command_hooks_keep_execution_cwd(workdir: Option<&str>, mode: &'static 
     use codex_protocol::protocol::TurnEnvironmentRequests;
 
     skip_if_no_network!(Ok(()));
-    if mode == "stdin" {
-    }
+    if mode == "stdin" {}
     let later_turn = matches!(mode, "delayed" | "stdin");
     let server = start_mock_server().await;
     let test = test_codex()

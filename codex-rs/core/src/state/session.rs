@@ -72,8 +72,6 @@ pub(crate) struct SessionState {
     pub(crate) session_configuration: SessionConfiguration,
     /// Catalog to carry across compaction, independent of an explicit resume override.
     pub(crate) persisted_dynamic_tools: Arc<[DynamicToolSpec]>,
-    /// Plugin selection of the last admitted task; settings updates take effect on the next task.
-    pub(crate) active_disabled_plugin_ids: Vec<String>,
     /// Persisted origin of the session base instructions, when known.
     pub(crate) base_instructions_provenance: Option<BaseInstructionsProvenance>,
     pub(crate) history: ContextManager,
@@ -104,7 +102,6 @@ pub(crate) struct SessionState {
     /// Retained after completion so later turns do not repeat speculative captures.
     pub(crate) shell_snapshot_prewarm: Option<AbortOnDropHandle<()>>,
     pub(crate) current_time_reminder: CurrentTimeReminderState,
-    pub(crate) active_connector_selection: HashSet<String>,
     pub(crate) pending_session_start_sources: VecDeque<codex_hooks::SessionStartSource>,
     next_turn_is_first: bool,
     initial_settings_pending: bool,
@@ -127,7 +124,6 @@ impl SessionState {
         history: ContextManager,
     ) -> Self {
         Self {
-            active_disabled_plugin_ids: Vec::new(),
             persisted_dynamic_tools: Arc::clone(&session_configuration.dynamic_tools),
             session_configuration,
             base_instructions_provenance: None,
@@ -147,7 +143,6 @@ impl SessionState {
             startup_prewarm: None,
             shell_snapshot_prewarm: None,
             current_time_reminder: CurrentTimeReminderState::default(),
-            active_connector_selection: HashSet::new(),
             pending_session_start_sources: VecDeque::new(),
             next_turn_is_first: true,
             initial_settings_pending: true,
@@ -408,25 +403,6 @@ impl SessionState {
 
     pub(crate) fn take_session_startup_prewarm(&mut self) -> Option<SessionStartupPrewarmHandle> {
         self.startup_prewarm.take()
-    }
-
-    // Adds connector IDs to the active set and returns the merged selection.
-    pub(crate) fn merge_connector_selection<I>(&mut self, connector_ids: I) -> HashSet<String>
-    where
-        I: IntoIterator<Item = String>,
-    {
-        self.active_connector_selection.extend(connector_ids);
-        self.active_connector_selection.clone()
-    }
-
-    // Returns the current connector selection tracked on session state.
-    pub(crate) fn get_connector_selection(&self) -> HashSet<String> {
-        self.active_connector_selection.clone()
-    }
-
-    // Removes all currently tracked connector selections.
-    pub(crate) fn clear_connector_selection(&mut self) {
-        self.active_connector_selection.clear();
     }
 
     pub(crate) fn queue_pending_session_start_source(

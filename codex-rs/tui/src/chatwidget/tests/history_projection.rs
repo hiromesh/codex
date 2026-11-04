@@ -15,8 +15,6 @@ async fn older_tool_projection_matches_initial_replay() {
     let command = "cargo check";
     let mut items = vec![AppServerThreadItemPayload::CommandExecution {
         id: "command".to_string(),
-        plugin_id: None,
-        script_path: None,
         model_context: None,
         sandbox_type: None,
         command: command.to_string(),
@@ -41,8 +39,6 @@ async fn older_tool_projection_matches_initial_replay() {
         let command = format!("cat {name}");
         items.push(AppServerThreadItemPayload::CommandExecution {
             id: name.to_string(),
-            plugin_id: None,
-            script_path: None,
             model_context: None,
             sandbox_type: None,
             command: command.clone(),
@@ -82,11 +78,7 @@ async fn older_tool_projection_matches_initial_replay() {
             tool: "js".to_string(),
             status: McpToolCallStatus::Completed,
             arguments: json!({"title": format!("Inspect page {id}"), "code": "await cua.getState()"}),
-            app_context: None,
-            mcp_app_resource_uri: None,
-            plugin_id: None,
             read_only_hint: None,
-            mcp_app_ui: None,
             result: Some(Box::new(McpToolCallResult {
                 content: vec![json!({"type": "text", "text": format!("Full result for {id}")})],
                 structured_content: None,

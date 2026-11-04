@@ -155,7 +155,6 @@ async fn refreshed_cloud_bundle_updates_later_sessions() -> Result<()> {
 
 #[tokio::test]
 async fn managed_deny_read_requirements_follow_thread_permission_updates() -> Result<()> {
-
     let server = start_mock_server().await;
     let home = Arc::new(TempDir::new()?);
     let denied_root = home.path().join("managed-private");
@@ -214,4 +213,3 @@ async fn managed_deny_read_requirements_follow_thread_permission_updates() -> Re
 
     Ok(())
 }
-

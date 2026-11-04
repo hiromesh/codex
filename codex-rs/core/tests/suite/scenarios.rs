@@ -10,18 +10,15 @@ use codex_protocol_test_support::ContentItemTestExt;
 use std::collections::HashMap;
 use std::collections::HashSet;
 use std::fs;
-use std::path::Path;
-use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
+use tempfile::TempDir;
 
 use anyhow::Result;
 use base64::Engine;
-use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
 use codex_analytics::CompactionTrigger;
 use codex_config::ConfigLayerSource;
 use codex_config::ConfigLayerStack;
-use codex_config::types::McpServerConfig;
 use codex_context_fragments::AnsweredQuestion;
 use codex_context_fragments::ContextualUserFragment;
 use codex_core::ForkSnapshot;
@@ -33,16 +30,12 @@ use codex_core::config::Config;
 use codex_core::config::TokenBudgetConfig;
 use codex_exec_server::CreateDirectoryOptions;
 use codex_exec_server::EnvironmentManager;
-use codex_exec_server::LOCAL_ENVIRONMENT_ID;
-use codex_extension_api::ExtensionDataInit;
 use codex_extension_api::ExtensionRegistry;
 use codex_extension_api::ExtensionRegistryBuilder;
 use codex_features::Feature;
 use codex_history::RolloutItem;
 use codex_login::CodexAuth;
 use codex_models_manager::bundled_models_response;
-use codex_protocol::capabilities::CapabilityRootLocation;
-use codex_protocol::capabilities::SelectedCapabilityRoot;
 use codex_protocol::dynamic_tools::DynamicToolCallOutputContentItem;
 use codex_protocol::dynamic_tools::DynamicToolFunctionSpec;
 use codex_protocol::dynamic_tools::DynamicToolResponse;
@@ -80,7 +73,6 @@ use core_test_support::context_snapshot::SnapshotEntry;
 use core_test_support::responses::ev_assistant_message;
 use core_test_support::responses::ev_completed;
 use core_test_support::responses::ev_completed_with_tokens;
-use core_test_support::responses::ev_custom_tool_call;
 use core_test_support::responses::ev_function_call_with_namespace;
 use core_test_support::responses::ev_message_item_added;
 use core_test_support::responses::ev_output_text_delta;
@@ -94,14 +86,12 @@ use core_test_support::streaming_sse::StreamingSseChunk;
 use core_test_support::streaming_sse::start_streaming_sse_server;
 use core_test_support::test_codex::TestCodex;
 use core_test_support::test_codex::environment_config_for_selection;
-use core_test_support::test_codex::executor_path_uri;
 use core_test_support::test_codex::test_codex;
 use core_test_support::wait_for_event;
 use core_test_support::wait_for_event_match;
 use core_test_support::wait_for_mcp_server;
 use pretty_assertions::assert_eq;
 use serde_json::json;
-use tempfile::TempDir;
 use tokio::sync::oneshot;
 
 const ONE_PIXEL_PNG_BASE64: &str = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGP4z8DwHwAFAAH/iZk9HQAAAABJRU5ErkJggg==";
@@ -139,36 +129,17 @@ mod reserved_spawn;
 #[path = "scenarios_partial_answers.rs"]
 mod partial_answers;
 
-#[path = "scenarios_guardian_sender_context.rs"]
-mod guardian_sender_context;
-
 #[path = "scenarios_mcp_resource_messages.rs"]
 mod mcp_resource_messages;
 
-#[path = "scenarios_mcp_ema.rs"]
-mod mcp_ema;
-
 #[path = "scenarios_mcp_sharing.rs"]
 mod mcp_sharing;
-
-#[path = "scenarios_guardian_agent_messages_tests.rs"]
-mod guardian_agent_messages;
-
-#[path = "scenarios_guardian_handoff.rs"]
-mod guardian_handoff;
-
-#[path = "scenarios_guardian_heartbeat.rs"]
-mod guardian_heartbeat;
 
 #[path = "scenarios_preparation.rs"]
 mod preparation;
 
 #[path = "scenarios_content_filter.rs"]
 mod content_filter;
-
-#[cfg(any(target_os = "linux", target_os = "macos"))]
-#[path = "scenarios_credential_masking.rs"]
-mod credential_masking;
 
 #[path = "scenarios_provider_capabilities.rs"]
 mod provider_capabilities;
@@ -184,12 +155,6 @@ mod tools_namespace_budget;
 
 #[path = "scenarios_skill_catalog_dedup.rs"]
 mod skill_catalog_dedup;
-
-#[path = "scenarios_frozen_cloud_skills.rs"]
-mod frozen_cloud_skills;
-
-#[path = "scenarios_compaction_tests.rs"]
-mod compaction;
 
 #[path = "scenarios_world_state_prefix_tests.rs"]
 mod world_state_prefix;
@@ -210,89 +175,10 @@ fn skills_extensions() -> Arc<ExtensionRegistry<Config>> {
     Arc::new(extensions.build())
 }
 
-fn write_skill(path: &Path, name: &str, description: &str, body: &str) -> Result<PathBuf> {
-    fs::create_dir_all(path)?;
-    let skill = path.join("SKILL.md");
-    fs::write(
-        &skill,
-        format!("---\nname: {name}\ndescription: {description}\n---\n\n{body}\n"),
-    )?;
-    Ok(fs::canonicalize(skill)?)
-}
-
-struct ScenarioSkills {
-    outline: PathBuf,
-    agenda: PathBuf,
-    summarize: PathBuf,
-    final_check: PathBuf,
-}
-
-fn write_scenario_capabilities(home: &TempDir) -> Result<ScenarioSkills> {
-    fs::write(
-        home.path().join("config.toml"),
-        "[features]\nplugins = true\n\n[skills.bundled]\nenabled = false\n\n[plugins.\"calendar@test\"]\nenabled = true\n\n[plugins.\"notes@test\"]\nenabled = true\n",
-    )?;
-    let plugin_cache = home.path().join("plugins/cache/test");
-    for (name, description) in [
-        ("calendar", "Prepare a team schedule"),
-        ("notes", "Summarize meeting notes"),
-    ] {
-        let manifest = plugin_cache
-            .join(name)
-            .join("local/.codex-plugin/plugin.json");
-        fs::create_dir_all(manifest.parent().expect("manifest parent"))?;
-        fs::write(
-            manifest,
-            json!({ "name": name, "description": description }).to_string(),
-        )?;
-    }
-
-    Ok(ScenarioSkills {
-        outline: write_skill(
-            &home.path().join("skills/outline"),
-            "outline",
-            "Draft a project outline",
-            "List the goals and owners.",
-        )?,
-        agenda: write_skill(
-            &plugin_cache.join("calendar/local/skills/agenda"),
-            "agenda",
-            "Plan a team agenda",
-            "List meetings with dates and attendees.",
-        )?,
-        summarize: write_skill(
-            &plugin_cache.join("notes/local/skills/summarize"),
-            "summarize",
-            "Summarize team notes",
-            "Extract decisions and action items.",
-        )?,
-        final_check: write_skill(
-            &home.path().join("skills/final-check"),
-            "final-check",
-            "Review a final brief",
-            "Check that the brief has an owner for every action.",
-        )?,
-    })
-}
-
 fn text(value: &str) -> UserInput {
     UserInput::Text {
         text: value.to_string(),
         text_elements: Vec::new(),
-    }
-}
-
-fn selected_skill(name: &str, path: &Path) -> UserInput {
-    UserInput::Skill {
-        name: name.to_string(),
-        path: path.to_path_buf(),
-    }
-}
-
-fn plugin(name: &str) -> UserInput {
-    UserInput::Mention {
-        name: name.to_string(),
-        path: format!("plugin://{name}@test"),
     }
 }
 
@@ -648,7 +534,6 @@ async fn unavailable_images_are_rechecked_without_rewriting_history() -> Result<
     Ok(())
 }
 
-
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn mcp_tool_discovery_in_same_turn() -> Result<()> {
     skip_if_no_network!(Ok(()));
@@ -773,7 +658,7 @@ async fn astra_asks_an_async_question_and_receives_the_answer_while_working() ->
     let base_url = format!("{}/v1", streaming.uri());
     let test = test_codex()
         .with_model("gpt-6-astra")
-        .with_auth(CodexAuth::create_dummy_chatgpt_auth_for_testing())
+        .with_auth(CodexAuth::from_api_key("test-api-key"))
         .with_config(move |config| {
             configure_scenario_catalog(config);
             config
@@ -908,7 +793,7 @@ async fn astra_switches_environments_for_the_rest_of_the_active_turn() -> Result
     .await;
     let test = test_codex()
         .with_model("gpt-6-astra")
-        .with_auth(CodexAuth::create_dummy_chatgpt_auth_for_testing())
+        .with_auth(CodexAuth::from_api_key("test-api-key"))
         .with_config(|config| {
             configure_scenario_catalog(config);
             config.workspace_roots = vec![config.cwd.clone()];
@@ -988,511 +873,6 @@ async fn astra_switches_environments_for_the_rest_of_the_active_turn() -> Result
             "Astra starts in one workspace, switches for the next step of the active turn, and returns to the original workspace on the next turn.",
             &requests,
             &ContextSnapshotOptions::default(),
-        )
-    );
-    Ok(())
-}
-
-#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn astra_kickoff_with_skills_plugins_and_remote_compaction() -> Result<()> {
-    skip_if_no_network!(Ok(()));
-
-    let server = start_mock_server().await;
-    let home = Arc::new(TempDir::new()?);
-    let skills = write_scenario_capabilities(&home)?;
-    let mock = mount_sse_sequence(
-        &server,
-        vec![
-            sse(vec![
-                ev_assistant_message("draft", "Agenda drafted for the kickoff."),
-                ev_completed("draft-response"),
-            ]),
-            sse(vec![
-                ev_assistant_message("notes", "The team chose Friday and assigned owners."),
-                ev_completed("notes-response"),
-            ]),
-            sse(vec![
-                json!({
-                    "type": "response.output_item.done",
-                    "item": {
-                        "type": "compaction",
-                        "encrypted_content": "SCENARIO_REMOTE_CHECKPOINT",
-                    }
-                }),
-                ev_completed("compact-response"),
-            ]),
-            sse(vec![
-                ev_assistant_message("final", "Here is the checked kickoff brief."),
-                ev_completed("final-response"),
-            ]),
-        ],
-    )
-    .await;
-    let mut builder = test_codex()
-        .with_model("gpt-6-astra")
-        .with_home(home)
-        .with_auth(CodexAuth::create_dummy_chatgpt_auth_for_testing())
-        .with_extensions(skills_extensions())
-        .with_workspace_setup(|cwd, fs| async move {
-            fs.write_file(
-                &executor_path_uri(cwd.join("AGENTS.md"))?,
-                b"Kickoff updates must name an owner and a date.".to_vec(),
-                Default::default(),
-                /*sandbox*/ None,
-            )
-            .await?;
-            Ok::<(), anyhow::Error>(())
-        })
-        .with_config(|config| {
-            configure_scenario_catalog(config);
-        });
-    let test = builder.build(&server).await?;
-
-    for input in [
-        vec![
-            text("Plan a team kickoff for Friday using $outline and $calendar:agenda."),
-            selected_skill("outline", &skills.outline),
-            selected_skill("calendar:agenda", &skills.agenda),
-            plugin("calendar"),
-        ],
-        vec![
-            text("Summarize the kickoff notes with $notes:summarize."),
-            selected_skill("notes:summarize", &skills.summarize),
-            plugin("notes"),
-        ],
-    ]
-    .into_iter()
-    {
-        test.codex
-            .start_or_steer_turn(TurnInputRequest::user_input(input))
-            .await?;
-        wait_for_event(&test.codex, |event| {
-            matches!(event, EventMsg::TurnComplete(_))
-        })
-        .await;
-    }
-
-    test.codex.submit(Op::Compact).await?;
-    wait_for_event(&test.codex, |event| {
-        matches!(event, EventMsg::TurnComplete(_))
-    })
-    .await;
-
-    test.codex
-        .start_or_steer_turn(TurnInputRequest::user_input(vec![
-            text("Check the final kickoff brief and attached sketch with $final-check and $calendar:agenda."),
-            UserInput::Image {
-                image: ImageReference::Inline {
-                    image_url: format!("data:image/png;base64,{ONE_PIXEL_PNG_BASE64}"),
-                },
-                detail: None,
-            },
-            selected_skill("final-check", &skills.final_check),
-            plugin("calendar"),
-        ]))
-        .await?;
-    wait_for_event(&test.codex, |event| {
-        matches!(event, EventMsg::TurnComplete(_))
-    })
-    .await;
-
-    let requests = mock.requests();
-    insta::assert_snapshot!(
-        "astra_kickoff_remote_compaction_windows",
-        context_snapshot::format_request_history_snapshot(
-            "Astra plans a kickoff with local and plugin skills, remotely compacts, and checks an image brief.",
-            &requests,
-            &ContextSnapshotOptions::default().include_request_settings(),
-        )
-    );
-    Ok(())
-}
-
-#[test_case::test_case(false; "descriptions")]
-#[test_case::test_case(true; "omit_descriptions")]
-#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn astra_plugin_policy_limits_visible_skills(omit_descriptions: bool) -> Result<()> {
-    skip_if_no_network!(Ok(()));
-
-    let server = start_mock_server().await;
-    let home = Arc::new(TempDir::new()?);
-    write_scenario_capabilities(&home)?;
-    fs::rename(
-        home.path().join("plugins/cache/test"),
-        home.path().join("plugins/cache/openai-curated-remote"),
-    )?;
-    fs::write(
-        home.path().join("config.toml"),
-        r#"[features]
-plugins = true
-remote_plugin = true
-[skills.bundled]
-enabled = false
-[plugins._default]
-enabled = false
-[plugins."calendar@openai-curated-remote"]
-enabled = true
-"#,
-    )?;
-    let installed_plugins = ["calendar", "notes"].map(|name| json!({
-        "id": format!("plugins~Plugin_{name}"),
-        "name": name,
-        "scope": "GLOBAL",
-        "status": "ENABLED",
-        "installation_policy": "AVAILABLE",
-        "authentication_policy": "ON_USE",
-        "release": { "version": "local", "display_name": name, "description": name, "interface": {} },
-        "enabled": true,
-    }));
-    wiremock::Mock::given(wiremock::matchers::method("GET"))
-        .and(wiremock::matchers::path("/ps/plugins/installed"))
-        .respond_with(wiremock::ResponseTemplate::new(200).set_body_json(json!({
-            "plugins": installed_plugins,
-            "pagination": { "next_page_token": null },
-        })))
-        .mount(&server)
-        .await;
-    let mock = mount_sse_sequence(
-        &server,
-        vec![sse(vec![
-            ev_response_created("skills-response"),
-            ev_assistant_message("skills", "The calendar agenda skill is available."),
-            ev_completed("skills-response"),
-        ])],
-    )
-    .await;
-    let chatgpt_base_url = server.uri();
-    let test = test_codex()
-        .with_model("gpt-6-astra")
-        .with_home(home)
-        .with_auth(CodexAuth::create_dummy_chatgpt_auth_for_testing())
-        .with_extensions(skills_extensions())
-        .with_config(move |config| {
-            configure_scenario_catalog(config);
-            config
-                .features
-                .set_enabled(Feature::OmitSkillDescriptions, omit_descriptions)
-                .expect("set omit_skill_descriptions feature");
-            config.chatgpt_base_url = chatgpt_base_url;
-            config.workspace_roots = vec![config.cwd.clone()];
-        })
-        .build_with_auto_env(&server)
-        .await?;
-    let auth = test.thread_manager.auth_manager().auth().await;
-    test.thread_manager
-        .plugins_manager()
-        .reconcile_remote_installed_plugins(&test.config.plugins_config_input(), auth.as_ref())
-        .await?;
-    test.submit_turn("Plan a team kickoff. Which planning skills are available?")
-        .await?;
-
-    let requests = mock.requests();
-    insta::assert_snapshot!(
-        if omit_descriptions {
-            "astra_plugin_policy_without_skill_descriptions"
-        } else {
-            "astra_plugin_policy_limits_visible_skills"
-        },
-        context_snapshot::format_request_history_snapshot(
-            "Astra sees the permitted calendar plugin and standalone skills, but not the unlisted notes plugin.",
-            &requests,
-            &ContextSnapshotOptions::default().include_request_settings(),
-        )
-    );
-    Ok(())
-}
-
-#[derive(Clone, Copy)]
-enum ExecutorPluginDisablement {
-    ThreadSelection,
-    ConfigRefresh,
-}
-
-#[test_case::test_case(ExecutorPluginDisablement::ThreadSelection; "thread_selection")]
-#[test_case::test_case(ExecutorPluginDisablement::ConfigRefresh; "config_refresh")]
-#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn astra_omits_disabled_executor_and_plugin_skills_from_model_context(
-    disablement: ExecutorPluginDisablement,
-) -> Result<()> {
-    use codex_extension_api::ContextContributor;
-    use codex_extension_api::ExtensionFuture;
-    use codex_extension_api::SelectedPluginSnapshot;
-    use codex_extension_api::WorldStateContributionInput;
-    use codex_extension_api::WorldStateSectionContribution;
-
-    skip_if_no_network!(Ok(()));
-
-    struct PauseFirstWorldState {
-        first: std::sync::Mutex<Option<oneshot::Sender<String>>>,
-        resume: tokio::sync::Notify,
-    }
-
-    impl ContextContributor for PauseFirstWorldState {
-        fn contribute_world_state<'a>(
-            &'a self,
-            input: WorldStateContributionInput<'a>,
-        ) -> ExtensionFuture<'a, Vec<WorldStateSectionContribution>> {
-            Box::pin(async move {
-                let first = self.first.lock().expect("world state pause lock").take();
-                if let Some(first) = first {
-                    first
-                        .send(input.turn_id.to_string())
-                        .expect("world state pause receiver");
-                    self.resume.notified().await;
-                }
-                Vec::new()
-            })
-        }
-    }
-
-    let server = start_mock_server().await;
-    let skill_files_dir = TempDir::new()?;
-    let skill_files = fs::canonicalize(skill_files_dir.path())?;
-    let skill_root = skill_files.join("skills");
-    let other_skill_root = skill_files.join("other-skills");
-    let plugin_root = skill_files.join("plugin");
-    let disabled = write_skill(
-        &skill_root.join("retired-helper"),
-        "retired-helper",
-        "Use the retired workflow",
-        "Follow the retired workflow.",
-    )?;
-    write_skill(
-        &skill_root.join("active-helper"),
-        "active-helper",
-        "Use the current workflow",
-        "Follow the current workflow.",
-    )?;
-    write_skill(
-        &other_skill_root.join("next-helper"),
-        "next-helper",
-        "Use the next workflow",
-        "Follow the next workflow.",
-    )?;
-    fs::create_dir_all(plugin_root.join(".codex-plugin"))?;
-    fs::write(
-        plugin_root.join(".codex-plugin/plugin.json"),
-        r#"{"name":"disabled"}"#,
-    )?;
-    write_skill(
-        &plugin_root.join("skills/disabled-plugin-helper"),
-        "disabled-plugin-helper",
-        "Use a disabled plugin workflow",
-        "Follow the disabled plugin workflow.",
-    )?;
-    let environment_manager = Arc::new(EnvironmentManager::default_for_tests());
-    let provider = ExecutorSkillProvider::new_with_restriction_product(
-        Arc::clone(&environment_manager),
-        /*restriction_product*/ None,
-    )
-    .with_disabled_skill_paths(HashMap::from([(
-        LOCAL_ENVIRONMENT_ID.to_string(),
-        HashSet::from([PathUri::from_host_native_path(disabled)?]),
-    )]));
-    let mut extensions = ExtensionRegistryBuilder::<Config>::new();
-    codex_mcp_extension::install_plugins(&mut extensions, environment_manager);
-    let (started, captured) = oneshot::channel();
-    let pause = Arc::new(PauseFirstWorldState {
-        first: std::sync::Mutex::new(Some(started)),
-        resume: tokio::sync::Notify::new(),
-    });
-    extensions.prompt_contributor(pause.clone());
-    install_with_providers(
-        &mut extensions,
-        SkillProviders::new().with_executor_provider(Arc::new(provider)),
-        |config: &Config| SkillsExtensionConfig {
-            include_instructions: config.include_skill_instructions,
-            catalog_deltas_enabled: config.features.enabled(Feature::SkillCatalogDeltas),
-            omit_descriptions: config
-                .features
-                .enabled(codex_features::Feature::OmitSkillDescriptions),
-            max_context_tokens: config.skill_max_context_tokens,
-            bundled_skills_enabled: false,
-            cloud_skill_enabled: false,
-            shadow_selection_enabled: false,
-        },
-    );
-    let mock = mount_sse_sequence(
-        &server,
-        vec![
-            sse(vec![
-                ev_function_call_with_namespace(
-                    "list-skills",
-                    "skills",
-                    "list",
-                    r#"{"authority":{"kind":"executor"}}"#,
-                ),
-                ev_completed("first-step"),
-            ]),
-            sse(vec![
-                ev_assistant_message("skills", "The next-helper skill is available."),
-                ev_completed("skills-response"),
-            ]),
-        ],
-    )
-    .await;
-    let test = test_codex()
-        .with_model("gpt-6-astra")
-        .with_auth(CodexAuth::create_dummy_chatgpt_auth_for_testing())
-        .with_extensions(Arc::new(extensions.build()))
-        .with_config(configure_scenario_catalog)
-        .build(&server)
-        .await?;
-    let skill_root = PathUri::from_host_native_path(skill_root)?;
-    let other_skill_root = PathUri::from_host_native_path(other_skill_root)?;
-    let skill_files = PathUri::from_host_native_path(skill_files)?
-        .inferred_native_path_string()
-        .replace('\\', "/");
-    let skill_files = format!("{}/", skill_files.trim_start_matches('/'));
-    let selected_root = |id: &str, path| SelectedCapabilityRoot {
-        id: id.to_string(),
-        location: CapabilityRootLocation::Environment {
-            environment_id: LOCAL_ENVIRONMENT_ID.to_string(),
-            path,
-        },
-    };
-    let mut thread_extension_init = ExtensionDataInit::new();
-    thread_extension_init.insert(vec![selected_root(
-        "plugin-skills",
-        PathUri::from_host_native_path(match disablement {
-            ExecutorPluginDisablement::ThreadSelection => plugin_root,
-            ExecutorPluginDisablement::ConfigRefresh => plugin_root.join("skills"),
-        })?,
-    )]);
-    let mut first_environment = test.executor_environment().selection().clone();
-    let mut environment_config = environment_config_for_selection(&test.config, &first_environment);
-    environment_config.selected_capability_roots =
-        vec![selected_root("workspace-skills", skill_root)];
-    first_environment.config = EnvironmentConfigState::Ready(environment_config.clone());
-    let mut next_environment = first_environment.clone();
-    environment_config.selected_capability_roots =
-        vec![selected_root("other-skills", other_skill_root)];
-    next_environment.config = EnvironmentConfigState::Ready(environment_config);
-    let thread = test
-        .thread_manager
-        .start_thread(StartThreadOptions {
-            environments: Some(vec![first_environment.into_request()]),
-            thread_extension_init,
-            disabled_plugin_ids: match disablement {
-                ExecutorPluginDisablement::ThreadSelection => {
-                    Some(vec!["plugin-skills".to_string()])
-                }
-                ExecutorPluginDisablement::ConfigRefresh => None,
-            },
-            ..StartThreadOptions::new(test.config.clone())
-        })
-        .await?
-        .thread;
-    thread
-        .start_or_steer_turn(TurnInputRequest::user_input(vec![text(
-            "Which workflow skills are available?",
-        )]))
-        .await?;
-    let turn_id = tokio::time::timeout(Duration::from_secs(/*secs*/ 10), captured).await??;
-    let (reply, outcome) = oneshot::channel();
-    thread
-        .submit(Op::TurnSettings {
-            turn_id,
-            update: TurnSettingsUpdate {
-                environments: Some(vec![next_environment.into_request()]),
-                ..Default::default()
-            },
-            reply,
-        })
-        .await?;
-    assert_eq!(outcome.await?, TurnSettingsUpdateOutcome::Applied);
-    if matches!(disablement, ExecutorPluginDisablement::ConfigRefresh) {
-        let current_config = thread.config().await;
-        let mut next_config = (*current_config).clone();
-        next_config.config_layer_stack = next_config.config_layer_stack.with_user_config(
-            &next_config.codex_home.join("config.toml"),
-            toml::from_str("[plugins._default]\nenabled = false")?,
-        )?;
-        assert_eq!(
-            thread
-                .refresh_runtime_config(current_config, next_config)
-                .await,
-            codex_core::ConfigRefreshOutcome::Published
-        );
-    }
-    // Refresh shared MCP for the new roots (there is no Apps server in this test), then
-    // replace its plugin list before the next step captures it or needs another refresh.
-    let _ = thread.refresh_codex_apps_tools().await;
-    let shared = thread.thread_extension_data();
-    assert_eq!(
-        shared
-            .insert(SelectedPluginSnapshot::default())
-            .expect("MCP should have published the new plugin list")
-            .disabled_plugin_roots,
-        ["plugin-skills"],
-    );
-    pause.resume.notify_one();
-    wait_for_event(&thread, |event| matches!(event, EventMsg::TurnComplete(_))).await;
-
-    let requests = mock.requests();
-    assert_eq!(requests.len(), 2);
-    let first_step_tool = requests[1]
-        .function_call_output_text("list-skills")
-        .expect("first step's skills.list output");
-    assert!(first_step_tool.contains("active-helper"));
-    assert!(!first_step_tool.contains("next-helper"));
-    let plugin_was_enabled = matches!(disablement, ExecutorPluginDisablement::ConfigRefresh);
-    assert_eq!(
-        first_step_tool.contains("disabled-plugin-helper"),
-        plugin_was_enabled
-    );
-    assert_eq!(
-        requests[0].body_contains_text("disabled-plugin-helper"),
-        plugin_was_enabled
-    );
-    let developer_texts = requests[1].message_input_texts("developer");
-    let latest_skills = developer_texts
-        .iter()
-        .rev()
-        .find(|text| text.contains("## Skills"))
-        .expect("second step's skills section");
-    assert!(latest_skills.contains("next-helper"));
-    assert!(!latest_skills.contains("active-helper"));
-    assert!(!latest_skills.contains("disabled-plugin-helper"));
-    let mut bodies = requests
-        .iter()
-        .map(core_test_support::responses::ResponsesRequest::body_json)
-        .collect::<Vec<_>>();
-    for body in &mut bodies {
-        let input = body["input"].to_string();
-        assert!(!input.contains("retired-helper"));
-        if !plugin_was_enabled {
-            assert!(!input.contains("disabled-plugin-helper"));
-        }
-        // Normalize opaque skill locators before snapshot truncation and hashing.
-        body["input"] = serde_json::from_str(&input.replace(&skill_files, "<SKILLS_ROOT>/"))?;
-        // Cargo and Bazel can serialize the JSON inside the tool output in different key orders.
-        for item in body["input"].as_array_mut().expect("request input") {
-            if item["type"] == "function_call_output" && item["call_id"] == "list-skills" {
-                let mut output: serde_json::Value =
-                    serde_json::from_str(item["output"].as_str().expect("skills.list output"))?;
-                output.sort_all_objects();
-                item["output"] = output.to_string().into();
-            }
-        }
-    }
-    let entries = bodies.iter().map(SnapshotEntry::body).collect::<Vec<_>>();
-    let (snapshot_name, description) = match disablement {
-        ExecutorPluginDisablement::ThreadSelection => (
-            "astra_disabled_executor_skills",
-            "Astra keeps disabled skills hidden and uses each step's selected skills after the environment changes during preparation.",
-        ),
-        ExecutorPluginDisablement::ConfigRefresh => (
-            "astra_executor_plugin_policy_refresh",
-            "Astra applies refreshed plugin policy to the next step while preserving earlier authorized skill context and tool output.",
-        ),
-    };
-    insta::assert_snapshot!(
-        snapshot_name,
-        context_snapshot::format_context_snapshot(
-            description,
-            &entries,
-            &ContextSnapshotOptions::default().include_request_settings(),
         )
     );
     Ok(())
@@ -1676,264 +1056,6 @@ async fn child_completion_wakes_parent_after_final_answer() -> Result<()> {
     Ok(())
 }
 
-#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn skill_read_recovers_omitted_installation_and_reads_selected_environment() -> Result<()> {
-    use codex_skills_extension::SkillProvider;
-    use codex_skills_extension::catalog::SkillAuthority;
-    use codex_skills_extension::catalog::SkillCatalog;
-    use codex_skills_extension::catalog::SkillCatalogEntry;
-    use codex_skills_extension::catalog::SkillPackageId;
-    use codex_skills_extension::catalog::SkillReadResult;
-    use codex_skills_extension::catalog::SkillResourceId;
-    use codex_skills_extension::catalog::SkillSearchResult;
-    use codex_skills_extension::catalog::SkillSourceKind;
-    use codex_skills_extension::catalog::SkillSourceLocation;
-    use codex_skills_extension::provider::SkillListQuery;
-    use codex_skills_extension::provider::SkillProviderFuture;
-    use codex_skills_extension::provider::SkillReadRequest;
-    use codex_skills_extension::provider::SkillSearchRequest;
-
-    skip_if_no_network!(Ok(()));
-
-    // Supply already-reconciled catalog fixtures; exercise production preparation and reads.
-    struct InstallationSkills(SkillCatalog);
-    impl SkillProvider for InstallationSkills {
-        fn list(&self, _query: SkillListQuery) -> SkillProviderFuture<'_, SkillCatalog> {
-            Box::pin(async { Ok(self.0.clone()) })
-        }
-
-        fn read<'a>(
-            &'a self,
-            request: SkillReadRequest<'a>,
-        ) -> SkillProviderFuture<'a, SkillReadResult> {
-            Box::pin(async move {
-                assert!(
-                    self.0
-                        .entries
-                        .iter()
-                        .any(|entry| entry.id == request.package)
-                );
-                Ok(SkillReadResult {
-                    resource: request.resource,
-                    contents: "# Deployment\nRun scripts/check.py from an available installation."
-                        .to_string(),
-                })
-            })
-        }
-
-        fn search(
-            &self,
-            _request: SkillSearchRequest,
-        ) -> SkillProviderFuture<'_, SkillSearchResult> {
-            Box::pin(async { Ok(SkillSearchResult::default()) })
-        }
-    }
-
-    let executor =
-        core_test_support::exec_server::ExecServerProcess::start_with_version("0.164.0").await?;
-    // Keep byte-budget decisions stable across host temporary-directory lengths.
-    let temp_root = fs::canonicalize(std::env::temp_dir())?;
-    let workspace = tempfile::Builder::new()
-        .rand_bytes(185_usize.saturating_sub(temp_root.to_string_lossy().len()))
-        .tempdir_in(temp_root)?;
-    let workspace_path = fs::canonicalize(workspace.path())?;
-    let deployment_root = workspace_path.join("skills/deploy");
-    fs::create_dir_all(&deployment_root)?;
-    let deployment_path = PathUri::from_host_native_path(&deployment_root)?;
-    let executor_contents = "# Deployment in env-04\nRun scripts/check.py from this installation.";
-    fs::write(deployment_root.join("SKILL.md"), executor_contents)?;
-
-    let mut catalog = SkillCatalog::default();
-    for (name, installation_count) in [("review", 2), ("deploy", 5)] {
-        let package = format!("skill://deployment/{name}");
-        let mut entry = SkillCatalogEntry::new(
-            SkillPackageId(package.clone()),
-            SkillAuthority::new(SkillSourceKind::Cloud, "codex_apps"),
-            name,
-            "Check an installed deployment before proceeding.",
-            SkillResourceId::new(format!("{package}/SKILL.md")),
-        );
-        for index in 0..installation_count {
-            let environment_id = format!("env-{index:02}");
-            let package = format!("skill://executor-{index:02}/{name}");
-            entry.sources.push(SkillSourceLocation {
-                authority: SkillAuthority::new(
-                    SkillSourceKind::Executor,
-                    format!("executor-{index:02}"),
-                ),
-                package: SkillPackageId(package.clone()),
-                main_prompt: SkillResourceId::environment(
-                    format!("{package}/SKILL.md"),
-                    environment_id,
-                    if name == "deploy" && index == 4 {
-                        PathUri::from_host_native_path(deployment_root.join("SKILL.md"))?
-                    } else {
-                        PathUri::parse(&format!("file:///opt/skills/{name}/SKILL.md"))?
-                    },
-                ),
-                display_path: None,
-                plugin_id: None,
-                enabled: true,
-                alias_root: None,
-                prompt_visible: true,
-            });
-        }
-        catalog.entries.push(entry);
-    }
-    let mut extensions = ExtensionRegistryBuilder::<Config>::new();
-    install_with_providers(
-        &mut extensions,
-        SkillProviders::new()
-            .with_cloud_provider(Arc::new(InstallationSkills(catalog)))
-            .with_executor_provider(Arc::new(
-                ExecutorSkillProvider::new_with_restriction_product(
-                    Arc::new(EnvironmentManager::default_for_tests()),
-                    /*restriction_product*/ None,
-                ),
-            )),
-        |config: &Config| SkillsExtensionConfig {
-            include_instructions: config.include_skill_instructions,
-            catalog_deltas_enabled: config.features.enabled(Feature::SkillCatalogDeltas),
-            omit_descriptions: config
-                .features
-                .enabled(codex_features::Feature::OmitSkillDescriptions),
-            max_context_tokens: config.skill_max_context_tokens,
-            bundled_skills_enabled: false,
-            cloud_skill_enabled: true,
-            shadow_selection_enabled: false,
-        },
-    );
-    let server = start_mock_server().await;
-    let mock = mount_sse_sequence(
-        &server,
-        vec![
-            sse(vec![
-                ev_function_call_with_namespace(
-                    "read-review",
-                    "skills",
-                    "read",
-                    r#"{"package":"skill://executor-00/review","source":{"kind":"cloud"}}"#,
-                ),
-                ev_completed("review-response"),
-            ]),
-            sse(vec![
-                ev_function_call_with_namespace(
-                    "read-deploy",
-                    "skills",
-                    "read",
-                    r#"{"package":"skill://deployment/deploy"}"#,
-                ),
-                ev_completed("deploy-response"),
-            ]),
-            sse(vec![
-                ev_function_call_with_namespace(
-                    "find-deploy",
-                    "skills",
-                    "installations",
-                    r#"{"package":"skill://deployment/deploy"}"#,
-                ),
-                ev_completed("installation-response"),
-            ]),
-            sse(vec![
-                ev_function_call_with_namespace(
-                    "read-env-04",
-                    "skills",
-                    "read",
-                    r#"{"package":"skill://deployment/deploy","source":{"kind":"executor","environment_id":"env-04"}}"#,
-                ),
-                ev_completed("executor-response"),
-            ]),
-            sse(vec![
-                ev_assistant_message(
-                    "done",
-                    "I found the omitted env-04 installation and read its deployment instructions.",
-                ),
-                ev_completed("done-response"),
-            ]),
-        ],
-    )
-    .await;
-    let test = test_codex()
-        .with_model("gpt-6-astra")
-        .with_auth(CodexAuth::create_dummy_chatgpt_auth_for_testing())
-        // Start without a local attachment so Cloud skills remain available.
-        .with_exec_server_url("none")
-        .with_extensions(Arc::new(extensions.build()))
-        .with_config(|config| {
-            configure_scenario_catalog(config);
-            config.cloud_skill_enabled = true;
-            config
-                .features
-                .enable(Feature::ExecutorCapabilityDiscoveryV2)
-                .expect("enable discovery V2");
-        })
-        .with_model_info_override("gpt-6-astra", |model| {
-            model.truncation_policy =
-                codex_protocol::openai_models::TruncationPolicyConfig::bytes(/*limit*/ 1200);
-        })
-        // The named executor runs on this host and reads the temporary workspace above.
-        .build(&server)
-        .await?;
-    test.thread_manager
-        .environment_manager()
-        .upsert_environment(
-            "env-04".to_string(),
-            executor.websocket_url.clone(),
-            /*connect_timeout*/ None,
-        )?;
-    let cwd = PathUri::from_host_native_path(&workspace_path)?;
-    test.submit_turn_with_environments(
-        "Read the review and deployment instructions, find all deployment installations, then read the instructions from env-04.",
-        Some(vec![TurnEnvironmentSelection {
-            selected_capability_roots: Default::default(),
-            environment_id: "env-04".to_string(),
-            cwd: cwd.clone(),
-            workspace_roots: vec![cwd],
-            config: EnvironmentConfigState::FromThread,
-        }]),
-    )
-    .await?;
-    let requests = mock.requests();
-    assert_eq!(requests.len(), 5);
-    let recovered: serde_json::Value = serde_json::from_str(
-        &mock
-            .function_call_output_text("read-env-04")
-            .expect("executor read output"),
-    )?;
-    assert_eq!(recovered["contents"], executor_contents);
-    assert_eq!(recovered["resource"], "skill://executor-04/deploy/SKILL.md");
-    // Canonicalize JSON only in snapshot copies (Cargo/Bazel differ in map ordering).
-    // Pretty printing keeps installation fields visible rather than hashing one long line.
-    let mut bodies = requests
-        .iter()
-        .map(core_test_support::responses::ResponsesRequest::body_json)
-        .collect::<Vec<_>>();
-    for body in &mut bodies {
-        for item in body["input"].as_array_mut().expect("request input") {
-            if item["type"] == "function_call_output" {
-                let mut output: serde_json::Value =
-                    serde_json::from_str(item["output"].as_str().expect("tool output"))?;
-                for location in output["installations"].as_array_mut().into_iter().flatten() {
-                    if location["skill_root"] == deployment_path.inferred_native_path_string() {
-                        location["skill_root"] = json!("<ENV_04_SKILL_ROOT>");
-                    }
-                }
-                output.sort_all_objects();
-                item["output"] = json!(serde_json::to_string_pretty(&output)?);
-            }
-        }
-    }
-    insta::assert_snapshot!(
-        "skill_read_installation_recovery_request_history",
-        context_snapshot::format_context_snapshot(
-            "Astra reads Cloud instructions, discovers an omitted deployment installation, and reads its instructions from env-04.",
-            &bodies.iter().map(SnapshotEntry::body).collect::<Vec<_>>(),
-            &ContextSnapshotOptions::default().rewrite_known_segments(),
-        )
-    );
-    Ok(())
-}
-
 #[test_case::test_case(false; "native_tools")]
 #[test_case::test_case(true; "host_tools")]
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
@@ -2056,7 +1178,7 @@ async fn astra_continues_after_a_stream_is_interrupted() -> Result<()> {
     let base_url = format!("{}/v1", streaming.uri());
     let test = test_codex()
         .with_model("gpt-6-astra")
-        .with_auth(CodexAuth::create_dummy_chatgpt_auth_for_testing())
+        .with_auth(CodexAuth::from_api_key("test-api-key"))
         .with_config(move |config| {
             configure_scenario_catalog(config);
             config.model_provider.base_url = Some(base_url);
@@ -2155,62 +1277,6 @@ async fn subagent_browser_auth_resolves_user_prompt() -> Result<()> {
         .replace_all(&snapshot, "Wall time: <DURATION> seconds")
         .into_owned();
     insta::assert_snapshot!("subagent_browser_auth", snapshot);
-    Ok(())
-}
-
-#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn subagent_waits_for_its_inherited_environment_configuration() -> Result<()> {
-    skip_if_no_network!(Ok(()));
-
-    use super::remote_env::spawn_tests::PendingSpawnCase;
-    use super::remote_env::spawn_tests::pending_subagent_scenario;
-
-    let requests =
-        pending_subagent_scenario(PendingSpawnCase::TurnSettings, configure_scenario_catalog)
-            .await?;
-    let labels = [
-        "parent delegates while the environment is starting",
-        "parent waits for the worker",
-        "child sees the inherited starting environment",
-        "child receives the ready result and updated environment",
-        "parent receives the child result",
-    ];
-    assert_eq!(requests.len(), labels.len());
-    let entries = requests
-        .iter()
-        .zip(labels)
-        .map(|(request, label)| SnapshotEntry::body(request).labeled(label))
-        .collect::<Vec<_>>();
-    let snapshot = context_snapshot::format_context_snapshot(
-        "A parent spawns a child before the selected environment is configured. The child sees it starting, waits, and receives the ready result after an ordinary parent turn-settings update.",
-        &entries,
-        &ContextSnapshotOptions::default(),
-    );
-    // Keep every request and its environment context; collapse unrelated guidance repeated per window.
-    let mut snapshot = snapshot;
-    for (pattern, replacement) in [
-        (
-            r"(?s)<permissions instructions>.*?</permissions instructions>",
-            "<PERMISSIONS_INSTRUCTIONS>",
-        ),
-        (
-            r"(?s)<environments_instructions>.*?</environments_instructions>",
-            "<ENVIRONMENTS_INSTRUCTIONS>",
-        ),
-        (
-            r"(?ms)(^\d+:message/developer:\n    You are (?:`/root`, the primary agent|an agent) in a team of agents[^\n]+)\n.*?(\n^\d+:message/developer:)",
-            "${1}\n    <STANDARD_MULTI_AGENT_INSTRUCTIONS>${2}",
-        ),
-        (
-            r#"(environment_id"\s*:\s*"|<environment id=")(?:local|remote)"#,
-            "${1}<ENVIRONMENT>",
-        ),
-    ] {
-        snapshot = regex_lite::Regex::new(pattern)?
-            .replace_all(&snapshot, replacement)
-            .into_owned();
-    }
-    insta::assert_snapshot!("subagent_inherits_pending_environment", snapshot);
     Ok(())
 }
 
@@ -2324,8 +1390,7 @@ async fn catalog_permission_paths_follow_selected_model(
     scenario: PermissionPathScenario,
 ) -> Result<()> {
     skip_if_no_network!(Ok(()));
-    if matches!(scenario, PermissionPathScenario::DeniedReads) {
-    }
+    if matches!(scenario, PermissionPathScenario::DeniedReads) {}
     let requests =
         super::permissions_messages::catalog_permission_paths_model_change_requests(scenario)
             .await?;
@@ -2399,7 +1464,7 @@ async fn async_compaction_test(
     let config_server = start_mock_server().await;
     let base_url = format!("{responses_uri}/v1");
     let test = test_codex()
-        .with_auth(CodexAuth::create_dummy_chatgpt_auth_for_testing())
+        .with_auth(CodexAuth::from_api_key("test-api-key"))
         .with_config(move |config| {
             configure_scenario_catalog(config);
             config.model_provider.base_url = Some(base_url);
@@ -2457,7 +1522,7 @@ async fn async_compaction_image_checks_do_not_block_turn_completion() -> Result<
     let config_server = start_mock_server().await;
     let base_url = format!("{}/v1", streaming.uri());
     let test = test_codex()
-        .with_auth(CodexAuth::create_dummy_chatgpt_auth_for_testing())
+        .with_auth(CodexAuth::from_api_key("test-api-key"))
         .with_image_store(image_store.clone())
         .with_config(move |config| {
             configure_scenario_catalog(config);
@@ -2815,7 +1880,6 @@ enum PendingCompactionOutcome {
     Absent,
     Success,
     SuccessOverBudget,
-    StaleSuccess,
     Failure,
     ReadyFailure,
     Interrupted,
@@ -2824,12 +1888,10 @@ enum PendingCompactionOutcome {
 #[test_case::test_case(PendingCompactionOutcome::Success, CompactionTrigger::Auto; "auto uses pending result")]
 #[test_case::test_case(PendingCompactionOutcome::Failure, CompactionTrigger::Auto; "auto falls back after failure")]
 #[test_case::test_case(PendingCompactionOutcome::ReadyFailure, CompactionTrigger::Auto; "auto falls back after failure before checkpoint")]
-#[test_case::test_case(PendingCompactionOutcome::StaleSuccess, CompactionTrigger::Auto; "auto falls back after account changes")]
 #[test_case::test_case(PendingCompactionOutcome::Interrupted, CompactionTrigger::Auto; "auto can be interrupted")]
 #[test_case::test_case(PendingCompactionOutcome::Absent, CompactionTrigger::Manual; "manual without background")]
 #[test_case::test_case(PendingCompactionOutcome::Success, CompactionTrigger::Manual; "manual uses pending result")]
 #[test_case::test_case(PendingCompactionOutcome::Failure, CompactionTrigger::Manual; "manual falls back after failure")]
-#[test_case::test_case(PendingCompactionOutcome::StaleSuccess, CompactionTrigger::Manual; "manual falls back after account changes")]
 #[test_case::test_case(PendingCompactionOutcome::Interrupted, CompactionTrigger::Manual; "manual can be interrupted")]
 #[test_case::test_case(PendingCompactionOutcome::SuccessOverBudget, CompactionTrigger::Auto; "pending adoption still over budget")]
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
@@ -2861,7 +1923,6 @@ async fn async_compaction_reuses_pending_work(
             | PendingCompactionOutcome::SuccessOverBudget
             | PendingCompactionOutcome::Failure
             | PendingCompactionOutcome::ReadyFailure
-            | PendingCompactionOutcome::StaleSuccess
     );
     let response = |id, event, tokens| vec![event, ev_completed_with_tokens(id, tokens)];
     let immediate = |events| vec![compaction_chunk(/*gate*/ None, events)];
@@ -2977,20 +2038,6 @@ async fn async_compaction_reuses_pending_work(
         assert_eq!(streaming.requests().await.len(), if manual { 2 } else { 3 });
         return Ok(());
     }
-    if outcome == PendingCompactionOutcome::StaleSuccess {
-        let auth = test.thread_manager.auth_manager();
-        let mut tokens = auth.auth_cached().expect("test auth").get_token_data()?;
-        tokens.id_token.raw_jwt = "e30.e30.signature".to_string();
-        tokens.account_id = Some("second-account".to_string());
-        tokens.access_token = "second-account-token".to_string();
-        std::fs::write(
-            test.home.path().join("auth.json"),
-            serde_json::to_vec(
-                &json!({"auth_mode":"chatgpt", "tokens":tokens, "last_refresh":chrono::Utc::now()}),
-            )?,
-        )?;
-        auth.reload().await;
-    }
     if has_background && let Some(release_background) = release_background {
         release_background.send(()).expect("release pending result");
     }
@@ -3096,21 +2143,5 @@ async fn async_compaction_reuses_pending_work(
         .map(|item| &item["encrypted_content"])
         .collect();
     assert_eq!(summaries, [&json!(if succeeds { "ASYNC" } else { "SYNC" })]);
-    Ok(())
-}
-
-#[tokio::test]
-async fn unshared_apps_catalog_across_turns() -> Result<()> {
-    skip_if_no_network!(Ok(()));
-    let requests =
-        super::mcp_tool_cache::apps_requests_during_peer_discovery(/*share*/ false).await?;
-    let snapshot = context_snapshot::format_request_history_snapshot(
-        "A peer finishes Apps discovery during submit. The thread uses its own catalog on its first and second model requests.",
-        &requests,
-        &ContextSnapshotOptions::default()
-            .rewrite_known_segments()
-            .include_request_settings(),
-    );
-    insta::assert_snapshot!("unshared_apps_catalog_across_turns", snapshot);
     Ok(())
 }

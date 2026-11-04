@@ -140,7 +140,7 @@ async fn handle_spawn_agent(
         ThreadSpawnError::Backend(err) => {
             record_collab_spawn_failure(
                 &turn.session_telemetry,
-                turn.config.apps_mcp_product_sku.as_deref(),
+                /*product_sku*/ None,
                 &err,
                 &call_id,
                 &turn.sub_id,

@@ -101,7 +101,6 @@ pub(crate) fn without_notification_media(notification: ServerNotification) -> Se
         | ServerNotification::McpServerEventStream(_)
         | ServerNotification::AccountUpdated(_)
         | ServerNotification::AccountRateLimitsUpdated(_)
-        | ServerNotification::RemoteControlStatusChanged(_)
         | ServerNotification::FsChanged(_)
         | ServerNotification::ReasoningSummaryTextDelta(_)
         | ServerNotification::ReasoningSummaryPartAdded(_)
@@ -119,8 +118,7 @@ pub(crate) fn without_notification_media(notification: ServerNotification) -> Se
         | ServerNotification::ConfigWarning(_)
         | ServerNotification::FuzzyFileSearchSessionUpdated(_)
         | ServerNotification::FuzzyFileSearchSessionCompleted(_)
-        | ServerNotification::AccountLoginCompleted(_)
-        | ServerNotification::GatewayOAuthChanged(_) => notification,
+        | ServerNotification::AccountLoginCompleted(_) => notification,
     }
 }
 

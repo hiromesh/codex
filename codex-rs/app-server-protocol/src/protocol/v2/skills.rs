@@ -73,8 +73,6 @@ pub struct SkillMetadata {
     pub path: LegacyAppPathString,
     pub scope: SkillScope,
     pub enabled: bool,
-    /// Owning plugin ID, matching `PluginSummary.id`, when known.
-    pub plugin_id: Option<String>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, JsonSchema, TS)]
@@ -89,9 +87,9 @@ pub struct SkillInterface {
     pub icon_small: Option<AbsolutePathBuf>,
     #[ts(optional)]
     pub icon_large: Option<AbsolutePathBuf>,
-    /// Remote small icon URL from the plugin catalog.
+    /// Remote small icon URL.
     pub icon_small_url: Option<String>,
-    /// Remote large icon URL from the plugin catalog.
+    /// Remote large icon URL.
     pub icon_large_url: Option<String>,
     #[ts(optional)]
     pub brand_color: Option<String>,
@@ -176,7 +174,6 @@ impl From<CoreSkillMetadata> for SkillMetadata {
             path: value.path.into(),
             scope: value.scope.into(),
             enabled: true,
-            plugin_id: None,
         }
     }
 }

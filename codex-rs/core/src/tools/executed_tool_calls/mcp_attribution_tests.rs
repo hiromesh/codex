@@ -10,7 +10,6 @@ use pretty_assertions::assert_eq;
 fn source(tool_name: &str, first_turn_id: &str) -> McpAttributionSource {
     McpAttributionSource {
         connector_id: None,
-        plugin_id: None,
         server_name: "example".to_string(),
         tool_name: tool_name.to_string(),
         first_turn_id: first_turn_id.to_string(),

@@ -63,7 +63,7 @@ impl AuthManager {
     /// CLI callers without a discovery owner retain their existing routing behavior.
     pub async fn workspace_routing(
         &self,
-        auth: &CodexAuth,
+        _auth: &CodexAuth,
         request: WorkspaceRoutingRequest,
     ) -> io::Result<Option<WorkspaceRouting>> {
         let Some(resolver) = self.workspace_routing_resolver.get() else {
@@ -77,11 +77,7 @@ impl AuthManager {
         let routing = resolver.resolve(request).await?;
         // Discovery may recover expired credentials for the same owner. Model
         // client setup rebuilds routing and credentials after that revision change.
-        if auth_changes.borrow().owner_generation != owner_generation
-            || routing.as_ref().is_some_and(|routing| {
-                auth.get_account_id().as_deref() != Some(routing.chatgpt_account_id.as_str())
-            })
-        {
+        if auth_changes.borrow().owner_generation != owner_generation {
             return Err(io::Error::other(
                 "account changed during workspace routing discovery",
             ));

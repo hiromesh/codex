@@ -441,11 +441,8 @@ async fn experimental_feature_enablement_set_ignores_invalid_features() -> Resul
     let actual = set_experimental_feature_enablement(
         &mut mcp,
         BTreeMap::from([
-            ("apps".to_string(), false),
             ("auth_elicitation".to_string(), true),
-            ("connectors".to_string(), false),
             ("personality".to_string(), false),
-            ("plugins".to_string(), false),
             ("tool_call_mcp_elicitation".to_string(), false),
             ("unknown_feature".to_string(), true),
         ]),

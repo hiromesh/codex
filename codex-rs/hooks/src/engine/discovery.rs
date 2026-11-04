@@ -63,10 +63,7 @@ struct HookHandlerSource<'a> {
     bypass_hook_trust: bool,
     hook_states: &'a HashMap<String, HookStateToml>,
     env: HashMap<String, String>,
-    plugin_id: Option<String>,
-    plugin_content_hash: Option<&'a std::io::Result<String>>,
     config_layer_stack: Option<&'a ConfigLayerStack>,
-    plugin_root: Option<&'a AbsolutePathBuf>,
 }
 
 enum HookRequirement<'a> {
@@ -159,11 +156,8 @@ pub(crate) fn discover_handlers(
                 bypass_hook_trust: false,
                 hook_states: &hook_states,
                 env: HashMap::new(),
-                plugin_id: None,
-                plugin_content_hash: None,
                 config_layer_stack: None,
-                plugin_root: None,
-            };
+                };
             if !policy.allows(&policy_source) {
                 continue;
             }
@@ -202,11 +196,8 @@ pub(crate) fn discover_handlers(
                         bypass_hook_trust: policy.bypass_hook_trust,
                         hook_states: &hook_states,
                         env: HashMap::new(),
-                        plugin_id: None,
-                        plugin_content_hash: None,
                         config_layer_stack: None,
-                        plugin_root: None,
-                    },
+                                },
                     hook_events,
                     policy,
                 );
@@ -250,10 +241,7 @@ fn append_managed_requirement_handlers(
             bypass_hook_trust: false,
             hook_states,
             env: HashMap::new(),
-            plugin_id: None,
-            plugin_content_hash: None,
             config_layer_stack: None,
-            plugin_root: None,
         },
         managed_hooks.get().hooks.as_ref().clone(),
         policy,
@@ -464,10 +452,7 @@ fn append_environment_hooks(
             bypass_hook_trust: false,
             hook_states: &HashMap::new(),
             env: HashMap::new(),
-            plugin_id: None,
-            plugin_content_hash: None,
             config_layer_stack: None,
-            plugin_root: None,
         },
         source.hooks,
         HookDiscoveryPolicy {
@@ -731,7 +716,6 @@ fn append_matcher_groups(
                 additional_context_limit,
                 source_path: source.path.clone(),
                 source: source.source,
-                plugin_id: source.plugin_id.clone(),
                 environment_id: None,
                 display_order: *display_order,
                 enabled,
@@ -939,10 +923,7 @@ mod tests {
             bypass_hook_trust: false,
             hook_states,
             env: std::collections::HashMap::new(),
-            plugin_id: None,
-            plugin_content_hash: None,
             config_layer_stack: None,
-            plugin_root: None,
         }
     }
 
@@ -960,10 +941,7 @@ mod tests {
             bypass_hook_trust,
             hook_states,
             env: std::collections::HashMap::new(),
-            plugin_id: None,
-            plugin_content_hash: None,
             config_layer_stack: None,
-            plugin_root: None,
         }
     }
 

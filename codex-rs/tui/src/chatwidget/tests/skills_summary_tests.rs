@@ -22,7 +22,6 @@ async fn manage_skills_summary_snapshot() {
                 .into(),
             scope: crate::test_support::skill_scope_user(),
             enabled,
-            plugin_id: None,
         })
         .collect();
     drain_insert_history(&mut rx);

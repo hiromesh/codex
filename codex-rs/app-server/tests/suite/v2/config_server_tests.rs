@@ -143,7 +143,7 @@ wire_api = 'responses'
         )?;
         std::fs::write(
             home.path().join("config.toml"),
-            "model = 'gpt-5.5'\napproval_policy = 'never'\nsandbox_mode = 'read-only'\n[features]\napps = false\n",
+            "model = 'gpt-5.5'\napproval_policy = 'never'\nsandbox_mode = 'read-only'\n",
         )?;
         Ok(Self {
             home,

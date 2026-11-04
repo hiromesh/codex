@@ -97,7 +97,6 @@ impl Session {
         if !matches!(scope, RuntimeConfigRefresh::UserFiles) {
             for (feature, description) in [
                 (Feature::Mcp20260728, "MCP protocol"),
-                (Feature::CodexAppsMcp20260728, "Codex Apps MCP protocol"),
             ] {
                 if let Err(err) = config
                     .features
@@ -162,7 +161,6 @@ impl Session {
             }
             if matches!(scope, RuntimeConfigRefresh::UserFiles) {
                 self.services.skills_service.clear_cache();
-                self.services.plugins_manager.clear_cache();
             }
             // A host refresh carries current rollout settings for recording. A
             // legacy file reload uses its original snapshot and bypasses this path.

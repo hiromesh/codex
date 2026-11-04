@@ -272,7 +272,6 @@ fn thread_resume_params_accept_turns_page_bootstrap() {
 #[test]
 fn thread_resume_response_round_trips_initial_turns_page() {
     let response = ThreadResumeResponse {
-        disabled_plugin_ids: Vec::new(),
         thread: Thread {
             originator: Some("future_client".to_string()),
             environments: Some(vec![ThreadEnvironment {
@@ -2027,7 +2026,6 @@ fn config_granular_approval_policy_is_marked_experimental() {
         model_verbosity: None,
         service_tier: None,
         analytics: None,
-        apps: None,
         browser_use: None,
         computer_use: None,
         desktop: None,
@@ -2062,7 +2060,6 @@ fn config_approvals_reviewer_is_marked_experimental() {
         model_verbosity: None,
         service_tier: None,
         analytics: None,
-        apps: None,
         browser_use: None,
         computer_use: None,
         desktop: None,
@@ -2098,7 +2095,6 @@ fn config_requirements_granular_allowed_approval_policy_is_marked_experimental()
             allow_managed_hooks_only: None,
             allow_browser_and_computer_use: None,
             allow_appshots: None,
-            allow_remote_control: None,
             computer_use: None,
             browser_use: None,
             in_app_browser: None,
@@ -2580,7 +2576,6 @@ fn mcp_server_status_serializes_absent_server_info_as_null() {
             tools_error: None,
             name: "not-ready".to_string(),
             runtime_status: None,
-            plugin_id: None,
             http_origin: None,
             server_info: None,
             tools: HashMap::new(),
@@ -2597,7 +2592,6 @@ fn mcp_server_status_serializes_absent_server_info_as_null() {
             "data": [{
                 "name": "not-ready",
                 "runtimeStatus": null,
-                "pluginId": null,
                 "httpOrigin": null,
                 "serverInfo": null,
                 "serverCapabilities": null,
@@ -2617,7 +2611,6 @@ fn mcp_server_status_serializes_absent_server_info_as_null() {
 fn mcp_server_status_accepts_older_inventory_without_runtime_status() {
     let status: McpServerStatus = serde_json::from_value(json!({
         "name": "older-server",
-        "pluginId": null,
         "serverInfo": null,
         "tools": {},
         "resources": [],
@@ -2633,7 +2626,6 @@ fn mcp_server_status_accepts_older_inventory_without_runtime_status() {
             tools_error: None,
             name: "older-server".to_string(),
             runtime_status: None,
-            plugin_id: None,
             http_origin: None,
             server_info: None,
             tools: HashMap::new(),
@@ -2708,7 +2700,6 @@ fn mcp_server_status_serializes_absent_server_info_metadata_as_null() {
             tools_error: None,
             name: "initialized".to_string(),
             runtime_status: None,
-            plugin_id: Some("lookup@test".to_string()),
             http_origin: None,
             server_info: Some(McpServerInfo {
                 name: "lookup-server".to_string(),
@@ -2732,7 +2723,6 @@ fn mcp_server_status_serializes_absent_server_info_metadata_as_null() {
             "data": [{
                 "name": "initialized",
                 "runtimeStatus": null,
-                "pluginId": "lookup@test",
                 "httpOrigin": null,
                 "serverCapabilities": null,
                 "toolListMeta": null,
@@ -3211,8 +3201,6 @@ fn core_turn_item_into_thread_item_converts_supported_variants() {
         model_context: None,
         sandbox_type: None,
         id: "exec-1".to_string(),
-        plugin_id: Some("sample@openai-curated".to_string()),
-        script_path: Some("scripts/run.py".to_string()),
         process_id: Some("pid-1".to_string()),
         command: vec![
             "git".to_string(),
@@ -3242,8 +3230,6 @@ fn core_turn_item_into_thread_item_converts_supported_variants() {
             model_context: None,
             sandbox_type: None,
             id: "exec-1".to_string(),
-            plugin_id: Some("sample@openai-curated".to_string()),
-            script_path: Some("scripts/run.py".to_string()),
             command: "git -c 'http.extraHeader=Authorization: Bearer [REDACTED_SECRET]' -c 'http.extraHeader=X-Trace:example' push"
                 .to_string(),
             cwd: LegacyAppPathString::from_abs_path(&test_path_buf("/tmp").abs()),
@@ -3469,13 +3455,6 @@ fn core_turn_item_into_thread_item_converts_supported_variants() {
         server: "server".to_string(),
         tool: "tool".to_string(),
         arguments: json!({"arg": "value"}),
-        connector_id: Some("calendar".to_string()),
-        mcp_app_resource_uri: Some("app://connector".to_string()),
-        mcp_app_ui: None,
-        link_id: Some("link_calendar".to_string()),
-        app_name: Some("Calendar".to_string()),
-        action_name: Some("create_event".to_string()),
-        plugin_id: Some("sample@test".to_string()),
         read_only_hint: Some(true),
         status: CoreMcpToolCallStatus::InProgress,
         result: None,
@@ -3491,16 +3470,6 @@ fn core_turn_item_into_thread_item_converts_supported_variants() {
             tool: "tool".to_string(),
             status: McpToolCallStatus::InProgress,
             arguments: json!({"arg": "value"}),
-            app_context: Some(McpToolCallAppContext {
-                connector_id: "calendar".to_string(),
-                link_id: Some("link_calendar".to_string()),
-                resource_uri: Some("app://connector".to_string()),
-                app_name: Some("Calendar".to_string()),
-                action_name: Some("create_event".to_string()),
-            }),
-            mcp_app_resource_uri: Some("app://connector".to_string()),
-            mcp_app_ui: None,
-            plugin_id: Some("sample@test".to_string()),
             read_only_hint: Some(true),
             result: None,
             error: None,
@@ -3513,13 +3482,6 @@ fn core_turn_item_into_thread_item_converts_supported_variants() {
         server: "server".to_string(),
         tool: "tool".to_string(),
         arguments: JsonValue::Null,
-        connector_id: None,
-        mcp_app_resource_uri: None,
-        mcp_app_ui: None,
-        link_id: None,
-        app_name: None,
-        action_name: None,
-        plugin_id: None,
         read_only_hint: Some(false),
         status: CoreMcpToolCallStatus::Completed,
         result: Some(CallToolResult {
@@ -3540,10 +3502,6 @@ fn core_turn_item_into_thread_item_converts_supported_variants() {
             tool: "tool".to_string(),
             status: McpToolCallStatus::Completed,
             arguments: JsonValue::Null,
-            app_context: None,
-            mcp_app_resource_uri: None,
-            mcp_app_ui: None,
-            plugin_id: None,
             read_only_hint: Some(false),
             result: Some(Box::new(McpToolCallResult {
                 content: vec![json!({"type": "text", "text": "ok"})],
@@ -3553,78 +3511,6 @@ fn core_turn_item_into_thread_item_converts_supported_variants() {
             error: None,
             duration_ms: Some(42),
         }
-    );
-}
-
-#[test]
-fn mcp_tool_call_app_context_serializes_connector_id() {
-    let item = ThreadItemPayload::McpToolCall {
-        id: "mcp-1".to_string(),
-        server: "codex_apps".to_string(),
-        tool: "calendar.create_event".to_string(),
-        status: McpToolCallStatus::InProgress,
-        arguments: json!({}),
-        app_context: Some(McpToolCallAppContext {
-            connector_id: "calendar".to_string(),
-            link_id: Some("link_calendar".to_string()),
-            resource_uri: Some("app://connector".to_string()),
-            app_name: Some("Calendar".to_string()),
-            action_name: Some("create_event".to_string()),
-        }),
-        mcp_app_resource_uri: Some("app://connector".to_string()),
-        mcp_app_ui: None,
-        plugin_id: None,
-        read_only_hint: Some(false),
-        result: None,
-        error: None,
-        duration_ms: None,
-    };
-
-    assert_eq!(
-        serde_json::to_value(item).expect("MCP tool call should serialize"),
-        json!({
-            "type": "mcpToolCall",
-            "id": "mcp-1",
-            "server": "codex_apps",
-            "tool": "calendar.create_event",
-            "status": "inProgress",
-            "arguments": {},
-            "appContext": {
-                "connectorId": "calendar",
-                "linkId": "link_calendar",
-                "resourceUri": "app://connector",
-                "appName": "Calendar",
-                "actionName": "create_event",
-            },
-            "mcpAppResourceUri": "app://connector",
-            "mcpAppUi": null,
-            "pluginId": null,
-            "readOnlyHint": false,
-            "result": null,
-            "error": null,
-            "durationMs": null,
-        })
-    );
-}
-
-#[test]
-fn mcp_tool_call_app_context_serializes_missing_mixed_version_fields_as_null() {
-    assert_eq!(
-        serde_json::to_value(McpToolCallAppContext {
-            connector_id: "calendar".to_string(),
-            link_id: None,
-            resource_uri: None,
-            app_name: None,
-            action_name: None,
-        })
-        .expect("MCP tool call app context should serialize"),
-        json!({
-            "connectorId": "calendar",
-            "linkId": null,
-            "resourceUri": null,
-            "appName": null,
-            "actionName": null,
-        })
     );
 }
 
@@ -3806,838 +3692,6 @@ fn skills_extra_roots_set_params_rejects_relative_roots() {
         "extraRoots": ["relative/path"],
     }));
     assert!(result.is_err());
-}
-
-#[test]
-fn plugin_source_serializes_local_git_npm_and_remote_variants() {
-    let local_path = if false {
-        r"C:\plugins\linear"
-    } else {
-        "/plugins/linear"
-    };
-    let local_path = AbsolutePathBuf::try_from(PathBuf::from(local_path)).unwrap();
-    let local_path_json = local_path.as_path().display().to_string();
-
-    assert_eq!(
-        serde_json::to_value(PluginSource::Local { path: local_path }).unwrap(),
-        json!({
-            "type": "local",
-            "path": local_path_json,
-        }),
-    );
-
-    assert_eq!(
-        serde_json::to_value(PluginSource::Git {
-            url: "https://github.com/openai/example.git".to_string(),
-            path: Some("plugins/example".to_string()),
-            ref_name: Some("main".to_string()),
-            sha: Some("abc123".to_string()),
-        })
-        .unwrap(),
-        json!({
-            "type": "git",
-            "url": "https://github.com/openai/example.git",
-            "path": "plugins/example",
-            "refName": "main",
-            "sha": "abc123",
-        }),
-    );
-
-    assert_eq!(
-        serde_json::to_value(PluginSource::Npm {
-            package: "@acme/plugin".to_string(),
-            version: Some("^1.2.0".to_string()),
-            registry: Some("https://npm.example.com".to_string()),
-        })
-        .unwrap(),
-        json!({
-            "type": "npm",
-            "package": "@acme/plugin",
-            "version": "^1.2.0",
-            "registry": "https://npm.example.com",
-        }),
-    );
-
-    assert_eq!(
-        serde_json::to_value(PluginSource::Remote).unwrap(),
-        json!({
-            "type": "remote",
-        }),
-    );
-}
-
-#[test]
-fn marketplace_add_params_serialization_uses_optional_ref_name_and_sparse_paths() {
-    assert_eq!(
-        serde_json::to_value(MarketplaceAddParams {
-            source: "owner/repo".to_string(),
-            ref_name: None,
-            sparse_paths: None,
-        })
-        .unwrap(),
-        json!({
-            "source": "owner/repo",
-            "refName": null,
-            "sparsePaths": null,
-        }),
-    );
-
-    assert_eq!(
-        serde_json::to_value(MarketplaceAddParams {
-            source: "owner/repo".to_string(),
-            ref_name: Some("main".to_string()),
-            sparse_paths: Some(vec!["plugins/foo".to_string()]),
-        })
-        .unwrap(),
-        json!({
-            "source": "owner/repo",
-            "refName": "main",
-            "sparsePaths": ["plugins/foo"],
-        }),
-    );
-}
-
-#[test]
-fn marketplace_upgrade_params_serialization_uses_optional_marketplace_name() {
-    assert_eq!(
-        serde_json::to_value(MarketplaceUpgradeParams {
-            marketplace_name: None,
-        })
-        .unwrap(),
-        json!({
-            "marketplaceName": null,
-        }),
-    );
-
-    assert_eq!(
-        serde_json::from_value::<MarketplaceUpgradeParams>(json!({})).unwrap(),
-        MarketplaceUpgradeParams {
-            marketplace_name: None,
-        },
-    );
-
-    assert_eq!(
-        serde_json::to_value(MarketplaceUpgradeParams {
-            marketplace_name: Some("debug".to_string()),
-        })
-        .unwrap(),
-        json!({
-            "marketplaceName": "debug",
-        }),
-    );
-}
-
-#[test]
-fn plugin_marketplace_entry_serializes_remote_only_path_as_null() {
-    assert_eq!(
-        serde_json::to_value(PluginMarketplaceEntry {
-            name: "openai-curated-remote".to_string(),
-            path: None,
-            interface: None,
-            plugins: Vec::new(),
-        })
-        .unwrap(),
-        json!({
-            "name": "openai-curated-remote",
-            "path": null,
-            "interface": null,
-            "plugins": [],
-        }),
-    );
-}
-
-#[test]
-fn plugin_interface_serializes_local_paths_and_remote_urls_separately() {
-    let composer_icon = if false {
-        r"C:\plugins\linear\icon.png"
-    } else {
-        "/plugins/linear/icon.png"
-    };
-    let composer_icon = AbsolutePathBuf::try_from(PathBuf::from(composer_icon)).unwrap();
-    let composer_icon_json = composer_icon.as_path().display().to_string();
-    let logo_dark = if false {
-        r"C:\plugins\linear\logo-dark.png"
-    } else {
-        "/plugins/linear/logo-dark.png"
-    };
-    let logo_dark = AbsolutePathBuf::try_from(PathBuf::from(logo_dark)).unwrap();
-    let logo_dark_json = logo_dark.as_path().display().to_string();
-
-    let interface = PluginInterface {
-        display_name: Some("Linear".to_string()),
-        short_description: None,
-        long_description: None,
-        developer_name: None,
-        category: Some("Productivity".to_string()),
-        capabilities: Vec::new(),
-        website_url: None,
-        privacy_policy_url: None,
-        terms_of_service_url: None,
-        default_prompt: None,
-        brand_color: None,
-        composer_icon: Some(composer_icon),
-        composer_icon_url: Some("https://example.com/linear/icon.png".to_string()),
-        logo: None,
-        logo_dark: Some(logo_dark),
-        logo_url: Some("https://example.com/linear/logo.png".to_string()),
-        logo_url_dark: Some("https://example.com/linear/logo-dark.png".to_string()),
-        screenshots: Vec::new(),
-        screenshot_urls: vec!["https://example.com/linear/screenshot.png".to_string()],
-    };
-
-    assert_eq!(
-        serde_json::to_value(interface).unwrap(),
-        json!({
-            "displayName": "Linear",
-            "shortDescription": null,
-            "longDescription": null,
-            "developerName": null,
-            "category": "Productivity",
-            "capabilities": [],
-            "websiteUrl": null,
-            "privacyPolicyUrl": null,
-            "termsOfServiceUrl": null,
-            "defaultPrompt": null,
-            "brandColor": null,
-            "composerIcon": composer_icon_json,
-            "composerIconUrl": "https://example.com/linear/icon.png",
-            "logo": null,
-            "logoDark": logo_dark_json,
-            "logoUrl": "https://example.com/linear/logo.png",
-            "logoUrlDark": "https://example.com/linear/logo-dark.png",
-            "screenshots": [],
-            "screenshotUrls": ["https://example.com/linear/screenshot.png"],
-        }),
-    );
-}
-
-#[test]
-fn plugin_list_params_ignore_removed_force_remote_sync_field() {
-    assert_eq!(
-        serde_json::from_value::<PluginListParams>(json!({
-            "cwds": null,
-            "forceRemoteSync": true,
-        }))
-        .unwrap(),
-        PluginListParams {
-            cwds: None,
-            marketplace_kinds: None,
-            force_refetch: false,
-        },
-    );
-}
-
-#[test]
-fn plugin_list_params_deserializes_force_refetch() {
-    assert_eq!(
-        serde_json::from_value::<PluginListParams>(json!({
-            "forceRefetch": true,
-        }))
-        .unwrap(),
-        PluginListParams {
-            cwds: None,
-            marketplace_kinds: None,
-            force_refetch: true,
-        },
-    );
-}
-
-#[test]
-fn plugin_list_params_serializes_marketplace_kind_filter() {
-    assert_eq!(
-        serde_json::to_value(PluginListParams {
-            cwds: None,
-            marketplace_kinds: Some(vec![
-                PluginListMarketplaceKind::Local,
-                PluginListMarketplaceKind::Vertical,
-                PluginListMarketplaceKind::WorkspaceDirectory,
-                PluginListMarketplaceKind::SharedWithMe,
-                PluginListMarketplaceKind::CreatedByMeRemote,
-            ]),
-            force_refetch: false,
-        })
-        .unwrap(),
-        json!({
-            "cwds": null,
-            "marketplaceKinds": [
-                "local",
-                "vertical",
-                "workspace-directory",
-                "shared-with-me",
-                "created-by-me-remote",
-            ],
-        }),
-    );
-}
-
-#[test]
-fn plugin_installed_params_serializes_install_suggestion_names() {
-    assert_eq!(
-        serde_json::to_value(PluginInstalledParams {
-            cwds: None,
-            install_suggestion_plugin_names: Some(vec![
-                "computer-use".to_string(),
-                "chrome".to_string(),
-            ]),
-        })
-        .unwrap(),
-        json!({
-            "cwds": null,
-            "installSuggestionPluginNames": [
-                "computer-use",
-                "chrome",
-            ],
-        }),
-    );
-}
-
-#[test]
-fn plugin_read_params_serialization_uses_install_source_fields() {
-    let marketplace_path = if false {
-        r"C:\plugins\marketplace.json"
-    } else {
-        "/plugins/marketplace.json"
-    };
-    let marketplace_path = AbsolutePathBuf::try_from(PathBuf::from(marketplace_path)).unwrap();
-    let marketplace_path_json = marketplace_path.as_path().display().to_string();
-    assert_eq!(
-        serde_json::to_value(PluginReadParams {
-            marketplace_path: Some(marketplace_path.clone()),
-            remote_marketplace_name: None,
-            plugin_name: "gmail".to_string(),
-        })
-        .unwrap(),
-        json!({
-            "marketplacePath": marketplace_path_json,
-            "remoteMarketplaceName": null,
-            "pluginName": "gmail",
-        }),
-    );
-
-    assert_eq!(
-        serde_json::from_value::<PluginReadParams>(json!({
-            "marketplacePath": marketplace_path_json,
-            "pluginName": "gmail",
-            "forceRemoteSync": true,
-        }))
-        .unwrap(),
-        PluginReadParams {
-            marketplace_path: Some(marketplace_path),
-            remote_marketplace_name: None,
-            plugin_name: "gmail".to_string(),
-        },
-    );
-
-    assert_eq!(
-        serde_json::from_value::<PluginReadParams>(json!({
-            "remoteMarketplaceName": "openai-curated-remote",
-            "pluginName": "gmail",
-        }))
-        .unwrap(),
-        PluginReadParams {
-            marketplace_path: None,
-            remote_marketplace_name: Some("openai-curated-remote".to_string()),
-            plugin_name: "gmail".to_string(),
-        },
-    );
-}
-
-#[test]
-fn plugin_install_params_serialization_omits_force_remote_sync() {
-    let marketplace_path = if false {
-        r"C:\plugins\marketplace.json"
-    } else {
-        "/plugins/marketplace.json"
-    };
-    let marketplace_path = AbsolutePathBuf::try_from(PathBuf::from(marketplace_path)).unwrap();
-    let marketplace_path_json = marketplace_path.as_path().display().to_string();
-    assert_eq!(
-        serde_json::to_value(PluginInstallParams {
-            marketplace_path: Some(marketplace_path.clone()),
-            remote_marketplace_name: None,
-            install_attempt_id: Some("94c79f7b-cceb-4415-9a3e-b51b2f718d43".to_string()),
-            plugin_name: "gmail".to_string(),
-        })
-        .unwrap(),
-        json!({
-            "marketplacePath": marketplace_path_json,
-            "remoteMarketplaceName": null,
-            "installAttemptId": "94c79f7b-cceb-4415-9a3e-b51b2f718d43",
-            "pluginName": "gmail",
-        }),
-    );
-
-    assert_eq!(
-        serde_json::from_value::<PluginInstallParams>(json!({
-            "marketplacePath": marketplace_path_json,
-            "pluginName": "gmail",
-            "forceRemoteSync": true,
-        }))
-        .unwrap(),
-        PluginInstallParams {
-            marketplace_path: Some(marketplace_path),
-            remote_marketplace_name: None,
-            install_attempt_id: None,
-            plugin_name: "gmail".to_string(),
-        },
-    );
-
-    assert_eq!(
-        serde_json::from_value::<PluginInstallParams>(json!({
-            "remoteMarketplaceName": "openai-curated-remote",
-            "pluginName": "gmail",
-            "forceRemoteSync": true,
-        }))
-        .unwrap(),
-        PluginInstallParams {
-            marketplace_path: None,
-            remote_marketplace_name: Some("openai-curated-remote".to_string()),
-            install_attempt_id: None,
-            plugin_name: "gmail".to_string(),
-        },
-    );
-}
-
-#[test]
-fn plugin_skill_read_params_serialization_uses_remote_plugin_id() {
-    assert_eq!(
-        serde_json::to_value(PluginSkillReadParams {
-            remote_marketplace_name: "openai-curated-remote".to_string(),
-            remote_plugin_id: "plugins~Plugin_00000000000000000000000000000000".to_string(),
-            skill_name: "plan-work".to_string(),
-        })
-        .unwrap(),
-        json!({
-            "remoteMarketplaceName": "openai-curated-remote",
-            "remotePluginId": "plugins~Plugin_00000000000000000000000000000000",
-            "skillName": "plan-work",
-        }),
-    );
-}
-
-#[test]
-fn plugin_share_params_and_response_serialization_use_camel_case_fields() {
-    let plugin_path = if false {
-        r"C:\plugins\gmail"
-    } else {
-        "/plugins/gmail"
-    };
-    let plugin_path = AbsolutePathBuf::try_from(PathBuf::from(plugin_path)).unwrap();
-    let plugin_path_json = plugin_path.as_path().display().to_string();
-
-    assert_eq!(
-        serde_json::to_value(PluginShareSaveParams {
-            plugin_path: plugin_path.clone(),
-            remote_plugin_id: None,
-            discoverability: None,
-            share_targets: None,
-        })
-        .unwrap(),
-        json!({
-            "pluginPath": plugin_path_json,
-            "remotePluginId": null,
-            "discoverability": null,
-            "shareTargets": null,
-        }),
-    );
-
-    assert_eq!(
-        serde_json::to_value(PluginShareSaveParams {
-            plugin_path,
-            remote_plugin_id: Some("plugins~Plugin_00000000000000000000000000000000".to_string(),),
-            discoverability: Some(PluginShareDiscoverability::Private),
-            share_targets: Some(vec![
-                PluginShareTarget {
-                    principal_type: PluginSharePrincipalType::User,
-                    principal_id: "user-1".to_string(),
-                    role: PluginShareTargetRole::Reader,
-                },
-                PluginShareTarget {
-                    principal_type: PluginSharePrincipalType::Group,
-                    principal_id: "group-1".to_string(),
-                    role: PluginShareTargetRole::Reader,
-                },
-            ]),
-        })
-        .unwrap(),
-        json!({
-            "pluginPath": plugin_path_json,
-            "remotePluginId": "plugins~Plugin_00000000000000000000000000000000",
-            "discoverability": "PRIVATE",
-            "shareTargets": [
-                {
-                    "principalType": "user",
-                    "principalId": "user-1",
-                    "role": "reader",
-                },
-                {
-                    "principalType": "group",
-                    "principalId": "group-1",
-                    "role": "reader",
-                },
-            ],
-        }),
-    );
-
-    assert_eq!(
-        serde_json::to_value(PluginShareSaveResponse {
-            remote_plugin_id: "plugins~Plugin_00000000000000000000000000000000".to_string(),
-            share_url: String::new(),
-            can_publish_to_workspace: Some(true),
-        })
-        .unwrap(),
-        json!({
-            "remotePluginId": "plugins~Plugin_00000000000000000000000000000000",
-            "shareUrl": "",
-            "canPublishToWorkspace": true,
-        }),
-    );
-
-    assert_eq!(
-        serde_json::to_value(PluginShareUpdateTargetsParams {
-            remote_plugin_id: "plugins~Plugin_00000000000000000000000000000000".to_string(),
-            discoverability: PluginShareUpdateDiscoverability::Unlisted,
-            share_targets: vec![PluginShareTarget {
-                principal_type: PluginSharePrincipalType::Group,
-                principal_id: "group-1".to_string(),
-                role: PluginShareTargetRole::Editor,
-            }],
-        })
-        .unwrap(),
-        json!({
-            "remotePluginId": "plugins~Plugin_00000000000000000000000000000000",
-            "discoverability": "UNLISTED",
-            "shareTargets": [{
-                "principalType": "group",
-                "principalId": "group-1",
-                "role": "editor",
-            }],
-        }),
-    );
-
-    assert_eq!(
-        serde_json::to_value(PluginShareUpdateTargetsResponse {
-            principals: vec![PluginSharePrincipal {
-                principal_type: PluginSharePrincipalType::User,
-                principal_id: "user-1".to_string(),
-                role: PluginSharePrincipalRole::Owner,
-                name: "Gavin".to_string(),
-            }],
-            discoverability: PluginShareDiscoverability::Unlisted,
-        })
-        .unwrap(),
-        json!({
-            "principals": [{
-                "principalType": "user",
-                "principalId": "user-1",
-                "role": "owner",
-                "name": "Gavin",
-            }],
-            "discoverability": "UNLISTED",
-        }),
-    );
-
-    assert_eq!(
-        serde_json::from_value::<PluginShareListParams>(json!({})).unwrap(),
-        PluginShareListParams {},
-    );
-
-    assert_eq!(
-        serde_json::to_value(PluginShareCheckoutParams {
-            remote_plugin_id: "plugins~Plugin_00000000000000000000000000000000".to_string(),
-        })
-        .unwrap(),
-        json!({
-            "remotePluginId": "plugins~Plugin_00000000000000000000000000000000",
-        }),
-    );
-
-    let plugin_path = if false {
-        r"C:\Users\me\plugins\gmail"
-    } else {
-        "/Users/me/plugins/gmail"
-    };
-    let plugin_path = AbsolutePathBuf::try_from(PathBuf::from(plugin_path)).unwrap();
-    let plugin_path_json = plugin_path.as_path().display().to_string();
-    let marketplace_path = if false {
-        r"C:\Users\me\.agents\plugins\marketplace.json"
-    } else {
-        "/Users/me/.agents/plugins/marketplace.json"
-    };
-    let marketplace_path = AbsolutePathBuf::try_from(PathBuf::from(marketplace_path)).unwrap();
-    let marketplace_path_json = marketplace_path.as_path().display().to_string();
-    assert_eq!(
-        serde_json::to_value(PluginShareCheckoutResponse {
-            remote_plugin_id: "plugins~Plugin_00000000000000000000000000000000".to_string(),
-            plugin_id: "gmail@codex-curated".to_string(),
-            plugin_name: "gmail".to_string(),
-            plugin_path,
-            marketplace_name: "codex-curated".to_string(),
-            marketplace_path,
-            remote_version: Some("1.2.3".to_string()),
-        })
-        .unwrap(),
-        json!({
-            "remotePluginId": "plugins~Plugin_00000000000000000000000000000000",
-            "pluginId": "gmail@codex-curated",
-            "pluginName": "gmail",
-            "pluginPath": plugin_path_json,
-            "marketplaceName": "codex-curated",
-            "marketplacePath": marketplace_path_json,
-            "remoteVersion": "1.2.3",
-        }),
-    );
-
-    assert_eq!(
-        serde_json::to_value(PluginShareDeleteParams {
-            remote_plugin_id: "plugins~Plugin_00000000000000000000000000000000".to_string(),
-        })
-        .unwrap(),
-        json!({
-            "remotePluginId": "plugins~Plugin_00000000000000000000000000000000",
-        }),
-    );
-}
-
-#[test]
-fn plugin_share_list_response_serializes_share_items() {
-    assert_eq!(
-        serde_json::to_value(PluginShareListResponse {
-            data: vec![PluginShareListItem {
-                plugin: PluginSummary {
-                    id: "gmail@openai-curated-remote".to_string(),
-                    remote_plugin_id: Some(
-                        "plugins~Plugin_00000000000000000000000000000000".to_string(),
-                    ),
-                    version: None,
-                    local_version: None,
-                    name: "gmail".to_string(),
-                    share_context: None,
-                    source: PluginSource::Remote,
-                    installed: false,
-                    installed_at: None,
-                    enabled: false,
-                    install_policy: PluginInstallPolicy::Available,
-                    install_policy_source: Some(PluginInstallPolicySource::WorkspaceSetting),
-                    must_show_installation_interstitial: None,
-                    auth_policy: PluginAuthPolicy::OnUse,
-                    availability: PluginAvailability::Available,
-                    disabled_reason: None,
-                    eligible_plan_types: None,
-                    interface: None,
-                    keywords: Vec::new(),
-                },
-                local_plugin_path: None,
-            }],
-        })
-        .unwrap(),
-        json!({
-            "data": [{
-                "plugin": {
-                    "id": "gmail@openai-curated-remote",
-                    "remotePluginId": "plugins~Plugin_00000000000000000000000000000000",
-                    "version": null,
-                    "localVersion": null,
-                    "name": "gmail",
-                    "shareContext": null,
-                    "source": { "type": "remote" },
-                    "installed": false,
-                    "installedAt": null,
-                    "enabled": false,
-                    "installPolicy": "AVAILABLE",
-                    "installPolicySource": "WORKSPACE_SETTING",
-                    "mustShowInstallationInterstitial": null,
-                    "authPolicy": "ON_USE",
-                    "availability": "AVAILABLE",
-                    "disabledReason": null,
-                    "eligiblePlanTypes": null,
-                    "interface": null,
-                    "keywords": [],
-                },
-                "localPluginPath": null,
-            }],
-        }),
-    );
-}
-
-#[test]
-fn plugin_summary_defaults_missing_availability_to_available() {
-    let summary: PluginSummary = serde_json::from_value(json!({
-        "id": "plugins~Plugin_00000000000000000000000000000000",
-        "name": "gmail",
-        "source": { "type": "remote" },
-        "installed": false,
-        "enabled": false,
-        "installPolicy": "AVAILABLE",
-        "authPolicy": "ON_USE",
-        "interface": null,
-    }))
-    .unwrap();
-
-    assert_eq!(summary.availability, PluginAvailability::Available);
-    assert_eq!(summary.installed_at, None);
-    assert_eq!(summary.local_version, None);
-    assert_eq!(summary.share_context, None);
-    assert_eq!(summary.must_show_installation_interstitial, None);
-    assert_eq!(summary.disabled_reason, None);
-    assert_eq!(summary.eligible_plan_types, None);
-}
-
-#[test]
-fn plugin_summary_round_trips_plan_eligibility_metadata() {
-    let value = json!({
-        "id": "gmail@openai-curated-remote",
-        "remotePluginId": "plugins~Plugin_00000000000000000000000000000000",
-        "version": null,
-        "localVersion": null,
-        "name": "gmail",
-        "shareContext": null,
-        "source": { "type": "remote" },
-        "installed": false,
-        "installedAt": null,
-        "enabled": false,
-        "installPolicy": "NOT_AVAILABLE",
-        "installPolicySource": null,
-        "mustShowInstallationInterstitial": null,
-        "authPolicy": "ON_USE",
-        "availability": "DISABLED_BY_ADMIN",
-        "disabledReason": "plan_not_eligible",
-        "eligiblePlanTypes": ["plus", "pro", "enterprise_cbp_automation"],
-        "interface": null,
-        "keywords": [],
-    });
-    let summary: PluginSummary =
-        serde_json::from_value(value.clone()).expect("plan metadata should deserialize");
-
-    assert_eq!(
-        summary.disabled_reason,
-        Some(PluginDisabledReason::PlanNotEligible)
-    );
-    assert_eq!(
-        serde_json::to_value(summary).expect("plan metadata should serialize"),
-        value
-    );
-}
-
-#[test]
-fn plugin_availability_deserializes_enabled_alias() {
-    let availability: PluginAvailability = serde_json::from_value(json!("ENABLED")).unwrap();
-
-    assert_eq!(availability, PluginAvailability::Available);
-    assert_eq!(
-        serde_json::to_value(availability).unwrap(),
-        json!("AVAILABLE")
-    );
-}
-
-#[test]
-fn plugin_uninstall_params_serialization_omits_force_remote_sync() {
-    assert_eq!(
-        serde_json::to_value(PluginUninstallParams {
-            plugin_id: "gmail@openai-curated".to_string(),
-        })
-        .unwrap(),
-        json!({
-            "pluginId": "gmail@openai-curated",
-        }),
-    );
-
-    assert_eq!(
-        serde_json::from_value::<PluginUninstallParams>(json!({
-            "pluginId": "gmail@openai-curated",
-            "forceRemoteSync": true,
-        }))
-        .unwrap(),
-        PluginUninstallParams {
-            plugin_id: "gmail@openai-curated".to_string(),
-        },
-    );
-
-    assert_eq!(
-        serde_json::to_value(PluginUninstallParams {
-            plugin_id: "plugins~Plugin_gmail".to_string(),
-        })
-        .unwrap(),
-        json!({
-            "pluginId": "plugins~Plugin_gmail",
-        }),
-    );
-
-    assert_eq!(
-        serde_json::from_value::<PluginUninstallParams>(json!({
-            "pluginId": "plugins~Plugin_gmail",
-            "forceRemoteSync": true,
-        }))
-        .unwrap(),
-        PluginUninstallParams {
-            plugin_id: "plugins~Plugin_gmail".to_string(),
-        },
-    );
-}
-
-#[test]
-fn marketplace_remove_response_serializes_nullable_installed_root() {
-    let installed_root = if false {
-        r"C:\marketplaces\debug"
-    } else {
-        "/tmp/marketplaces/debug"
-    };
-    let installed_root = AbsolutePathBuf::try_from(PathBuf::from(installed_root)).unwrap();
-    let installed_root_json = installed_root.as_path().display().to_string();
-    assert_eq!(
-        serde_json::to_value(MarketplaceRemoveResponse {
-            marketplace_name: "debug".to_string(),
-            installed_root: Some(installed_root),
-        })
-        .unwrap(),
-        json!({
-            "marketplaceName": "debug",
-            "installedRoot": installed_root_json,
-        }),
-    );
-
-    assert_eq!(
-        serde_json::to_value(MarketplaceRemoveResponse {
-            marketplace_name: "debug".to_string(),
-            installed_root: None,
-        })
-        .unwrap(),
-        json!({
-            "marketplaceName": "debug",
-            "installedRoot": null,
-        }),
-    );
-}
-
-#[test]
-fn marketplace_upgrade_response_serializes_camel_case_fields() {
-    let upgraded_root = if false {
-        r"C:\marketplaces\debug"
-    } else {
-        "/tmp/marketplaces/debug"
-    };
-    let upgraded_root = AbsolutePathBuf::try_from(PathBuf::from(upgraded_root)).unwrap();
-    let upgraded_root_json = upgraded_root.as_path().display().to_string();
-
-    assert_eq!(
-        serde_json::to_value(MarketplaceUpgradeResponse {
-            selected_marketplaces: vec!["debug".to_string()],
-            upgraded_roots: vec![upgraded_root],
-            errors: vec![MarketplaceUpgradeErrorInfo {
-                marketplace_name: "broken".to_string(),
-                message: "failed to clone".to_string(),
-            }],
-        })
-        .unwrap(),
-        json!({
-            "selectedMarketplaces": ["debug"],
-            "upgradedRoots": [upgraded_root_json],
-            "errors": [{
-                "marketplaceName": "broken",
-                "message": "failed to clone",
-            }],
-        }),
-    );
 }
 
 #[test]
@@ -4952,7 +4006,6 @@ fn turn_start_params_preserve_explicit_null_service_tier() {
     );
 
     let without_override = TurnStartParams {
-        disabled_plugin_ids: None,
         thread_id: "thread_123".to_string(),
         client_user_message_id: None,
         input: vec![],

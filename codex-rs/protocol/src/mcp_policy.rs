@@ -5,7 +5,6 @@ use std::collections::BTreeMap;
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct EnvironmentMcpPolicy {
     pub servers: Option<BTreeMap<String, McpServerRequirement>>,
-    pub plugins: Option<BTreeMap<String, PluginMcpRequirements>>,
 }
 
 #[derive(Deserialize, Debug, Clone, PartialEq, Eq)]
@@ -83,14 +82,3 @@ impl<'de> Deserialize<'de> for McpServerRequirement {
     }
 }
 
-/// Managed MCP server requirements for one plugin.
-#[derive(Deserialize, Debug, Clone, Default, PartialEq, Eq)]
-pub struct PluginMcpRequirements {
-    pub mcp_servers: Option<BTreeMap<String, McpServerRequirement>>,
-}
-
-impl PluginMcpRequirements {
-    pub fn is_empty(&self) -> bool {
-        self.mcp_servers.as_ref().is_none_or(BTreeMap::is_empty)
-    }
-}

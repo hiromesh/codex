@@ -18,7 +18,7 @@ use codex_extension_api::ToolName;
 use codex_extension_api::ToolOutput;
 use codex_extension_api::ToolSpec;
 use codex_extension_api::parse_tool_input_schema;
-use codex_mcp::CODEX_APPS_MCP_SERVER_NAME;
+use crate::CODEX_APPS_MCP_SERVER_NAME;
 use codex_mcp::McpResourceClient;
 use codex_otel::SessionTelemetry;
 use codex_otel::SkillInvocationEvent;
@@ -149,7 +149,6 @@ impl SkillAnalytics {
                     turn_id: &turn_id,
                     skill_name: &skill.name,
                     scope: skill.analytics_scope,
-                    plugin_id: None,
                     invocation_type: match invocation_type {
                         InvocationType::Explicit => SkillInvocationType::Explicit,
                         InvocationType::Implicit => SkillInvocationType::Implicit,

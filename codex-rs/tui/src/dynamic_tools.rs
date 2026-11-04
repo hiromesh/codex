@@ -1296,7 +1296,6 @@ async fn background_turn_program(
     };
     let eligible = provider == "openai"
         && match account {
-            Some(Account::Chatgpt { .. }) => true,
             Some(Account::ApiKey { .. }) => {
                 // Only the target thread can establish its forwarding policy, including
                 // project opt-outs. Older servers that cannot report it keep omission.
@@ -1316,7 +1315,7 @@ async fn background_turn_program(
                 }
                 true
             }
-            Some(Account::AmazonBedrock { .. } | Account::Gcp {}) | None => false,
+            None => false,
         };
     // Retain saved metadata while suppressing it for accounts that cannot use Daybreak.
     let enabled = enabled && eligible;

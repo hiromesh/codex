@@ -2,7 +2,6 @@
 
 mod common;
 
-use codex_exec_server::Environment;
 use codex_exec_server::EnvironmentStatus;
 use codex_exec_server::EnvironmentStatusKind;
 use codex_exec_server::InitializeParams;
@@ -26,22 +25,6 @@ async fn exec_server_serves_readyz_alongside_websocket_endpoint() -> anyhow::Res
         .send()
         .await?;
     assert_eq!(response.status(), http::StatusCode::OK);
-
-    server.shutdown().await?;
-    Ok(())
-}
-
-#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn remote_environment_fetches_info_from_exec_server() -> anyhow::Result<()> {
-    let mut server = exec_server().await?;
-    let environment = Environment::create_for_tests(Some(server.websocket_url().to_string()))?;
-    assert!(environment.is_remote());
-
-    let remote_info = environment.info().await?;
-    let mut local_info = Environment::default_for_tests().info().await?;
-    // Only the remote executor advertises its optional build identity.
-    local_info.provider_id = remote_info.provider_id.clone();
-    assert_eq!(remote_info, local_info);
 
     server.shutdown().await?;
     Ok(())

@@ -50,8 +50,6 @@ pub struct ToolInfo {
     pub openai_file_input_optional_fields: HashMap<String, Vec<String>>,
     pub connector_id: Option<String>,
     pub connector_name: Option<String>,
-    #[serde(default)]
-    pub plugin_display_names: Vec<String>,
 }
 
 impl ToolInfo {

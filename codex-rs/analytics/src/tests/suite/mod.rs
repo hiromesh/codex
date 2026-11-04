@@ -7,14 +7,10 @@
 
 #[path = "approvals_tests.rs"]
 mod approvals;
-#[path = "apps_tests.rs"]
-mod apps;
 #[path = "hooks_tests.rs"]
 mod hooks;
 #[path = "onboarding_tests.rs"]
 mod onboarding;
-#[path = "plugins_tests.rs"]
-mod plugins;
 #[path = "reducer_ordering_tests.rs"]
 mod reducer_ordering;
 #[path = "skills_tests.rs"]

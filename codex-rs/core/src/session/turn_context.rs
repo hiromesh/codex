@@ -11,11 +11,7 @@ use crate::shell_snapshot::ShellSnapshot;
 use crate::shell_snapshot::ShellSnapshotFile;
 use crate::shell_snapshot::ShellSnapshotSandbox;
 use arc_swap::ArcSwap;
-use codex_core_plugins::PluginCommandAttribution;
-use codex_core_plugins::ResolvedPluginMetricsOperation;
-use codex_core_plugins::TrustedPluginRoots;
 use codex_exec_server::ExecutorFileSystem;
-use codex_extension_api::SelectedPluginSnapshot;
 use codex_file_system::EnvironmentAccess;
 use codex_file_system::FileSystemEnvironmentAccessor;
 use codex_file_system::FileSystemSandboxContext;
@@ -41,7 +37,6 @@ use codex_sandboxing::policy_transforms::merge_permission_profiles;
 use codex_skills_extension::HostSkillsSnapshot;
 use codex_skills_extension::SkillLoadOutcome;
 use codex_utils_path_uri::PathUri;
-use codex_utils_plugins::PluginIdentity;
 use futures::FutureExt;
 use futures::future::BoxFuture;
 use futures::future::Shared;
@@ -309,9 +304,6 @@ pub struct TurnContext {
     /// Frozen settings used to construct this context. Legacy turn consumers
     /// keep this view even when later steps use different settings.
     pub(crate) initial_settings: Arc<ResolvedStepSettings>,
-    /// Thread-owned plugin selection captured when this turn was admitted.
-    pub(crate) disabled_plugin_ids: Vec<String>,
-    pub(super) active_host_plugin_identities: Option<Vec<PluginIdentity>>,
     /// Settings for the next step; environments are owned by `ThreadEnvironments`.
     pub(super) next_step_settings: ArcSwap<ResolvedStepSettings>,
     /// Turn-wide telemetry; model-attributed step work should use `StepContext::session_telemetry`.
@@ -397,8 +389,6 @@ impl TurnContext {
             config,
             auth_manager: self.auth_manager.clone(),
             initial_settings: Arc::clone(&step_settings),
-            disabled_plugin_ids: self.disabled_plugin_ids.clone(),
-            active_host_plugin_identities: None,
             next_step_settings: ArcSwap::from(step_settings),
             session_telemetry,
             provider: self.provider.clone(),
@@ -553,82 +543,6 @@ impl TurnContext {
 
     /// Combines setup-time host identities with the first step's ready selected packages.
     /// Keeps the complete observation or marks it unknown; never truncates membership.
-    pub(super) fn active_plugin_ids_for_telemetry(
-        &self,
-        selected: Option<&SelectedPluginSnapshot>,
-    ) -> Option<Vec<String>> {
-        const MAX_TELEMETRY_PLUGIN_IDS: usize = 512;
-        const MAX_TELEMETRY_PLUGIN_ID_BYTES: usize = 128;
-
-        let mut identities = self.active_host_plugin_identities.clone()?;
-        // Selected catalogs preserve local package keys or canonical remote identities.
-        if let Some(selected) = selected {
-            identities.extend(
-                selected
-                    .plugins
-                    .iter()
-                    .map(|plugin| match &plugin.plugin_id {
-                        codex_core_plugins::PluginIdentity::Local { plugin_id } => PluginIdentity {
-                            plugin_id: plugin_id.clone(),
-                            remote_plugin_id: None,
-                        },
-                        codex_core_plugins::PluginIdentity::Remote { remote_plugin_id } => {
-                            PluginIdentity {
-                                plugin_id: String::new(),
-                                remote_plugin_id: Some(remote_plugin_id.clone()),
-                            }
-                        }
-                    }),
-            );
-        }
-        let mut ids = Vec::with_capacity(identities.len());
-        for identity in identities {
-            let id = match identity.remote_plugin_id {
-                Some(remote_id) => {
-                    if !codex_core_plugins::remote::is_valid_remote_plugin_id(&remote_id) {
-                        return None;
-                    }
-                    remote_id
-                }
-                None => {
-                    if codex_plugin::PluginId::parse(&identity.plugin_id).is_err() {
-                        return None;
-                    }
-                    identity.plugin_id
-                }
-            };
-            if id.len() > MAX_TELEMETRY_PLUGIN_ID_BYTES {
-                return None;
-            }
-            ids.push(id);
-        }
-        ids.sort_unstable();
-        ids.dedup();
-        (ids.len() <= MAX_TELEMETRY_PLUGIN_IDS).then_some(ids)
-    }
-
-    pub(crate) fn plugin_attribution_for_command(
-        &self,
-        command: &[String],
-        cwd: &AbsolutePathBuf,
-    ) -> Option<PluginCommandAttribution> {
-        self.extension_data
-            .get::<TrustedPluginRoots>()?
-            .resolve_attribution(command, cwd)
-    }
-
-    pub(crate) async fn plugin_attribution_for_executor_command(
-        &self,
-        command: &[String],
-        cwd: &PathUri,
-        file_system: &dyn ExecutorFileSystem,
-    ) -> Option<PluginCommandAttribution> {
-        self.extension_data
-            .get::<TrustedPluginRoots>()?
-            .resolve_executor_attribution(command, cwd, file_system)
-            .await
-    }
-
     /// Legacy: returns the frozen initial-turn approval policy.
     /// Step-scoped consumers should use their captured `StepContext::settings`.
     pub(crate) fn approval_policy(&self) -> AskForApproval {
@@ -652,26 +566,6 @@ impl TurnContext {
             AllowPrefixRules::IgnoreForCyberModel
         } else {
             AllowPrefixRules::Honor
-        }
-    }
-
-    pub(crate) async fn plugin_metrics_operation_for_command(
-        &self,
-        command: &[String],
-        cwd: &PathUri,
-        environment: &Environment,
-    ) -> Option<ResolvedPluginMetricsOperation> {
-        let trusted_roots = self.extension_data.get::<TrustedPluginRoots>()?;
-        if environment.is_remote() {
-            trusted_roots
-                .resolve_metrics_operation_in_filesystem(
-                    command,
-                    cwd,
-                    environment.get_filesystem().as_ref(),
-                )
-                .await
-        } else {
-            trusted_roots.resolve_metrics_operation(command, &cwd.to_abs_path().ok()?)
         }
     }
 
@@ -731,17 +625,6 @@ impl TurnContext {
     /// Step-scoped consumers should use their captured `StepContext::settings`.
     pub(crate) fn model_context_window(&self) -> Option<i64> {
         self.model_info().usable_context_window()
-    }
-
-    pub(crate) fn apps_enabled(&self) -> bool {
-        let uses_codex_backend = self
-            .auth_manager
-            .as_deref()
-            .is_some_and(AuthManager::current_auth_uses_codex_backend);
-        self.config
-            .features
-            .apps_enabled_for_auth(uses_codex_backend)
-            && self.config.orchestrator_mcp_enabled
     }
 
     pub(crate) async fn with_model(
@@ -805,8 +688,6 @@ impl TurnContext {
             use_model_token_budget_defaults: self.use_model_token_budget_defaults,
             auth_manager: self.auth_manager.clone(),
             initial_settings: Arc::clone(&step_settings),
-            disabled_plugin_ids: self.disabled_plugin_ids.clone(),
-            active_host_plugin_identities: self.active_host_plugin_identities.clone(),
             next_step_settings: ArcSwap::from(step_settings),
             session_telemetry,
             provider: self.provider.clone(),
@@ -866,7 +747,6 @@ impl TurnContext {
         TurnContextItem {
             turn_id: Some(self.sub_id.clone()),
             root_turn_id: self.turn_metadata_state.root_turn_id(),
-            disabled_plugin_ids: Some(self.disabled_plugin_ids.clone()),
             cwd,
             approval_policy: self.approval_policy(),
             approvals_reviewer: Some(self.config.approvals_reviewer),
@@ -916,7 +796,7 @@ impl Session {
         // todo(aibrahim): store this state somewhere else so we don't need to mut config
         let config = session_configuration.original_config_do_not_use.clone();
         let mut per_turn_config = (*config).clone();
-        // Config is consumed by host plugins and MCP processes. Executor paths and
+        // Config is consumed by MCP processes. Executor paths and
         // permissions remain on their captured environment attachments.
         per_turn_config.cwd = local_environment
             .and_then(|environment| environment.cwd.to_abs_path().ok())
@@ -1071,8 +951,6 @@ impl Session {
             use_model_token_budget_defaults,
             auth_manager,
             initial_settings: Arc::clone(&step_settings),
-            disabled_plugin_ids: session_configuration.disabled_plugin_ids.clone(),
-            active_host_plugin_identities: None,
             next_step_settings: ArcSwap::from(step_settings),
             session_telemetry: session_telemetry_for_context,
             provider,
@@ -1250,17 +1128,6 @@ impl Session {
                 )
             }
         };
-        let plugins_input = per_turn_config.plugins_config_input();
-        let plugin_outcome = self
-            .services
-            .plugins_manager
-            .plugins_for_config(&plugins_input)
-            .await
-            .without_plugins(&session_configuration.disabled_plugin_ids);
-        let trusted_plugin_roots = TrustedPluginRoots::from_plugin_load_outcome(
-            &plugin_outcome,
-            per_turn_config.codex_home.as_path(),
-        );
         let skills_snapshot = if matches!(build_mode, TurnContextBuildMode::InjectItems)
             || crate::guardian::is_basic_session_source(&session_configuration.session_source)
             || (per_turn_config
@@ -1312,19 +1179,6 @@ impl Session {
             sub_id,
             skills_snapshot,
         );
-        turn_context.extension_data.insert(trusted_plugin_roots);
-        turn_context.active_host_plugin_identities = Some(
-            plugin_outcome
-                .plugins()
-                .iter()
-                .filter(|plugin| plugin.is_active())
-                .map(|plugin| PluginIdentity {
-                    plugin_id: plugin.config_name.clone(),
-                    remote_plugin_id: plugin.remote_plugin_id.clone(),
-                })
-                .collect(),
-        );
-
         turn_context.final_output_json_schema = options.final_output_json_schema;
         turn_context.cyber_access_program =
             cyber_access_program::for_provider(&turn_context.config, options.cyber_access_program);
@@ -1426,7 +1280,3 @@ impl Session {
         state.session_configuration.clone()
     }
 }
-
-#[cfg(test)]
-#[path = "active_plugin_inventory_tests.rs"]
-mod tests;

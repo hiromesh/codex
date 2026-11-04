@@ -6,14 +6,10 @@ use crate::events::TrackEventsRequest;
 use crate::events::current_runtime_metadata;
 use crate::facts::AnalyticsFact;
 use crate::facts::AnalyticsJsonRpcError;
-use crate::facts::AppInvocation;
-use crate::facts::AppMentionedInput;
-use crate::facts::AppUsedInput;
 use crate::facts::ArtifactOperation;
 use crate::facts::ArtifactOperationInput;
 use crate::facts::CodexGoalEvent;
 use crate::facts::CustomAnalyticsFact;
-use crate::facts::ElicitationType;
 use crate::facts::ExternalAgentConfigImportCompletedInput;
 use crate::facts::ExternalAgentConfigImportFailureInput;
 use crate::facts::HookRunFact;
@@ -63,7 +59,6 @@ use codex_protocol::items::TurnItem;
 use codex_protocol::protocol::Event;
 use codex_protocol::protocol::EventMsg;
 use codex_protocol::request_permissions::RequestPermissionsResponse;
-use std::collections::HashSet;
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::sync::Mutex;
@@ -77,7 +72,6 @@ const ANALYTICS_EVENTS_QUEUE_SIZE: usize = 256;
 const ANALYTICS_EVENTS_TIMEOUT: Duration = Duration::from_secs(10);
 // Covers two sequential POSTs plus queue/barrier scheduling; additional queued sends remain best-effort.
 const ANALYTICS_EVENTS_FLUSH_TIMEOUT: Duration = Duration::from_secs(25);
-const ANALYTICS_EVENT_DEDUPE_MAX_KEYS: usize = 4096;
 
 pub(crate) enum AnalyticsEventsQueueMessage {
     Fact(Box<AnalyticsFact>),
@@ -93,7 +87,6 @@ pub(crate) enum AnalyticsEventsQueueMessage {
 pub(crate) struct AnalyticsEventsQueue {
     pub(crate) sender: mpsc::Sender<AnalyticsEventsQueueMessage>,
     pub(crate) product_generation: Arc<AtomicU64>,
-    pub(crate) app_used_emitted_keys: Arc<Mutex<HashSet<(String, String)>>>,
 }
 
 #[derive(Clone)]
@@ -227,7 +220,6 @@ impl AnalyticsEventsQueue {
         Self {
             sender,
             product_generation,
-            app_used_emitted_keys: Arc::new(Mutex::new(HashSet::new())),
         }
     }
 
@@ -240,24 +232,6 @@ impl AnalyticsEventsQueue {
             //TODO: add a metric for this
             tracing::warn!("dropping analytics events: queue is full");
         }
-    }
-
-    pub(crate) fn should_enqueue_app_used(
-        &self,
-        tracking: &TrackEventsContext,
-        app: &AppInvocation,
-    ) -> bool {
-        let Some(connector_id) = app.connector_id.as_ref() else {
-            return true;
-        };
-        let mut emitted = self
-            .app_used_emitted_keys
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner);
-        if emitted.len() >= ANALYTICS_EVENT_DEDUPE_MAX_KEYS {
-            emitted.clear();
-        }
-        emitted.insert((tracking.turn_id.clone(), connector_id.clone()))
     }
 }
 
@@ -443,15 +417,6 @@ impl AnalyticsEventsClient {
         )));
     }
 
-    pub fn track_app_mentioned(&self, tracking: TrackEventsContext, mentions: Vec<AppInvocation>) {
-        if mentions.is_empty() {
-            return;
-        }
-        self.record_fact(AnalyticsFact::Custom(CustomAnalyticsFact::AppMentioned(
-            AppMentionedInput { tracking, mentions },
-        )));
-    }
-
     pub fn track_request(
         &self,
         connection_id: u64,
@@ -481,27 +446,6 @@ impl AnalyticsEventsClient {
             request_id,
             request: Box::new(request.clone()),
         });
-    }
-
-    pub fn track_app_used(
-        &self,
-        tracking: TrackEventsContext,
-        app: AppInvocation,
-        elicitation_type: Option<ElicitationType>,
-    ) {
-        let Some(queue) = self.queue.as_ref() else {
-            return;
-        };
-        if !queue.should_enqueue_app_used(&tracking, &app) {
-            return;
-        }
-        self.record_fact(AnalyticsFact::Custom(CustomAnalyticsFact::AppUsed(
-            AppUsedInput {
-                tracking,
-                app,
-                elicitation_type,
-            },
-        )));
     }
 
     pub fn track_mcp_tool_call_elicitation(&self, input: McpToolCallElicitation) {
@@ -821,11 +765,10 @@ async fn send_track_events(
     else {
         return;
     };
-    if auth.is_api_key_auth() {
-        events.retain(TrackEventRequest::can_send_with_api_key_auth);
-    } else if !auth.uses_codex_backend() {
+    if !auth.is_api_key_auth() {
         return;
     }
+    events.retain(TrackEventRequest::can_send_with_api_key_auth);
     if events.is_empty() {
         return;
     }
