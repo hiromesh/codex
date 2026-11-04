@@ -72,7 +72,6 @@ mod exec_policy;
 mod fork_thread;
 mod git_enrichment;
 mod guardian_authorization;
-mod guardian_authorization_refresh;
 #[path = "guardian_checkpoint_migration_tests.rs"]
 mod guardian_checkpoint_migration;
 mod guardian_retained_context;
@@ -191,6 +190,3 @@ mod websocket_fallback;
 mod window_headers;
 mod workspace_roots;
 mod worktree_trust;
-
-#[path = "guardian_sender_messages_tests.rs"]
-mod guardian_sender_messages;

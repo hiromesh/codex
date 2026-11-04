@@ -1,0 +1,5 @@
+- [codex-f2 派发任务](codex-f2-dispatches-tasks.md) — 完成 codex-f2 派发的任务后向其汇报
+- [RSI 内核裁剪项目](rsi-kernel-trimming.md) — 按"用户是否需要该功能"决定删除，用户负责提交，codex-f2 协调 6 个 worker
+- [任务 C 删除范围](task-c-guardian-runtime-deletion.md) — 删 Guardian 自动审查与 runtime-agent-instance；多智能体保留；等“开始C”
+- [Worktree CLI 测试债](worktree-cli-test-debt.md) — worktree start/fork E2E 已删，待 API-key 版重写
+- [loopback ws 代理坑](tui-loopback-ws-proxy-gotcha.md) — 测试进程带 HTTP_PROXY，tungstenite 连 ws://127.0.0.1 也走代理，需 NO_PROXY

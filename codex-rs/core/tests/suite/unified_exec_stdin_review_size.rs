@@ -23,13 +23,6 @@ use core_test_support::wait_for_event;
 use pretty_assertions::assert_eq;
 use serde_json::json;
 
-// The oversized input fits in 8KB before JSON escaping. Neither rejected input
-// may reach the shell, including the trailing assignment.
-#[test_case::test_case(
-    format!("#{}\nREJECTED=1\n", "\"".repeat(4_100)),
-    "too large to review safely";
-    "oversized"
-)]
 #[test_case::test_case("\0REJECTED=1\n".to_string(), "NUL byte"; "nul")]
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn unreviewable_stdin_is_rejected_before_approval_or_execution(

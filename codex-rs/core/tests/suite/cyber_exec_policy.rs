@@ -14,7 +14,6 @@ use codex_protocol::protocol::ReviewDecision;
 use codex_protocol::protocol::SandboxPolicy;
 use codex_protocol::protocol::ThreadSettingsOverrides;
 use codex_protocol::user_input::UserInput;
-use core_test_support::responses::ev_assistant_message;
 use core_test_support::responses::ev_completed;
 use core_test_support::responses::ev_function_call;
 use core_test_support::responses::ev_response_created;
@@ -31,16 +30,9 @@ use core_test_support::wait_for_event;
 use pretty_assertions::assert_eq;
 use serde_json::json;
 use std::fs;
-use test_case::test_case;
 
 const TEST_COMMAND: &str = "git version";
 const SAVED_PREFIX: &str = r#"["git", "version"]"#;
-
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-enum ModelSpecialty {
-    Cyber,
-    General,
-}
 
 fn configure_saved_prefix_and_guardian(config: &mut Config) {
     let policy_path = config.codex_home.join("rules/default.rules");
@@ -67,7 +59,7 @@ fn command_response(response_id: &str, call_id: &str) -> Result<String> {
     let args = json!({
         "cmd": TEST_COMMAND,
         "sandbox_permissions": SandboxPermissions::RequireEscalated,
-        "justification": "Check whether a saved prefix bypasses Guardian.",
+        "justification": "Check whether a saved prefix bypasses approval.",
         "prefix_rule": ["git", "version"],
     });
 
@@ -76,14 +68,6 @@ fn command_response(response_id: &str, call_id: &str) -> Result<String> {
         ev_function_call(call_id, "exec_command", &serde_json::to_string(&args)?),
         ev_completed(response_id),
     ]))
-}
-
-fn guardian_allow_response(response_id: &str) -> String {
-    sse(vec![
-        ev_response_created(response_id),
-        ev_assistant_message(&format!("{response_id}-message"), r#"{"outcome":"allow"}"#),
-        ev_completed(response_id),
-    ])
 }
 
 async fn submit_model_turn(test: &TestCodex, model: &str, prompt: &str) -> Result<()> {
@@ -100,61 +84,32 @@ async fn submit_model_turn(test: &TestCodex, model: &str, prompt: &str) -> Resul
     test.submit_text_turn(prompt).await
 }
 
-#[test_case(ModelSpecialty::Cyber; "cyber unified exec is reviewed")]
-#[test_case(ModelSpecialty::General; "general unified exec keeps saved approval")]
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn saved_prefix_only_bypasses_guardian_for_general_models(
-    model_specialty: ModelSpecialty,
-) -> Result<()> {
+async fn saved_prefix_only_bypasses_review_for_general_models() -> Result<()> {
     skip_if_no_network!(Ok(()));
     skip_if_sandbox!(Ok(()));
 
     let server = start_mock_server().await;
-    let builder = test_codex();
-    let mut builder = builder
-        .with_model_info_override("gpt-5.4", move |model| {
-            if model_specialty == ModelSpecialty::Cyber {
-                model.model_specialty = Some(MODEL_SPECIALTY_CYBER.to_string());
-            }
-        })
-        .with_config(configure_saved_prefix_and_guardian);
+    let builder = test_codex().with_config(configure_saved_prefix_and_guardian);
     let test = builder.build_with_auto_env(&server).await?;
-    let expected_guardian_review_count = match model_specialty {
-        ModelSpecialty::General => 0,
-        ModelSpecialty::Cyber => 1,
-    };
 
-    let mut response_bodies = vec![command_response(
-        "parent-saved-prefix-command",
-        "saved-prefix-command",
-    )?];
-    for review_index in 0..expected_guardian_review_count {
-        response_bodies.push(guardian_allow_response(&format!(
-            "guardian-saved-prefix-review-{review_index}"
-        )));
-    }
-    response_bodies.push(sse_completed("parent-saved-prefix-complete"));
-    let responses = mount_sse_sequence(&server, response_bodies).await;
+    let responses = mount_sse_sequence(
+        &server,
+        vec![
+            command_response("parent-saved-prefix-command", "saved-prefix-command")?,
+            sse_completed("parent-saved-prefix-complete"),
+        ],
+    )
+    .await;
 
     submit_model_turn(&test, "gpt-5.4", "run the saved-prefix command").await?;
 
     let requests = responses.requests();
-    let guardian_request_count = requests
-        .iter()
-        .filter(|request| {
-            request.body_json()["client_metadata"]["x-openai-subagent"].as_str() == Some("guardian")
-        })
-        .count();
-    assert_eq!(guardian_request_count, expected_guardian_review_count);
-
     let advertised_saved_prefix = requests[0]
         .message_input_texts("developer")
         .iter()
         .any(|message| message.contains(SAVED_PREFIX));
-    assert_eq!(
-        advertised_saved_prefix,
-        model_specialty == ModelSpecialty::General,
-    );
+    assert!(advertised_saved_prefix);
     assert!(
         responses
             .function_call_output_text("saved-prefix-command")
@@ -239,101 +194,6 @@ async fn cyber_model_user_approval_never_offers_a_reusable_prefix() -> Result<()
     );
     assert_eq!(fs::read_to_string(policy_path)?, initial_policy);
     assert_eq!(responses.requests().len(), 2);
-
-    Ok(())
-}
-
-#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn switching_models_suppresses_and_restores_saved_prefix_approvals() -> Result<()> {
-    skip_if_no_network!(Ok(()));
-    skip_if_sandbox!(Ok(()));
-
-    let server = start_mock_server().await;
-    let messages = |heading: &str| ModelMessages {
-        permissions: Some(PermissionMessages {
-            approved_command_prefix_saved: Some(heading.to_string()),
-            ..Default::default()
-        }),
-        ..Default::default()
-    };
-    let mut builder = test_codex()
-        .with_model_info_override("gpt-5.4", move |model| {
-            model.model_specialty = Some(MODEL_SPECIALTY_CYBER.to_string());
-            model.model_messages = Some(messages("Cyber model saved rule"));
-        })
-        .with_model_info_override("gpt-5.2", move |model| {
-            model.model_messages = Some(messages("General model saved rule"));
-        })
-        .with_config(configure_saved_prefix_and_guardian);
-    let test = builder.build_with_auto_env(&server).await?;
-
-    let responses = mount_sse_sequence(
-        &server,
-        vec![
-            command_response("parent-general-first-command", "general-first-command")?,
-            sse_completed("parent-general-first-complete"),
-            command_response("parent-cyber-command", "cyber-command")?,
-            guardian_allow_response("guardian-cyber-review"),
-            sse_completed("parent-cyber-complete"),
-            command_response("parent-general-last-command", "general-last-command")?,
-            sse_completed("parent-general-last-complete"),
-        ],
-    )
-    .await;
-
-    submit_model_turn(&test, "gpt-5.2", "run the first general-model command").await?;
-    submit_model_turn(&test, "gpt-5.4", "run the cyber-model command").await?;
-    submit_model_turn(&test, "gpt-5.2", "run the final general-model command").await?;
-
-    let requests = responses.requests();
-    let guardian_requests = requests
-        .iter()
-        .filter(|request| {
-            request.body_json()["client_metadata"]["x-openai-subagent"].as_str() == Some("guardian")
-        })
-        .collect::<Vec<_>>();
-    assert_eq!(guardian_requests.len(), 1);
-    assert!(guardian_requests[0].body_contains_text(TEST_COMMAND));
-
-    let cyber_request = requests
-        .iter()
-        .find(|request| request.body_json()["model"] == "gpt-5.4")
-        .expect("cyber-model request");
-    let cyber_developer_messages = cyber_request.message_input_texts("developer");
-    let cyber_permissions = cyber_developer_messages
-        .iter()
-        .rev()
-        .find(|message| message.contains("<permissions instructions>"))
-        .expect("refreshed cyber-model permissions instructions");
-    assert!(!cyber_permissions.contains(SAVED_PREFIX));
-    assert!(!cyber_request.body_contains_text("Cyber model saved rule"));
-
-    let final_parent_request = requests
-        .iter()
-        .rev()
-        .find(|request| request.body_json()["model"] == "gpt-5.2")
-        .expect("final general-model request");
-    assert!(
-        final_parent_request
-            .message_input_texts("developer")
-            .contains(&format!(
-                "Approved command prefix saved:\nGeneral model saved rule\n- {SAVED_PREFIX}"
-            )),
-        "switching back should restore the original saved-prefix context",
-    );
-
-    for call_id in [
-        "general-first-command",
-        "cyber-command",
-        "general-last-command",
-    ] {
-        assert!(
-            responses
-                .function_call_output_text(call_id)
-                .is_some_and(|output| output.contains(TEST_COMMAND)),
-            "approved {call_id} should execute",
-        );
-    }
 
     Ok(())
 }

@@ -23,7 +23,6 @@ use pretty_assertions::assert_eq;
 use serde_json::Value;
 use serde_json::json;
 use test_case::test_case;
-use wiremock::matchers::body_partial_json;
 
 const SERVER: &str = r#"
 import json
@@ -76,7 +75,6 @@ pub(super) enum RequestKind {
     FormInput,
     ShutdownFormInput,
     Permission,
-    StrictReview,
 }
 
 #[test_case(Caller::FullAccessSubagent, RequestKind::BrowserAuth; "full_access_subagent_preserves_automatic_approval")]
@@ -85,7 +83,6 @@ pub(super) enum RequestKind {
 #[test_case(Caller::Subagent, RequestKind::FormInput; "subagent_receives_form_input")]
 #[test_case(Caller::Subagent, RequestKind::Permission; "subagent_permission_remains_interactive")]
 #[test_case(Caller::FullAccessSubagent, RequestKind::Permission; "full_access_subagent_automatically_approves_permission")]
-#[test_case(Caller::Subagent, RequestKind::StrictReview; "subagent_keeps_strict_automatic_safety_review")]
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn mcp_server_elicitations_follow_approval_policy(
     caller: Caller,
@@ -121,11 +118,10 @@ pub(super) async fn mcp_server_elicitation_scenario(
         RequestKind::FormInput | RequestKind::ShutdownFormInput => {
             elicitation["requestedSchema"]["properties"] = json!({"answer": {"type": "string"}});
         }
-        RequestKind::Permission | RequestKind::StrictReview => {
+        RequestKind::Permission => {
             elicitation["_meta"] = json!({
                 "codex_request_type": "approval_request",
                 "codex_approval_kind": "mcp_tool_call",
-                "codex_strict_auto_review": matches!(request_kind, RequestKind::StrictReview),
                 "codex_sensitive_action": true,
                 "tool_name": "write_record",
                 "tool_params": {"value": 42}
@@ -142,7 +138,7 @@ pub(super) async fn mcp_server_elicitation_scenario(
         }
     }))?)?;
     let full_access = matches!(caller, Caller::FullAccessSubagent);
-    let expects_prompt = !full_access && !matches!(request_kind, RequestKind::StrictReview);
+    let expects_prompt = !full_access;
     let session_source = if matches!(caller, Caller::Root) {
         SessionSource::Exec
     } else {
@@ -177,28 +173,6 @@ pub(super) async fn mcp_server_elicitation_scenario(
         ]),
     )
     .await;
-    let guardian = if matches!(request_kind, RequestKind::StrictReview) {
-        Some(
-            responses::mount_sse_once_match(
-                &server,
-                body_partial_json(json!({"client_metadata": {"x-openai-subagent": "guardian"}})),
-                responses::sse(vec![
-                    responses::ev_assistant_message(
-                        "review-result",
-                        &json!({
-                            "risk_level": "low", "user_authorization": "high", "outcome": "allow",
-                            "rationale": "The user requested this action."
-                        })
-                        .to_string(),
-                    ),
-                    responses::ev_completed("guardian-review"),
-                ]),
-            )
-            .await,
-        )
-    } else {
-        None
-    };
     let follow_up = responses::mount_sse_once(
         &server,
         responses::sse(vec![
@@ -307,20 +281,9 @@ pub(super) async fn mcp_server_elicitation_scenario(
             .as_str()
             .expect("MCP response must reach the model"),
     )?;
-    let expected = if matches!(request_kind, RequestKind::StrictReview) {
-        json!({
-            "action": "accept", "content": {},
-            "_meta": {"approvals_reviewer": "auto_review"}
-        })
-    } else {
-        json!({"action": "accept", "content": response_content})
-    };
+    let expected = json!({"action": "accept", "content": response_content});
     assert_eq!(response, expected);
     let mut requests = tool_call.requests();
-    if let Some(guardian) = guardian {
-        assert!(guardian.single_request().body_contains_text("write_record"));
-        requests.extend(guardian.requests());
-    }
     requests.extend(follow_up.requests());
     thread.shutdown_and_wait().await?;
     test.codex.shutdown_and_wait().await?;

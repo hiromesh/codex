@@ -1,11 +1,9 @@
-//! Exercises retained terminal grants and strict stdin review through the agent API.
+//! Exercises retained terminal grants through the agent API.
 
 use anyhow::Context;
 use anyhow::Result;
 use codex_core::TurnInputRequest;
-use codex_core::config::Config;
 use codex_core::config::Constrained;
-use codex_extension_api::ExtensionRegistryBuilder;
 use codex_features::Feature;
 use codex_protocol::approvals::ExecApprovalKind;
 use codex_protocol::models::AdditionalPermissionProfile;
@@ -43,8 +41,6 @@ use core_test_support::wait_for_event_match;
 use pretty_assertions::assert_eq;
 use serde_json::Value;
 use serde_json::json;
-use std::sync::Arc;
-use std::sync::Mutex;
 
 fn tool_response(id: &str, tool: &str, args: Value) -> String {
     sse(vec![
@@ -313,137 +309,6 @@ async fn stdin_reviews_escalated_terminal_with_denied_reads_before_delivering_in
     Ok(())
 }
 
-#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn strict_stdin_review_reaches_guardian_with_sandbox_prompts_disabled() -> Result<()> {
-    skip_if_no_network!(Ok(()));
-    skip_if_sandbox!(Ok(()));
-    #[derive(Default)]
-    struct ReviewedCalls(Mutex<Vec<String>>);
-
-    impl codex_extension_api::ApprovalReviewContributor for ReviewedCalls {
-        fn decide<'a>(
-            &'a self,
-            input: &'a codex_extension_api::ApprovalDecisionInput<'_>,
-        ) -> codex_extension_api::ExtensionFuture<'a, Option<codex_extension_api::ApprovalDecision>>
-        {
-            self.0
-                .lock()
-                .unwrap()
-                .push(input.tool_call_id.expect("reviewed call id").to_owned());
-            Box::pin(async { None })
-        }
-    }
-
-    let calls = Arc::new(ReviewedCalls::default());
-    let mut extensions = ExtensionRegistryBuilder::<Config>::new();
-    extensions.approval_review_contributor(calls.clone());
-    let harness = harness(test_codex().with_extensions(Arc::new(extensions.build()))).await?;
-    let test = harness.test();
-    let original_command = format!("/bin/bash --noprofile --norc # {}", "x".repeat(8_000));
-    let opened = mount_sse_sequence(
-        harness.server(),
-        vec![
-            tool_response(
-                "open",
-                "exec_command",
-                json!({"cmd":original_command, "tty":true, "yield_time_ms":200}),
-            ),
-            tool_response(
-                "baseline",
-                "write_stdin",
-                json!({"session_id":1000, "chars":"INITIAL=1\n"}),
-            ),
-            sse(vec![ev_completed("opened")]),
-        ],
-    )
-    .await;
-    harness
-        .submit_with_permission_profile("open terminal", PermissionProfile::read_only())
-        .await?;
-    assert_eq!(opened.requests().len(), 3);
-    let decision = |outcome: &str| {
-        sse(vec![
-        ev_assistant_message(outcome, &json!({"risk_level":"low", "user_authorization":"high", "outcome":outcome, "rationale":"stdin test"}).to_string()),
-        ev_completed(outcome),
-    ])
-    };
-    let writes = mount_sse_sequence(harness.server(), vec![
-        tool_response("strict", "request_permissions", json!({"reason":"review later input", "permissions":{"network":{"enabled":true}}})),
-        tool_response("poll", "write_stdin", json!({"session_id":1000, "chars":"", "yield_time_ms":1000})),
-        tool_response("denied", "write_stdin", json!({"session_id":1000, "chars":"REJECTED=1\n"})),
-        decision("deny"),
-        tool_response("allowed", "write_stdin", json!({"session_id":1000, "chars":"test \"${INITIAL-}\" = 1 && test -z \"${REJECTED-}\" && printf 'STDIN_%s_OK\\n' REVIEW; exit\n"})),
-        decision("allow"),
-        sse(vec![ev_completed("done")]),
-    ]).await;
-    test.codex
-        .start_or_steer_turn(
-            TurnInputRequest::user_input(vec![UserInput::Text {
-                text: "send input".into(),
-                text_elements: Vec::new(),
-            }])
-            .with_thread_settings(ThreadSettingsOverrides {
-                approval_policy: Some(AskForApproval::Granular(GranularApprovalConfig {
-                    sandbox_approval: false,
-                    rules: false,
-                    skill_approval: true,
-                    request_permissions: true,
-                    mcp_elicitations: false,
-                })),
-                ..Default::default()
-            }),
-        )
-        .await?;
-    let request = wait_for_event_match(&test.codex, |event| match event {
-        EventMsg::RequestPermissions(request) => Some(request.clone()),
-        _ => None,
-    })
-    .await;
-    test.codex
-        .submit(Op::RequestPermissionsResponse {
-            id: request.call_id,
-            response: RequestPermissionsResponse {
-                permissions: request.permissions,
-                scope: PermissionGrantScope::Turn,
-                strict_auto_review: true,
-            },
-        })
-        .await?;
-    wait_for_event(&test.codex, |event| {
-        matches!(event, EventMsg::TurnComplete(_))
-    })
-    .await;
-    let requests = writes.requests();
-    assert_eq!(
-        *calls.0.lock().unwrap(),
-        vec!["strict", "denied", "allowed"]
-    );
-    let original_commands = requests
-        .iter()
-        .filter(|request| request.body_contains_text("Planned action JSON:"))
-        .map(|request| {
-            let text = request.message_input_texts("user").join("\n");
-            let (_, action) = text
-                .rsplit_once("Planned action JSON:\n")
-                .context("planned stdin action")?;
-            let (action, _) = action
-                .split_once("\n>>> APPROVAL REQUEST END")
-                .context("end of planned stdin action")?;
-            Ok(serde_json::from_str::<Value>(action)?["original_command"].clone())
-        })
-        .collect::<Result<Vec<_>>>()?;
-    assert_eq!(original_commands, vec![json!(original_command); 2]);
-    let output = requests.last().unwrap().function_call_output("allowed");
-    assert!(output.to_string().contains("STDIN_REVIEW_OK"), "{output}");
-    Ok(())
-}
-
-#[derive(Clone, Copy)]
-enum StdinReviewer {
-    User,
-    Guardian,
-}
-
 #[derive(Clone, Copy)]
 enum GrantChange {
     Unchanged,
@@ -462,17 +327,15 @@ enum LaterApprovalPolicy {
 /// A grant active at launch permits later input to reach review without enabling
 /// sandbox escalation, including grants with interleaved denials. Expired authority
 /// beneath parent grants and Never policy must block input without delivery.
-#[test_case::test_case(PermissionGrantScope::Turn, StdinReviewer::User, GrantChange::Unchanged, LaterApprovalPolicy::Inherit; "turn_grant_user_review")]
-#[test_case::test_case(PermissionGrantScope::Turn, StdinReviewer::Guardian, GrantChange::Unchanged, LaterApprovalPolicy::Inherit; "turn_grant_strict_review")]
-#[test_case::test_case(PermissionGrantScope::Session, StdinReviewer::User, GrantChange::Unchanged, LaterApprovalPolicy::Never; "session_grant_never_policy")]
-#[test_case::test_case(PermissionGrantScope::Session, StdinReviewer::User, GrantChange::ReadOnlyChildExpires, LaterApprovalPolicy::Inherit; "read_only_child_grant_expiry")]
-#[test_case::test_case(PermissionGrantScope::Session, StdinReviewer::User, GrantChange::MetadataWriteExpires, LaterApprovalPolicy::Inherit; "explicit_metadata_grant_expiry")]
-#[test_case::test_case(PermissionGrantScope::Session, StdinReviewer::User, GrantChange::SymlinkWriteExpires, LaterApprovalPolicy::Inherit; "symlink_grant_expiry")]
-#[test_case::test_case(PermissionGrantScope::Session, StdinReviewer::User, GrantChange::UnchangedOrderedDenies, LaterApprovalPolicy::Inherit; "unchanged_interleaved_denials")]
+#[test_case::test_case(PermissionGrantScope::Turn, GrantChange::Unchanged, LaterApprovalPolicy::Inherit; "turn_grant_user_review")]
+#[test_case::test_case(PermissionGrantScope::Session, GrantChange::Unchanged, LaterApprovalPolicy::Never; "session_grant_never_policy")]
+#[test_case::test_case(PermissionGrantScope::Session, GrantChange::ReadOnlyChildExpires, LaterApprovalPolicy::Inherit; "read_only_child_grant_expiry")]
+#[test_case::test_case(PermissionGrantScope::Session, GrantChange::MetadataWriteExpires, LaterApprovalPolicy::Inherit; "explicit_metadata_grant_expiry")]
+#[test_case::test_case(PermissionGrantScope::Session, GrantChange::SymlinkWriteExpires, LaterApprovalPolicy::Inherit; "symlink_grant_expiry")]
+#[test_case::test_case(PermissionGrantScope::Session, GrantChange::UnchangedOrderedDenies, LaterApprovalPolicy::Inherit; "unchanged_interleaved_denials")]
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn stdin_reviews_current_grants_with_sandbox_prompts_disabled(
     scope: PermissionGrantScope,
-    reviewer: StdinReviewer,
     grant_change: GrantChange,
     later_policy: LaterApprovalPolicy,
 ) -> Result<()> {
@@ -581,9 +444,6 @@ async fn stdin_reviews_current_grants_with_sandbox_prompts_disabled(
         "exec_command",
         json!({"cmd":"/bin/bash --noprofile --norc", "tty":true, "yield_time_ms":200}),
     ));
-    if matches!(reviewer, StdinReviewer::Guardian) {
-        responses.push(decision("allow"));
-    }
     let grant_probe = match grant_change {
         GrantChange::ReadOnlyChildExpires => "printf launch > allowed/child/launched && ",
         GrantChange::MetadataWriteExpires => "printf launch > allowed/.git/launched && ",
@@ -594,9 +454,6 @@ async fn stdin_reviews_current_grants_with_sandbox_prompts_disabled(
         GrantChange::Unchanged => "",
     };
     responses.push(tool_response("allowed", "write_stdin", json!({"session_id":1000, "chars":format!("{grant_probe}printf 'CURRENT_%s_OK\\n' GRANT\n")})));
-    if matches!(reviewer, StdinReviewer::Guardian) {
-        responses.push(decision("allow"));
-    }
     responses.push(sse(vec![ev_completed("done")]));
     let writes = mount_sse_sequence(harness.server(), responses).await;
     test.codex
@@ -629,13 +486,12 @@ async fn stdin_reviews_current_grants_with_sandbox_prompts_disabled(
                         response: RequestPermissionsResponse {
                             permissions: request.permissions,
                             scope: grant_scopes.next().expect("requested grant"),
-                            strict_auto_review: matches!(reviewer, StdinReviewer::Guardian),
+                            strict_auto_review: false,
                         },
                     })
                     .await?;
             }
             EventMsg::ExecApprovalRequest(request) => {
-                assert!(matches!(reviewer, StdinReviewer::User));
                 assert_eq!(
                     (request.kind, request.effective_approval_id()),
                     (ExecApprovalKind::WriteStdin, "allowed".to_string())
@@ -654,25 +510,11 @@ async fn stdin_reviews_current_grants_with_sandbox_prompts_disabled(
         }
     }
     assert_eq!(grant_scopes.next(), None);
-    assert_eq!(
-        approvals,
-        usize::from(matches!(reviewer, StdinReviewer::User))
-    );
+    assert_eq!(approvals, 1);
     let output = writes
         .function_call_output_text("allowed")
         .expect("stdin output");
     assert!(output.contains("CURRENT_GRANT_OK"), "{output}");
-    if matches!(reviewer, StdinReviewer::Guardian) {
-        assert_eq!(
-            writes
-                .requests()
-                .iter()
-                .filter(|request| request.body_contains_text("Planned action JSON:"))
-                .count(),
-            2
-        );
-        return Ok(());
-    }
 
     let later = mount_function_call_agent_response(
         harness.server(),

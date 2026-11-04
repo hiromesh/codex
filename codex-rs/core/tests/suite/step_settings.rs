@@ -83,7 +83,6 @@ use core_test_support::apps_test_server::recorded_apps_tool_calls;
 use core_test_support::responses::ResponsesRequest;
 use core_test_support::responses::ev_apply_patch_custom_tool_call;
 use core_test_support::responses::ev_completed;
-use core_test_support::responses::ev_custom_tool_call;
 use core_test_support::responses::ev_function_call;
 use core_test_support::responses::ev_function_call_with_namespace;
 use core_test_support::responses::ev_response_created;

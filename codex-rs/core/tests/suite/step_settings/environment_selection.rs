@@ -1,13 +1,11 @@
 //! Active settings keep environment selection and model changes scoped to the running turn.
 
 use super::*;
-use codex_config::test_support::CloudConfigBundleFixture;
 use codex_exec_server::CreateDirectoryOptions;
 use codex_extension_api::ExtensionDataInit;
 use codex_protocol::capabilities::CapabilityRootLocation;
 use codex_protocol::capabilities::EnvironmentCapabilityRoots;
 use codex_protocol::capabilities::SelectedCapabilityRoot;
-use codex_protocol::models::PermissionProfileSnapshot;
 use codex_protocol::protocol::EnvironmentConfigState;
 use codex_protocol::protocol::TurnEnvironmentRequests;
 use codex_protocol::protocol::TurnEnvironmentSelection;

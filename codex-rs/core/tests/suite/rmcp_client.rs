@@ -2043,7 +2043,9 @@ async fn stdio_mcp_tool_call_includes_sandbox_state_meta(
     // TODO(anp): Remove after packaging a Windows stdio test server for Wine exec.
     skip_if_no_network!(Ok(()));
 
-    let server = responses::start_mock_server().await;
+    // A plain mock server avoids the default `/models` mock from `start_mock_server`,
+    // which would otherwise receive the catalog request instead of `mount_models_once`.
+    let server = MockServer::start().await;
 
     let call_id = "sandbox-meta-call";
     let restricted_call_id = "owner-restricted-call";
@@ -2107,6 +2109,7 @@ async fn stdio_mcp_tool_call_includes_sandbox_state_meta(
     let fixture = test_codex()
         .with_auth(CodexAuth::from_api_key("test-api-key"))
         .with_model("gpt-5.5")
+        .with_mock_model_catalog(&server)
         .with_config(move |config| {
             // The real CLI is explicitly provided; the test harness is not a CLI.
             config.codex_self_exe = Some(
@@ -2208,9 +2211,11 @@ async fn stdio_mcp_tool_call_includes_sandbox_state_meta(
     } else {
         Vec::new()
     };
-    fixture
-        .thread_manager
-        .get_models_manager()
+    let models_manager = fixture.thread_manager.get_models_manager();
+    // API-key providers with an explicit base URL only refresh the catalog when
+    // API-key model discovery is enabled.
+    models_manager.set_api_key_model_discovery_enabled(true);
+    models_manager
         .list_models(
             RefreshStrategy::Online,
             codex_core::test_support::default_http_client_factory(),
@@ -3072,7 +3077,9 @@ async fn stdio_image_responses_are_sanitized_for_text_only_model() -> anyhow::Re
     // TODO(anp): Remove after packaging a Windows stdio test server for Wine exec.
     skip_if_no_network!(Ok(()));
 
-    let server = responses::start_mock_server().await;
+    // A plain mock server avoids the default `/models` mock from `start_mock_server`,
+    // which would otherwise receive the catalog request instead of `mount_models_once`.
+    let server = MockServer::start().await;
 
     let call_id = "img-text-only-1";
     let server_name = "rmcp";
@@ -3160,6 +3167,7 @@ async fn stdio_image_responses_are_sanitized_for_text_only_model() -> anyhow::Re
 
     let fixture = test_codex()
         .with_auth(CodexAuth::from_api_key("test-api-key"))
+        .with_mock_model_catalog(&server)
         .with_config(move |config| {
             insert_mcp_server(
                 config,
@@ -3182,9 +3190,11 @@ async fn stdio_image_responses_are_sanitized_for_text_only_model() -> anyhow::Re
         .await?;
     wait_for_mcp_server(&fixture.codex, server_name).await?;
 
-    fixture
-        .thread_manager
-        .get_models_manager()
+    let models_manager = fixture.thread_manager.get_models_manager();
+    // API-key providers with an explicit base URL only refresh the catalog when
+    // API-key model discovery is enabled.
+    models_manager.set_api_key_model_discovery_enabled(true);
+    models_manager
         .list_models(
             RefreshStrategy::Online,
             codex_core::test_support::default_http_client_factory(),

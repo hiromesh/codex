@@ -5,7 +5,6 @@ use codex_features::Feature;
 use codex_login::CodexAuth;
 use codex_protocol::config_types::ServiceTier;
 use codex_protocol::openai_models::ModelServiceTier;
-use codex_protocol::openai_models::ToolMode;
 use codex_protocol::protocol::EventMsg;
 use codex_protocol::protocol::ThreadSettingsOverrides;
 use codex_protocol::user_input::UserInput;
